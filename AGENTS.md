@@ -4,9 +4,9 @@
 
 ## 工程定位
 
-Aurora 是**单体优先、可演进微服务**的业务开发脚手架,**JDK 25 + Spring Boot 4.1.0**。
+Aurora 是**一套代码、两种架构**(单体优先、可演进微服务)的业务开发脚手架,**JDK 25 + Spring Boot 4.1.0**。
 
-**本质**:把 xiaoqu-platform 已深度使用的 yudao 范式,抽干净成独立品牌产物,升级到 Boot4+JDK25,并择优吸收 bladex 工程机制。**与 xiaoqu 现有 yudao 范式 100% 兼容**(保证 6000 文件零返工)是硬约束。
+**本质**:把 xiaoqu-platform 已深度使用的 yudao 范式,抽干净成独立品牌产物,升级到 Boot4+JDK25,并吸收 bladex(模块演进)+ dante-cloud(一套代码两种架构)工程机制。**与 xiaoqu 现有 yudao 范式 100% 兼容**(保证 6000 文件零返工)是硬约束。
 
 ## 当前阶段
 
@@ -49,6 +49,13 @@ Aurora 是**单体优先、可演进微服务**的业务开发脚手架,**JDK 25
 - `aurora-dependencies` 是唯一版本源,子模块 pom **禁止写版本号**。
 - `aurora-common` 是最底层,**不得反向依赖任何业务模块**。
 
+### 架构切换(dante-cloud 机制)
+
+- 跨模块调用**一律走 `XxxApi` 接口注入**,**禁止直连别的模块 Service**(单体本地 Impl,未来切 Feign 远程,业务代码零改动)。
+- 单体实现打 `@ConditionalOnArchitecture(MONOLITH)`;Feign 实现留 `DISTRIBUTED` 位(阶段 8+ 补)。
+- 切换开关:`aurora.architecture: monolith`(默认)| `distributed`。
+- 机制详见 `docs/design/aurora-scaffold-design.md` §6。
+
 ## 吸收决策(已论证,勿推翻)
 
 | 来源 | 吸收 |
@@ -56,8 +63,12 @@ Aurora 是**单体优先、可演进微服务**的业务开发脚手架,**JDK 25
 | bladex | ① 单体 modules/X + 演进抽 X-api ② codegen 双模板(api/api-fast)③ BOM+flatten+revision ④ 文档骨架 |
 | bladex(舍弃) | blade-core-auto 注解处理器、BladeApplication SPI、R<T>+BladeController、Wrapper |
 | yudao(=xiaoqu 现状) | ① 双轨跨模块契约 ② 空壳 server ③ BaseDO ④ BaseMapperX ⑤ LambdaQueryWrapperX ⑥ CommonResult+ErrorCode+ServiceException ⑦ MapStruct Convert ⑧ 内建 codegen |
+| **dante-cloud**(技术栈与 Aurora 完全一致:JDK25+Boot4.1) | ① **一套代码两种架构**(`@ConditionalOnArchitecture` 配置驱动)② Strategy 接口双实现(Local/Feign)③ BusBridge 空实现短路 ④ `@EnableXxx` 模块开关 ⑤ 网关防伪造内部调用头 |
+| dante-cloud(舍弃) | JPA+Hibernate 二级缓存(范式冲突,Aurora 用 MyBatis-Plus)、opaque token、passkey/国密(业务特定)、Nacos 强依赖(与单体优先冲突) |
 
 论证详见 `docs/design/aurora-scaffold-design.md` §2。
+
+**dante-cloud 实现边界提醒**:其 `@ConditionalOnArchitecture`、Strategy 接口、ConfigurerManager 的底层实现在另一个仓库 **dante-engine**(本地未 clone)。Aurora **借鉴其设计思路,用 Boot4 原生 `@Conditional` + Environment 自行实现**,不直接移植 dante 代码。
 
 ## 待决策项(默认值见 design §8)
 

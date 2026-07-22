@@ -1,22 +1,24 @@
 # Aurora 脚手架 · 架构设计
 
-> 状态:**DRAFT v0.1** · 日期:2026-07-22
+> 状态:**DRAFT v0.2** · 日期:2026-07-22
 > 技术基线:**JDK 25 + Spring Boot 4.1.0**(Spring Framework 7 / Jakarta EE 11 / Servlet 6.1)
-> 定位:单体优先、可演进微服务的业务开发脚手架
+> 定位:单体优先、可演进微服务(**一套代码、两种架构**)的业务开发脚手架
 > 身份:全新独立 greenfield 仓库,**与 xiaoqu-platform 现有 yudao 范式 100% 兼容**(保证 6000 文件零返工)
+> 参考源:**bladex**(单体→微服务模块拆分) + **yudao/ruoyi-vue-pro**(业务范式) + **dante-cloud**(一套代码两种架构)
 
 ---
 
 ## 0. 阅读顺序
 
 1. [§1 定位与约束](#1-定位与约束)—— 为什么是"范式提炼 + 升级 + 独立",而非"范式创新"
-2. [§2 吸收清单](#2-吸收清单bladex--yudao)—— 从两个脚手架各吸收什么、舍弃什么,逐项附理由
+2. [§2 吸收清单](#2-吸收清单bladex--yudao--dante-cloud)—— 从三个脚手架各吸收什么、舍弃什么,逐项附理由
 3. [§3 技术栈基线](#3-技术栈基线boot4--jdk25)—— 已 git show 核实的精确坐标
 4. [§4 模块划分](#4-模块划分)—— 工程骨架
 5. [§5 跨模块契约](#5-跨模块契约双轨制)—— yudao 最精华设计
-6. [§6 Boot4+JDK25 适配](#6-boot4jdk25-适配清单)—— 踩坑点全列(详见 `boot4-migration-notes.md`)
-7. [§7 分阶段实施](#7-分阶段实施计划)—— 从骨架到迁移
-8. [§8 待决策项](#8-待决策项)—— 默认值与备选
+6. [§6 单体↔微服务一套代码](#6-单体微服务一套代码)—— dante-cloud 最关键差异化价值的 Aurora 落地
+7. [§7 Boot4+JDK25 适配](#7-boot4jdk25-适配清单)—— 踩坑点全列(详见 `boot4-migration-notes.md`)
+8. [§8 分阶段实施](#8-分阶段实施计划)—— 从骨架到迁移
+9. [§9 待决策项](#9-待决策项)—— 默认值与备选
 
 ---
 
@@ -24,7 +26,7 @@
 
 ### 1.1 一句话定位
 
-**Aurora = 把 xiaoqu-platform 已深度使用的 yudao 范式,抽干净成独立品牌产物,升级到 Boot4+JDK25,并择优吸收 bladex 的工程机制。**
+**Aurora = 把 xiaoqu-platform 已深度使用的 yudao 范式,抽干净成独立品牌产物,升级到 Boot4+JDK25,并吸收 bladex 的模块演进路径 + dante-cloud 的"一套代码两种架构"机制。**
 
 ### 1.2 为什么不是"范式创新"
 
@@ -50,17 +52,30 @@
 | 依赖方向 | 单向:xiaoqu(未来)依赖 Aurora 的 framework;Aurora **不反向依赖** xiaoqu 业务模块 |
 | 演进 | Aurora 是 framework 提供者;xiaoqu 业务模块逐层迁入(见 `migration/aurora-migration-plan.md`) |
 
-### 1.4 运行模式
+### 1.4 运行模式:一套代码、两种架构(吸收 dante-cloud)
 
-**单体优先 + 演进路线预留**:
+这是 Aurora 的核心叙事,也是 dante-cloud 相对 bladex/yudao **唯一的决定性差异化价值**。
 
-- 单体期:每业务模块一个 Maven module,模块间走 `api/` 包契约 + 本地 `@Service` 注入,**零网络开销**
-- 演进期:把高频被调的 `api/`+DTO 抽为 `X-api` 独立子模块(yudao 在 `trade-api` 上已局部实践),为未来 Feign 切换留口子
-- 微服务期:同一 `api/` 接口加 `@FeignClient` 即可切远程调用,业务代码零改动
+> 三方对比:
+> - **bladex**:单体(全揉 modules 包)和微服务(api+service 物理拆分)是**两套代码**,演进靠重写模块边界。
+> - **yudao**:单体和微服务是**两个独立工程**(`ruoyi-vue-pro` 单体 vs `yudao-cloud`),共享部分 framework。
+> - **dante-cloud**:**一套代码**,靠配置 `herodotus.platform.architecture: monolith|distributed` 在运行时切换,业务代码零改动。**这是 Aurora 要走的路。**
+
+Aurora 落地这套机制(详见 §6):
+
+- **单体期(默认)**:配置 `aurora.architecture: monolith`,跨模块走 `api/` 接口的**本地实现**(`@Service` 注入,零网络开销)
+- **微服务期(演进)**:配置 `aurora.architecture: distributed`,同一 `api/` 接口切换为 **Feign 远程实现**;`@ConditionalOnArchitecture` 条件注解控制 Bean 注册;**业务代码、接口签名零改动**
+- 切换开关是 YAML 一行配置,不改代码
+
+关键工程细节(吸收 dante-cloud):
+- **Strategy 接口双实现**:同一接口配 `LocalXxxStrategy`(直连本地 Service)和 `FeignXxxStrategy`(Feign 远程),靠条件注解按架构装配
+- **BusBridge 短路**:单体模式把 Spring Cloud Bus 的跨进程消息短路成进程内事件,避免单体被迫连 Kafka
+
+> ⚠️ **dante-cloud 的实现边界**:其条件注解(`@ConditionalOnArchitecture`)、Strategy 接口、ConfigurerManager 的**底层实现在另一个仓库 `dante-engine`**(本地未 clone)。Aurora **借鉴其设计思路,用 Boot4 原生能力(`@Conditional` + Environment 属性)自行实现**,不直接移植 dante 代码。
 
 ---
 
-## 2. 吸收清单(bladex + yudao)
+## 2. 吸收清单(bladex + yudao + dante-cloud)
 
 ### 2.1 从 bladex 吸收(精选 4 项)
 
@@ -93,17 +108,43 @@
 | Y7 | **MapStruct Convert**(编译期生成) | 类型安全 + 性能,替代 bladex 反射 Wrapper |
 | Y8 | **内建 codegen**(连库读表 → 全套后端 + SQL + 可选前端) | 生产力杠杆 |
 
-### 2.4 两方融合的关键判断
+### 2.4 从 dante-cloud 吸收(精选 4 项 + 安全补丁 1 项)
 
-| 设计点 | bladex | yudao | Aurora 选择 |
-|---|---|---|---|
-| 统一响应 | `R<T>`(带 success) | `CommonResult<T>`(无 success + 异常体系) | **yudao**(Boot3/4 现代写法) |
-| VO 转换 | Wrapper(反射) | Convert(MapStruct) | **yudao**(性能+类型安全) |
-| 版本管理 | blade-bom 子模块 | yudao-dependencies 独立顶级 | **融合**:结构跟 yudao(独立顶级),flatten 配置参数抄 bladex(pomElements) |
-| 模块拆分 | 单体全揉 / 微服务 api+service | 统一 module(单体形态) | **bladex 演进路径**:单体 modules/X,演进抽 X-api |
-| 跨模块契约 | Feign IXxxClient(独立 api jar) | 双轨(api 包本地 + biz/CommonApi 下沉) | **yudao 双轨**(最精华),演进借鉴 bladex 抽独立 api jar |
-| 装配生成 | blade-core-auto 编译期处理器 | 手写 AutoConfiguration.imports | **yudao 手写**(Boot4 已不需要 spring.factories) |
-| 启动入口 | BladeApplication.run + LauncherService SPI | 裸 SpringApplication.run + spring.config.import | **yudao 裸 run**(单体无聚合场景) |
+> dante-cloud(JDK25 + Boot4.1 + Spring Cloud 2025.1.2,与 Aurora 技术栈完全一致)是三个参考源里**唯一与 Aurora 定位("一套代码两种架构")对齐**的。它的核心价值在"配置驱动架构切换",数据层(JPA)与 Aurora(MyBatis-Plus)范式冲突,故选择性吸收。
+
+| # | 吸收项 | dante-cloud 做法 | Aurora 做法 | 价值 |
+|---|---|---|---|---|
+| D1 | **配置驱动的架构切换** | `@ConditionalOnArchitecture` + `herodotus.platform.architecture: monolith\|distributed`,一套代码运行时切换 | `@ConditionalOnArchitecture` + `aurora.architecture: monolith\|distributed`,用 Boot4 原生 `@Conditional` 实现 | **决定性差异化**:单体↔微服务零代码改动,bladex/yudao 都做不到 |
+| D2 | **Strategy 接口双实现** | `StrategyUserDetailsService` → `LocalStrategy`(直连 Service)/ `FeignStrategy`(远程) | 跨模块 `api/` 接口配 Local/Feign 双实现,条件注解按架构装配 | 架构切换的落地手段,比 yudao 纯本地注入更演进友好 |
+| D3 | **BusBridge 空实现短路** | 单体模式 `MonolithBusBridge.send()` 空方法,把 Spring Cloud Bus 短路成进程内事件 | 单体模式提供空 BusBridge,避免强依赖 Kafka | 单体演进微服务的小妙招,成本低收益高 |
+| D4 | **`@EnableXxx` 模块开关注解** | `@EnableHerodotusLogicUpms` 等打在 AutoConfiguration 上触发装配 | 关键能力 starter 提供 `@EnableXxx` 显式开关 | 比 AutoConfiguration.imports 隐式装配更显式可控 |
+| D5 | **网关侧拦伪造内部调用头** | `GlobalCertificationFilter` 检测外部请求带 `X-Herodotus-From-In` 头直接 403 | 演进到微服务时,网关补内部调用头伪造拦截 | `@Inner`/免鉴权方案的安全补丁,必装 |
+
+### 2.5 论证后舍弃的 dante-cloud 机制(附理由)
+
+| 舍弃项 | dante-cloud 做法 | 舍弃理由 |
+|---|---|---|
+| **JPA + Hibernate 二级缓存 + JetCache 多租户** | `MultiTenantFilter` + `HerodotusRegionFactory`,数据层全 JPA | **范式根本冲突**。Aurora 是 MyBatis-Plus 阵营(xiaoqu 6000 文件已用),强塞 JPA 会撕裂架构;多租户用 MyBatis-Plus TenantLineHandler |
+| **opaque token + introspection** 资源服务器 | `resourceserver.opaquetoken` 中心化 introspection | 中心化 introspection 每次请求多一次网络调用;Aurora 用 JWT 验签更轻(单体期)/ 可选 introspection(强撤销场景) |
+| **passkey / 国密数字信封 / 三级等保** | SAS 扩展 grant type + `DigitalEnvelopeProcessor` | 业务特定,非通用脚手架刚需;过早引入是负担,按业务需求再补 |
+| **Nacos 配置全外部化** | application.yaml 只剩 bootstrap,业务配置全在 Nacos | 与"单体优先"冲突(单体不该强依赖 Nacos);微服务演进阶段再考虑 |
+| **Spring Authorization Server + ConfigurerManager** | SAS + 把 HttpSecurity 配置器封装成可注入 Manager | 比 yudao 自造 token 更正统,但实现复杂度高;与 §9 决策项 A 相关,**若选 OAuth2 标准方案再参考**,首期不引入 |
+| **三基础设施 facility starter(Nacos/Polaris/Zookeeper)** | `facility-spring-boot-starter` pom 注释切换 | 单体阶段默认无注册中心,演进时再做适配层 |
+
+### 2.6 三方融合的关键判断
+
+| 设计点 | bladex | yudao | dante-cloud | Aurora 选择 |
+|---|---|---|---|---|
+| 统一响应 | `R<T>`(带 success) | `CommonResult<T>`(无 success) | — | **yudao**(Boot3/4 现代写法) |
+| VO 转换 | Wrapper(反射) | Convert(MapStruct) | — | **yudao**(性能+类型安全) |
+| 数据层 | MyBatis-Plus | MyBatis-Plus | **JPA** | **MyBatis-Plus**(yudao/bladex,Aurora 阵营) |
+| 版本管理 | blade-bom 子模块 | yudao-dependencies 独立顶级 | ecosystem-parent + 双 BOM 三层 | **融合**:结构跟 yudao(独立顶级),flatten 参数抄 bladex(pomElements) |
+| **单体↔微服务** | 两套代码(模块物理拆) | 两个工程(vue-pro/cloud) | **一套代码**(配置切换) | **dante-cloud 配置驱动** + bladex 演进抽 X-api |
+| 模块拆分 | 单体全揉 / 微服务 api+service | 统一 module(单体形态) | 配置条件注解 | **bladex 演进路径** + dante 条件装配 |
+| 跨模块契约 | Feign IXxxClient | 双轨(api 包本地 + biz/CommonApi) | `@Inner` + Feign Contract + 网关拦伪造头 | **yudao 双轨**(最精华)+ dante 网关防伪造(安全补丁) |
+| 装配生成 | blade-core-auto 编译期处理器 | 手写 AutoConfiguration.imports | `@ConditionalOnXxx` + `@EnableXxx` | **yudao 手写** imports + **dante `@EnableXxx` 显式开关** |
+| 启动入口 | BladeApplication.run + SPI | 裸 SpringApplication.run | 裸 run + 条件注解 | **裸 run**(单体无聚合场景) |
+| 认证 | 自造 token | Spring Security + 自造 OAuth2 token | **Spring Authorization Server + ConfigurerManager** | **首期 yudao 路线**(决策项 A),OAuth2 标准化时参考 dante |
 
 ---
 
@@ -198,21 +239,17 @@ cn.<brand>.module.<name>/
 
 ### 4.2 演进到微服务时的拆分(预留口子)
 
-单体期的 `api/` 包 + `dal/dataobject/` 的 DTO 部分,**整体上移**为独立 `aurora-module-<name>-api` 子模块:
+单体期每模块一个 Maven module,`api/` 包内置。演进到微服务时,**把 `api/` + DTO 抽为独立 `aurora-module-<name>-api` 子模块**(yudao 在 `trade-api` 上已实践):
 
 ```
-aurora-module-trade/              # 实现端(单体时即此形态)
-└── cn.<brand>.module.trade/
-    ├── controller/ service/ dal/mysql/ convert/ ...
+aurora-module-trade/              # 实现端
+└── cn.aurora.module.trade/{controller, service, dal/mysql, convert, ...}
 
-aurora-module-trade-api/          # 契约端(微服务演进时新增)
-└── cn.<brand>.module.trade.api/
-    ├── api/order/TradeOrderApi   # 接口(单体本地 impl,微服务加 @FeignClient)
-    ├── dto/order/                # *RespDTO
-    └── enums/                    # 共享枚举
+aurora-module-trade-api/          # 契约端(演进时新增)
+└── cn.aurora.module.trade.api/{api/order/TradeOrderApi, dto/order/, enums/}
 ```
 
-业务代码**零改动**:调用方从 `@Resource TradeOrderApi`(本地)到 `@Resource TradeOrderApi`(@FeignClient)注入方式不变。
+这样拆分后,跨模块调用从"依赖整个实现模块"瘦身为"只依赖契约 jar"。**具体的架构切换机制(本地实现 ↔ Feign 远程,零代码改动)见 [§6](#6-单体微服务一套代码)。**
 
 ---
 
@@ -296,7 +333,97 @@ private final OAuth2TokenCommonApi oauth2TokenApi;
 
 ---
 
-## 6. Boot4 + JDK25 适配清单
+## 6. 单体↔微服务:一套代码
+
+这是 dante-cloud 最关键的差异化价值,Aurora 用 Boot4 原生能力实现(dante 的底层在 dante-engine,本地未 clone,故**借鉴设计、自行实现**)。
+
+### 6.1 目标
+
+**同一份业务代码,通过 YAML 一行配置在单体/微服务间切换,业务代码、接口签名、模块边界零改动。**
+
+```
+aurora:
+  architecture: monolith     # ← 切换开关:monolith(默认) | distributed
+```
+
+### 6.2 实现机制(三层)
+
+**(1)条件注解 `@ConditionalOnArchitecture`**(放在 `aurora-starter-architecture` 或 `aurora-common`)
+
+基于 Spring 原生 `@Conditional` + `Environment` 属性,自定义 Condition 读取 `aurora.architecture`:
+
+```java
+// 条件:匹配指定架构
+public class OnArchitectureCondition implements Condition {
+    @Override
+    public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+        Architecture arch = Architecture.valueOf(
+            context.getEnvironment().getProperty("aurora.architecture", "monolith").toUpperCase());
+        Architecture required = (Architecture) metadata.getAnnotationAttributes(
+            ConditionalOnArchitecture.class.getName()).get("value");
+        return arch == required;
+    }
+}
+
+@Target({TYPE, METHOD})
+@Retention(RUNTIME)
+@Conditional(OnArchitectureCondition.class)
+public @interface ConditionalOnArchitecture {
+    Architecture value();
+}
+
+public enum Architecture { MONOLITH, DISTRIBUTED }
+```
+
+**(2)Strategy 接口双实现**(每个需要跨边界调用的 `api/` 接口)
+
+```java
+// 业务契约接口(单体/微服务共享,定义在 api 包)
+public interface TradeOrderApi {
+    TradeOrderRespDTO getOrder(Long id);
+}
+
+// 单体实现:直连本地 Service(默认装配)
+@Service
+@ConditionalOnArchitecture(MONOLITH)
+public class TradeOrderApiLocalImpl implements TradeOrderApi {
+    @Resource private TradeOrderService tradeOrderService;
+    @Override public TradeOrderRespDTO getOrder(Long id) {
+        return BeanUtils.toBean(tradeOrderService.getOrder(id), TradeOrderRespDTO.class);
+    }
+}
+
+// 微服务实现:Feign 远程(演进时启用)
+// 注:契约接口加 @FeignClient,实现在远程服务进程;此处本地无需 Impl
+```
+
+**(3)配置驱动的 Bean 装配**
+
+- `aurora.architecture: monolith` → `@ConditionalOnArchitecture(MONOLITH)` 的 Local 实现注册,调用方注入本地 Bean,**零网络开销**
+- `aurora.architecture: distributed` → Local 实现不注册,改由 `@FeignClient` 代理注入,调用走 HTTP
+
+### 6.3 单体演进的配套机制
+
+| 机制 | 单体模式 | 微服务模式 | 来源 |
+|---|---|---|---|
+| 跨模块调用 | Local 实现(本地 Service) | Feign 实现(远程) | §6.2 |
+| Spring Cloud Bus | **BusBridge 空实现短路**(进程内事件) | 正常连 Kafka | dante-cloud D3 |
+| 服务发现 | 无(同进程) | Nacos/Polaris | 演进时启用 |
+| 配置中心 | 本地 `application.yaml` | Nacos(可选) | 演进时启用 |
+
+### 6.4 与 yudao 双轨契约的关系
+
+- **不冲突,是叠加增强**。yudao 的"业务间 api 接口 + 框架反调 biz/CommonApi"是**契约定义层**;dante 的"配置驱动架构切换"是**实现装配层**。
+- Aurora 的 `XxxApi` 接口在单体期用 `@ConditionalOnArchitecture(MONOLITH)` 的 Local Impl,微服务期切 Feign——**接口本身不变**,契约层零改动。
+
+### 6.5 首期落地范围(克制)
+
+- **首期(阶段 2-5)**:`aurora.architecture` 属性 + `@ConditionalOnArchitecture` 注解框架**就位**,但默认只有 Local 实现(单体)。架构切换的**完整 Feign 实现留到微服务演进阶段**(阶段 7+)。
+- **意义**:脚手架从第一天就内置"一套代码两种架构"的**机制骨架**,业务代码按此范式编写(注入接口、不直连 Service),未来切微服务时无需返工。
+
+---
+
+## 7. Boot4 + JDK25 适配清单
 
 > 详见 `boot4-migration-notes.md`(含全量代码片段)。此处仅列踩坑点。
 
@@ -311,21 +438,23 @@ private final OAuth2TokenCommonApi oauth2TokenApi;
 
 ---
 
-## 7. 分阶段实施计划
+## 8. 分阶段实施计划
 
 | 阶段 | 目标 | 产出物 | 验收 |
 |---|---|---|---|
-| **0. 决策对齐** | 确认 §8 四项 | 决策记录 | 文档批准 + 4 项回执 |
-| **1. 设计文档落盘** | 本步(进行中) | docs/ 5 份 + README + AGENTS | 文档评审通过 |
-| **2. 骨架可编译** | Boot4+JDK25 跑通空壳 | BOM + common + web/mybatis/redis/security + server + `GET /hello` 返回 CommonResult | mvn install + spring-boot:run + curl + springdoc UI 出 |
+| **0. 决策对齐** | 确认 §9 四项 | 决策记录 | 文档批准 + 4 项回执 |
+| **1. 设计文档落盘** | ✅ 完成(本次 v0.2) | docs/ 5 份 + README + AGENTS | 文档评审通过 |
+| **2. 骨架可编译** | Boot4+JDK25 跑通空壳 | BOM + common + web/mybatis/redis/security + architecture(条件注解框架)+ server + `GET /hello` 返回 CommonResult | mvn install + spring-boot:run + curl + springdoc UI 出 |
 | **3. system+infra 样本** | 打通完整 CRUD | security 全链路 + system(用户/角色/部门/字典)+ infra(文件)+ demo 增删改查分页 | 登录拿 token → CRUD → 落 PG → 操作日志 |
 | **4. 重能力接入** | 逐个可开关 | tenant(默认关)/data-permission/datasource(多源)/bpm(Flowable8) | 各能力开关测试;多租户数据隔离验证 |
 | **5. 代码生成器** | 后端 codegen | 连库读表 → DO/Mapper/Service/Controller/VO/SQL;预留 api-fast/api 双模板 | 一键生成可编译可运行 CRUD |
-| **6. 迁移启动** | 按 L0→L6 迁现有模块 | 详见 `migration/aurora-migration-plan.md` | 各层验收通过 |
+| **6. 架构切换骨架** | "一套代码两种架构"机制就位 | `@ConditionalOnArchitecture` + Strategy 接口 Local 实现(默认)+ BusBridge 空实现短路;Feign 实现留空位 | 单体模式验证通过;`aurora.architecture` 属性可读 |
+| **7. 迁移启动** | 按 L0→L6 迁现有模块 | 详见 `migration/aurora-migration-plan.md` | 各层验收通过 |
+| **8+. 微服务演进** | 启用 distributed 架构 | Feign 实现 + 服务发现 + 配置中心 + 网关防伪造头(D5) | 切 `aurora.architecture: distributed` 启动成功,跨服务调用通 |
 
 ---
 
-## 8. 待决策项
+## 9. 待决策项
 
 以下为**推荐默认值**,文档已据此撰写,可在评审后调整(品牌名/groupId 全文可一键替换)。
 
@@ -333,11 +462,11 @@ private final OAuth2TokenCommonApi oauth2TokenApi;
 
 | 方案 | 优点 | 代价 | Boot4 成熟度 |
 |---|---|---|---|
-| **A. Spring Security 7 + 自建 OAuth2 token 表 + Redis**(推荐) | 团队最熟;xiaoqu 现状即此;多租户/数据权限/操作日志集成成本最低;ruoyi master-jdk25 已验证 Boot4 跑通 | 自管 token 表/刷新/登出逻辑 | ✅ 有活样本 |
+| **A. Spring Security 7 + 自建 OAuth2 token 表 + Redis**(推荐) | 团队最熟;xiaoqu 现状即此;多租户/数据权限/操作日志集成成本最低;ruoyi master-jdk25 已验证 Boot4 跑通 | 自管 token 表/刷新/登出逻辑 | ✅ 有活样本(yudao) |
 | B. Sa-Token | API 极简、中文文档好、上手快 | 与 yudao 系数据权限/租户/操作日志需大量重写适配;greenfield 要自建整套集成 | ⚠️ 需验证 Boot4 starter |
-| C. Spring Authorization Server | 最"正规"标准 OAuth2 授权服务器 | 最重;password grant 已弃用;单体场景过度设计 | ✅ 标准但重 |
+| C. Spring Authorization Server + ConfigurerManager | 最"正规"标准 OAuth2 授权服务器;**dante-cloud 的 ConfigurerManager 模式可封装 SAS 复杂配置,业务方零配置**;支持 passkey/国密/社交扩展 | 最重;password grant 已弃用需适配;dante 底层实现在 dante-engine(未本地),需自行实现 ConfigurerManager | ✅ dante-cloud 有 Boot4 活样本 |
 
-**推荐 A 的理由**:首期全内置多租户+数据权限+BPM,这些与 yudao 系 security/operatelog/tenant 深度耦合,方案 A 集成成本最低且有 Boot4 活样本可照抄。
+**推荐 A 的理由**:首期全内置多租户+数据权限+BPM,这些与 yudao 系 security/operatelog/tenant 深度耦合,方案 A 集成成本最低且有 Boot4 活样本可照抄。**若未来需要标准化 OAuth2(开放平台/第三方接入/passkey),可参考 dante-cloud 的方案 C 升级**。
 
 ### B. 品牌名(推荐 Aurora)
 
@@ -369,5 +498,6 @@ private final OAuth2TokenCommonApi oauth2TokenApi;
 本文档基于以下真实代码核实:
 - **bladex**:`/Users/xq/01-code/xq/bladex/`(BladeX-Tool 45 模块、BladeX-Boot 单体、BladeX-Biz 业务样本、CLAUDE.md 两份)
 - **ruoyi-vue-pro**:`origin/master-jdk25` 分支(JDK25 + Boot4.1.0,git show 读取,未 checkout)
+- **dante-cloud**:`/Users/xq/01-code/xq/dante-cloud/`(JDK25 + Boot4.1 + Spring Cloud 2025.1.2,v4.1.0.4;**注意:其框架核心实现在另一个仓库 dante-engine,本地未 clone**,本次仅核实了 dante-cloud 的装配层代码与设计思路)
 - **xiaoqu-platform**:`/Users/xq/01-code/xq/xiaoqu-platform/`(13+ 模块、~6000 文件、~57 万行)
 - **Spring Boot 4**:2025-11-20 GA,Spring Framework 7,Jakarta EE 11,Servlet 6.1,最低 JDK17/推荐 25

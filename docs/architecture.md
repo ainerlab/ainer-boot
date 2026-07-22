@@ -1,16 +1,18 @@
 # Aurora 架构总览
 
-> 状态:**DRAFT v0.1** · 日期:2026-07-22
+> 状态:**DRAFT v0.2** · 日期:2026-07-22
 > 关联:`design/aurora-scaffold-design.md`(设计详述)、`migration/aurora-migration-plan.md`(迁移路线)
+> 三参考源:bladex(模块演进)+ yudao(业务范式)+ dante-cloud(一套代码两种架构)
 
 ---
 
 ## 1. 工程性质
 
-Aurora 是 **framework 提供者 + 业务模块载体** 的双层工程:
+Aurora 是 **framework 提供者 + 业务模块载体 + 架构切换机制** 的工程:
 
 - **framework 层**(`aurora-framework/`):提供 starter,可被任意项目(包括 xiaoqu 迁移后)以 GAV 依赖消费
 - **业务层**(`aurora-module-*/`):遵循 framework 约定的业务模块,单体期与 framework 同仓,演进时可独立成服务
+- **架构切换层**(`aurora-starter-architecture`):配置驱动单体↔微服务切换,**一套代码两种架构**(吸收 dante-cloud)
 
 ---
 
@@ -24,6 +26,7 @@ aurora-boot/
 │
 ├── aurora-framework/                    ③ 框架层(parent = ①)
 │   ├── aurora-common                    ③-a 全模块共享:pojo/exception/util/biz 契约
+│   ├── aurora-starter-architecture      ③-★ 架构切换:@ConditionalOnArchitecture + Strategy(吸收 dante-cloud)
 │   ├── aurora-starter-web               ③-b Web 层:前缀绑定/全局异常/apilog/springdoc
 │   ├── aurora-starter-security          ③-c 认证:Spring Security 7 + OAuth2 token
 │   ├── aurora-starter-mybatis           ③-d ORM:BaseDO/BaseMapperX/Wrapper/easy-trans
@@ -62,6 +65,7 @@ aurora-boot/
 | 模块 | 职责 | 关键类 |
 |---|---|---|
 | `aurora-common` | 全模块共享基础 | `CommonResult`、`PageResult`、`PageParam`、`ErrorCode`、`ServiceException`、`biz/*CommonApi`(7 个跨模块契约)、util |
+| `aurora-starter-architecture` | **架构切换**(吸收 dante-cloud) | `@ConditionalOnArchitecture`、`Architecture` 枚举、`OnArchitectureCondition`、Strategy 接口约定、BusBridge 空实现 |
 | `aurora-starter-web` | Web 层 | `/admin-api`+`/app-api` 前缀绑定、`GlobalExceptionHandler`、apilog、springdoc3、XSS |
 | `aurora-starter-security` | 认证 | `TokenAuthenticationFilter`、`AuroraWebSecurityConfigurerAdapter`(Security 7 lambda DSL)、operatelog |
 | `aurora-starter-mybatis` | ORM | `BaseDO`、`BaseMapperX`、`LambdaQueryWrapperX`、`QueryWrapperX`、`MPJLambdaWrapperX`、TypeHandler、easy-trans |
@@ -129,9 +133,36 @@ PostgreSQL
 | `TenantBaseDO` | aurora-starter-biz-tenant | extends BaseDO + `tenantId` |
 | `BaseMapperX<T>` | aurora-starter-mybatis | extends `MPJBaseMapper`:selectPage/selectJoinPage/selectOne/insertBatch/updateBatch/delete |
 | `LambdaQueryWrapperX<T>` | aurora-starter-mybatis | extends `LambdaQueryWrapper`:xxxIfPresent 系列(值为空不拼条件) |
-| `*Api` / `*ApiImpl` | module/*/api | 业务间跨模块契约(本地注入) |
+| `*Api` / `*ApiImpl` | module/*/api | 业务间跨模块契约(单体本地注入,微服务切 Feign) |
 | `*CommonApi` | aurora-common/biz | 框架反调业务的契约(依赖倒置) |
 | `*Convert` | module/*/convert | MapStruct 转换器(复杂 DO↔VO 映射) |
+| `@ConditionalOnArchitecture` | aurora-starter-architecture | 架构条件注解:`MONOLITH`/`DISTRIBUTED`,按 `aurora.architecture` 属性装配 Bean |
+| `Architecture` | aurora-starter-architecture | 枚举:`MONOLITH`(默认)/ `DISTRIBUTED` |
+
+---
+
+## 6. 运行架构:一套代码、两种架构(吸收 dante-cloud)
+
+Aurora 通过配置 `aurora.architecture` 在单体/微服务间切换,**业务代码零改动**:
+
+```
+aurora:
+  architecture: monolith     # monolith(默认) | distributed
+```
+
+| 关注点 | monolith(默认) | distributed(演进) |
+|---|---|---|
+| 跨模块调用 | `XxxApi` 本地 Impl(`@ConditionalOnArchitecture(MONOLITH)`) | `XxxApi` Feign 远程 |
+| Spring Cloud Bus | BusBridge 空实现短路(进程内事件,不连 Kafka) | 正常连 Kafka |
+| 服务发现 | 无(同进程) | Nacos/Polaris |
+| 配置中心 | 本地 `application.yaml` | Nacos(可选) |
+| 网关 | 无 | Spring Cloud Gateway + 防伪造内部调用头拦截 |
+
+机制三层:① `@ConditionalOnArchitecture` 条件注解 ② Strategy 接口双实现(Local/Feign)③ 配置驱动 Bean 装配。详见 `design/aurora-scaffold-design.md` §6。
+
+---
+
+## 7. 技术栈速查
 
 ---
 

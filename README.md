@@ -1,11 +1,11 @@
 # Aurora Boot
 
-> 状态:**DRAFT v0.1** · 2026-07-22 · 仅有设计文档阶段,尚无可编译代码
+> 状态:**DRAFT v0.2** · 2026-07-22 · 仅有设计文档阶段,尚无可编译代码
 
-**单体优先、可演进微服务** 的业务开发脚手架。
+**一套代码、两种架构**(单体优先、可演进微服务)的业务开发脚手架。
 
 - 技术基线:**JDK 25 + Spring Boot 4.1.0**(Spring Framework 7 / Jakarta EE 11 / Servlet 6.1)
-- 定位:把 xiaoqu-platform 已深度使用的 yudao 范式,**抽干净成独立品牌产物**,升级到 Boot4+JDK25,并择优吸收 bladex 工程机制
+- 定位:把 xiaoqu-platform 已深度使用的 yudao 范式,**抽干净成独立品牌产物**,升级到 Boot4+JDK25,并吸收 bladex(模块演进)+ **dante-cloud(一套代码两种架构)** 工程机制
 - 身份:全新独立 greenfield 仓库,与 xiaoqu 现有 yudao 范式 **100% 兼容**(保证 6000 文件零返工)
 
 ---
@@ -15,12 +15,14 @@
 | 阶段 | 状态 | 产出 |
 |---|---|---|
 | 0. 决策对齐 | ⏳ 待确认 4 项(见下) | — |
-| **1. 设计文档落盘** | ✅ **完成(本次)** | `docs/` 5 份 + 本 README |
-| 2. 骨架可编译 | ⬜ 未开始 | BOM + common + web/mybatis/redis/security + server |
+| **1. 设计文档落盘** | ✅ **完成(本次 v0.2)** | `docs/` 5 份 + 本 README |
+| 2. 骨架可编译 | ⬜ 未开始 | BOM + common + web/mybatis/redis/security + **architecture(架构切换)** + server |
 | 3. system+infra 样本 | ⬜ 未开始 | 完整 CRUD 链路 |
 | 4. 重能力接入 | ⬜ 未开始 | tenant/data-permission/datasource/bpm |
 | 5. 代码生成器 | ⬜ 未开始 | 后端 codegen |
-| 6. 迁移启动 | ⬜ 未开始 | xiaoqu 13+ 模块逐层迁入 |
+| 6. 架构切换骨架 | ⬜ 未开始 | `@ConditionalOnArchitecture` + Strategy Local 实现 + BusBridge 短路 |
+| 7. 迁移启动 | ⬜ 未开始 | xiaoqu 13+ 模块逐层迁入 |
+| 8+. 微服务演进 | ⬜ 未开始 | 启用 distributed 架构 + Feign + 网关防伪造头 |
 
 ---
 
@@ -94,9 +96,10 @@ aurora-boot/
 
 ## 设计来源
 
-本脚手架基于三个项目的真实代码深度调研:
-- **bladex** (`/Users/xq/01-code/xq/bladex/`):BladeX-Tool 45 模块、BladeX-Boot 单体、BladeX-Biz 业务样本、CLAUDE.md 两份
-- **ruoyi-vue-pro** (`origin/master-jdk25` 分支):JDK25 + Boot4.1.0 的活样板(git show 读取,未 checkout)
-- **xiaoqu-platform** (`/Users/xq/01-code/xq/xiaoqu-platform/`):13+ 模块、~6000 文件、~57 万行,全平台深度跑 yudao 范式
+本脚手架基于四个项目的真实代码深度调研:
+- **bladex** (`/Users/xq/01-code/xq/bladex/`):BladeX-Tool 45 模块、BladeX-Boot 单体、BladeX-Biz 业务样本、CLAUDE.md 两份。**吸收**:单体 modules/X + 演进抽 X-api、codegen 双模板、BOM+flatten、文档骨架
+- **ruoyi-vue-pro** (`origin/master-jdk25` 分支):JDK25 + Boot4.1.0 的活样板(git show 读取,未 checkout)。**吸收**:业务范式全 8 项(= xiaoqu 现状)
+- **dante-cloud** (`/Users/xq/01-code/xq/dante-cloud/`):JDK25 + Boot4.1 + Spring Cloud 2025.1.2,v4.1.0.4。**吸收**:**一套代码两种架构**(`@ConditionalOnArchitecture` 配置驱动)、Strategy 双实现、BusBridge 短路、`@EnableXxx` 开关、网关防伪造头。注意:其框架核心在另一个仓库 dante-engine(本地未 clone),Aurora 借鉴设计、自行实现
+- **xiaoqu-platform** (`/Users/xq/01-code/xq/xiaoqu-platform/`):13+ 模块、~6000 文件、~57 万行,全平台深度跑 yudao 范式(迁移目标)
 
 吸收论证详见 [design/aurora-scaffold-design.md](docs/design/aurora-scaffold-design.md) §2。
