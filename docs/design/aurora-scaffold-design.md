@@ -1,6 +1,6 @@
 # Aurora 脚手架 · 架构设计
 
-> 状态:**DRAFT v0.2** · 日期:2026-07-22
+> 状态:**DRAFT v0.3** · 日期:2026-07-22
 > 技术基线:**JDK 25 + Spring Boot 4.1.0**(Spring Framework 7 / Jakarta EE 11 / Servlet 6.1)
 > 定位:单体优先、可演进微服务(**一套代码、两种架构**)的业务开发脚手架
 > 身份:全新独立 greenfield 仓库,**与 xiaoqu-platform 现有 yudao 范式 100% 兼容**(保证 6000 文件零返工)
@@ -67,11 +67,12 @@ Aurora 落地这套机制(详见 §6):
 - **微服务期(演进)**:配置 `aurora.architecture: distributed`,同一 `api/` 接口切换为 **Feign 远程实现**;`@ConditionalOnArchitecture` 条件注解控制 Bean 注册;**业务代码、接口签名零改动**
 - 切换开关是 YAML 一行配置,不改代码
 
-关键工程细节(吸收 dante-cloud):
-- **Strategy 接口双实现**:同一接口配 `LocalXxxStrategy`(直连本地 Service)和 `FeignXxxStrategy`(Feign 远程),靠条件注解按架构装配
-- **BusBridge 短路**:单体模式把 Spring Cloud Bus 的跨进程消息短路成进程内事件,避免单体被迫连 Kafka
+关键工程细节(吸收 dante-cloud/engine,已基于 engine 真实代码核实,见 §6):
+- **条件注解体系**:`@ConditionalOnArchitecture` 用"枚举即条件"三层委托设计(`AbstractEnumSpringBootCondition` + `ConditionEnum` 接口),新增维度只加枚举
+- **Local/Remote 切换**:跨模块 `api/` 接口配 Local 实现(单体)/ Feign 实现(微服务);跨进程事件用 Local Listener(默认)/ Remote Listener(分布式)成对
+- **单体不连 Kafka**:单体模式 Remote Listener 不装配(配合 `@ConditionalOnClass(StreamBusBridge.class)` 双保险),进程内事件用 Local Listener
 
-> ⚠️ **dante-cloud 的实现边界**:其条件注解(`@ConditionalOnArchitecture`)、Strategy 接口、ConfigurerManager 的**底层实现在另一个仓库 `dante-engine`**(本地未 clone)。Aurora **借鉴其设计思路,用 Boot4 原生能力(`@Conditional` + Environment 属性)自行实现**,不直接移植 dante 代码。
+> ℹ️ **dante-engine 已本地 clone**(54 模块)。条件注解/分层/`@EnableXxx` 可直接移植代码;Strategy 双实现 dante v4.1.0.4 已删除,Aurora 需自研。详见 §6.9 移植复杂度评估。
 
 ---
 
@@ -110,15 +111,16 @@ Aurora 落地这套机制(详见 §6):
 
 ### 2.4 从 dante-cloud 吸收(精选 4 项 + 安全补丁 1 项)
 
-> dante-cloud(JDK25 + Boot4.1 + Spring Cloud 2025.1.2,与 Aurora 技术栈完全一致)是三个参考源里**唯一与 Aurora 定位("一套代码两种架构")对齐**的。它的核心价值在"配置驱动架构切换",数据层(JPA)与 Aurora(MyBatis-Plus)范式冲突,故选择性吸收。
+> dante-cloud + dante-engine(JDK25 + Boot4.1 + Spring Cloud 2025.1.2,与 Aurora 技术栈完全一致)是参考源里**唯一与 Aurora 定位("一套代码两种架构")对齐**的。核心价值在"配置驱动架构切换",数据层(JPA)与 Aurora(MyBatis-Plus)范式冲突,故选择性吸收。**dante-engine 已本地 clone**,以下基于真实代码核实。
 
-| # | 吸收项 | dante-cloud 做法 | Aurora 做法 | 价值 |
+| # | 吸收项 | dante 真实做法 | Aurora 做法 | 移植性 |
 |---|---|---|---|---|
-| D1 | **配置驱动的架构切换** | `@ConditionalOnArchitecture` + `herodotus.platform.architecture: monolith\|distributed`,一套代码运行时切换 | `@ConditionalOnArchitecture` + `aurora.architecture: monolith\|distributed`,用 Boot4 原生 `@Conditional` 实现 | **决定性差异化**:单体↔微服务零代码改动,bladex/yudao 都做不到 |
-| D2 | **Strategy 接口双实现** | `StrategyUserDetailsService` → `LocalStrategy`(直连 Service)/ `FeignStrategy`(远程) | 跨模块 `api/` 接口配 Local/Feign 双实现,条件注解按架构装配 | 架构切换的落地手段,比 yudao 纯本地注入更演进友好 |
-| D3 | **BusBridge 空实现短路** | 单体模式 `MonolithBusBridge.send()` 空方法,把 Spring Cloud Bus 短路成进程内事件 | 单体模式提供空 BusBridge,避免强依赖 Kafka | 单体演进微服务的小妙招,成本低收益高 |
-| D4 | **`@EnableXxx` 模块开关注解** | `@EnableHerodotusLogicUpms` 等打在 AutoConfiguration 上触发装配 | 关键能力 starter 提供 `@EnableXxx` 显式开关 | 比 AutoConfiguration.imports 隐式装配更显式可控 |
-| D5 | **网关侧拦伪造内部调用头** | `GlobalCertificationFilter` 检测外部请求带 `X-Herodotus-From-In` 头直接 403 | 演进到微服务时,网关补内部调用头伪造拦截 | `@Inner`/免鉴权方案的安全补丁,必装 |
+| D1 | **配置驱动架构切换** | `@ConditionalOnArchitecture` + `aurora.architecture: monolith\|distributed`,**枚举即条件**三层委托设计(`AbstractEnumSpringBootCondition` + `ConditionEnum`) | 同,4 文件 ~120 行 | ✅ 直接移植代码 |
+| D2 | **跨模块 Local/Feign 双实现** | ⚠️ dante v4.1.0.4 **已删除**双实现(改为 UAA 直连库);`StrategyUserDetailsService` 退化单实现 | Aurora **自研**:接口 + Local Impl(`@ConditionalOnArchitecture(MONOLITH)`)+ Feign(分布式) | ⚠️ 需自研 |
+| D3 | **单体不连 Kafka**(Local/Remote Listener 成对) | ⚠️ **非** BusBridge 空实现;而是 Local Listener(默认)+ Remote Listener(`@ConditionalOnArchitecture(DISTRIBUTED)` + `@ConditionalOnClass(StreamBusBridge)`)成对 | 同模式,Listener 代码极简 | ✅ 直接移植模式 |
+| D4 | **`@EnableXxx` 模块开关** | `@Import(XxxConfiguration.class)` 一行注解,Configuration 内组合扫描 | 同 | ✅ 直接移植 |
+| D5 | **framework 分层 core→spring** | `dante-core`(零 Spring 依赖)→ `dante-spring`(条件注解体系)→ 其余 | `aurora-common` → `aurora-spring`(条件注解)→ 其余 | ✅ 直接移植架构 |
+| D6 | **网关防伪造内部调用头** | `GlobalCertificationFilter` 检测外部请求带 `X-Herodotus-From-In` 头直接 403 | 微服务演进时网关补此拦截 | ✅ 演进阶段补 |
 
 ### 2.5 论证后舍弃的 dante-cloud 机制(附理由)
 
@@ -335,7 +337,7 @@ private final OAuth2TokenCommonApi oauth2TokenApi;
 
 ## 6. 单体↔微服务:一套代码
 
-这是 dante-cloud 最关键的差异化价值,Aurora 用 Boot4 原生能力实现(dante 的底层在 dante-engine,本地未 clone,故**借鉴设计、自行实现**)。
+这是 dante-cloud 最关键的差异化价值。以下实现基于 **dante-engine 真实代码核实**(v4.1.0.4,`/Users/xq/01-code/xq/dante-engine/dante-framework/dante-spring`),非猜测。dante-engine 已本地 clone(54 模块)。
 
 ### 6.1 目标
 
@@ -346,36 +348,72 @@ aurora:
   architecture: monolith     # ← 切换开关:monolith(默认) | distributed
 ```
 
-### 6.2 实现机制(三层)
+### 6.2 机制 ①:条件注解 `@ConditionalOnArchitecture`(可直接移植)
 
-**(1)条件注解 `@ConditionalOnArchitecture`**(放在 `aurora-starter-architecture` 或 `aurora-common`)
+> **核实结论**:dante-engine 的条件注解是**"枚举即条件"的三层委托设计**——把"是否激活"的判断下放到枚举常量自身,而非写在 Condition 里。新增一种架构维度只需加一个枚举 + 一个 2 行 Condition 子类。**4 个文件 + 1 枚举,共 ~120 行,Boot4 零兼容性问题,可直接移植代码。**
 
-基于 Spring 原生 `@Conditional` + `Environment` 属性,自定义 Condition 读取 `aurora.architecture`:
+放置位置:借鉴 dante 的 `dante-spring`,Aurora 放 `aurora-starter-architecture`(或按 dante 分层放更底层的 `aurora-spring`,见 §6.7)。
 
 ```java
-// 条件:匹配指定架构
-public class OnArchitectureCondition implements Condition {
-    @Override
-    public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
-        Architecture arch = Architecture.valueOf(
-            context.getEnvironment().getProperty("aurora.architecture", "monolith").toUpperCase());
-        Architecture required = (Architecture) metadata.getAnnotationAttributes(
-            ConditionalOnArchitecture.class.getName()).get("value");
-        return arch == required;
+// ① 枚举约定接口(可复用于其它维度,如 DataAccessStrategy)
+public interface ConditionEnum {
+    boolean isActive(Environment environment);
+    String getConstant();
+    default boolean isActive(Environment environment, String property) {
+        String value = environment.getProperty(property);
+        return StringUtils.isNotBlank(value) && value.equalsIgnoreCase(getConstant());
     }
 }
 
-@Target({TYPE, METHOD})
-@Retention(RUNTIME)
+// ② 架构枚举:枚举自己实现 isActive(DISTRIBUTED 正向匹配,MONOLITH 取反 → 默认单体)
+public enum Architecture implements ConditionEnum {
+    DISTRIBUTED {
+        @Override public boolean isActive(Environment env) {
+            return isActive(env, "aurora.architecture");  // 读 aurora.architecture 属性
+        }
+        @Override public String getConstant() { return name(); }
+    },
+    MONOLITH {
+        @Override public boolean isActive(Environment env) {
+            return !DISTRIBUTED.isActive(env);  // ← 关键:默认单体(无配置即单体)
+        }
+        @Override public String getConstant() { return name(); }
+    };
+}
+
+// ③ 抽象基类:委托给枚举自身的 isActive
+public abstract class AbstractEnumSpringBootCondition<T extends ConditionEnum> extends SpringBootCondition {
+    protected abstract Class<? extends Annotation> getAnnotationClass();
+    @Override
+    public ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTypeMetadata metadata) {
+        T[] enums = (T[]) metadata.getAnnotationAttributes(getAnnotationClass().getName()).get("value");
+        // ... 读取注解 value,委托 enums.isActive(context.getEnvironment()) 返回 match/noMatch
+    }
+}
+
+// ④ 具体 Condition:只绑定注解类型(2 行)
+class OnArchitectureCondition extends AbstractEnumSpringBootCondition<Architecture> {
+    @Override protected Class<? extends Annotation> getAnnotationClass() {
+        return ConditionalOnArchitecture.class;
+    }
+}
+
+// ⑤ 注解
+@Target({ElementType.TYPE, ElementType.METHOD})  // ★ 可用于 @Bean 方法级
+@Retention(RetentionPolicy.RUNTIME)
 @Conditional(OnArchitectureCondition.class)
 public @interface ConditionalOnArchitecture {
     Architecture value();
 }
-
-public enum Architecture { MONOLITH, DISTRIBUTED }
 ```
 
-**(2)Strategy 接口双实现**(每个需要跨边界调用的 `api/` 接口)
+**设计精髓**:`AbstractEnumSpringBootCondition` + `ConditionEnum` 接口是通用骨架,后续若要加"数据访问策略切换"(`@ConditionalOnDataAccessStrategy`),只需一个 `DataAccessStrategy` 枚举(实现 `ConditionEnum`)+ 一个 2 行 Condition,**无需改框架**。
+
+### 6.3 机制 ②:跨模块调用的 Local/Remote 切换(需自研,不能照搬)
+
+> ⚠️ **重要修正**:我之前(基于 dante-cloud 装配层)以为 dante 有 `LocalStrategyUserDetailsService`/`FeignStrategyUserDetailsService` 双实现。核实 dante-engine v4.1.0.4 发现**这两个类已被删除**——dante 现在 UAA 直连库,`StrategyUserDetailsService` 退化成单实现接口注入。**Aurora 不能照搬,需自行设计 Local/Feign 双实现。**
+
+Aurora 的设计(借鉴 dante 的"接口注入 + Strategy"思路,用 Boot4 原生实现):
 
 ```java
 // 业务契约接口(单体/微服务共享,定义在 api 包)
@@ -385,41 +423,103 @@ public interface TradeOrderApi {
 
 // 单体实现:直连本地 Service(默认装配)
 @Service
-@ConditionalOnArchitecture(MONOLITH)
+@ConditionalOnArchitecture(Architecture.MONOLITH)
 public class TradeOrderApiLocalImpl implements TradeOrderApi {
     @Resource private TradeOrderService tradeOrderService;
     @Override public TradeOrderRespDTO getOrder(Long id) {
         return BeanUtils.toBean(tradeOrderService.getOrder(id), TradeOrderRespDTO.class);
     }
 }
-
-// 微服务实现:Feign 远程(演进时启用)
-// 注:契约接口加 @FeignClient,实现在远程服务进程;此处本地无需 Impl
+// 微服务实现:契约接口加 @FeignClient(演进时启用,阶段 8+)
 ```
 
-**(3)配置驱动的 Bean 装配**
+### 6.4 机制 ③:消息/事件的 Local/Remote Listener 成对(可直接移植模式)
 
-- `aurora.architecture: monolith` → `@ConditionalOnArchitecture(MONOLITH)` 的 Local 实现注册,调用方注入本地 Bean,**零网络开销**
-- `aurora.architecture: distributed` → Local 实现不注册,改由 `@FeignClient` 代理注入,调用走 HTTP
+> ⚠️ **重要修正**:dante-engine **没有** BusBridge 空实现类(全仓零命中)。单体短路的真实做法是 **Local Listener(默认/无条件)+ Remote Listener(`@ConditionalOnArchitecture(DISTRIBUTED)`)成对**,配合 `@ConditionalOnClass(StreamBusBridge.class)` 双保险。
 
-### 6.3 单体演进的配套机制
+```java
+@AutoConfiguration
+public class AuroraServiceMessageAutoConfiguration {
 
-| 机制 | 单体模式 | 微服务模式 | 来源 |
-|---|---|---|---|
-| 跨模块调用 | Local 实现(本地 Service) | Feign 实现(远程) | §6.2 |
-| Spring Cloud Bus | **BusBridge 空实现短路**(进程内事件) | 正常连 Kafka | dante-cloud D3 |
-| 服务发现 | 无(同进程) | Nacos/Polaris | 演进时启用 |
-| 配置中心 | 本地 `application.yaml` | Nacos(可选) | 演进时启用 |
+    // 单体:本地 Listener(始终开启,进程内事件)
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnArchitecture(Architecture.MONOLITH)
+    static class LocalMessageConfiguration {
+        @Bean public LocalMessageListener localMessageListener(...) { ... }
+    }
 
-### 6.4 与 yudao 双轨契约的关系
+    // 分布式:远程 Bus Listener(仅分布式 + classpath 有 Bus 才开启)
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnArchitecture(Architecture.DISTRIBUTED)
+    @ConditionalOnClass(StreamBusBridge.class)
+    static class RemoteMessageConfiguration {
+        @Bean public RemoteMessageListener remoteMessageListener(...) { ... }
+    }
+}
+```
+
+**效果**:单体模式完全不引入 Spring Cloud Bus / Kafka 依赖,Remote 配置类不装配;切到分布式时,Remote Listener 自动接管,通过 Bus 跨进程传播。
+
+### 6.5 机制 ④:`@EnableAuroraXxx` 模块开关(可直接移植)
+
+> 核实:dante 的 `@EnableHerodotusXxx` 统一是 `@Import(一个 @Configuration)` 一行注解,Configuration 内部用 `@ComponentScan`/`@Import` 组合整个模块。Boot4 完全兼容,零改动可搬。
+
+```java
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Import(AuroraLogicSystemConfiguration.class)  // ← 唯一机制:@Import
+public @interface EnableAuroraSystem {}
+
+// 被引用的 Configuration 组合扫描范围
+@Configuration(proxyBeanMethods = false)
+@ComponentScan(basePackages = {"cn.aurora.module.system"})
+@Import({AuroraSecurityConfiguration.class})  // 可链式 Import
+public class AuroraLogicSystemConfiguration {}
+```
+
+与 `@AutoConfiguration`(隐式自动装配)互补:`@EnableXxx` 是**显式开关**,让使用方主动声明"我要启用这个模块"。
+
+### 6.6 单体↔微服务切换对照
+
+| 关注点 | monolith(默认) | distributed(演进) |
+|---|---|---|
+| 跨模块调用 | `XxxApi` Local Impl(`@ConditionalOnArchitecture(MONOLITH)`) | `XxxApi` Feign 远程 |
+| 跨进程事件 | Local Listener(始终开启,进程内) | Remote Listener(`@ConditionalOnArchitecture(DISTRIBUTED)` + `@ConditionalOnClass(StreamBusBridge)`) |
+| 服务发现 | 无(同进程) | Nacos/Polaris |
+| 配置中心 | 本地 `application.yaml` | Nacos(可选) |
+| 网关 | 无 | Spring Cloud Gateway + 防伪造内部调用头(D5) |
+
+### 6.7 framework 分层(吸收 dante-engine)
+
+dante-engine 的分层很干净,Aurora 照搬:
+
+- `aurora-common`(对应 `dante-core`):**零 Spring 依赖**最底层,常量/枚举/工具/异常/domain
+- `aurora-spring`(对应 `dante-spring`):Spring 基础设施层,**条件注解体系**(`@ConditionalOnArchitecture` 等)+ Jackson 序列化器
+- 其余 starter 在 `aurora-spring` 之上
+
+> 注:`@ConditionalOnDataAccessStrategy`(LOCAL/REMOTE 数据访问策略切换)在 dante 放 `dante-web`,Aurora 可统一放 `aurora-spring` 简化分层。
+
+### 6.8 与 yudao 双轨契约的关系
 
 - **不冲突,是叠加增强**。yudao 的"业务间 api 接口 + 框架反调 biz/CommonApi"是**契约定义层**;dante 的"配置驱动架构切换"是**实现装配层**。
-- Aurora 的 `XxxApi` 接口在单体期用 `@ConditionalOnArchitecture(MONOLITH)` 的 Local Impl,微服务期切 Feign——**接口本身不变**,契约层零改动。
+- Aurora 的 `XxxApi` 接口在单体期用 Local Impl,微服务期切 Feign——**接口本身不变**,契约层零改动。
 
-### 6.5 首期落地范围(克制)
+### 6.9 移植复杂度评估(基于真实代码)
 
-- **首期(阶段 2-5)**:`aurora.architecture` 属性 + `@ConditionalOnArchitecture` 注解框架**就位**,但默认只有 Local 实现(单体)。架构切换的**完整 Feign 实现留到微服务演进阶段**(阶段 7+)。
-- **意义**:脚手架从第一天就内置"一套代码两种架构"的**机制骨架**,业务代码按此范式编写(注入接口、不直连 Service),未来切微服务时无需返工。
+| 机制 | 复杂度 | 可移植性 | 说明 |
+|---|---|---|---|
+| ① `@ConditionalOnArchitecture` 体系 | **简单** | **可直接移植代码** | 4 文件 + 1 枚举 ~120 行,纯 Spring API,Boot4 零兼容问题 |
+| ② Local/Feign 双实现 | **中等** | **需自研** | dante v4.1.0.4 已删除双实现;Aurora 需自己设计接口+双实现+条件装配 |
+| ③ Local/Remote Listener 成对 | **简单** | **可直接移植模式** | 不是 BusBridge;Listener 代码极简,Boot4 兼容 |
+| ④ `@EnableXxx` 开关 | **简单** | **可直接移植** | `@Import` 一行注解,零改动 |
+| ⑤ framework 分层 core→spring | **简单** | **可直接移植架构** | dante-core 零依赖 → dante-spring 条件注解,分层干净 |
+| ConfigurerManager(SAS OAuth2) | **中等** | **需用 SAS 原生重写** | 聚合根思路好,但 dante 用的 SAS Customizer 在新版本有变化;首期不上(决策项 A) |
+
+### 6.10 首期落地范围(克制)
+
+- **首期(阶段 2-6)**:机制 ①②③④⑤ 就位。默认只有 Local 实现(单体),**Feign 远程实现留到阶段 8+**。
+- **意义**:脚手架从第一天就内置"一套代码两种架构"的**机制骨架**,业务代码按"注入接口、不直连 Service"范式写,未来切微服务无需返工。
 
 ---
 
@@ -448,7 +548,7 @@ public class TradeOrderApiLocalImpl implements TradeOrderApi {
 | **3. system+infra 样本** | 打通完整 CRUD | security 全链路 + system(用户/角色/部门/字典)+ infra(文件)+ demo 增删改查分页 | 登录拿 token → CRUD → 落 PG → 操作日志 |
 | **4. 重能力接入** | 逐个可开关 | tenant(默认关)/data-permission/datasource(多源)/bpm(Flowable8) | 各能力开关测试;多租户数据隔离验证 |
 | **5. 代码生成器** | 后端 codegen | 连库读表 → DO/Mapper/Service/Controller/VO/SQL;预留 api-fast/api 双模板 | 一键生成可编译可运行 CRUD |
-| **6. 架构切换骨架** | "一套代码两种架构"机制就位 | `@ConditionalOnArchitecture` + Strategy 接口 Local 实现(默认)+ BusBridge 空实现短路;Feign 实现留空位 | 单体模式验证通过;`aurora.architecture` 属性可读 |
+| **6. 架构切换骨架** | "一套代码两种架构"机制就位 | `@ConditionalOnArchitecture`(枚举即条件三层委托)+ Local/Feign 双实现(Local 默认)+ Local/Remote Listener 成对(单体不连 Kafka)+ `@EnableXxx` 开关;Feign 实现留空位 | 单体模式验证通过;`aurora.architecture` 属性可读 |
 | **7. 迁移启动** | 按 L0→L6 迁现有模块 | 详见 `migration/aurora-migration-plan.md` | 各层验收通过 |
 | **8+. 微服务演进** | 启用 distributed 架构 | Feign 实现 + 服务发现 + 配置中心 + 网关防伪造头(D5) | 切 `aurora.architecture: distributed` 启动成功,跨服务调用通 |
 
@@ -498,6 +598,7 @@ public class TradeOrderApiLocalImpl implements TradeOrderApi {
 本文档基于以下真实代码核实:
 - **bladex**:`/Users/xq/01-code/xq/bladex/`(BladeX-Tool 45 模块、BladeX-Boot 单体、BladeX-Biz 业务样本、CLAUDE.md 两份)
 - **ruoyi-vue-pro**:`origin/master-jdk25` 分支(JDK25 + Boot4.1.0,git show 读取,未 checkout)
-- **dante-cloud**:`/Users/xq/01-code/xq/dante-cloud/`(JDK25 + Boot4.1 + Spring Cloud 2025.1.2,v4.1.0.4;**注意:其框架核心实现在另一个仓库 dante-engine,本地未 clone**,本次仅核实了 dante-cloud 的装配层代码与设计思路)
+- **dante-cloud**:`/Users/xq/01-code/xq/dante-cloud/`(JDK25 + Boot4.1 + Spring Cloud 2025.1.2,v4.1.0.4;装配层代码)
+- **dante-engine**:`/Users/xq/01-code/xq/dante-engine/`(54 模块,框架核心实现;条件注解在 `dante-framework/dante-spring`,已逐行核实 `@ConditionalOnArchitecture` 体系)
 - **xiaoqu-platform**:`/Users/xq/01-code/xq/xiaoqu-platform/`(13+ 模块、~6000 文件、~57 万行)
 - **Spring Boot 4**:2025-11-20 GA,Spring Framework 7,Jakarta EE 11,Servlet 6.1,最低 JDK17/推荐 25

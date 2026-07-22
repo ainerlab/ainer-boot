@@ -1,6 +1,6 @@
 # Aurora 架构总览
 
-> 状态:**DRAFT v0.2** · 日期:2026-07-22
+> 状态:**DRAFT v0.3** · 日期:2026-07-22
 > 关联:`design/aurora-scaffold-design.md`(设计详述)、`migration/aurora-migration-plan.md`(迁移路线)
 > 三参考源:bladex(模块演进)+ yudao(业务范式)+ dante-cloud(一套代码两种架构)
 
@@ -65,7 +65,7 @@ aurora-boot/
 | 模块 | 职责 | 关键类 |
 |---|---|---|
 | `aurora-common` | 全模块共享基础 | `CommonResult`、`PageResult`、`PageParam`、`ErrorCode`、`ServiceException`、`biz/*CommonApi`(7 个跨模块契约)、util |
-| `aurora-starter-architecture` | **架构切换**(吸收 dante-cloud) | `@ConditionalOnArchitecture`、`Architecture` 枚举、`OnArchitectureCondition`、Strategy 接口约定、BusBridge 空实现 |
+| `aurora-starter-architecture` | **架构切换**(吸收 dante-cloud/engine) | `@ConditionalOnArchitecture`(枚举即条件三层委托)、`Architecture` 枚举、`AbstractEnumSpringBootCondition`/`ConditionEnum`、Strategy 接口约定 |
 | `aurora-starter-web` | Web 层 | `/admin-api`+`/app-api` 前缀绑定、`GlobalExceptionHandler`、apilog、springdoc3、XSS |
 | `aurora-starter-security` | 认证 | `TokenAuthenticationFilter`、`AuroraWebSecurityConfigurerAdapter`(Security 7 lambda DSL)、operatelog |
 | `aurora-starter-mybatis` | ORM | `BaseDO`、`BaseMapperX`、`LambdaQueryWrapperX`、`QueryWrapperX`、`MPJLambdaWrapperX`、TypeHandler、easy-trans |
@@ -153,7 +153,7 @@ aurora:
 | 关注点 | monolith(默认) | distributed(演进) |
 |---|---|---|
 | 跨模块调用 | `XxxApi` 本地 Impl(`@ConditionalOnArchitecture(MONOLITH)`) | `XxxApi` Feign 远程 |
-| Spring Cloud Bus | BusBridge 空实现短路(进程内事件,不连 Kafka) | 正常连 Kafka |
+| 跨进程事件 | Local Listener(默认,进程内事件,不连 Kafka) | Remote Listener(`@ConditionalOnArchitecture(DISTRIBUTED)` + `@ConditionalOnClass(StreamBusBridge)`) |
 | 服务发现 | 无(同进程) | Nacos/Polaris |
 | 配置中心 | 本地 `application.yaml` | Nacos(可选) |
 | 网关 | 无 | Spring Cloud Gateway + 防伪造内部调用头拦截 |

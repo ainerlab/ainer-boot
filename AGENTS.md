@@ -63,12 +63,16 @@ Aurora 是**一套代码、两种架构**(单体优先、可演进微服务)的�
 | bladex | ① 单体 modules/X + 演进抽 X-api ② codegen 双模板(api/api-fast)③ BOM+flatten+revision ④ 文档骨架 |
 | bladex(舍弃) | blade-core-auto 注解处理器、BladeApplication SPI、R<T>+BladeController、Wrapper |
 | yudao(=xiaoqu 现状) | ① 双轨跨模块契约 ② 空壳 server ③ BaseDO ④ BaseMapperX ⑤ LambdaQueryWrapperX ⑥ CommonResult+ErrorCode+ServiceException ⑦ MapStruct Convert ⑧ 内建 codegen |
-| **dante-cloud**(技术栈与 Aurora 完全一致:JDK25+Boot4.1) | ① **一套代码两种架构**(`@ConditionalOnArchitecture` 配置驱动)② Strategy 接口双实现(Local/Feign)③ BusBridge 空实现短路 ④ `@EnableXxx` 模块开关 ⑤ 网关防伪造内部调用头 |
+| **dante-cloud + dante-engine**(技术栈与 Aurora 完全一致:JDK25+Boot4.1,已本地 clone) | ① **一套代码两种架构**(`@ConditionalOnArchitecture` 枚举即条件三层委托)② Local/Remote Listener 成对(单体不连 Kafka)③ `@EnableXxx` 模块开关 ④ framework core→spring 分层 ⑤ 网关防伪造内部调用头。**注意:Strategy 双实现需自研**(dante v4.1.0.4 已删除) |
 | dante-cloud(舍弃) | JPA+Hibernate 二级缓存(范式冲突,Aurora 用 MyBatis-Plus)、opaque token、passkey/国密(业务特定)、Nacos 强依赖(与单体优先冲突) |
 
 论证详见 `docs/design/aurora-scaffold-design.md` §2。
 
-**dante-cloud 实现边界提醒**:其 `@ConditionalOnArchitecture`、Strategy 接口、ConfigurerManager 的底层实现在另一个仓库 **dante-engine**(本地未 clone)。Aurora **借鉴其设计思路,用 Boot4 原生 `@Conditional` + Environment 自行实现**,不直接移植 dante 代码。
+**dante-engine 实现边界提醒**(已本地 clone `/Users/xq/01-code/xq/dante-engine`,54 模块):
+- ✅ **可直接移植代码**:条件注解(`@ConditionalOnArchitecture` 体系,`dante-framework/dante-spring`)、Local/Remote Listener 成对、`@EnableXxx` 开关、core→spring 分层
+- ⚠️ **需自研**:Strategy 双实现(dante v4.1.0.4 **已删除** Local/Feign 双实现,改成 UAA 直连库;Aurora 要自己设计)、ConfigurerManager(绑定 SAS,首期不上)
+- ⚠️ **关键纠正**:dante **没有** BusBridge 空实现类(全仓零命中),单体不连 Kafka 是靠 Local/Remote Listener 成对 + `@ConditionalOnClass(StreamBusBridge)` 双保险实现
+- 移植复杂度评估见 `docs/design/aurora-scaffold-design.md` §6.9
 
 ## 待决策项(默认值见 design §8)
 
