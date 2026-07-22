@@ -223,119 +223,148 @@ Redisson 4.6.1 需排除 `spring-boot-starter-actuator`(避免与 Boot4 actuator
 
 ## 4. 模块划分
 
+### 4.1 工程骨架(kb+kernel 分离 + dante core→spring 分层)
+
 ```
 aurora-boot/
-├── pom.xml                               # parent: ${revision} + enforcer(JDK25/Maven≥3.9) + flatten + 注解处理器
+├── pom.xml                               # parent: ${revision} + enforcer(JDK25/Maven≥3.9,禁循环) + flatten + 注解处理器
 ├── aurora-dependencies/                  # BOM:唯一版本源,import spring-boot-dependencies 4.1.0
-├── aurora-framework/                     # 框架层(parent=aurora)
-│   ├── aurora-common                     # pojo(CommonResult/PageResult/PageParam) + exception(ErrorCode/ServiceException) + util + biz/*CommonApi(跨模块契约)
-│   ├── aurora-starter-web                # /admin-api+/app-api 前缀绑定 + 全局异常 + apilog + springdoc3
-│   ├── aurora-starter-security           # 认证(见 §8 决策A,默认 Spring Security 7 + 自建 OAuth2 token)
-│   ├── aurora-starter-mybatis            # BaseDO/BaseMapperX/LambdaQueryWrapperX/TypeHandler/easy-trans
-│   ├── aurora-starter-datasource         # dynamic-datasource boot4(多数据源) ◆重能力
-│   ├── aurora-starter-redis              # Redisson 4.6 + Jackson3(删旧 JavaTimeModule 样板)
-│   ├── aurora-starter-biz-tenant         # TenantBaseDO + MP拦截器 + Redis隔离 + 可开关 ◆重能力
-│   ├── aurora-starter-biz-data-permission# 数据权限:表维度(@DataPermission)+ API 维度(Snowy S1 预计算表)+ 字段加密(S2) ◆重能力
-│   ├── aurora-starter-biz-bpm            # Flowable 8 封装 ◆重能力
-│   ├── aurora-starter-job                # Quartz 定时任务
-│   ├── aurora-starter-mq                 # Redis Stream / RabbitMQ / RocketMQ
-│   ├── aurora-starter-excel              # FastExcel 导入导出 + 字典转换
-│   ├── aurora-starter-protection         # 限流/幂等/分布式锁
-│   ├── aurora-starter-websocket          # WebSocket
-│   └── aurora-starter-test               # 单测基座(H2 + redis mock + BaseDbUnitTest)
-├── aurora-module-system/                 # 样本+地基:用户/角色/部门/菜单/字典/租户/RBAC/oauth2/social/logger/notify/sms/mail
-├── aurora-module-infra/                  # 样本:文件/codegen HTTP 入口/dbdoc/job/config/file 多存储
+│
+├── aurora-framework/                     # 框架层(吸收 dante-engine core→spring 分层)
+│   ├── aurora-core                       # ★ 零 Spring 依赖最底层:常量/枚举/工具/异常/domain(对应 dante-core)
+│   ├── aurora-spring                     # ★ Spring 基础设施:条件注解体系(@ConditionalOnArchitecture)+ Jackson(对应 dante-spring)
+│   ├── aurora-common                     # pojo(CommonResult+traceId/PageResult/PageParam) + exception(枚举 ErrorCode+注册表) + biz/*CommonApi(跨模块契约)
+│   ├── aurora-starter-architecture       # 架构切换:@ConditionalOnArchitecture + Strategy + Local/Remote Listener(吸收 dante-cloud)
+│   ├── aurora-starter-web                # 前缀绑定 + 全局异常(HTTP status 真语义,缺陷7) + apilog + springdoc3
+│   ├── aurora-starter-security           # 认证:Spring Authorization Server + ConfigurerManager(缺陷3,dante-cloud)
+│   ├── aurora-starter-mybatis            # BaseEntity(重命名,非 dataobject)/BaseMapperX/LambdaQueryWrapperX/EncryptTypeHandler(Snowy S2 字段加密)
+│   ├── aurora-starter-datasource         # dynamic-datasource boot4(多数据源)
+│   ├── aurora-starter-redis              # Redisson 4.6 + Jackson3
+│   ├── aurora-starter-biz-tenant         # TenantEntity + MP拦截器 + Redis隔离 + 可开关
+│   ├── aurora-starter-biz-data-permission# 数据权限:表维度(@DataPermission)+ API维度(Snowy S1 预计算表/scopeKey)
+│   ├── aurora-starter-biz-bpm            # Flowable 8
+│   ├── aurora-starter-job / -mq / -excel / -protection / -websocket / -test
+│
+├── aurora-module-kernel/                 # ★ 纯技术内核(拆自 yudao 上帝模块 system,缺陷5)
+│   # 只含"任何业务都要用的平台基础设施",禁止塞业务
+│   # auth/oauth2(SAS)/permission(role/dept/post)/dict/tenant/user 基础/social/logger/notify/sms/mail
+│
+├── aurora-module-infra/                  # 基础设施:文件(多存储)/codegen HTTP 入口/dbdoc/job/config
+│
+├── aurora-module-organization/           # ★ 业务:销售组织/项目(从 yudao system 错放的 organization/project 拆出,缺陷5)
+├── aurora-module-payment/                # ★ 业务:支付桥接(从 yudao system 错放的 payment 拆出)
+│
 ├── aurora-server/                        # 启动 shell + application.yaml + logback
 └── docs/                                 # 本文档集
 ```
 
-### 4.1 单体期的模块内部包结构(每模块统一)
+**与 yudao 的关键差异**(对应缺陷):
+- **kernel/business 分离**(缺陷5):yudao 的 `module-system` 上帝模块拆成 `module-kernel`(纯技术)+ 各业务模块(organization/payment 等回各自的家)
+- **framework core→spring 分层**(吸收 dante-engine):`aurora-core` 零 Spring 依赖,`aurora-spring` 放条件注解等基础设施
+- **认证独立 starter**(缺陷3):`aurora-starter-security` 用 SAS,非自造 token
+- **数据权限双模**(缺陷2):starter-biz-data-permission 同时支持表维度 + API 维度
+- **BaseEntity 重命名**(缺陷4):`dataobject/DO` → `entity/Entity`,消除 yudao 生造词
+
+### 4.2 业务模块内部包结构(新分层,收敛维度)
+
+> 对照缺陷4:yudao 四维(分层+端+领域+用途)全铺包 + 后缀双标。Aurora 收敛为:包目录只体现「分层+领域」,端在 controller 子包,用途用精简后缀。
 
 ```
-cn.<brand>.module.<name>/
+cn.aurora.module.<name>.<feature>/
 ├── controller/
-│   ├── admin/<feature>/          # 管理端接口(自动绑定 /admin-api 前缀)
-│   │   └── vo/                   # *ReqVO / *RespVO / *PageReqVO / *SaveReqVO
-│   └── app/<feature>/            # 用户端接口(自动绑定 /app-api 前缀)
-├── service/<feature>/            # XxxService + XxxServiceImpl
-├── dal/
-│   ├── dataobject/<feature>/     # XxxDO extends BaseDO / TenantBaseDO
-│   ├── mysql/<feature>/          # XxxMapper extends BaseMapperX
-│   └── redis/<feature>/          # XxxRedisDAO(可选)
-├── api/<feature>/                # 跨模块契约:XxxApi + XxxApiImpl + dto/(*RespDTO)
-├── convert/<feature>/            # MapStruct Convert(复杂映射)
-├── enums/                        # ErrorCodeConstants / 业务枚举
-├── framework/                    # 本模块的 Spring 配置(security/datapermission 等)
-├── job/                          # 定时任务(可选)
-└── mq/                           # 消息生产/消费(可选)
+│   ├── admin/                    # 管理端接口(自动绑定 /admin-api 前缀)
+│   └── app/                      # 用户端接口(自动绑定 /app-api 前缀)
+├── service/                      # XxxService + XxxServiceImpl(单向依赖,禁互注,缺陷1)
+├── repository/                   # 持久层(原 dal,重命名)
+│   ├── entity/                   # XxxEntity(原 DO,一份,非三份) + XxxMapper extends BaseMapperX
+│   └── redis/                    # XxxRedisDAO(可选)
+├── integration/                  # 跨模块契约:XxxApi(接口)+ impl/(Local/Feign)+ dto/(由 MapStruct 生成,非手写)
+├── event/                        # 领域事件(破循环依赖,缺陷1)+ listener/
+├── enums/                        # XxxErrorEnum(枚举,非散落常量,缺陷6)+ 业务枚举
+└── config/                       # 本模块 Spring 配置
 ```
 
-### 4.2 演进到微服务时的拆分(预留口子)
+**VO 收敛**(缺陷4,7 种 → 3 种):
+- `XxxCreateReq` / `XxxUpdateReq`(或合并 `XxxSaveReq`)— 写操作入参
+- `XxxResp` — 读操作返回
+- `XxxPageReq extends PageReq` — 分页查询(条件 + 分页参数)→ `PageResult<XxxResp>`
+- **取消** SimpleRespVO / ExportReqVO / ExcelVO(Resp + 字段过滤/导出注解替代)
+- VO 放对应 controller 子包下(`controller/admin/vo/`),不再按领域再分一层(消除 6 层包)
 
-单体期每模块一个 Maven module,`api/` 包内置。演进到微服务时,**把 `api/` + DTO 抽为独立 `aurora-module-<name>-api` 子模块**(yudao 在 `trade-api` 上已实践):
+**实体模型统一**(缺陷4,三份 → 一份):
+- 一份 `XxxEntity`(`@TableName`,原 DO)
+- 跨模块 DTO 由 MapStruct 从 Entity 生成,放 `integration/dto/`,不手写重复字段
+
+### 4.3 演进到微服务时的拆分(预留口子)
+
+单体期每模块一个 Maven module,`integration/` 包内置。演进到微服务时,把 `integration/`(api+impl+dto)抽为独立 `aurora-module-<name>-api` 子模块:
 
 ```
 aurora-module-trade/              # 实现端
-└── cn.aurora.module.trade/{controller, service, dal/mysql, convert, ...}
+└── cn.aurora.module.trade/{controller, service, repository, event, ...}
 
 aurora-module-trade-api/          # 契约端(演进时新增)
-└── cn.aurora.module.trade.api/{api/order/TradeOrderApi, dto/order/, enums/}
+└── cn.aurora.module.trade.api/{api/order/TradeOrderApi, dto/order/(MapStruct 生成), enums/}
 ```
 
-这样拆分后,跨模块调用从"依赖整个实现模块"瘦身为"只依赖契约 jar"。**具体的架构切换机制(本地实现 ↔ Feign 远程,零代码改动)见 [§6](#6-单体微服务一套代码)。**
+跨模块调用从"依赖整个实现模块"瘦身为"只依赖契约 jar"。架构切换机制(本地 ↔ Feign,零代码改动)见 [§6](#6-单体微服务一套代码)。
 
 ---
 
-## 5. 跨模块契约(双轨制)
+## 5. 跨模块契约(单向 api + 领域事件)
 
-这是 yudao 最精华的设计,Aurora 直接继承。
+> 对照缺陷1:yudao 模块内 Service 直接 `@Resource` 互注(297 处 @Lazy 兜底)。Aurora **禁止 Service 互注**,跨域一律走单向 api 接口 + 领域事件解耦。这是消灭循环依赖的核心机制。
 
-### 5.1 业务间契约:`module/*/api/XxxApi`
+### 5.1 三层契约体系
 
-**场景**:业务模块 A 调用业务模块 B 的能力(如 mall 调 system 查用户)。
+| 层 | 场景 | 机制 | 单向性 |
+|---|---|---|---|
+| **业务间** | 模块 A 调模块 B(如 mall 调 kernel 查用户) | `integration/api/XxxApi` 接口 + Local/Feign Impl | ✅ A→B 单向,B 不反向依赖 A |
+| **框架反调业务** | starter 要调业务能力(如 security 校验 token) | `common/biz/*CommonApi` 接口下沉,业务提供 Impl(依赖倒置) | ✅ starter 定义接口,业务实现 |
+| **反向通知** | "完成 A 后触发 B"(易制造二元环) | **领域事件**(`ApplicationEventPublisher`),A 发事件不持有 B | ✅ A 不依赖 B,B 监听 A 的事件 |
+
+### 5.2 业务间契约:`integration/api/XxxApi`(单向)
 
 ```java
-// aurora-module-system: api/dept/DeptApi.java(接口,与 Impl 同模块)
+// aurora-module-kernel: integration/api/dept/DeptApi.java(接口)
 public interface DeptApi {
     DeptRespDTO getDept(Long id);
     List<DeptRespDTO> getDeptList(Collection<Long> ids);
-    void validateDeptList(Collection<Long> ids);
 }
 
-// aurora-module-system: api/dept/DeptApiImpl.java(@Service,注入本模块 Service)
+// aurora-module-kernel: integration/api/dept/impl/DeptApiLocalImpl.java(单体本地实现)
 @Service
-public class DeptApiImpl implements DeptApi {
-    @Resource private DeptService deptService;
+@ConditionalOnArchitecture(Architecture.MONOLITH)
+public class DeptApiLocalImpl implements DeptApi {
+    @Resource private DeptService deptService;  // 只依赖本模块 Service
     @Override
     public DeptRespDTO getDept(Long id) {
-        return BeanUtils.toBean(deptService.getDept(id), DeptRespDTO.class);
+        return DeptConvert.INSTANCE.toResp(deptService.getDept(id));  // MapStruct
     }
 }
 
-// aurora-module-mall: 调用方(本地注入,零网络开销)
+// aurora-module-mall: 调用方(注入接口,零网络开销;微服务期自动切 Feign)
 @Resource private DeptApi deptApi;
 ```
 
 **关键约定**:
-- 接口 + Impl + DTO **同模块同包**(`api/<feature>/` + `api/<feature>/dto/`)
-- 返回值**永远用 `*RespDTO`**,绝不返回 DO(DO→DTO 用 `BeanUtils.toBean`)
-- 调用方 Maven 硬依赖整个被调模块(单体可接受;微服务期改为依赖 `*-api` 瘦 jar)
+- 接口 + Impl + DTO 同模块(`integration/api/<feature>/` + `impl/` + `dto/`)
+- 返回值**永远用 `*RespDTO`**(MapStruct 从 Entity 生成,非手写),绝不返回 Entity
+- **依赖单向**:mall → kernel 允许;kernel **不得**反向依赖 mall。Maven enforcer + ArchUnit 校验
+- 微服务期:同一 `DeptApi` 接口切 `@FeignClient`,调用方零改动(见 §6)
 
-### 5.2 框架反调业务契约:`common/biz/*CommonApi`(依赖倒置)
+### 5.3 框架反调业务:`common/biz/*CommonApi`(依赖倒置)
 
-**场景**:框架 starter 需要调用业务能力,但 starter 不能依赖业务模块。
-
-> 经典矛盾:`security` starter 的 `TokenAuthenticationFilter` 要校验 token,但 token 表在 `module-system`。starter 在 framework 层,不能反向依赖业务 module。
-
-**解法**:接口下沉到 `aurora-common`,业务模块提供实现。
+> 经典矛盾:starter 在 framework 层,不能依赖业务 module;但又要调业务能力(如 security 校验 token)。
+> 解法(yudao 精华保留):接口下沉到 `aurora-common`,业务模块提供 Impl。
 
 ```java
-// aurora-common: biz/system/oauth2/OAuth2TokenCommonApi.java(框架层定义接口)
+// aurora-common: biz/kernel/oauth2/OAuth2TokenCommonApi.java(框架层定义接口)
 public interface OAuth2TokenCommonApi {
     OAuth2AccessTokenCheckRespDTO checkAccessToken(String accessToken);
 }
 
-// aurora-module-system: api/oauth2/OAuth2TokenApiImpl.java(业务层提供实现)
+// aurora-module-kernel: integration/api/oauth2/impl/OAuth2TokenApiImpl.java(业务层实现)
 @Service
 public class OAuth2TokenApiImpl implements OAuth2TokenCommonApi {
     @Resource private OAuth2AccessTokenService oauth2AccessTokenService;
@@ -345,22 +374,63 @@ public class OAuth2TokenApiImpl implements OAuth2TokenCommonApi {
     }
 }
 
-// aurora-starter-security: TokenAuthenticationFilter(框架层注入接口,钩回业务实现)
+// aurora-starter-security: 注入接口,钩回业务实现
 private final OAuth2TokenCommonApi oauth2TokenApi;
-// ... oauth2TokenApi.checkAccessToken(token);
 ```
 
-### 5.3 Aurora common/biz/ 的 7 个 CommonApi(xiaoqu 现状)
+### 5.4 反向通知:领域事件(破二元环)
 
-| CommonApi | 位置 | DTO | 用途 |
-|---|---|---|---|
-| `OAuth2TokenCommonApi` | common.biz.system.oauth2 | OAuth2AccessTokenCreate/Check/RespDTO | token 校验/创建(security starter 调) |
-| `PermissionCommonApi` | common.biz.system.permission | DeptDataPermissionRespDTO | 权限/数据权限校验(security + data-permission starter 调) |
-| `TenantCommonApi` | common.biz.system.tenant | — | 租户列表/校验(tenant starter 调) |
-| `DictDataCommonApi` | common.biz.system.dict | DictDataRespDTO | 字典查询(excel/web starter 调) |
-| `OperateLogCommonApi` | common.biz.system.logger | OperateLogCreateReqDTO | 操作日志记录 |
-| `ApiAccessLogCommonApi` | common.biz.infra.logger | ApiAccessLogCreateReqDTO | API 访问日志 |
-| `ApiErrorLogCommonApi` | common.biz.infra.logger | ApiErrorLogCreateReqDTO | API 错误日志 |
+> 这是 yudao **缺失**的机制——它靠 Service 互注 + @Lazy 处理"A 完成后通知 B",制造循环。Aurora 用领域事件。
+
+```java
+// 模块 A(订单):完成下单后发事件,不持有模块 B(库存)的引用
+@Service
+public class OrderService {
+    @Resource private ApplicationEventPublisher eventPublisher;
+    @Resource private OrderMapper orderMapper;
+
+    public void createOrder(OrderCreateReq req) {
+        // ... 创建订单 ...
+        eventPublisher.publishEvent(new OrderCreatedEvent(order.getId()));  // 发事件,不调库存 Service
+    }
+}
+
+// 模块 B(库存):监听事件,A 不依赖 B,B 依赖 A 的事件类(单向)
+@Component
+public class StockEventListener {
+    @EventListener
+    public void onOrderCreated(OrderCreatedEvent event) {
+        // 扣减库存...
+    }
+}
+```
+
+**规则**:
+- 事件类放发出方的 `event/` 包,接收方依赖事件类(单向)
+- 跨进程演进:Local Listener(单体) / Remote Listener(`@ConditionalOnArchitecture(DISTRIBUTED)`,见 §6.4)
+- **禁止**用事件做"同步请求-响应"(那是 api 接口的职责);事件只用于"已完成动作的通知"
+
+### 5.5 common/biz/ 的 CommonApi(框架反调业务契约)
+
+| CommonApi | 位置 | 用途 |
+|---|---|---|
+| `OAuth2TokenCommonApi` | common.biz.kernel.oauth2 | token 校验/创建(security starter 调)—— 注:SAS 接管后此契约调整 |
+| `PermissionCommonApi` | common.biz.kernel.permission | 权限/数据权限校验(security + data-permission starter 调) |
+| `TenantCommonApi` | common.biz.kernel.tenant | 租户列表/校验(tenant starter 调) |
+| `DictDataCommonApi` | common.biz.kernel.dict | 字典查询(excel/web starter 调) |
+| `OperateLogCommonApi` | common.biz.kernel.logger | 操作日志记录 |
+| `ApiAccessLogCommonApi` | common.biz.infra.logger | API 访问日志 |
+| `ApiErrorLogCommonApi` | common.biz.infra.logger | API 错误日志 |
+
+### 5.6 循环依赖治理(缺陷1 落地)
+
+| 治理手段 | 说明 |
+|---|---|
+| **禁止 Service 互注** | 模块内 Service 之间不得直接 `@Resource` 对方;跨域走 api 接口 |
+| **领域事件破环** | "A 完成后触发 B" 用事件,不用互注 |
+| **关闭全局开关** | `spring.main.allow-circular-references: false`(yudao 是 true) |
+| **`@Lazy` 禁用** | 极少场景需 `@Lazy` 必须注释理由,默认不允许 |
+| **ArchUnit 校验** | 构建期校验模块依赖方向单向,环即失败 |
 
 > ⚠️ **迁移第 0 步必须先迁这 7 个 CommonApi 到 aurora-common**,否则全平台编译断裂。
 
@@ -620,30 +690,7 @@ dante-engine 的分层很干净,Aurora 照搬:
 - **不预设继承 yudao**:以"正确工程范式"为基线,四家择优
 - **主动改掉 yudao 7 缺陷**:循环依赖 / 数据权限粗 / token 自造 / 命名分层乱 / 模块边界不清 / 错误码 / 异常处理(详见 `paradigm-redesign.md`)
 - **迁移 = 重写**:xiaoqu ~6000 文件按新范式重写,不妥协(不追求 100% 兼容旧 API 形状)
-- **借鉴保留**:BaseDO/BaseMapperX/LambdaQueryWrapperX/CommonResult(改)/api 契约思路(改单向)等好东西保留借鉴
-
-### B. 品牌名(推荐 Aurora)
-
-候选 **Aurora**(极光/启明),与 `xq-ui/xq-starter/aurora-admin` 一脉相承。
-- 建议坐标:`<groupId>cn.aurora</groupId>`(可调)
-- 包名:`cn.aurora.framework.*` / `cn.aurora.module.*`
-- 仓库名:`aurora-boot`
-
-### C. 仓库位置(推荐 ~/01-code/xq/aurora-boot/)
-
-已创建于 `~/01-code/xq/aurora-boot/`,git init 完成。
-
-### D. 范式兼容承诺(推荐:100% 兼容)
-
-确认脚手架与 xiaoqu 现有 yudao 范式 100% 兼容:
-- `BaseDO`(5 审计字段 + `@TableLogic` + `TransPojo`)
-- `BaseMapperX extends MPJBaseMapper`(分页/Join/ForUpdate/批量 default 方法)
-- `LambdaQueryWrapperX`(xxxIfPresent 系列)
-- `CommonResult` + `ErrorCode` + `ServiceException`
-- `module/*/api/XxxApi` + `common/biz/*CommonApi` 双轨契约
-- VO 命名:`*ReqVO` / `*RespVO` / `*PageReqVO` / `*SaveReqVO`
-
-**这是保证 6000 文件零返工的前提。** Aurora 可在兼容基础上做增量增强(如提供 `BaseConvert` 模板方法补便捷性),但不改变既有 API 形状。
+- **借鉴保留**:BaseEntity(原 BaseDO)/BaseMapperX/LambdaQueryWrapperX/CommonResult(改)/api 契约思路(改单向)等好东西保留借鉴
 
 ---
 

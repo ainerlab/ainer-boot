@@ -1,18 +1,20 @@
 # Aurora 工程约定
 
-> 状态:**DRAFT v0.1** · 日期:2026-07-22
+> 状态:**DRAFT v0.2** · 日期:2026-07-22
 > 适用范围:aurora-boot 全工程(framework + module + server)
-> 文档骨架借鉴 BladeX-Tool/CLAUDE.md(章节组织),约定内容兼容 xiaoqu 现有范式(保证迁移零返工)
+> 文档骨架借鉴 BladeX-Tool/CLAUDE.md(章节组织)
+> **范式立场**:不预设继承 yudao,主动改 7 缺陷(见 `design/paradigm-redesign.md`)
 > 协作语言:**中文**
+> ⚠️ 注:§3-§5 的部分代码示例仍沿用旧命名(UserDO/SaveReqVO 等),将随阶段 2 代码落地一并改为新命名(Entity/CreateReq 等)。**规则以 §2 命名规范和 `paradigm-redesign.md` 为准。**
 
 ---
 
 ## 0. 协作准则
 
-1. **模仿优先**:编写新功能前,先读现有同类代码,复用既有抽象(BaseDO/BaseMapperX/CommonResult/*Api),避免新造轮子。
-2. **最小改动**:重构与功能新增分离,一个 PR 不做两件事。
-3. **范式兼容**:本工程与 xiaoqu 现有 yudao 范式 100% 兼容,**不得擅自改变 BaseDO/BaseMapperX/CommonResult/*Api 的 API 形状**(见 `design/aurora-scaffold-design.md` §8-D)。
-4. **Boot4 纪律**:所有新增代码必须符合 Boot4+JDK25 适配(见 `boot4-migration-notes.md`),禁止引入 javax.*(除 JDK 内置)、禁止 spring.factories 自动装配。
+1. **范式立场优先**:本工程**不预设继承 yudao**,主动改掉 yudao 7 缺陷(循环依赖/数据权限粗/token 自造/命名分层乱/模块边界不清/错误码/异常处理)。写代码前必读 `design/paradigm-redesign.md`。
+2. **模仿优先**:编写新功能前,先读现有同类代码,复用既有抽象(BaseEntity/BaseMapperX/CommonResult/XxxApi)。
+3. **最小改动**:重构与功能新增分离,一个 PR 不做两件事。
+4. **Boot4 纪律**:符合 Boot4+JDK25 适配(见 `boot4-migration-notes.md`),禁止 javax.*(除 JDK 内置)、禁止 spring.factories 自动装配。
 
 ---
 
@@ -20,17 +22,17 @@
 
 ### 1.1 工程性质
 
-- **framework 层**(`aurora-framework/`):提供 starter,是"基础设施提供者",不含业务 CRUD。
-- **业务层**(`aurora-module-*/`):遵循 framework 约定的业务模块。
+- **framework 层**(`aurora-framework/`):提供 starter,是"基础设施提供者",不含业务 CRUD。**core→spring 分层**(吸收 dante-engine)。
+- **业务层**(`aurora-module-*/`):**kernel vs business 分离**(缺陷5)。`module-kernel` 只放纯技术,业务模块各自独立。
 - **启动层**(`aurora-server/`):空壳,靠 pom 依赖决定启动范围。
 
 ### 1.2 核心理解要点(必须记住)
 
 1. **BOM 管版本**:`aurora-dependencies` 是唯一版本源,子模块 pom **禁止写版本号**。
-2. **common 是最底层**:`aurora-common` 被所有模块依赖,**不得反向依赖任何业务模块**;跨模块契约放 `common/biz/`(依赖倒置)。
-3. **api 双轨**:业务间用 `module/*/api/XxxApi`(本地注入);框架反调业务用 `common/biz/*CommonApi`(依赖倒置)。
+2. **core 是最底层**:`aurora-core` 零 Spring 依赖;`aurora-common` 不反向依赖业务模块;跨模块契约放 `common/biz/`(依赖倒置)。
+3. **跨模块契约单向**(缺陷1):业务间用 `integration/api/XxxApi`(**单向**,禁 Service 互注);"完成后通知"走**领域事件**;框架反调业务用 `common/biz/*CommonApi`(依赖倒置)。详见 `design` §5。
 4. **starter 用 `@AutoConfiguration`**:装配走 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`,**不写 spring.factories 的 EnableAutoConfiguration**。
-5. **单体演进**:模块间走 `api/` 契约,**禁止跨模块直接依赖 Service 实现类**;未来拆 `X-api` 子模块时业务代码零改动。
+5. **循环依赖零容忍**(缺陷1):`allow-circular-references: false`,`@Lazy` 禁用(除非充分理由+注释),跨域走 api 接口/事件。
 
 ---
 
@@ -39,31 +41,31 @@
 ### 2.1 包名
 
 - 框架:`cn.aurora.framework.<层>.<功能>`(如 `cn.aurora.framework.mybatis.core.mapper`)
-- 业务:`cn.aurora.module.<模块名>.<层>.<功能>`(如 `cn.aurora.module.system.controller.admin.dept`)
+- 业务:`cn.aurora.module.<模块名>.<层>.<功能>`(如 `cn.aurora.module.kernel.controller.admin.dept`)— **≤4 层包**(缺陷4)
 - 启动:`cn.aurora.server`
-- common 跨模块契约:`cn.aurora.framework.common.biz.<源模块>.<功能>`(如 `cn.aurora.framework.common.biz.system.oauth2`)
+- common 跨模块契约:`cn.aurora.framework.common.biz.<源模块>.<功能>`(如 `cn.aurora.framework.common.biz.kernel.oauth2`)
 
 ### 2.2 类名后缀词典(按角色)
 
 | 角色 | 后缀 | 示例 |
 |---|---|---|
 | 配置类 | `AutoConfiguration` / `Properties` | `AuroraRedisAutoConfiguration`、`WebProperties` |
-| 配置属性 | `Properties` | `SecurityProperties` |
 | 工具类 | `Util` / `Utils` | `BeanUtils`、`DateUtils` |
 | 拦截器 | `Interceptor` | `TenantDatabaseInterceptor` |
-| 处理器 | `Handler` | `DefaultDBFieldHandler`、`GlobalExceptionHandler` |
+| 处理器 | `Handler` | `DefaultFieldHandler`、`GlobalExceptionHandler` |
 | 过滤器 | `Filter` | `TokenAuthenticationFilter` |
 | 常量 | `Constants` / `Constant` | `RedisKeyConstants` |
 | 枚举 | `Enum` / `Type` | `UserTypeEnum`、`CommonStatusEnum` |
-| 数据对象 | `DO` | `UserDO extends BaseDO` |
-| 视图对象 | `VO` | `UserRespVO`、`UserPageReqVO`、`UserSaveReqVO` |
-| 数据传输 | `DTO` | `UserRespDTO`(跨模块) |
-| Mapper | `Mapper` | `UserMapper extends BaseMapperX<UserDO>` |
+| ★ 实体 | **`Entity`**(**原 DO**,缺陷4) | `UserEntity extends BaseEntity` |
+| ★ 视图对象 | **`Resp`/`CreateReq`/`UpdateReq`/`PageReq`**(**原 RespVO 等 7 种,缺陷4**) | `UserResp`、`UserCreateReq`、`UserPageReq` |
+| 数据传输 | `DTO` | `UserRespDTO`(跨模块,MapStruct 生成) |
+| Mapper | `Mapper` | `UserMapper extends BaseMapperX<UserEntity>` |
 | Service 接口 | `Service` | `UserService` |
 | Service 实现 | `ServiceImpl` | `UserServiceImpl` |
 | Controller | `Controller` | `UserController` |
-| 跨模块契约接口 | `Api` | `AdminUserApi`(业务间)、`OAuth2TokenCommonApi`(框架反调) |
+| 跨模块契约接口 | `Api` | `DeptApi`(业务间)、`OAuth2TokenCommonApi`(框架反调) |
 | 转换器 | `Convert` | `UserConvert`(@Mapper,MapStruct) |
+| ★ 领域事件 | **`Event`**(缺陷1) | `OrderCreatedEvent`(`event/` 包) |
 | Redis DAO | `RedisDAO` | `UserRedisDAO` |
 | 异常 | `Exception` | `ServiceException`、`ServerException` |
 
@@ -73,16 +75,19 @@
 - 常量:`UPPER_SNAKE_CASE`,定义在 `interface XxxConstants` 或枚举中。
 - 表名:`<前缀>_<下划线命名>`,逻辑删除字段统一 `deleted`(Boolean),审计字段统一 `create_time/update_time/creator/updater`。
 
-### 2.4 VO 命名约定
+### 2.4 VO 命名约定(★ 收敛,缺陷4)
+
+> yudao 有 7 种 VO 后缀(ReqVO/RespVO/PageReqVO/SaveReqVO/SimpleRespVO/ExportReqVO/ExcelVO)。Aurora **收敛到 3 种**。
 
 | 类型 | 命名 | 用途 |
 |---|---|---|
-| 响应 | `XxxRespVO` | 接口返回 |
-| 分页请求 | `XxxPageReqVO` | 分页查询入参(extends PageParam) |
-| 保存请求 | `XxxSaveReqVO` | 新增 + 修改共用 |
-| 简单响应 | `XxxSimpleRespVO` | 列表/下拉场景的精简响应 |
-| 导出请求 | `XxxExportReqVO` | 导出入参 |
-| Excel | `XxxExcelVO` | 导入导出 Excel 行 |
+| ★ 写请求 | `XxxCreateReq` / `XxxUpdateReq`(或合并 `XxxSaveReq`) | 新增/修改入参 |
+| ★ 读响应 | `XxxResp` | 接口返回(列表/详情共用,字段按需) |
+| ★ 分页请求 | `XxxPageReq extends PageReq` | 分页查询(条件 + 分页参数)→ `PageResult<XxxResp>` |
+| ~~SimpleRespVO~~ | 取消,用 `XxxResp` + 字段过滤 | — |
+| ~~ExportReqVO/ExcelVO~~ | 取消,用 `XxxPageReq` + 导出注解 | — |
+
+VO 放对应 controller 子包下(`controller/admin/vo/`),不再按领域再分一层(消除 yudao 6 层包)。
 
 ---
 
@@ -313,11 +318,12 @@ public interface UserMapper extends BaseMapperX<UserDO> {
 - 单字段查询用 default 方法 + `selectOne(SFunction, value)`
 - 复杂 SQL 写 XML(同包 `XxxMapper.xml`,PostgreSQL 语法)
 
-### 5.6 跨模块调用约定
+### 5.6 跨模块调用约定(★ 单向,缺陷1)
 
-- **业务间**:注入 `XxxApi`(本地 `@Service` 实现),返回 `*RespDTO`(绝不返回 DO)。
+- **业务间**:注入 `XxxApi`(`integration/api/`,Local 实现/未来 Feign),返回 `*RespDTO`(绝不返回 Entity)。**依赖单向**:A→B 允许,B 不得反向依赖 A。
+- **反向通知**:"完成 A 后触发 B" 用**领域事件**(`event/XxxEvent` + `@EventListener`),A 不持有 B 的引用。**禁止**用 Service 互注处理此类联动。
 - **框架反调业务**:starter 注入 `XxxCommonApi`(接口在 common/biz,实现在业务模块)。
-- **禁止**:跨模块直接 `@Resource` 别的 Service(制造循环依赖);用 `@Lazy` 是兜底,应优先走 api 契约解耦。
+- **禁止**:跨模块/跨域直接 `@Resource` 别的 Service(制造循环依赖);`@Lazy` 默认禁用,极少场景需用必须注释理由。
 
 ---
 
@@ -396,12 +402,17 @@ mvn test -Dtest=UserServiceTest#testCreateUser   # 单测
 
 单测基座:`aurora-starter-test` 提供 `BaseDbUnitTest`(H2 + redis mock)。
 
-### 9.4 循环依赖检查
+### 9.4 循环依赖检查(★ 零容忍,缺陷1)
 
-若启动报循环依赖:
-1. 优先用 `api/` 契约解耦(把直接 Service 调用改为 Api 调用)
-2. 实在无法解耦,用 `@Lazy` 精准破环(**注释说明原因**)
-3. 兜底:`spring.main.allow-circular-references: true`(已有,yudao 实测真实需要)
+> Aurora 与 yudao 根本不同:`allow-circular-references: false`(yudao 是 true),循环依赖 = 设计错误,**编译/启动即失败**,不兜底。
+
+若出现循环依赖报错,**必须重构**,不允许 `@Lazy` 掩盖:
+1. **领域事件破环**(首选):把"A 完成后通知 B"改为 A 发 `event/XxxEvent`,B 用 `@EventListener` 监听。A 不依赖 B。
+2. **api 契约解耦**:把跨域的 Service 直调改为 `integration/api/XxxApi` 单向接口。
+3. **合并同域 Service**:若两个 Service 本属同一聚合(如 yudao 的 SPU↔SKU),合并为一个 Service 或重新划分子域。
+4. **仅在极少数有充分架构理由时**(如框架基础设施与业务的引导期依赖),经评审可用 `@Lazy`,**必须注释说明**。
+
+`@Lazy` 默认视为坏味道,PR review 重点检查。
 
 ---
 
