@@ -1,17 +1,17 @@
 # Aurora 脚手架 · 架构设计
 
-> 状态:**DRAFT v0.3** · 日期:2026-07-22
+> 状态:**DRAFT v0.4** · 日期:2026-07-22
 > 技术基线:**JDK 25 + Spring Boot 4.1.0**(Spring Framework 7 / Jakarta EE 11 / Servlet 6.1)
 > 定位:单体优先、可演进微服务(**一套代码、两种架构**)的业务开发脚手架
 > 身份:全新独立 greenfield 仓库,**与 xiaoqu-platform 现有 yudao 范式 100% 兼容**(保证 6000 文件零返工)
-> 参考源:**bladex**(单体→微服务模块拆分) + **yudao/ruoyi-vue-pro**(业务范式) + **dante-cloud**(一套代码两种架构)
+> 参考源:**bladex**(单体→微服务模块拆分) + **yudao/ruoyi-vue-pro**(业务范式) + **dante-cloud/engine**(一套代码两种架构) + **Snowy**(数据权限/字段加密)
 
 ---
 
 ## 0. 阅读顺序
 
 1. [§1 定位与约束](#1-定位与约束)—— 为什么是"范式提炼 + 升级 + 独立",而非"范式创新"
-2. [§2 吸收清单](#2-吸收清单bladex--yudao--dante-cloud)—— 从三个脚手架各吸收什么、舍弃什么,逐项附理由
+2. [§2 吸收清单](#2-吸收清单bladex--yudao--dante-cloud--snowy)—— 从四个脚手架各吸收什么、舍弃什么,逐项附理由
 3. [§3 技术栈基线](#3-技术栈基线boot4--jdk25)—— 已 git show 核实的精确坐标
 4. [§4 模块划分](#4-模块划分)—— 工程骨架
 5. [§5 跨模块契约](#5-跨模块契约双轨制)—— yudao 最精华设计
@@ -26,7 +26,7 @@
 
 ### 1.1 一句话定位
 
-**Aurora = 把 xiaoqu-platform 已深度使用的 yudao 范式,抽干净成独立品牌产物,升级到 Boot4+JDK25,并吸收 bladex 的模块演进路径 + dante-cloud 的"一套代码两种架构"机制。**
+**Aurora = 把 xiaoqu-platform 已深度使用的 yudao 范式,抽干净成独立品牌产物,升级到 Boot4+JDK25,并吸收 bladex 的模块演进路径 + dante-cloud 的"一套代码两种架构"机制 + Snowy 的 API 维度数据权限与字段加密。**
 
 ### 1.2 为什么不是"范式创新"
 
@@ -76,7 +76,7 @@ Aurora 落地这套机制(详见 §6):
 
 ---
 
-## 2. 吸收清单(bladex + yudao + dante-cloud)
+## 2. 吸收清单(bladex + yudao + dante-cloud + Snowy)
 
 ### 2.1 从 bladex 吸收(精选 4 项)
 
@@ -133,20 +133,51 @@ Aurora 落地这套机制(详见 §6):
 | **Spring Authorization Server + ConfigurerManager** | SAS + 把 HttpSecurity 配置器封装成可注入 Manager | 比 yudao 自造 token 更正统,但实现复杂度高;与 §9 决策项 A 相关,**若选 OAuth2 标准方案再参考**,首期不引入 |
 | **三基础设施 facility starter(Nacos/Polaris/Zookeeper)** | `facility-spring-boot-starter` pom 注释切换 | 单体阶段默认无注册中心,演进时再做适配层 |
 
-### 2.6 三方融合的关键判断
+### 2.6 从 Snowy 吸收(精选 3 项,均为四家独有)
 
-| 设计点 | bladex | yudao | dante-cloud | Aurora 选择 |
+> Snowy(v3.6.5,Boot 3.5/JDK17,Sa-Token 1.44)是四个参考源里**唯一有真正工程创新**的——其核心价值不在"插件化"(那是物理模块换皮,bladex 已覆盖),而在**两个具体而微的设计**。注意 Snowy 用 Sa-Token,Aurora 用 Spring Security,**认证层冲突,吸收时必须剥离 Sa-Token 改基于 SecurityContext**。
+
+| # | 吸收项 | Snowy 真实做法 | Aurora 做法 | 价值(四家独有?) |
 |---|---|---|---|---|
-| 统一响应 | `R<T>`(带 success) | `CommonResult<T>`(无 success) | — | **yudao**(Boot3/4 现代写法) |
-| VO 转换 | Wrapper(反射) | Convert(MapStruct) | — | **yudao**(性能+类型安全) |
-| 数据层 | MyBatis-Plus | MyBatis-Plus | **JPA** | **MyBatis-Plus**(yudao/bladex,Aurora 阵营) |
-| 版本管理 | blade-bom 子模块 | yudao-dependencies 独立顶级 | ecosystem-parent + 双 BOM 三层 | **融合**:结构跟 yudao(独立顶级),flatten 参数抄 bladex(pomElements) |
-| **单体↔微服务** | 两套代码(模块物理拆) | 两个工程(vue-pro/cloud) | **一套代码**(配置切换) | **dante-cloud 配置驱动** + bladex 演进抽 X-api |
-| 模块拆分 | 单体全揉 / 微服务 api+service | 统一 module(单体形态) | 配置条件注解 | **bladex 演进路径** + dante 条件装配 |
-| 跨模块契约 | Feign IXxxClient | 双轨(api 包本地 + biz/CommonApi) | `@Inner` + Feign Contract + 网关拦伪造头 | **yudao 双轨**(最精华)+ dante 网关防伪造(安全补丁) |
-| 装配生成 | blade-core-auto 编译期处理器 | 手写 AutoConfiguration.imports | `@ConditionalOnXxx` + `@EnableXxx` | **yudao 手写** imports + **dante `@EnableXxx` 显式开关** |
-| 启动入口 | BladeApplication.run + SPI | 裸 SpringApplication.run | 裸 run + 条件注解 | **裸 run**(单体无聚合场景) |
-| 认证 | 自造 token | Spring Security + 自造 OAuth2 token | **Spring Authorization Server + ConfigurerManager** | **首期 yudao 路线**(决策项 A),OAuth2 标准化时参考 dante |
+| S1 | **API 维度数据权限 + 预计算表 + scopeKey 去重** | `DataScope{apiUrl,dataScope,scopeAll}` 挂登录用户;`SYS_USER_DATA_SCOPE` + `SYS_USER_DATA_SCOPE_MAP` 预计算表,`scopeKey=MD5(orgId集合)` 去重;`CommonSqlUtil.scopeIn()` inSql 子查询下推(SQL 长度固定可缓存) | **剥离 Sa-Token**,`DataScope` 改挂 Spring Security 的 `LoginUser`;5 级范围(SCOPE_ALL/SELF/ORG/ORG_CHILD/ORG_DEFINE) | ✅ 四家独有。yudao 是表维度 SQL 重写,Snowy 能"同一实体不同接口不同可见范围";scopeKey 去重 + 子查询解决 orgId 列表过长/性能 |
+| S2 | **字段级透明加密(SM4-CBC + TypeHandler)** | 字段写明文,`CommonSm4CbcTypeHandler` 自动加解密;`CommonCryptogramUtil` SM2/SM3/SM4 全套;密钥 XOR 混淆防反编译 | `EncryptTypeHandler` 模式(yudao 已有雏形),算法按需(SM4 国密 或 AES 通用) | ✅ 四家独有。字段级透明加密,政务/金融等保刚需 |
+| S3 | **easy-trans `@Trans` 字段翻译** | `CommonEntity implements TransPojo`,`@Trans(type=RPC/DICT, ref="createUserName")` 自动翻译 createUser→name | `BaseDO implements TransPojo`(yudao 已有),配 `@Trans` 注解自动填充创建人/更新人/字典名 | ⭐ 部分独有。yudao 已实现 TransPojo 但手写翻译,Snowy 用 `@Trans` 注解更声明式(两者互补,Aurora 已选 yudao TransPojo,补 `@Trans` 声明式用法) |
+
+附加吸收(轻量,P1):
+- **CommonResult 加 traceId 字段**(Snowy 独有,链路追踪必备,一行字段)
+- **CommonNoRepeat 防重提交注解**(IP+URL+参数 Redis 比对,30 行代码)
+- **ResourceCollectListener 思想**(启动扫权限注解入缓存,"代码即权限清单",改扫 Spring Security 注解)
+- **代码生成 4 业务形态**(table/tree/left-tree-table/master-detail,比 yudao 的 CRUD+树更细,吸收产品划分,模板重写为 Aurora 的 Vue 库)
+
+### 2.7 论证后舍弃的 Snowy 机制(Sa-Token 冲突为主)
+
+| 舍弃项 | Snowy 做法 | 舍弃理由 |
+|---|---|---|
+| **Sa-Token 全家桶** | AuthConfigure / SaServletFilter / StpLogic 双实例 / StpInterface / SSO 协议层(14 厂商) | ⚠️ **与 Spring Security 互斥**。Aurora 已选 yudao 的 Spring Security 路线(决策项 A),认证层整体丢弃 |
+| **StpLoginUserUtil / StpUtil 静态调用** | 散落在 MetaObjectHandler / BizUserServiceImpl | 与 Spring Security 的 SecurityContextHolder 模型冲突;吸收数据权限时**改写为基于 LoginUser** |
+| **"插件式动态加载"幻觉** | 实际就是 Maven 物理模块(plugin/plugin-api)+ pom 装配 | **与 bladex modules/X 同档**,Aurora 已吸收 bladex,Snowy 无新增价值 |
+| **JSONObject 跨模块 API 返回** | `SysUserApi` 返回 `JSONObject` | 弱类型,与 yudao 强类型 DTO 范式冲突,**不要降级** |
+| **hutool CronUtil 数据库定时任务** | `DevJobListener` 启动 `CronUtil.schedule` | 无集群协调(多实例重复执行);Aurora 用 Quartz(yudao 路线) |
+| **CommonDataChangeEventCenter 手写事件总线** | 静态 List<Listener> + dataType 字符串分发 | 与 Spring ApplicationEvent 重叠,Spring Event 更标准,Aurora 已有 |
+
+### 2.8 四方融合的关键判断
+
+| 设计点 | bladex | yudao | dante-cloud | Snowy | Aurora 选择 |
+|---|---|---|---|---|---|
+| 统一响应 | `R<T>`(带 success) | `CommonResult<T>`(无 success) | — | `CommonResult<T>`(**+traceId**) | **yudao + Snowy traceId** |
+| VO 转换 | Wrapper(反射) | Convert(MapStruct) | — | easy-trans @Trans(翻译) | **yudao MapStruct** + **Snowy @Trans**(翻译填充) |
+| 字段加密 | 无 | EncryptTypeHandler 雏形 | 无 | **SM4-CBC + TypeHandler + 密钥混淆** | **Snowy S2**(字段级透明加密) |
+| 数据层 | MyBatis-Plus | MyBatis-Plus | **JPA** | MyBatis-Plus | **MyBatis-Plus**(yudao/bladex/Snowy 阵营) |
+| 版本管理 | blade-bom 子模块 | yudao-dependencies 独立顶级 | ecosystem-parent + 双 BOM 三层 | 根 pom properties(无 BOM) | **融合**:结构跟 yudao(独立顶级),flatten 参数抄 bladex(pomElements) |
+| **单体↔微服务** | 两套代码(模块物理拆) | 两个工程(vue-pro/cloud) | **一套代码**(配置切换) | EnvironmentDetector(弱) | **dante-cloud 配置驱动** + bladex 演进抽 X-api |
+| 模块拆分 | 单体全揉 / 微服务 api+service | 统一 module(单体形态) | 配置条件注解 | 物理 plugin/plugin-api | **bladex 演进路径** + dante 条件装配 |
+| 跨模块契约 | Feign IXxxClient | 双轨(api 包本地 + biz/CommonApi) | `@Inner` + Feign Contract + 网关拦伪造头 | plugin-api/provider 弱类型 JSONObject | **yudao 双轨**(最精华)+ dante 网关防伪造 |
+| 装配生成 | blade-core-auto 编译期处理器 | 手写 AutoConfiguration.imports | `@ConditionalOnXxx` + `@EnableXxx` | 物理模块 + pom | **yudao 手写** imports + **dante `@EnableXxx`** |
+| 启动入口 | BladeApplication.run + SPI | 裸 SpringApplication.run | 裸 run + 条件注解 | 裸 run | **裸 run**(单体无聚合场景) |
+| 认证 | 自造 token | Spring Security + 自造 OAuth2 token | **Spring Authorization Server + ConfigurerManager** | **Sa-Token**(B/C 双 StpLogic) | **首期 yudao 路线**(决策项 A),OAuth2 标准化时参考 dante;**Sa-Token 互斥不吸收** |
+| **数据权限** | @DataAuth + 拦截器(表维度) | @DataPermission + SQL 重写(表维度) | 无专门层 | **API 维度 + 预计算表 + scopeKey 去重**(四家独有) | **yudao 表维度 + Snowy API 维度融合**(见 §4 starter-biz-data-permission) |
+| **多租户** | 有(字段隔离) | 有(拦截器+缓存隔离) | 有(JPA filter) | **无** | **yudao**(MyBatis-Plus 拦截器) |
+| **代码生成业务形态** | CRUD/树/主子 | CRUD/树 | 无 | **table/tree/left-tree-table/master-detail 4 形态** | **Snowy 4 形态划分** + bladex api/api-fast 双模板 |
 
 ---
 
@@ -204,7 +235,7 @@ aurora-boot/
 │   ├── aurora-starter-datasource         # dynamic-datasource boot4(多数据源) ◆重能力
 │   ├── aurora-starter-redis              # Redisson 4.6 + Jackson3(删旧 JavaTimeModule 样板)
 │   ├── aurora-starter-biz-tenant         # TenantBaseDO + MP拦截器 + Redis隔离 + 可开关 ◆重能力
-│   ├── aurora-starter-biz-data-permission# @DataPermission 规则引擎 ◆重能力
+│   ├── aurora-starter-biz-data-permission# 数据权限:表维度(@DataPermission)+ API 维度(Snowy S1 预计算表)+ 字段加密(S2) ◆重能力
 │   ├── aurora-starter-biz-bpm            # Flowable 8 封装 ◆重能力
 │   ├── aurora-starter-job                # Quartz 定时任务
 │   ├── aurora-starter-mq                 # Redis Stream / RabbitMQ / RocketMQ
@@ -563,7 +594,7 @@ dante-engine 的分层很干净,Aurora 照搬:
 | 方案 | 优点 | 代价 | Boot4 成熟度 |
 |---|---|---|---|
 | **A. Spring Security 7 + 自建 OAuth2 token 表 + Redis**(推荐) | 团队最熟;xiaoqu 现状即此;多租户/数据权限/操作日志集成成本最低;ruoyi master-jdk25 已验证 Boot4 跑通 | 自管 token 表/刷新/登出逻辑 | ✅ 有活样本(yudao) |
-| B. Sa-Token | API 极简、中文文档好、上手快 | 与 yudao 系数据权限/租户/操作日志需大量重写适配;greenfield 要自建整套集成 | ⚠️ 需验证 Boot4 starter |
+| B. Sa-Token | API 极简、中文文档好、上手快;Snowy 用此方案(B/C 双 StpLogic) | ⚠️ **与 Spring Security 互斥**;与 yudao 系数据权限/租户/操作日志需大量重写适配;greenfield 要自建整套集成 | ⚠️ 需验证 Boot4 starter。**注:即便选 Sa-Token,Snowy 的数据权限(S1)仍需剥离 StpUtil 改 SecurityContext** |
 | C. Spring Authorization Server + ConfigurerManager | 最"正规"标准 OAuth2 授权服务器;**dante-cloud 的 ConfigurerManager 模式可封装 SAS 复杂配置,业务方零配置**;支持 passkey/国密/社交扩展 | 最重;password grant 已弃用需适配;dante 底层实现在 dante-engine(未本地),需自行实现 ConfigurerManager | ✅ dante-cloud 有 Boot4 活样本 |
 
 **推荐 A 的理由**:首期全内置多租户+数据权限+BPM,这些与 yudao 系 security/operatelog/tenant 深度耦合,方案 A 集成成本最低且有 Boot4 活样本可照抄。**若未来需要标准化 OAuth2(开放平台/第三方接入/passkey),可参考 dante-cloud 的方案 C 升级**。
@@ -600,5 +631,6 @@ dante-engine 的分层很干净,Aurora 照搬:
 - **ruoyi-vue-pro**:`origin/master-jdk25` 分支(JDK25 + Boot4.1.0,git show 读取,未 checkout)
 - **dante-cloud**:`/Users/xq/01-code/xq/dante-cloud/`(JDK25 + Boot4.1 + Spring Cloud 2025.1.2,v4.1.0.4;装配层代码)
 - **dante-engine**:`/Users/xq/01-code/xq/dante-engine/`(54 模块,框架核心实现;条件注解在 `dante-framework/dante-spring`,已逐行核实 `@ConditionalOnArchitecture` 体系)
+- **Snowy**:`/Users/xq/01-code/xq/Snowy/`(v3.6.5,Boot 3.5/JDK17,Sa-Token 1.44;已核实 API 维度数据权限 + 预计算表 + scopeKey、SM4 字段加密 + TypeHandler、easy-trans @Trans、代码生成 4 形态)
 - **xiaoqu-platform**:`/Users/xq/01-code/xq/xiaoqu-platform/`(13+ 模块、~6000 文件、~57 万行)
 - **Spring Boot 4**:2025-11-20 GA,Spring Framework 7,Jakarta EE 11,Servlet 6.1,最低 JDK17/推荐 25

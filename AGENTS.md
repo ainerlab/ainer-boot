@@ -6,7 +6,7 @@
 
 Aurora 是**一套代码、两种架构**(单体优先、可演进微服务)的业务开发脚手架,**JDK 25 + Spring Boot 4.1.0**。
 
-**本质**:把 xiaoqu-platform 已深度使用的 yudao 范式,抽干净成独立品牌产物,升级到 Boot4+JDK25,并吸收 bladex(模块演进)+ dante-cloud(一套代码两种架构)工程机制。**与 xiaoqu 现有 yudao 范式 100% 兼容**(保证 6000 文件零返工)是硬约束。
+**本质**:把 xiaoqu-platform 已深度使用的 yudao 范式,抽干净成独立品牌产物,升级到 Boot4+JDK25,并吸收 bladex(模块演进)+ dante-cloud(一套代码两种架构)+ Snowy(API 维度数据权限/字段加密)工程机制。**与 xiaoqu 现有 yudao 范式 100% 兼容**(保证 6000 文件零返工)是硬约束。
 
 ## 当前阶段
 
@@ -56,6 +56,12 @@ Aurora 是**一套代码、两种架构**(单体优先、可演进微服务)的�
 - 切换开关:`aurora.architecture: monolith`(默认)| `distributed`。
 - 机制详见 `docs/design/aurora-scaffold-design.md` §6。
 
+### 认证与 Sa-Token 互斥(Snowy 纪律)
+
+- Aurora 用 **Spring Security**(yudao 路线)。**禁止引入 Sa-Token**(与 Spring Security 互斥)。
+- 吸收 Snowy 数据权限(S1)时,**剥离 `StpUtil`/`StpLoginUserUtil`**,`DataScope` 改挂 Spring Security 的 `LoginUser` 上下文。
+- Snowy 的 SSO 协议层(14 厂商)若要复用,需改写为 Spring Security 的 OAuth2/justauth 适配,**不直接搬 Sa-Token 版**。
+
 ## 吸收决策(已论证,勿推翻)
 
 | 来源 | 吸收 |
@@ -65,6 +71,8 @@ Aurora 是**一套代码、两种架构**(单体优先、可演进微服务)的�
 | yudao(=xiaoqu 现状) | ① 双轨跨模块契约 ② 空壳 server ③ BaseDO ④ BaseMapperX ⑤ LambdaQueryWrapperX ⑥ CommonResult+ErrorCode+ServiceException ⑦ MapStruct Convert ⑧ 内建 codegen |
 | **dante-cloud + dante-engine**(技术栈与 Aurora 完全一致:JDK25+Boot4.1,已本地 clone) | ① **一套代码两种架构**(`@ConditionalOnArchitecture` 枚举即条件三层委托)② Local/Remote Listener 成对(单体不连 Kafka)③ `@EnableXxx` 模块开关 ④ framework core→spring 分层 ⑤ 网关防伪造内部调用头。**注意:Strategy 双实现需自研**(dante v4.1.0.4 已删除) |
 | dante-cloud(舍弃) | JPA+Hibernate 二级缓存(范式冲突,Aurora 用 MyBatis-Plus)、opaque token、passkey/国密(业务特定)、Nacos 强依赖(与单体优先冲突) |
+| **Snowy**(v3.6.5,Boot 3.5/JDK17,真实代码核实) | ① **API 维度数据权限 + 预计算表 + scopeKey 去重**(四家独有,剥离 Sa-Token)② **SM4 字段级透明加密 + TypeHandler**(四家独有)③ easy-trans `@Trans` 字段翻译 ④ CommonResult+traceId ⑤ 防重提交注解 ⑥ 代码生成 4 业务形态 |
+| Snowy(舍弃) | ⚠️ **Sa-Token 全家桶**(与 Spring Security 互斥)、StpUtil 静态调用(改 SecurityContext)、"插件式动态加载"幻觉(实为物理模块,bladex 已覆盖)、JSONObject 弱类型 API(yudao 强类型不降级)、hutool CronUtil 定时(无集群协调) |
 
 论证详见 `docs/design/aurora-scaffold-design.md` §2。
 

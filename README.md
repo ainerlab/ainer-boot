@@ -1,11 +1,11 @@
 # Aurora Boot
 
-> 状态:**DRAFT v0.3** · 2026-07-22 · 仅有设计文档阶段,尚无可编译代码
+> 状态:**DRAFT v0.4** · 2026-07-22 · 仅有设计文档阶段,尚无可编译代码
 
 **一套代码、两种架构**(单体优先、可演进微服务)的业务开发脚手架。
 
 - 技术基线:**JDK 25 + Spring Boot 4.1.0**(Spring Framework 7 / Jakarta EE 11 / Servlet 6.1)
-- 定位:把 xiaoqu-platform 已深度使用的 yudao 范式,**抽干净成独立品牌产物**,升级到 Boot4+JDK25,并吸收 bladex(模块演进)+ **dante-cloud(一套代码两种架构)** 工程机制
+- 定位:把 xiaoqu-platform 已深度使用的 yudao 范式,**抽干净成独立品牌产物**,升级到 Boot4+JDK25,并吸收 bladex(模块演进)+ **dante-cloud(一套代码两种架构)** + **Snowy(API 维度数据权限/字段加密)** 工程机制
 - 身份:全新独立 greenfield 仓库,与 xiaoqu 现有 yudao 范式 **100% 兼容**(保证 6000 文件零返工)
 
 ---
@@ -96,10 +96,11 @@ aurora-boot/
 
 ## 设计来源
 
-本脚手架基于四个项目的真实代码深度调研:
+本脚手架基于五个项目的真实代码深度调研:
 - **bladex** (`/Users/xq/01-code/xq/bladex/`):BladeX-Tool 45 模块、BladeX-Boot 单体、BladeX-Biz 业务样本、CLAUDE.md 两份。**吸收**:单体 modules/X + 演进抽 X-api、codegen 双模板、BOM+flatten、文档骨架
 - **ruoyi-vue-pro** (`origin/master-jdk25` 分支):JDK25 + Boot4.1.0 的活样板(git show 读取,未 checkout)。**吸收**:业务范式全 8 项(= xiaoqu 现状)
 - **dante-cloud + dante-engine** (`/Users/xq/01-code/xq/dante-cloud/` + `/Users/xq/01-code/xq/dante-engine/`):JDK25 + Boot4.1 + Spring Cloud 2025.1.2,v4.1.0.4。**吸收**:**一套代码两种架构**(`@ConditionalOnArchitecture` 枚举即条件三层委托,dante-engine 已逐行核实)、Local/Remote Listener 成对(单体不连 Kafka)、`@EnableXxx` 开关、framework core→spring 分层、网关防伪造头。**注意**:Strategy 双实现需自研(dante v4.1.0.4 已删除)、ConfigurerManager 绑定 SAS 首期不上
+- **Snowy** (`/Users/xq/01-code/xq/Snowy/`):v3.6.5,Boot 3.5/JDK17,Sa-Token 1.44。**吸收**:**API 维度数据权限 + 预计算表 + scopeKey 去重 + inSql 子查询**(四家独有)、**SM4 字段级透明加密 + TypeHandler**(四家独有)、easy-trans `@Trans` 字段翻译、CommonResult+traceId、防重提交注解、代码生成 4 业务形态。**注意**:Sa-Token 与 Spring Security 互斥,**认证层不吸收**,数据权限剥离 StpUtil 改基于 SecurityContext
 - **xiaoqu-platform** (`/Users/xq/01-code/xq/xiaoqu-platform/`):13+ 模块、~6000 文件、~57 万行,全平台深度跑 yudao 范式(迁移目标)
 
 吸收论证详见 [design/aurora-scaffold-design.md](docs/design/aurora-scaffold-design.md) §2。

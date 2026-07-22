@@ -1,8 +1,8 @@
 # Aurora 架构总览
 
-> 状态:**DRAFT v0.3** · 日期:2026-07-22
+> 状态:**DRAFT v0.4** · 日期:2026-07-22
 > 关联:`design/aurora-scaffold-design.md`(设计详述)、`migration/aurora-migration-plan.md`(迁移路线)
-> 三参考源:bladex(模块演进)+ yudao(业务范式)+ dante-cloud(一套代码两种架构)
+> 四参考源:bladex(模块演进)+ yudao(业务范式)+ dante-cloud(一套代码两种架构)+ Snowy(数据权限/字段加密)
 
 ---
 
@@ -33,7 +33,7 @@ aurora-boot/
 │   ├── aurora-starter-datasource        ③-e 多数据源:dynamic-datasource boot4
 │   ├── aurora-starter-redis             ③-f 缓存:Redisson 4.6 + Jackson 3
 │   ├── aurora-starter-biz-tenant        ③-g 多租户:拦截器/隔离/可开关
-│   ├── aurora-starter-biz-data-permission ③-h 数据权限:@DataPermission 规则引擎
+│   ├── aurora-starter-biz-data-permission ③-h 数据权限:表维度(@DataPermission)+ API 维度(Snowy 预计算表)+ 字段加密(SM4)
 │   ├── aurora-starter-biz-bpm           ③-i 工作流:Flowable 8
 │   ├── aurora-starter-job               ③-j 定时任务:Quartz
 │   ├── aurora-starter-mq                ③-k 消息队列:Redis Stream/RabbitMQ/RocketMQ
@@ -72,7 +72,7 @@ aurora-boot/
 | `aurora-starter-datasource` | 多数据源 | dynamic-datasource boot4 封装 |
 | `aurora-starter-redis` | 缓存 | `AuroraRedisAutoConfiguration`(`@AutoConfiguration(before = RedissonAutoConfigurationV4.class)`)、JSON RedisTemplate、限流锁 |
 | `aurora-starter-biz-tenant` | 多租户 | `TenantBaseDO`、`TenantDatabaseInterceptor`、Redis 缓存隔离、`@TenantIgnore`、可开关 |
-| `aurora-starter-biz-data-permission` | 数据权限 | `@DataPermission`、`DataPermissionRule`、dept-based rule |
+| `aurora-starter-biz-data-permission` | 数据权限 | `@DataPermission`(表维度,yudao)+ API 维度 DataScope/预计算表/scopeKey(Snowy S1)+ `EncryptTypeHandler`/SM4 字段加密(Snowy S2) |
 | `aurora-starter-biz-bpm` | 工作流 | Flowable 8 封装 |
 | `aurora-starter-job` | 定时任务 | Quartz + `@Async` |
 | `aurora-starter-mq` | 消息队列 | Redis Stream/PubSub + RabbitMQ + RocketMQ(租户感知) |
