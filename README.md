@@ -1,12 +1,13 @@
 # Aurora Boot
 
-> 状态:**DRAFT v0.4** · 2026-07-22 · 仅有设计文档阶段,尚无可编译代码
+> 状态:**DRAFT v0.5** · 2026-07-22 · 仅有设计文档阶段,尚无可编译代码
 
 **一套代码、两种架构**(单体优先、可演进微服务)的业务开发脚手架。
 
 - 技术基线:**JDK 25 + Spring Boot 4.1.0**(Spring Framework 7 / Jakarta EE 11 / Servlet 6.1)
-- 定位:把 xiaoqu-platform 已深度使用的 yudao 范式,**抽干净成独立品牌产物**,升级到 Boot4+JDK25,并吸收 bladex(模块演进)+ **dante-cloud(一套代码两种架构)** + **Snowy(API 维度数据权限/字段加密)** 工程机制
-- 身份:全新独立 greenfield 仓库,与 xiaoqu 现有 yudao 范式 **100% 兼容**(保证 6000 文件零返工)
+- 定位:**全新设计的范式**——从 bladex/yudao/dante-cloud/Snowy 四家择优 + **主动改掉 yudao 的 7 个范式缺陷**(循环依赖/数据权限粗/token 自造/命名分层乱/模块边界不清/错误码/异常处理)
+- 立场:**不预设继承 yudao**;xiaoqu 迁移 = **按新范式重写,非改包名搬家**
+- 身份:全新独立 greenfield 仓库
 
 ---
 
@@ -30,13 +31,13 @@
 
 | 文档 | 内容 |
 |---|---|
-| [docs/design/aurora-scaffold-design.md](docs/design/aurora-scaffold-design.md) | **架构设计主文档**:吸收清单(bladex 4 项 + yudao 8 项,逐项论证)、Boot4 适配、模块划分、跨模块契约双轨制、待决策项 |
-| [docs/migration/aurora-migration-plan.md](docs/migration/aurora-migration-plan.md) | **迁移路线**:xiaoqu 13+ 现有模块逐层迁入(L0-L6),含真实依赖图与风险点 |
+| **[docs/design/paradigm-redesign.md](docs/design/paradigm-redesign.md)** | **★ 范式重新设计(核心)**:yudao 7 缺陷核实(真实代码)+ 新范式逐条改进 |
+| [docs/design/aurora-scaffold-design.md](docs/design/aurora-scaffold-design.md) | 架构设计主文档:吸收清单、Boot4 适配、模块划分、待决策项 |
 | [docs/boot4-migration-notes.md](docs/boot4-migration-notes.md) | **Boot4 适配备忘**:全量真实代码片段(Redisson 4.6 / Security 7 / BaseDO / yaml / 坐标陷阱) |
 | [docs/architecture.md](docs/architecture.md) | **架构总览**:模块全景图、分层架构、核心抽象速查 |
 | [docs/conventions.md](docs/conventions.md) | **工程约定**:命名/编码/框架开发/业务模块开发/数据库/缓存/日志/Git |
 
-阅读建议:先 [design](docs/design/aurora-scaffold-design.md) 理解定位与吸收决策,再 [architecture](docs/architecture.md) 看模块全景。
+阅读建议:先 [paradigm-redesign](docs/design/paradigm-redesign.md)(理解为什么不继承 yudao、改哪些),再 [design](docs/design/aurora-scaffold-design.md) 看整体,再 [architecture](docs/architecture.md) 看模块全景。
 
 ---
 
@@ -44,10 +45,10 @@
 
 | 项 | 推荐默认 | 备选 | 影响 |
 |---|---|---|---|
-| **A. 认证方案** | Spring Security 7 + 自建 OAuth2 token 表 + Redis | Sa-Token / Spring Authorization Server | 影响 security starter 全部设计 |
+| **A. 认证方案** | **Spring Authorization Server + ConfigurerManager**(改掉 yudao 自造 token,缺陷 3) | Sa-Token | security starter 全部设计;已纳入新范式 |
 | **B. 品牌名** | Aurora(与 xq-ui/xq-starter/aurora-admin 一脉) | 你指定 | groupId / 包名 / 仓库名(全文可一键替换) |
 | **C. 仓库位置** | `~/01-code/xq/aurora-boot/`(已创建) | 别处 | — |
-| **D. 范式兼容** | 与 xiaoqu yudao 范式 100% 兼容(BaseDO/BaseMapperX/CommonResult/api 契约) | 改范式 | 改则 6000 文件返工 |
+| **D. 范式立场** | **不预设继承 yudao,主动改 7 缺陷**;迁移=重写 | — | 已确定,见 `paradigm-redesign.md` |
 
 ---
 

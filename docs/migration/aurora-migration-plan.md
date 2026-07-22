@@ -1,23 +1,32 @@
 # Aurora 迁移路线 · xiaoqu-platform → aurora-boot
 
-> 状态:**DRAFT v0.1** · 日期:2026-07-22
-> 目标:将 xiaoqu-platform 现有 13+ 业务模块(~6000 文件 / ~57 万行)逐层迁入 aurora-boot
-> 前提:Aurora 与 xiaoqu 现有 yudao 范式 100% 兼容(见 `design/aurora-scaffold-design.md` §8-D),迁移**只改包名 + 升 Boot4 + 改 pom**,不动业务逻辑
+> 状态:**DRAFT v0.2** · 日期:2026-07-22
+> 目标:将 xiaoqu-platform 现有 13+ 业务模块(~6000 文件 / ~57 万行)迁入 aurora-boot
+> 前提变更:~~Aurora 与 xiaoqu yudao 范式 100% 兼容~~ → **新范式不预设继承 yudao,主动改 7 缺陷**。迁移**不是改包名搬家,而是按新范式重写**。详见 `design/paradigm-redesign.md`
 
 ---
 
-## 0. 迁移本质
+## 0. 迁移本质:**重写,不是搬家**
 
-**不是重写,是搬家**。每个模块的迁移动作固定为:
+> ⚠️ 本节是 v0.1 → v0.2 的根本变更。旧版"改包名 + 升 Boot4 + 业务逻辑零改动"已作废。
 
-1. `cn.xiaoqu.module.X` → `cn.aurora.module.X`(包名全局替换)
-2. `cn.xiaoqu.framework.*` → `cn.aurora.framework.*`(框架引用替换)
-3. pom 依赖从 `cn.xiaoqu:*` 改为 `cn.aurora:*`
-4. javax.* → jakarta.*(Boot4 要求,xiaoqu 现状可能仍有少量 javax)
-5. 验证 Boot4 适配点(见 `boot4-migration-notes.md`)
-6. 编译 + 回归测试
+**每个模块的迁移 = 按新范式重写**。xiaoqu 旧代码作为**需求参照**(业务规则照搬),但工程结构按新范式重建:
 
-业务逻辑(DO 字段、Service 方法、Controller 签名)**零改动**。
+| 维度 | 旧代码(xiaoqu/yudao) | 迁移后(Aurora 新范式) | 性质 |
+|---|---|---|---|
+| 包名 | `cn.xiaoqu.module.X` | `cn.aurora.module.X` | 重命名 |
+| 分层 | controller/service/dal/dataobject/dal/mysql/api/dto 四套 | controller/service/repository/integration 收敛 | **重设**(缺陷 4) |
+| VO | ReqVO/RespVO/PageReqVO/SaveReqVO/SimpleRespVO 7 种 | Create/Update/Save Req + Resp + PageReq 2~3 种 | **收敛**(缺陷 4) |
+| 实体 | DO/Mapper/DTO 三份重复字段类 | Entity 一份 + MapStruct 生成 DTO | **统一**(缺陷 4) |
+| 跨模块 | Service 互注 + @Lazy 兜底(110 处) | 单向 api 接口 + 领域事件,禁止 Service 互注 | **重设**(缺陷 1) |
+| 认证 | 自造 OAuth2 token 表 | Spring Authorization Server 标准 | **重建**(缺陷 3) |
+| 数据权限 | 表维度 SQL 重写 | 表维度 + API 维度双模 | **增强**(缺陷 2) |
+| 错误码 | 常量接口散落 + 手工段位(冲突) | 枚举 + 注册表启动校验 | **重设**(缺陷 6) |
+| 异常 | HTTP 全 200 + body code | HTTP status 真语义 + body 兜底 | **改进**(缺陷 7) |
+| 模块边界 | module-system 上帝模块 | kernel vs business 分离 | **重拆**(缺陷 5) |
+| 循环依赖 | `allow-circular-references: true` 兜底 | **关闭**,循环即设计错误 | **纠正**(缺陷 1) |
+
+**业务逻辑(字段含义、校验规则、计算公式)照搬;工程范式(分层/命名/契约/依赖方向)按新范式重建。**
 
 ---
 
@@ -175,25 +184,33 @@ CommonApi 清单:`OAuth2TokenCommonApi` / `PermissionCommonApi` / `TenantCommonA
 
 ---
 
-## 4. 迁移通用动作清单(每模块执行)
+## 4. 迁移通用动作清单(每模块执行 · 重写式)
+
+> 与 v0.1 的"改包名清单"不同,这是"按新范式重写"清单。
 
 ```
-□ 1. git 复制模块源码到 aurora-boot(或 submodule/copy)
-□ 2. 包名全局替换:cn.xiaoqu → cn.aurora
-□ 3. 框架引用替换:cn.xiaoqu.framework → cn.aurora.framework
-□ 4. pom 依赖:cn.xiaoqu:* → cn.aurora:*
-□ 5. javax.* → jakarta.*(Boot4,grep 排查残留)
-□ 6. Boot4 适配点检查(见 boot4-migration-notes.md):
-     □ Redisson:RedissonAutoConfigurationV4
-     □ Security:lambda DSL / authorizeHttpRequests / requestMatchers
-     □ mybatis-plus-spring-boot4-starter 坐标
-     □ dynamic-datasource-spring-boot4-starter 坐标
-     □ easy-trans BaseDO TransPojo + @JsonIgnoreProperties("transMap")
-     □ yaml: spring.data.redis / spring.cache.type:REDIS
-□ 7. 编译:mvn clean compile -pl <module> -am
-□ 8. 回归测试:跑该模块的现有单测
-□ 9. 集成验证:启动 aurora-server,验证该模块接口可用
-□ 10. 提交:git commit -m "migrate(<module>): 迁入 aurora-boot,包名+Boot4 适配"
+【需求抽取】(从旧代码读,不搬代码)
+□ 1. 通读旧模块,梳理:实体字段、业务规则、校验逻辑、接口清单、对外契约
+□ 2. 记录为新模块的"需求规格"(文档/注释),作为重写依据
+
+【按新范式重建】
+□ 3. 新建 aurora-module-<X>,按新分层(controller/service/repository/integration)搭骨架
+□ 4. 实体:一份 Entity(原 DO),@TableName;DTO 用 MapStruct 生成(非手写三份)
+□ 5. VO 收敛:Create/Update/Save Req + Resp + PageReq(≤3 种),非 7 种后缀
+□ 6. 跨模块:走单向 api 接口(本地 Impl/未来 Feign)+ 领域事件,**禁止 Service 互注**(缺陷 1)
+□ 7. 数据权限:按需用 @DataPermission(表维度)或 API 维度 DataScope(缺陷 2)
+□ 8. 认证:用 Spring Authorization Server 体系(缺陷 3),非自造 token
+□ 9. 错误码:枚举 + 注册表,启动校验无冲突(缺陷 6)
+□ 10. 异常:HTTP status 真语义 + body CommonResult(缺陷 7)
+□ 11. 模块边界:业务不落 kernel;该独立就独立模块(缺陷 5)
+
+【Boot4 适配 + 验证】
+□ 12. jakarta.*(grep 排查 javax 残留,除 JDK 内置)
+□ 13. Boot4 适配点(见 boot4-migration-notes.md):Redisson V4 / Security 7 lambda / boot4 starter 坐标 / easy-trans
+□ 14. 编译:mvn clean compile -pl <module> -am(关 allow-circular-references,循环即报错)
+□ 15. 测试:按需求规格写新单测(旧单测作参考)
+□ 16. 集成:启动 aurora-server 验证接口
+□ 17. 提交:git commit -m "rewrite(<module>): 按新范式重写迁入 aurora-boot"
 ```
 
 ---

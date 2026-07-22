@@ -6,7 +6,7 @@
 
 Aurora 是**一套代码、两种架构**(单体优先、可演进微服务)的业务开发脚手架,**JDK 25 + Spring Boot 4.1.0**。
 
-**本质**:把 xiaoqu-platform 已深度使用的 yudao 范式,抽干净成独立品牌产物,升级到 Boot4+JDK25,并吸收 bladex(模块演进)+ dante-cloud(一套代码两种架构)+ Snowy(API 维度数据权限/字段加密)工程机制。**与 xiaoqu 现有 yudao 范式 100% 兼容**(保证 6000 文件零返工)是硬约束。
+**本质**:**全新设计的范式**——不预设继承 yudao,从 bladex/yudao/dante-cloud/Snowy 四家择优 + **主动改掉 yudao 的 7 个范式缺陷**(循环依赖/数据权限粗/token 自造/命名分层乱/模块边界不清/错误码/异常处理)。详见 `docs/design/paradigm-redesign.md`。xiaoqu 迁移 = 按新范式重写,非改包名搬家。
 
 ## 当前阶段
 
@@ -15,18 +15,26 @@ Aurora 是**一套代码、两种架构**(单体优先、可演进微服务)的�
 ## 必读文档(按顺序)
 
 1. `README.md` — 总览与当前状态
-2. `docs/design/aurora-scaffold-design.md` — **架构设计主文档**(吸收决策、Boot4 适配、模块划分、跨模块契约、待决策项)
-3. `docs/architecture.md` — 模块全景图
-4. `docs/conventions.md` — 工程约定(命名/编码/框架开发/业务模块开发)
-5. `docs/boot4-migration-notes.md` — Boot4 适配备忘(全量代码片段,写代码前必读)
-6. `docs/migration/aurora-migration-plan.md` — xiaoqu 模块迁移路线(阶段 6 用)
+2. **`docs/design/paradigm-redesign.md`** — **★ 范式重新设计(核心)**:yudao 7 缺陷 + 新范式改进。**写任何代码前必读**
+3. `docs/design/aurora-scaffold-design.md` — 架构设计主文档(吸收决策、Boot4 适配、模块划分、待决策项)
+4. `docs/architecture.md` — 模块全景图
+5. `docs/conventions.md` — 工程约定(命名/编码/框架开发/业务模块开发)
+6. `docs/boot4-migration-notes.md` — Boot4 适配备忘(全量代码片段,写代码前必读)
+7. `docs/migration/aurora-migration-plan.md` — xiaoqu 模块重写迁移路线
 
 ## 关键规则(MUST)
 
-### 范式兼容(最高优先级)
+### 范式立场(最高优先级)
 
-- **不得擅自改变** `BaseDO` / `BaseMapperX` / `LambdaQueryWrapperX` / `CommonResult` / `*Api` 的 API 形状。
-- 改这些 = 6000 文件返工。增量增强可以(如加 `BaseConvert` 模板方法),改既有形状不行。
+- **不预设继承 yudao**。yudao 的好东西可借鉴,7 个缺陷必须改掉(详见 `docs/design/paradigm-redesign.md`)。
+- **7 缺陷清单(写代码时主动避免)**:
+  1. 循环依赖:模块内 **禁止 Service 互注**,走单向 api 接口 + 领域事件;`allow-circular-references: false`,`@Lazy` 禁用(除非充分理由+注释)
+  2. 数据权限:支持表维度 + API 维度双模(缺陷 2)
+  3. 认证:用 Spring Authorization Server,非自造 token(缺陷 3)
+  4. 命名分层:VO 收敛到 ≤3 种(Create/Update/Save Req + Resp + PageReq),实体统一一份 Entity,包路径 ≤4 层(缺陷 4)
+  5. 模块边界:业务不落 kernel,kernel 只放纯技术(auth/oauth2/permission/dict/tenant/user)(缺陷 5)
+  6. 错误码:枚举 + 注册表启动校验,非散落常量接口(缺陷 6)
+  7. 异常:HTTP status 真语义 + body CommonResult,非全 200(缺陷 7)
 
 ### Boot4 + JDK25 纪律
 
@@ -82,12 +90,12 @@ Aurora 是**一套代码、两种架构**(单体优先、可演进微服务)的�
 - ⚠️ **关键纠正**:dante **没有** BusBridge 空实现类(全仓零命中),单体不连 Kafka 是靠 Local/Remote Listener 成对 + `@ConditionalOnClass(StreamBusBridge)` 双保险实现
 - 移植复杂度评估见 `docs/design/aurora-scaffold-design.md` §6.9
 
-## 待决策项(默认值见 design §8)
+## 待决策项(默认值见 design §9)
 
-- A. 认证方案(推荐 Spring Security 7 + 自建 OAuth2 token + Redis)
+- A. 认证方案(推荐 **Spring Authorization Server + ConfigurerManager**,改掉 yudao 自造 token,缺陷 3)
 - B. 品牌名(推荐 Aurora,全文可一键替换)
 - C. 仓库位置(已 `~/01-code/xq/aurora-boot/`)
-- D. 范式兼容(推荐 100% 兼容)
+- D. 范式立场(已确定:**不预设继承 yudao,主动改 7 缺陷**,见 `paradigm-redesign.md`)
 
 ## 构建(阶段 2 后可用)
 

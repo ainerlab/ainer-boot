@@ -1,24 +1,26 @@
 # Aurora 脚手架 · 架构设计
 
-> 状态:**DRAFT v0.4** · 日期:2026-07-22
+> 状态:**DRAFT v0.5** · 日期:2026-07-22
 > 技术基线:**JDK 25 + Spring Boot 4.1.0**(Spring Framework 7 / Jakarta EE 11 / Servlet 6.1)
 > 定位:单体优先、可演进微服务(**一套代码、两种架构**)的业务开发脚手架
-> 身份:全新独立 greenfield 仓库,**与 xiaoqu-platform 现有 yudao 范式 100% 兼容**(保证 6000 文件零返工)
-> 参考源:**bladex**(单体→微服务模块拆分) + **yudao/ruoyi-vue-pro**(业务范式) + **dante-cloud/engine**(一套代码两种架构) + **Snowy**(数据权限/字段加密)
+> 范式立场:**不预设继承 yudao**,从 bladex/yudao/dante-cloud/Snowy 四家择优 + 主动改掉 yudao 的 7 个范式缺陷(详见 `paradigm-redesign.md`)
+> 身份:全新独立 greenfield 仓库;xiaoqu 迁移 = **按新范式重写**,非改包名搬家
+> 参考源:**bladex**(单体→微服务模块拆分) + **yudao/ruoyi-vue-pro**(业务范式,择优 + 改缺陷) + **dante-cloud/engine**(一套代码两种架构) + **Snowy**(数据权限/字段加密)
 
 ---
 
 ## 0. 阅读顺序
 
-1. [§1 定位与约束](#1-定位与约束)—— 为什么是"范式提炼 + 升级 + 独立",而非"范式创新"
+1. [§1 定位与约束](#1-定位与约束)—— 为什么不预设继承 yudao,主动改 7 缺陷
 2. [§2 吸收清单](#2-吸收清单bladex--yudao--dante-cloud--snowy)—— 从四个脚手架各吸收什么、舍弃什么,逐项附理由
 3. [§3 技术栈基线](#3-技术栈基线boot4--jdk25)—— 已 git show 核实的精确坐标
-4. [§4 模块划分](#4-模块划分)—— 工程骨架
-5. [§5 跨模块契约](#5-跨模块契约双轨制)—— yudao 最精华设计
+4. [§4 模块划分](#4-模块划分)—— 工程骨架(kernel/business 分离)
+5. [§5 跨模块契约](#5-跨模块契约)—— 单向 api + 领域事件
 6. [§6 单体↔微服务一套代码](#6-单体微服务一套代码)—— dante-cloud 最关键差异化价值的 Aurora 落地
 7. [§7 Boot4+JDK25 适配](#7-boot4jdk25-适配清单)—— 踩坑点全列(详见 `boot4-migration-notes.md`)
-8. [§8 分阶段实施](#8-分阶段实施计划)—— 从骨架到迁移
+8. [§8 分阶段实施](#8-分阶段实施计划)—— 从骨架到重写迁移
 9. [§9 待决策项](#9-待决策项)—— 默认值与备选
+10. **[范式重新设计](paradigm-redesign.md)**—— yudao 7 缺陷核实 + 新范式逐条改进(范式级核心文档)
 
 ---
 
@@ -26,31 +28,27 @@
 
 ### 1.1 一句话定位
 
-**Aurora = 把 xiaoqu-platform 已深度使用的 yudao 范式,抽干净成独立品牌产物,升级到 Boot4+JDK25,并吸收 bladex 的模块演进路径 + dante-cloud 的"一套代码两种架构"机制 + Snowy 的 API 维度数据权限与字段加密。**
+**Aurora = 一个全新设计的、主动纠正 yudao 7 个范式缺陷的业务脚手架:从 bladex/yudao/dante-cloud/Snowy 四家择优吸收,该改的改掉、该重设的重设,升级到 Boot4+JDK25,单体优先可演进微服务。xiaoqu 现有代码按新范式重写迁移,不妥协。**
 
-### 1.2 为什么不是"范式创新"
+### 1.2 为什么不预设继承 yudao
 
-深度盘点 xiaoqu-platform 后的硬事实:
+前一版设计曾把「与 xiaoqu 现有 yudao 范式 100% 兼容」当硬约束(理由:6000 文件已跑在该范式,改范式=返工)。**这个前提已推翻**,理由:
 
-- xiaoqu 现有 **~6000 Java 文件 / ~57 万行**,13+ 业务模块
-- 全平台已深度跑在 yudao 范式上:`BaseDO` / `BaseMapperX` / `LambdaQueryWrapperX` / `CommonResult` / `module/*/api/XxxApi` 契约 / `common/biz/*CommonApi` 下沉
-- 其中 mall/trade 单模块族 13 万行、AI 模块 27 个功能域、cdp/wecom 全新自研——这些是**真 IP**
+- 迁移成本是要算的**代价**(可用分批重写、strangler 摊薄),不是**禁止改范式的理由**。
+- yudao 范式有 **7 个真实、可量化、可复现的设计缺陷**(详见 `paradigm-redesign.md` §1):循环依赖靠 @Lazy(297 处)、数据权限表维度、token 自造非标 OAuth2、命名分层混乱(VO 7 种后缀/包 6 层)、module-system 上帝模块、错误码散落冲突(17 处跨模块冲突)、HTTP 异常全 200。
+- 把这些缺陷原样搬进新脚手架 = 让新平台从第一天就背 yudao 的债,持续出血整个生命周期。
+- greenfield 的意义就是**摆脱历史包袱设计更对的范式**。
 
-**推论**:脚手架若改范式 = 6000 文件返工。因此**与 xiaoqu 现有 yudao 范式 100% 兼容是硬约束**(见 [§8 决策项 D](#8-待决策项))。Aurora 的价值不在发明新范式,而在:
-
-1. **范式提炼**:把散在 xiaoqu 各处的约定,固化成独立、可复用的 framework 产物
-2. **技术栈升级**:Boot 3.5.13 → 4.1.0,JDK 已就绪 25
-3. **品牌独立**:零 `cn.iocoder.yudao` / `cn.xiaoqu` 包名残留,自有 GAV
-4. **工程增强**:吸收 bladex 的演进友好型设计(单体→微服务路径、双模板 codegen)
+**新立场**:Aurora 以「正确的工程范式」为基线,不以 yudao 为基线。yudao 的好东西(BaseDO 审计字段、统一响应、api 契约思路)可借鉴,7 个缺陷必须改掉。xiaoqu 迁移 = 按新范式重写,不是改包名搬家。
 
 ### 1.3 与 xiaoqu 的关系
 
 | 维度 | 关系 |
 |---|---|
 | 仓库 | **独立** greenfield 仓库,不与 xiaoqu 同仓 |
-| 包名 | Aurora 自有(`cn.<brand>.*`),xiaoqu 迁移时改包名迁入 |
+| 包名 | Aurora 自有(`cn.aurora.*`) |
 | 依赖方向 | 单向:xiaoqu(未来)依赖 Aurora 的 framework;Aurora **不反向依赖** xiaoqu 业务模块 |
-| 演进 | Aurora 是 framework 提供者;xiaoqu 业务模块逐层迁入(见 `migration/aurora-migration-plan.md`) |
+| 迁移 | xiaoqu 业务模块**按新范式重写**迁入(非改包名),旧代码作需求参照。详见 `migration/aurora-migration-plan.md` |
 
 ### 1.4 运行模式:一套代码、两种架构(吸收 dante-cloud)
 
@@ -96,18 +94,20 @@ Aurora 落地这套机制(详见 §6):
 | `R<T>` + BladeController 强继承 | R 带 success 字段 + 静态工厂;BladeController 含文件下载强继承 | ① `success` 字段与 HTTP 语义重复;② BladeController 连 bladex 自己核心 controller 都不全继承(耦合重);③ 改吸收 yudao 的 CommonResult(无 success + 全局异常兜底)是 Boot3/4 现代写法 |
 | Wrapper(Entity→VO 反射转换) | BaseEntityWrapper + BeanUtil 反射 + 缓存翻译塞入 | ① 反射性能差;② 无接口契约,重构易漏;③ 改用 MapStruct(编译期生成 + 性能完胜),便捷性 default 方法补 |
 
-### 2.3 从 yudao 吸收(精华 8 项,保证 6000 文件零返工)
+### 2.3 从 yudao 择优吸收 + 主动改缺陷
 
-| # | 吸收项 | 为什么 |
+> ⚠️ **关系变了**:yudao 不再是"基线全盘继承",而是"择优 + 改缺陷"。下表 Y 项是**保留借鉴**的好东西;7 个缺陷(循环依赖/数据权限粗/token 自造/命名分层乱/模块边界不清/错误码/异常处理)**主动改掉**,详见 `paradigm-redesign.md`。
+
+| # | 借鉴项 | 说明(标注是否改) |
 |---|---|---|
-| Y1 | **双轨跨模块契约**:业务间 `module/*/api/XxxApi`(本地 @Service 注入),框架 starter 反调业务用 `common/biz/*CommonApi`(依赖倒置) | yudao 最精华设计,解决"starter 不能依赖业务模块"核心矛盾。详见 [§5](#5-跨模块契约双轨制) |
-| Y2 | **空壳 server + pom 组合决定启动范围** | 零业务代码,fat jar,注释切模块即可裁剪。单体扩展性最好 |
-| Y3 | **BaseDO**(5 审计字段 + 逻辑删除 + TransPojo) | 6000 文件已用,复刻即零返工 |
-| Y4 | **BaseMapperX**(分页/Join/ForUpdate/批量全套 default 方法) | 开发体验核心 |
-| Y5 | **LambdaQueryWrapperX**(xxxIfPresent 系列) | 条件构造便捷性 |
-| Y6 | **CommonResult + ErrorCode + ServiceException + 全局兜底** | 后端只 throw,统一兜底转响应 |
-| Y7 | **MapStruct Convert**(编译期生成) | 类型安全 + 性能,替代 bladex 反射 Wrapper |
-| Y8 | **内建 codegen**(连库读表 → 全套后端 + SQL + 可选前端) | 生产力杠杆 |
+| Y1 | **跨模块 api 契约思路** | yudao 的 api 契约 + biz/CommonApi 下沉思路好,但**改:模块内禁止 Service 互注**(消除循环依赖,缺陷 1),跨域走单向 api + 领域事件。详见 [§5](#5-跨模块契约) |
+| Y2 | **空壳 server + pom 组合决定启动范围** | 保留。零业务代码,fat jar,注释切模块 |
+| Y3 | **BaseDO**(审计字段 + 逻辑删除 + TransPojo) | 保留(重命名/字段见 §4),`dataobject`→`entity` |
+| Y4 | **BaseMapperX**(分页/Join/ForUpdate/批量 default 方法) | 保留 |
+| Y5 | **LambdaQueryWrapperX**(xxxIfPresent 系列) | 保留 |
+| Y6 | **统一响应 CommonResult + 异常体系** | **部分改**:CommonResult 保留(加 traceId),但**错误码改枚举+注册表自动校验**(缺陷 6),**异常处理改 HTTP status 真语义**(缺陷 7)。见 `paradigm-redesign.md` 改进 6/7 |
+| Y7 | **MapStruct Convert**(编译期生成) | 保留(替代 bladex 反射 Wrapper) |
+| Y8 | **内建 codegen** | 保留思路,模板按新命名/分层重写 + 吸收 Snowy 4 业务形态(缺陷 4) |
 
 ### 2.4 从 dante-cloud 吸收(精选 4 项 + 安全补丁 1 项)
 
@@ -587,17 +587,40 @@ dante-engine 的分层很干净,Aurora 照搬:
 
 ## 9. 待决策项
 
-以下为**推荐默认值**,文档已据此撰写,可在评审后调整(品牌名/groupId 全文可一键替换)。
+以下为**推荐默认值**,文档已据此撰写,可在评审后调整。
 
-### A. 认证授权方案(推荐 A)
+### A. 认证授权方案(推荐 C —— 已纳入新范式)
+
+> ⚠️ 推荐从原先的 A(自造 token)改为 **C(Spring Authorization Server)**。理由:这是 yudao 缺陷 3 的直接修正(见 `paradigm-redesign.md` 改进 3),且 dante-cloud 有 Boot4 活样本。新范式已定改用 SAS,此项主要确认"是否同意承担 SAS 的实现成本"。
 
 | 方案 | 优点 | 代价 | Boot4 成熟度 |
 |---|---|---|---|
-| **A. Spring Security 7 + 自建 OAuth2 token 表 + Redis**(推荐) | 团队最熟;xiaoqu 现状即此;多租户/数据权限/操作日志集成成本最低;ruoyi master-jdk25 已验证 Boot4 跑通 | 自管 token 表/刷新/登出逻辑 | ✅ 有活样本(yudao) |
-| B. Sa-Token | API 极简、中文文档好、上手快;Snowy 用此方案(B/C 双 StpLogic) | ⚠️ **与 Spring Security 互斥**;与 yudao 系数据权限/租户/操作日志需大量重写适配;greenfield 要自建整套集成 | ⚠️ 需验证 Boot4 starter。**注:即便选 Sa-Token,Snowy 的数据权限(S1)仍需剥离 StpUtil 改 SecurityContext** |
-| C. Spring Authorization Server + ConfigurerManager | 最"正规"标准 OAuth2 授权服务器;**dante-cloud 的 ConfigurerManager 模式可封装 SAS 复杂配置,业务方零配置**;支持 passkey/国密/社交扩展 | 最重;password grant 已弃用需适配;dante 底层实现在 dante-engine(未本地),需自行实现 ConfigurerManager | ✅ dante-cloud 有 Boot4 活样本 |
+| ~~A. yudao 自造 OAuth2 token 表~~ | — | **已被列为范式缺陷 3,新范式不再用** | — |
+| B. Sa-Token | API 极简 | ⚠️ 与 Spring Security 互斥;非标准 OAuth2 生态 | 需验证 Boot4 |
+| **C. Spring Authorization Server + ConfigurerManager**(推荐) | 标准 OAuth2:endpoint/JWT/JWK/OIDC/PKCE/introspection/revocation 全套;dante-cloud ConfigurerManager 模式封装复杂配置;passkey/社交可扩展 | 实现成本最高(需基于 Boot4 SAS API 自研 ConfigurerManager,dante-engine 提供设计参考);password grant 需适配 | ✅ dante-cloud 有 Boot4 活样本 |
 
-**推荐 A 的理由**:首期全内置多租户+数据权限+BPM,这些与 yudao 系 security/operatelog/tenant 深度耦合,方案 A 集成成本最低且有 Boot4 活样本可照抄。**若未来需要标准化 OAuth2(开放平台/第三方接入/passkey),可参考 dante-cloud 的方案 C 升级**。
+**确认点**:SAS 是新范式的核心组成(修正缺陷 3),但实现成本最高。若确认走 C,需在阶段 2-3 优先投入认证 starter 的 SAS 封装。
+
+### B. 品牌名(推荐 Aurora)
+
+候选 **Aurora**(极光/启明),与 `xq-ui/xq-starter/aurora-admin` 一脉相承。
+- 建议坐标:`<groupId>cn.aurora</groupId>`(可调)
+- 包名:`cn.aurora.framework.*` / `cn.aurora.module.*`
+- 仓库名:`aurora-boot`
+
+### C. 仓库位置(推荐 ~/01-code/xq/aurora-boot/)
+
+已创建于 `~/01-code/xq/aurora-boot/`,git init 完成。
+
+### D. 范式立场(已确定:不预设继承 yudao,主动改 7 缺陷)
+
+> ⚠️ 此项已从"兼容承诺"变更为"范式立场"。原 v0.4 的"100% 兼容 yudao"前提**已推翻**(见 §1.2、`paradigm-redesign.md` §0)。
+
+新范式立场:
+- **不预设继承 yudao**:以"正确工程范式"为基线,四家择优
+- **主动改掉 yudao 7 缺陷**:循环依赖 / 数据权限粗 / token 自造 / 命名分层乱 / 模块边界不清 / 错误码 / 异常处理(详见 `paradigm-redesign.md`)
+- **迁移 = 重写**:xiaoqu ~6000 文件按新范式重写,不妥协(不追求 100% 兼容旧 API 形状)
+- **借鉴保留**:BaseDO/BaseMapperX/LambdaQueryWrapperX/CommonResult(改)/api 契约思路(改单向)等好东西保留借鉴
 
 ### B. 品牌名(推荐 Aurora)
 
