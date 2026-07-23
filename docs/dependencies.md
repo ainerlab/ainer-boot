@@ -14,6 +14,7 @@
 | Testcontainers | 2.0.5 | PostgreSQL 集成测试 | MIT | `org.testcontainers:*` |
 | ArchUnit | 1.4.2 | 包和分层边界测试 | Apache-2.0；其发布 POM 同时声明传递 ASM 的 BSD 许可证 | `com.tngtech.archunit:archunit` |
 | Micrometer Core | 1.17.0 | 在线校验、撤销传播与安全运营指标 API | Apache-2.0 | `io.micrometer:micrometer-core` |
+| Micrometer Prometheus Registry | 1.17.0 | 两个可执行发行物的 Prometheus 文本格式导出 | Apache-2.0 | `io.micrometer:micrometer-registry-prometheus` |
 | Flatten Maven Plugin | 1.7.3 | 解析 CI-friendly `${revision}` 发布 POM | Apache-2.0 | `org.codehaus.mojo:flatten-maven-plugin` |
 
 ## 引入规则
@@ -54,3 +55,9 @@
 - Resource Server 在线存活检查使用 Spring Security 官方 opaque-token introspector；Authorization Server 使用官方 RFC 7662/RFC 7009 端点和 JDBC authorization service，没有引入自研 Token 表或 Redis deny-list。
 - `ainer-starter-security` 直接依赖 Micrometer Core，使可复用 starter 可以在存在 `MeterRegistry` 时记录在线校验指标，不强迫消费方引入 Actuator exporter。
 - Identity revocation epoch 复用现有 access-event 表与 PostgreSQL 索引，不引入新的数据库组件；高风险请求明确接受一次在线网络与数据库查询成本。
+
+## M4.3 生产可观测性切片取舍
+
+- 两个可执行发行物直接引入 Boot BOM 管理的 Micrometer Prometheus registry；可复用安全 starter 仍只依赖 Micrometer Core，不强迫所有消费方选择 Prometheus。
+- Prometheus Java client 由 registry 传递引入，不在 Ainer 代码中直接依赖其 API；商业发布前仍需由 SBOM 和许可证扫描复核完整传递依赖。
+- 指标访问复用 Spring Security JWT 与 OAuth2 Client Credentials，不引入监控厂商 SDK、自研静态 Token 或新的会话组件。

@@ -19,6 +19,7 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - 增加撤销传播 Timer/SLO bucket、OWNER 缺失、拒绝窗口、归档量与归档失败指标。
 - 增加高风险 API 的选择性 RFC 7662 在线 Token 校验、无正向缓存、inactive 401 与依赖失败 503。
 - 增加专用 introspection client bootstrap、普通 client 拒绝、RFC 7009 撤销和 Identity revocation epoch。
+- 为两个发行物增加受保护的 Prometheus exporter，以及无 tenant、短 Token、最小 scope 的独立 metrics client bootstrap。
 - 建立架构决策、HTTP API、开发、测试、数据库、配置、运行和发布文档体系。
 
 ### Security
@@ -30,13 +31,14 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - 重放与 OWNER 恢复强制 SERVICE 身份、request/approve scope 分离、不同 `sub`、tenant 二次绑定与默认 15 分钟过期。
 - 恢复新 OWNER 不会重新激活原 REVOKED OWNER；SIEM 导出另要求精确可信 exporter subject 并记录批次操作审计。
 - 高风险请求在线校验失败关闭；专用 introspection client 不得绑定 tenant 或携带业务 scope，人员旧 Token 受 Identity 当前状态和最新撤销事件共同约束。
+- `/actuator/prometheus` 只接受无 tenant 的 SERVICE JWT 与 `platform.metrics.read`；关闭业务 Resource Server 也不会匿名公开指标。
 - AI 审计默认不保存 prompt、模型输出、API key 或供应商错误正文。
 
 ### Known limitations
 
 - 当前仍为 `0.1.0-SNAPSHOT` foundation，不是生产就绪发行版。
 - 在线撤销只覆盖配置的高风险路径；普通低风险自包含 JWT 仍存在自然到期窗口。
-- Authorization Server 已成为高风险 API 的在线依赖，但生产高可用、容量、专用凭据轮换和告警尚未完成。
+- Authorization Server 已成为高风险 API 的在线依赖；Prometheus 导出与独立抓取凭据已有代码基线，但生产高可用、容量、凭据退役轮换、dashboard 和告警路由尚未完成。
 - 审计归档仍位于同一 PostgreSQL 数据库，没有 WORM/法律保留、外部不可变副本、生产 SIEM 消费者和告警路由。
 - 正式 CI、制品发布、备份恢复、经真实流量验证的 SLO 与商业授权交付尚未建立。
 

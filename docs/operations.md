@@ -69,6 +69,39 @@ relay 的 Token endpoint 可以是同一 Authorization Server 的外部 HTTPS is
 
 回滚时优先修复 Authorization Server 或网络依赖。关闭 Resource Server 在线校验会恢复 JWT 自然到期窗口，属于安全降级，必须独立批准、记录开始/结束时间并保持 Identity access-event 和 OAuth authorization 元数据不变。不得通过删除撤销事件或重建 client 规避故障。
 
+### 2.4 受保护 Prometheus exporter 上线顺序
+
+应用已经提供 exporter 与授权边界，但不包含 Prometheus、dashboard 或告警部署。首次接入按以下顺序：
+
+1. 发布两个发行物，确认 exposure 只有 `health,info,prometheus`，并验证匿名 `/actuator/prometheus` 返回 401；
+2. 在受控初始化窗口启用 metrics bootstrap，创建与业务/introspection client 不同的 client ID 和 secret，随后立即移除 bootstrap 开关与明文 secret；
+3. 获取 Token 后验证 USER、tenant-bound SERVICE、缺 scope 均 403，只有无 tenant SERVICE + `platform.metrics.read` 返回 200；
+4. 把 secret 写入 Prometheus 节点上的 secret file/store，文件权限只授予抓取进程；不得在仓库、命令历史或抓取配置中写明文；
+5. 先接入 Authorization Server 自身指标，再接入 `ainer-server`，建立 scrape 成功率、Token endpoint、JVM、连接池与在线校验 dashboard；
+6. 根据压测和故障注入建立告警阈值、路由、值班人与 runbook，再把“指标可抓取”升级为“生产监控已完成”。
+
+Prometheus 抓取配置示例：
+
+```yaml
+scrape_configs:
+  - job_name: ainer-server
+    scheme: https
+    metrics_path: /actuator/prometheus
+    oauth2:
+      client_id: ainer-prometheus
+      client_secret_file: /run/secrets/ainer-prometheus-client-secret
+      scopes:
+        - platform.metrics.read
+      token_url: https://auth.example.com/oauth2/token
+    static_configs:
+      - targets:
+          - ainer-server.example.com
+```
+
+指标 client 当前只支持“新 ID 蓝绿切换”，完整退役旧 client 仍等待受审计 Client 控制面。轮换时先创建新 client、更新 Prometheus、确认持续抓取，再按变更窗口停用旧 client；在停用能力落地前不能宣称轮换闭环完成。
+
+Authorization Server 多实例接受门禁至少包括：两实例共享 PostgreSQL、相同 active JWK、滚动更新、单节点中断、Token 签发/introspection/metrics 连续性、数据库中断与恢复，以及 `ainer-server` 高风险请求在依赖故障时保持 503 失败关闭。浏览器登录会话若依赖节点本地状态，入口必须显式使用粘性会话或后续设计共享会话；当前尚无多节点证据。
+
 ## 3. 健康检查
 
 ```bash
@@ -77,6 +110,8 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 ```
 
 当前公开 `health` 和 `info`。健康为 `UP` 只证明应用存活与已注册健康组件状态，不能替代登录、发 Token、Workspace 授权和 AI 调用 smoke test。
+
+`/actuator/prometheus` 虽在 exposure 中，但不是公开端点。匿名请求应返回 401，错误主体/tenant/scope 应返回 403；只有专用 metrics Token 可以读取。不要把 `curl` 携带的真实 Token 写入文档、工单或 shell history。
 
 ## 4. 启动失败诊断
 
@@ -151,7 +186,7 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 
 ## 8. 当前可观测性与告警基线
 
-已有 request ID、Actuator health/info、AI invocation 审计、Workspace 授权审计以及以下 Micrometer 指标：
+已有 request ID、Actuator health/info、受保护 Prometheus exporter、AI invocation 审计、Workspace 授权审计以及以下 Micrometer 指标：
 
 | 指标 | 类型 | 含义 |
 |---|---|---|
@@ -185,4 +220,4 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 
 初始告警条件至少包括：`exhausted > 0` 立即告警、最老可领取年龄持续超过 60 秒、`ownerless > 0` 立即告警、archive failure 增长，以及 DENIED 窗口值明显超过环境基线。DENIED 阈值必须根据正常流量建基线，不能在未观测环境中伪造通用数字。
 
-在线校验初始告警至少包括 `.failed` 持续增长、`.inactive` 异常突增和 `.duration` 接近读取超时；阈值必须由压测和真实流量建立。当前 Actuator 仍只公开 health/info，尚未配置生产指标 exporter、统一 dashboard、告警路由、trace 和结构化日志 schema。指标、归档代码和 SIEM 拉取 API 存在，不等于生产监控或外部不可变审计链路已经完成。
+在线校验初始告警至少包括 `.failed` 持续增长、`.inactive` 异常突增和 `.duration` 接近读取超时；阈值必须由压测和真实流量建立。当前代码已经安全暴露 Prometheus 文本 exporter，但尚未部署生产 Prometheus、统一 dashboard、告警路由、trace 和结构化日志 schema。exporter、指标、归档代码和 SIEM 拉取 API 存在，不等于生产监控或外部不可变审计链路已经完成。

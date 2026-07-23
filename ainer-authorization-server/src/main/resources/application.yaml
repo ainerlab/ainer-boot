@@ -50,6 +50,10 @@ ainer:
         enabled: ${AINER_AUTHORIZATION_BOOTSTRAP_INTROSPECTION_ENABLED:false}
         client-id: ${AINER_AUTHORIZATION_BOOTSTRAP_INTROSPECTION_CLIENT_ID:}
         client-secret: ${AINER_AUTHORIZATION_BOOTSTRAP_INTROSPECTION_CLIENT_SECRET:}
+      metrics-client-bootstrap:
+        enabled: ${AINER_AUTHORIZATION_BOOTSTRAP_METRICS_ENABLED:false}
+        client-id: ${AINER_AUTHORIZATION_BOOTSTRAP_METRICS_CLIENT_ID:}
+        client-secret: ${AINER_AUTHORIZATION_BOOTSTRAP_METRICS_CLIENT_SECRET:}
 
 mybatis:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -60,7 +64,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:

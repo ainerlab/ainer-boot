@@ -80,8 +80,16 @@ class AinerResourceServerIntegrationTest {
     }
 
     private HttpResponse<String> get(String token, String tenantHeader, String subjectHeader) throws Exception {
+        return get("/api/security/me", token, tenantHeader, subjectHeader);
+    }
+
+    private HttpResponse<String> get(
+            String path,
+            String token,
+            String tenantHeader,
+            String subjectHeader) throws Exception {
         HttpRequest.Builder request = HttpRequest.newBuilder()
-                .uri(URI.create("http://127.0.0.1:%d/api/security/me".formatted(port)))
+                .uri(URI.create("http://127.0.0.1:%d%s".formatted(port, path)))
                 .GET();
         if (token != null) {
             request.header("Authorization", "Bearer " + token);
@@ -116,6 +124,7 @@ class AinerResourceServerIntegrationTest {
             actor.requireAuthority("SCOPE_ai.invoke");
             return ApiResponse.success(actor, RequestIds.currentOrCreate(request));
         }
+
     }
 
     @TestConfiguration(proxyBeanMethods = false)

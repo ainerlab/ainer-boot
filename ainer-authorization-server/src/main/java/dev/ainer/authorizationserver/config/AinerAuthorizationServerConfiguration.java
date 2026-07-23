@@ -184,6 +184,19 @@ public class AinerAuthorizationServerConfiguration {
                 properties, registeredClientRepository, passwordEncoder);
     }
 
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "ainer.security.authorization-server.metrics-client-bootstrap",
+            name = "enabled",
+            havingValue = "true")
+    AinerMetricsClientBootstrapRunner ainerMetricsClientBootstrapRunner(
+            AinerAuthorizationServerProperties properties,
+            RegisteredClientRepository registeredClientRepository,
+            PasswordEncoder passwordEncoder) {
+        return new AinerMetricsClientBootstrapRunner(
+                properties, registeredClientRepository, passwordEncoder);
+    }
+
     private List<String> roleNames(AinerUserDetails user) {
         return user.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)

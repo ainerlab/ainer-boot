@@ -47,7 +47,7 @@
 ### 安全与身份变更
 
 1. [`security.md`](security.md)
-2. ADR-0005 至 ADR-0011
+2. ADR-0005 至 ADR-0012
 3. [`configuration.md`](configuration.md)
 
 ### AI 能力变更

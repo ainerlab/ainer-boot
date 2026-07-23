@@ -6,6 +6,7 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import dev.ainer.authorizationserver.config.AinerAuthorizationServerConfiguration;
+import dev.ainer.security.AinerSecurityScopes;
 import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.module.identity.account.application.IdentityAccessLifecycleService;
 import dev.ainer.module.identity.account.application.ProvisionTenantOwnerCommand;
@@ -256,6 +257,27 @@ class AinerAuthorizationServerIntegrationTest {
     }
 
     @Test
+    void prometheusEndpointRequiresDedicatedTenantlessServiceToken() throws Exception {
+        String metricsClientId = "ainer-metrics-test";
+        registeredClientRepository.save(machineClient(
+                metricsClientId, null, AinerSecurityScopes.PLATFORM_METRICS_READ));
+        String tenantMetricsClientId = "ainer-tenant-metrics-test";
+        registeredClientRepository.save(machineClient(
+                tenantMetricsClientId, TENANT_ID, AinerSecurityScopes.PLATFORM_METRICS_READ));
+
+        HttpResponse<String> unauthenticated = metrics(null);
+        HttpResponse<String> tenantBound = metrics(accessToken(
+                tenantMetricsClientId, AinerSecurityScopes.PLATFORM_METRICS_READ));
+        HttpResponse<String> allowed = metrics(accessToken(
+                metricsClientId, AinerSecurityScopes.PLATFORM_METRICS_READ));
+
+        assertThat(unauthenticated.statusCode()).isEqualTo(401);
+        assertThat(tenantBound.statusCode()).isEqualTo(403);
+        assertThat(allowed.statusCode()).isEqualTo(200);
+        assertThat(allowed.body()).contains("# HELP").contains("jvm_");
+    }
+
+    @Test
     void directoryEnforcesServiceActorScopeAndTenantBoundary() throws Exception {
         ProvisionedIdentity first = identityService.provisionTenantOwner(new ProvisionTenantOwnerCommand(
                 "directory-first", "Directory First", "first@example.com",
@@ -387,6 +409,16 @@ class AinerAuthorizationServerIntegrationTest {
                 .GET()
                 .build();
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> metrics(String accessToken) throws Exception {
+        HttpRequest.Builder request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:%d/actuator/prometheus".formatted(port)))
+                .GET();
+        if (accessToken != null) {
+            request.header("Authorization", "Bearer " + accessToken);
+        }
+        return httpClient.send(request.build(), HttpResponse.BodyHandlers.ofString());
     }
 
     private String userToken(ProvisionedIdentity identity) {

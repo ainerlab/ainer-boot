@@ -14,6 +14,7 @@ public class AinerAuthorizationServerProperties {
     private final MachineClientBootstrap machineClientBootstrap = new MachineClientBootstrap();
     private final IntrospectionClientBootstrap introspectionClientBootstrap =
             new IntrospectionClientBootstrap();
+    private final MetricsClientBootstrap metricsClientBootstrap = new MetricsClientBootstrap();
 
     public String getIssuer() {
         return issuer;
@@ -41,6 +42,10 @@ public class AinerAuthorizationServerProperties {
 
     public IntrospectionClientBootstrap getIntrospectionClientBootstrap() {
         return introspectionClientBootstrap;
+    }
+
+    public MetricsClientBootstrap getMetricsClientBootstrap() {
+        return metricsClientBootstrap;
     }
 
     public static final class SigningKey {
@@ -124,6 +129,37 @@ public class AinerAuthorizationServerProperties {
     }
 
     public static final class IntrospectionClientBootstrap {
+
+        private boolean enabled;
+        private String clientId;
+        private String clientSecret;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getClientId() {
+            return clientId;
+        }
+
+        public void setClientId(String clientId) {
+            this.clientId = clientId;
+        }
+
+        public String getClientSecret() {
+            return clientSecret;
+        }
+
+        public void setClientSecret(String clientSecret) {
+            this.clientSecret = clientSecret;
+        }
+    }
+
+    public static final class MetricsClientBootstrap {
 
         private boolean enabled;
         private String clientId;

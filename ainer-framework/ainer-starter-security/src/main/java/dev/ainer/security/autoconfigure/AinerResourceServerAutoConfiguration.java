@@ -2,7 +2,10 @@ package dev.ainer.security.autoconfigure;
 
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.core.error.ErrorCodeContributor;
+import dev.ainer.security.AinerSecurityScopes;
 import dev.ainer.security.actor.AuthenticatedActorResolver;
+import dev.ainer.security.authorization.PrometheusEndpointRequestMatcher;
+import dev.ainer.security.authorization.TenantlessServiceScopeAuthorizationManager;
 import dev.ainer.security.error.AinerSecurityErrorCode;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -12,6 +15,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -91,11 +95,15 @@ public class AinerResourceServerAutoConfiguration {
             HttpSecurity http,
             AinerResourceServerProperties properties,
             ObjectProvider<OnlineAccessTokenValidationFilter> onlineValidationFilter,
+            Environment environment,
             ObjectMapper objectMapper) throws Exception {
         AinerSecurityFailureWriter failureWriter = new AinerSecurityFailureWriter(objectMapper);
         String[] publicPaths = properties.getPublicPaths().toArray(String[]::new);
 
         http.authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(new PrometheusEndpointRequestMatcher(environment))
+                        .access(new TenantlessServiceScopeAuthorizationManager(
+                                AinerSecurityScopes.PLATFORM_METRICS_READ))
                         .requestMatchers(publicPaths).permitAll()
                         .anyRequest().authenticated())
                 .csrf(csrf -> csrf.disable())

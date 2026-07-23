@@ -86,6 +86,8 @@ Surefire XML 报告位于各模块 `target/surefire-reports/`。`target/` 是构
 - inactive 返回 401，在线依赖失败返回 503，二者都不能泄漏 Token 或原始响应；
 - introspection client 必须显式受信、只有 `token.introspect`，携带 tenant、业务 scope 或普通 client 身份时拒绝；
 - RFC 7009 撤销后 inactive；Identity user/tenant/membership 非 ACTIVE 与 `issuedAt <= latestRevokedAt` 均 inactive，事件后新 Token 可恢复。
+- `/actuator/prometheus` 无 Token 401，USER、tenant-bound SERVICE 与缺 `platform.metrics.read` 403，只有 tenantless SERVICE 成功；业务 Resource Server 显式关闭时也不得公开指标。
+- metrics bootstrap 只能创建无 tenant、单一 `platform.metrics.read`、一分钟 Token 的 Client Credentials client，不得带 introspection 标记，并验证幂等与弱 secret 失败关闭。
 
 ### 数据与事务
 
@@ -117,4 +119,4 @@ Surefire XML 报告位于各模块 `target/surefire-reports/`。`target/` 是构
 
 合并前：受影响模块测试、完整 `mvn clean test`、`git diff --check`。
 
-发布前还必须确认：数据库测试未因 Docker 缺失而跳过、两个可执行发行物均能启动、Flyway 从空库成功、升级 migration 在备份副本成功、关键鉴权与健康检查通过。M4.2 还要在可运行 Testcontainers 的环境执行双人审批、锁定重检、归档回滚和游标边界集成测试。M4.3 还要在真实 PostgreSQL 上执行 Authorization Server 协议 smoke，证明专用/普通 introspection client 隔离、active、RFC 7009 撤销和 Identity epoch，并用接近真实规模数据检查 epoch 查询计划。手工 PostgreSQL 与 loopback 证据是补充，不取代发布候选环境中不跳过的自动门禁。当前验证快照见 [`project-status.md`](project-status.md)。
+发布前还必须确认：数据库测试未因 Docker 缺失而跳过、两个可执行发行物均能启动、Flyway 从空库成功、升级 migration 在备份副本成功、关键鉴权与健康检查通过。M4.2 还要在可运行 Testcontainers 的环境执行双人审批、锁定重检、归档回滚和游标边界集成测试。M4.3 还要在真实 PostgreSQL 上执行 Authorization Server 协议 smoke，证明专用/普通 introspection client 隔离、active、RFC 7009 撤销和 Identity epoch，并用接近真实规模数据检查 epoch 查询计划；生产可观测性切片还要用独立 metrics client 抓取两个真实 exporter，并验证多节点、Token endpoint/数据库故障和告警路由。手工 PostgreSQL 与 loopback 证据是补充，不取代发布候选环境中不跳过的自动门禁。当前验证快照见 [`project-status.md`](project-status.md)。

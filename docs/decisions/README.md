@@ -19,6 +19,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0009](0009-cross-runtime-access-revocation-delivery.md) | Accepted | 跨运行时 Directory 与访问撤销投递 |
 | [0010](0010-security-operations-and-audit-lifecycle.md) | Accepted | 安全运维双人审批与授权审计生命周期 |
 | [0011](0011-selective-online-token-validation.md) | Accepted | 高风险 API 选择性在线 Token 校验 |
+| [0012](0012-production-observability-and-auth-availability.md) | Proposed | 生产指标访问与 Authorization Server 可用性边界 |
 
 ## 何时需要 ADR
 

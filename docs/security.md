@@ -153,6 +153,20 @@ export AINER_AUTHORIZATION_BOOTSTRAP_INTROSPECTION_CLIENT_SECRET='at-least-24-ch
 
 初始化完成后立即移除开关和明文 secret。不得用普通 machine bootstrap 建立该 client，也不得给它增加 tenant 或业务 scope。RFC 7009 `/oauth2/revoke` 继续使用 Spring Authorization Server 官方授权元数据；M4.3 没有创建自研 Token 表。
 
+### 5.3 指标抓取专用 Client
+
+两个发行物的 `/actuator/prometheus` 都是服务控制面，不是匿名健康端点。Token 必须满足 `actor_type=SERVICE`、不存在 `tenant_id`，并且只有所需的 `platform.metrics.read` scope；人员、tenant-bound 业务服务、introspection client 和普通业务 client 都不能读取指标。
+
+受控初始化窗口可以建立独立 metrics client：
+
+```bash
+export AINER_AUTHORIZATION_BOOTSTRAP_METRICS_ENABLED=true
+export AINER_AUTHORIZATION_BOOTSTRAP_METRICS_CLIENT_ID=ainer-prometheus
+export AINER_AUTHORIZATION_BOOTSTRAP_METRICS_CLIENT_SECRET='at-least-24-characters-secret'
+```
+
+它只支持 Client Credentials，access token TTL 为 1 分钟，不携带 tenant，也没有 introspection 标记。创建完成后立即移除开关和明文 secret。Prometheus 应使用 OAuth2 配置从 secret file 获取 client secret，不能保存长期静态 Bearer Token。完整边界与尚未完成的 HA/轮换证据见 [ADR-0012](decisions/0012-production-observability-and-auth-availability.md)。
+
 ## 6. 浏览器与人员身份
 
 协议装配支持 Authorization Code、PKCE、Refresh Token、Client Credentials 与 OIDC；实际可用授权类型仍由 registered client 白名单决定。禁止配置 password grant。
@@ -192,4 +206,4 @@ mvn test
 
 Resource Server 的 401/403、可信 claim、伪造身份头以及 Workspace 应用授权测试不依赖 Docker。Identity、JDBC 协议表、Client Credentials 签发与 Workspace tenant SQL 测试使用 PostgreSQL Testcontainers；没有 Docker 时会明确跳过，不会改用 H2。
 
-M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存、inactive 401、在线依赖失败 503、专用 client 与普通 client 隔离、RFC 7009 撤销，以及 Identity epoch 的等于/前后边界。真实 PostgreSQL 和协议 smoke 证据维护在 [`project-status.md`](project-status.md)。
+M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存、inactive 401、在线依赖失败 503、专用 client 与普通 client 隔离、RFC 7009 撤销，以及 Identity epoch 的等于/前后边界。指标边界还要验证无 Token 401，USER/tenant-bound/missing-scope 403，专用 tenantless SERVICE 200，以及业务 Resource Server 关闭时仍不匿名公开。真实 PostgreSQL 和协议 smoke 证据维护在 [`project-status.md`](project-status.md)。

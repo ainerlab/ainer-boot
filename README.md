@@ -16,12 +16,12 @@ Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 
 | `ainer-starter-web` | ✅ | 真实 HTTP 状态、统一响应、请求 ID、全局异常处理 |
 | `ainer-starter-persistence` | ✅ | MyBatis、Flyway、PostgreSQL 与 UUID 的公共装配 |
 | `ainer-security` | ✅ | 与框架无关的可信参与者与 authority 契约 |
-| `ainer-starter-security` | ✅ | Resource Server、人员/服务 JWT 投影、选择性 RFC 7662 在线校验与统一 401/403/503 |
+| `ainer-starter-security` | ✅ | Resource Server、人员/服务 JWT 投影、选择性 RFC 7662 在线校验、tenantless 指标授权与统一 401/403/503 |
 | `ainer-module-identity` | ✅ | 用户/租户、安全 Directory、禁用/撤销、revocation epoch、可租约 outbox 与双人重放端口 |
 | `ainer-module-workspace` | ✅ | 可信租户资源、成员治理、幂等撤销、OWNER 恢复、授权审计热/归档与 SIEM 契约 |
 | `ainer-module-ai-runtime` | ✅ | OpenAI-compatible 网关、SSE、策略、预算与用量/费用审计 |
-| `ainer-server` | ✅ | JWT Resource Server、可选 Directory client、撤销 consumer/SLO、OWNER 恢复与审计运营端点 |
-| `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、受限 introspection/RFC 7009、Identity 状态感知、Directory/relay 与 JDBC 协议仓库 |
+| `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、可选 Directory client、撤销 consumer/SLO、OWNER 恢复与审计运营端点 |
+| `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、受限 introspection/RFC 7009、独立 metrics client、Identity 状态感知、Directory/relay 与 JDBC 协议仓库 |
 
 当前版本已经通过完整 Reactor 测试；M1/M2 曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。M3 至 M4.3 增加 Identity、服务身份、Directory/outbox、Workspace 撤销、双人恢复、审计归档和选择性在线 Token 校验测试；当前机器没有 Docker 时数据库测试会明确跳过。本轮还在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
 
@@ -147,4 +147,4 @@ ainer-boot/
 
 M4.3 已为高风险 API 建立选择性在线撤销基线：本地 JWT 认证后按路径/方法执行 RFC 7662，无 active 正向缓存；inactive 返回 401，Authorization Server 依赖失败返回 503；人员 Token 同时受 Identity 当前状态与 revocation epoch 约束，普通业务 client 不能调用 introspection。
 
-下一步不是继续扩张安全抽象，而是把该边界接入生产运营：Authorization Server 高可用与容量、专用凭据轮换、指标 exporter/dashboard/告警、IAM 职责分离、外部不可变审计副本和多节点 SLO 验证。M3 仍需完成人员账号/Client 控制面、tenant ownership transfer、Authorization Code + PKCE 端到端验证、MFA 与密钥轮换。
+生产指标代码基线现已开始落地：两个发行物提供受 JWT 保护的 Prometheus exporter，抓取凭据使用独立无 tenant metrics client。下一步仍需部署真实 Prometheus、dashboard/告警，并完成 Authorization Server 多实例容量、故障切换和旧凭据退役证据；随后继续 IAM 职责分离、外部不可变审计副本、多节点 SLO，以及人员账号/Client 控制面、tenant ownership transfer、Authorization Code + PKCE、MFA 与签名密钥轮换。

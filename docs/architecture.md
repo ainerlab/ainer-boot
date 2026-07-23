@@ -160,6 +160,7 @@ M3/M4 已形成以下边界：
 - 内部 HTTP adapter 使用短生命周期 Client Credentials JWT、issuer/audience、`actor_type=SERVICE`、scope 与可信 publisher subject；生产仍需 TLS、受控网络，后续可叠加 mTLS 或服务网格身份。
 - 耗尽事件重放复用原 event ID；OWNER 恢复只提升现有 ACTIVE 成员，不恢复被禁用主体。两者由不同 request/approve Client 完成并写模块所属安全操作审计。
 - M4.3 在上述本地 JWT 认证后为高风险路径追加 RFC 7662 在线校验；Authorization Server 使用 Identity 当前状态与最新 access-event 作为人员 Token revocation epoch。普通低风险 JWT 请求仍有自然到期窗口，不能宣称所有 API 强实时撤销。
+- 两个发行物的 Prometheus endpoint 使用相同的 tenantless SERVICE + `platform.metrics.read` 契约；指标 client 与业务、Directory、relay、SIEM 和 introspection client 分离。共享 PostgreSQL 只是 Authorization Server 多实例前提，尚未验证的浏览器会话、容量和故障切换不能写成已完成 HA。
 
 ## 8. AI 原生能力
 

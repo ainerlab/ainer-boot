@@ -125,10 +125,15 @@ AI 默认关闭。启用时以下设置共同构成安全门禁：
 | `AINER_AUTHORIZATION_BOOTSTRAP_INTROSPECTION_ENABLED` | `false` | 只在建立专用在线校验 client 的初始化窗口启用 |
 | `AINER_AUTHORIZATION_BOOTSTRAP_INTROSPECTION_CLIENT_ID` | 空 | bootstrap 开启时必填，不得与业务 client 复用 |
 | `AINER_AUTHORIZATION_BOOTSTRAP_INTROSPECTION_CLIENT_SECRET` | 空 | 24..128 字符，secret 注入 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_METRICS_ENABLED` | `false` | 只在建立专用 Prometheus client 的初始化窗口启用 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_METRICS_CLIENT_ID` | 空 | bootstrap 开启时必填，必须与 introspection/业务 client 分离 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_METRICS_CLIENT_SECRET` | 空 | 24..128 字符，secret 注入 |
 
 Bootstrap 是幂等初始化手段，不是长期管理 API。初始化完成后应关闭，并通过后续 Client 控制面完成生命周期管理。
 
 introspection bootstrap 固定创建无 tenant、只有 `token.introspect` scope、`ainer.introspection-allowed=true` 的专用 client；其 access token TTL 为 1 分钟。端点还会再次拒绝带 tenant、额外业务 scope 或缺少显式标记的 client。普通 machine bootstrap 不具备 introspection 权限。
+
+metrics bootstrap 固定创建无 tenant、只有 `platform.metrics.read` scope、仅支持 Client Credentials 的专用 client；其 access token TTL 为 1 分钟，且没有 introspection 标记。它与 introspection client 必须使用不同 ID/secret。两个 bootstrap 都只创建不存在的 client，不会覆盖、轮换或停用已有记录。
 
 Identity 内部 API 与 relay 配置：
 
@@ -156,7 +161,9 @@ Directory client 与 relay 应使用两个不同 client/secret，并分别只授
 
 ## 6. Actuator 与运行时
 
-两个发行物当前只公开 `health` 和 `info` Actuator endpoint，并启用健康探针。扩大 exposure 前必须评估认证、网络边界和信息泄露。
+两个发行物只公开 `health`、`info` 和 `prometheus` Actuator endpoint，并启用健康探针。`health`/`info` 保持现有公开可见性；`/actuator/prometheus` 强制要求无 tenant 的 `actor_type=SERVICE` JWT 与 `platform.metrics.read` scope。人员 Token、tenant-bound 服务 Token、缺 scope 或无 Token 均不能读取指标。显式关闭业务 Resource Server 时，指标端点仍拒绝匿名访问。
+
+Prometheus registry 已随两个可执行发行物引入，但仓库没有部署 Prometheus、dashboard 或告警路由。生产还必须使用 TLS、受控网络入口和 secret file/store；不得把固定 Bearer Token 或 client secret 写入 YAML。
 
 优雅停机已启用，shutdown phase 超时为 20 秒。修改超时必须结合请求、SSE 和数据库事务实测。
 

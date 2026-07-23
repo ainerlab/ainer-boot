@@ -1,10 +1,14 @@
 package dev.ainer.authorizationserver.config;
 
 import dev.ainer.core.error.StandardErrorCode;
+import dev.ainer.security.AinerSecurityScopes;
 import dev.ainer.security.autoconfigure.AinerSecurityFailureWriter;
+import dev.ainer.security.authorization.PrometheusEndpointRequestMatcher;
+import dev.ainer.security.authorization.TenantlessServiceScopeAuthorizationManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
@@ -116,6 +120,34 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
 
     @Bean
     @Order(3)
+    SecurityFilterChain authorizationServerMetricsSecurityFilterChain(
+            HttpSecurity http,
+            JwtDecoder jwtDecoder,
+            Environment environment,
+            ObjectMapper objectMapper) throws Exception {
+        AinerSecurityFailureWriter failureWriter = new AinerSecurityFailureWriter(objectMapper);
+        http.securityMatcher(new PrometheusEndpointRequestMatcher(environment))
+                .authorizeHttpRequests(authorize -> authorize
+                        .anyRequest()
+                        .access(new TenantlessServiceScopeAuthorizationManager(
+                                AinerSecurityScopes.PLATFORM_METRICS_READ)))
+                .csrf(csrf -> csrf.disable())
+                .requestCache(cache -> cache.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .oauth2ResourceServer(resourceServer -> resourceServer
+                        .jwt(jwt -> jwt.decoder(jwtDecoder))
+                        .authenticationEntryPoint((request, response, exception) ->
+                                failureWriter.write(request, response, StandardErrorCode.UNAUTHENTICATED)))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, exception) ->
+                                failureWriter.write(request, response, StandardErrorCode.UNAUTHENTICATED))
+                        .accessDeniedHandler((request, response, exception) ->
+                                failureWriter.write(request, response, StandardErrorCode.FORBIDDEN)));
+        return http.build();
+    }
+
+    @Bean
+    @Order(4)
     SecurityFilterChain authorizationServerDefaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()

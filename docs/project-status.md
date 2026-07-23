@@ -28,11 +28,14 @@ Foundation M4.3 选择性在线 Token 校验工程基线已完成，下一阶段
 - Resource Server 高风险路径/方法选择性 RFC 7662 在线校验，无 active 正向缓存，inactive 401、依赖失败 503；
 - Authorization Server 专用 introspection client 隔离、RFC 7009 撤销、官方 JDBC authorization 包装与协议级普通 client 拒绝；
 - Identity 当前状态与最新 access-event 组成的人员 Token revocation epoch，以及在线校验放行/拒绝/失败/延时指标；
-- ADR-0001 至 ADR-0011、架构、HTTP API、安全、数据、测试、运行与发布基础文档。
+- 两个发行物的 Prometheus registry 与 exporter、tenantless SERVICE + `platform.metrics.read` 授权，以及独立一分钟 metrics client bootstrap；
+- ADR-0001 至 ADR-0011 已接受，ADR-0012 处于 Proposed；架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
 
 ## 3. 最近验证证据
 
-2026-07-23 执行完整 `mvn clean test`：14 个 Reactor 模块成功，144 个测试，0 failure，0 error；其中 98 个实际执行通过，46 个 Testcontainers 测试因当前机器没有 Docker 而明确跳过。
+2026-07-23 执行完整 `mvn clean test`：14 个 Reactor 模块成功，157 个测试，0 failure，0 error；其中 110 个实际执行通过，47 个 Testcontainers 测试因当前机器没有 Docker 而明确跳过。
+
+本轮新增指标安全证据：Resource Server 真实 HTTP 测试覆盖无 Token 401、USER/tenant-bound SERVICE/缺 scope 403、tenantless SERVICE 200，并使用自定义 management base path 证明路径配置不会绕过授权；路径 matcher 还覆盖 context path、尾斜杠和编码路径。业务 Resource Server 显式关闭时，真实 Prometheus endpoint 仍拒绝匿名并且不返回 JVM/process 指标。metrics bootstrap 测试证明只创建 Client Credentials、无 tenant、只有 `platform.metrics.read`、一分钟 Token、无 introspection 标记，重复运行不覆盖且弱 secret 失败关闭。Authorization Server 的真实 PostgreSQL 协议测试已加入专用/tenant-bound metrics Token 与实际 exporter 的 401/403/200 验证，但本机无 Docker，因此该新增协议用例与同组七个用例一并明确跳过。
 
 同日使用本机真实 PostgreSQL 18.4 从空库执行 Identity 四份、Workspace 八份全量 migration。除 M4.1 的 outbox 领取/撤销证据外，本轮实际执行了耗尽原事件双人重放事务、REVOKED OWNER 提升新 OWNER 事务、安全操作审计约束，以及授权审计归档 CTE、热冷统一查询和导出审计。原事件内容保持不变，旧 OWNER 保持 REVOKED，归档后热表 0/归档表 3；两个一次性数据库均已删除。loopback HTTP 测试实际验证 Client Credentials Token 获取/缓存和 Bearer 事件发布。
 
@@ -45,7 +48,7 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 ### 访问控制
 
 - 选择性在线校验只覆盖配置的高风险 API；普通低风险自包含 JWT 仍有自然到期窗口；
-- Authorization Server 已成为高风险 API 在线依赖，但尚未完成生产高可用、容量、专用凭据轮换、dashboard 与告警；
+- Authorization Server 已成为高风险 API 在线依赖；受保护 exporter 与独立 metrics/introspection 凭据创建基线已有代码，但尚未完成生产高可用、容量、旧凭据退役、真实 Prometheus、dashboard 与告警；
 - 重放与 OWNER 恢复已做服务 `sub` 分离，但生产 IAM 仍需证明凭据由不同人员/职责保管；
 - 授权审计归档仍位于同一数据库，没有 WORM、数字签名、法律保留和最终删除策略；
 - SIEM 只有默认关闭的拉取 API，没有部署外部消费者、不可变副本或告警路由；
@@ -73,7 +76,7 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 ## 5. 下一里程碑
 
-M4.3 的代码和协议基线已经落地，下一里程碑优先完成生产启用：Authorization Server 多实例高可用与容量证据、专用 introspection 凭据轮换、Resource Server 灰度与安全降级审批、指标 exporter/dashboard/告警和多节点故障验证。同时把 M4.2 的 SIEM 拉取与操作审计接入生产级 IAM 职责分离和外部不可变存储。
+M4.3 的代码和协议基线已经落地，生产指标安全切片已完成应用侧 exporter 与专用凭据基线。下一步优先完成真实 Prometheus 抓取、dashboard/告警和 Authorization Server 多实例容量/故障证据；同时补齐 metrics/introspection 旧凭据退役、Resource Server 灰度与安全降级审批，并把 M4.2 的 SIEM 拉取与操作审计接入生产级 IAM 职责分离和外部不可变存储。
 
 完成条件包括：发布候选环境的 Testcontainers 测试不跳过；高风险 online validation 在目标容量与故障注入下满足确定的延时/可用性目标；request/approve 与 introspection 凭据在运营上真正分离并可轮换；外部审计副本可验证、可恢复；初始撤销 SLO 经多节点证据修正后形成正式错误预算。随后继续补齐人员账号/Client 控制面、Authorization Code + PKCE、MFA、tenant ownership transfer 与密钥轮换。
 

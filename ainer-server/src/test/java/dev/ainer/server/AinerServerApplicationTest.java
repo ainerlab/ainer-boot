@@ -45,4 +45,18 @@ class AinerServerApplicationTest {
                 .contains("\"runtimeMode\":\"MONOLITH\"")
                 .contains("\"javaFeatureVersion\":25");
     }
+
+    @Test
+    void disablingBusinessResourceServerDoesNotExposeMetrics() throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:%d/actuator/prometheus".formatted(port)))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(request, HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isIn(401, 403);
+        assertThat(response.body()).doesNotContain("jvm_").doesNotContain("process_");
+    }
 }
