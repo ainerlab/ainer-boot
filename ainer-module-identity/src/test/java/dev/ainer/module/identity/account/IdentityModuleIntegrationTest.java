@@ -158,7 +158,9 @@ class IdentityModuleIntegrationTest {
                 identity.tenantId(), identity.subjectId(), revokedAt.plusNanos(1))).isTrue();
 
         jdbcTemplate.update(
-                "UPDATE ainer_identity_membership SET status = 'DISABLED', updated_at = CURRENT_TIMESTAMP "
+                "UPDATE ainer_identity_membership "
+                        + "SET status = 'DISABLED', "
+                        + "updated_at = GREATEST(updated_at, CURRENT_TIMESTAMP) "
                         + "WHERE tenant_id = ? AND user_id = ?",
                 identity.tenantId(), identity.subjectId());
         assertThat(tokenStatusService.isAccessTokenActive(
