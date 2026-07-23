@@ -6,7 +6,9 @@
 
 ## 1. 当前阶段
 
-Foundation M4.3 选择性在线 Token 校验工程基线已完成，下一阶段进入生产启用与安全运营验证。项目已经从纯设计文档进入可编译、可运行、可测试的 Spring Boot 4.1 多模块工程，但尚未达到生产或商业发行就绪。
+Foundation M4.4 受审计 tenant 服务 Client 生命周期工程基线已完成，下一阶段进入
+Authorization Code + PKCE 端到端门禁与生产启用验证。项目已经从纯设计文档进入可编译、可运行、
+可测试的 Spring Boot 4.1 多模块工程，但尚未达到生产或商业发行就绪。
 
 ## 2. 已完成
 
@@ -29,11 +31,28 @@ Foundation M4.3 选择性在线 Token 校验工程基线已完成，下一阶段
 - Authorization Server 专用 introspection client 隔离、RFC 7009 撤销、官方 JDBC authorization 包装与协议级普通 client 拒绝；
 - Identity 当前状态与最新 access-event 组成的人员 Token revocation epoch，以及在线校验放行/拒绝/失败/延时指标；
 - 两个发行物的 Prometheus registry 与 exporter、tenantless SERVICE + `platform.metrics.read` 授权，以及独立一分钟 metrics client bootstrap；
-- ADR-0001 至 ADR-0011 已接受，ADR-0012 处于 Proposed；架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
+- 默认关闭的 tenant 服务 Client 控制面：一次性服务端随机 secret、scope 白名单、tenantless
+  operator 双重授权、蓝绿新 ID 轮换、显式退役和同事务操作审计；
+- 退役感知 registered client/authorization 包装：阻止新 Token、历史 Token introspection
+  inactive，同时保留官方 JDBC authorization 历史可读性；
+- 独立的一分钟 client-control operator bootstrap，以及配置失败关闭和真实 PostgreSQL 生命周期
+  门禁；
+- ADR-0001 至 ADR-0011 已接受，ADR-0012 与 ADR-0013 处于 Proposed；架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
 
 ## 3. 最近验证证据
 
-2026-07-23 在 macOS Colima 0.10.3、Docker 29.5.2 与 Testcontainers 2.0.5 环境执行完整 `mvn clean test`：14 个 Reactor 模块成功，157 个测试全部实际执行通过，0 failure、0 error、0 skipped。PostgreSQL 集成组使用 `postgres:18.3-alpine` 从空库启动并执行 Flyway，覆盖 Identity、Workspace、AI runtime 与 Authorization Server。
+2026-07-23 在 macOS Colima 0.10.3、Docker 29.5.2 与 Testcontainers 2.0.5 环境执行完整
+`mvn test`：14 个 Reactor 模块成功，167 个测试全部实际执行通过，0 failure、0 error、
+0 skipped。PostgreSQL 集成组使用 `postgres:18.3-alpine` 从空库启动并执行 Flyway，覆盖
+Identity、Workspace、AI runtime 与 Authorization Server。
+
+本轮新增 OAuth Client 生命周期证据：Authorization Server 从空库执行六份 migration；创建
+managed client 后只保存 password hash，一次性 secret 可正常换取 tenant-bound JWT；未授权 scope
+返回稳定 422，tenant-bound operator 返回 403。蓝绿轮换期间新旧 ID 并行可用，显式退役后旧
+secret 换 Token 返回 401、历史 Token introspection inactive，而 Spring 官方 JDBC authorization
+仍可重建历史记录。配置测试覆盖空 operator、平台/`.all` scope、过长 access token 和弱随机
+secret 的启动失败；operator bootstrap 只创建无 tenant、`oauth.clients.manage`、一分钟 Token。
+创建、轮换、退役审计表没有 secret 字段。
 
 本轮新增指标安全证据：Resource Server 真实 HTTP 测试覆盖无 Token 401、USER/tenant-bound SERVICE/缺 scope 403、tenantless SERVICE 200，并使用自定义 management base path 证明路径配置不会绕过授权；路径 matcher 还覆盖 context path、尾斜杠和编码路径。业务 Resource Server 显式关闭时，真实 Prometheus endpoint 仍拒绝匿名并且不返回 JVM/process 指标。metrics bootstrap 测试证明只创建 Client Credentials、无 tenant、只有 `platform.metrics.read`、一分钟 Token、无 introspection 标记，重复运行不覆盖且弱 secret 失败关闭。Authorization Server 的真实 PostgreSQL 协议测试已实际验证专用/tenant-bound metrics Token 与 exporter 的 401/403/200，并同时覆盖 Client Credentials、OIDC discovery、专用 introspection、RFC 7009 与 Identity revocation epoch。
 
@@ -56,8 +75,10 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 ### Identity 与 OAuth
 
-- 人员账号、tenant 和 Client 管理控制面不完整；
-- Authorization Code + PKCE 端到端、MFA、密钥轮换和恢复流程未完成；
+- tenant-bound Client Credentials 已有生命周期控制面，但 browser/OIDC、平台级
+  metrics/introspection/operator、`.all` 与既有 bootstrap client 尚未纳管，也没有列表分页、审计
+  导出、双人审批或 UI；
+- Authorization Code + PKCE 端到端、MFA、签名密钥轮换和恢复流程未完成；
 - tenant ownership transfer 的 Identity 控制面尚未完成。
 
 ### AI 平台
@@ -76,9 +97,19 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 ## 5. 下一里程碑
 
-M4.3 的代码和协议基线已经落地，生产指标安全切片已完成应用侧 exporter 与专用凭据基线。下一步优先完成真实 Prometheus 抓取、dashboard/告警和 Authorization Server 多实例容量/故障证据；同时补齐 metrics/introspection 旧凭据退役、Resource Server 灰度与安全降级审批，并把 M4.2 的 SIEM 拉取与操作审计接入生产级 IAM 职责分离和外部不可变存储。
+M4.4 已完成 tenant 服务 Client 生命周期的应用与真实数据库基线。下一工程切片优先补齐
+Authorization Code + PKCE 的真实浏览器协议链路，包括 public client、S256 challenge、登录、
+authorization code 单次交换、错误 verifier 和 redirect URI 拒绝；不能只依赖 discovery 元数据。
 
-完成条件包括：发布候选环境的 Testcontainers 测试不跳过；高风险 online validation 在目标容量与故障注入下满足确定的延时/可用性目标；request/approve 与 introspection 凭据在运营上真正分离并可轮换；外部审计副本可验证、可恢复；初始撤销 SLO 经多节点证据修正后形成正式错误预算。随后继续补齐人员账号/Client 控制面、Authorization Code + PKCE、MFA、tenant ownership transfer 与密钥轮换。
+生产并行工作仍包括真实 Prometheus 抓取、dashboard/告警、Authorization Server 多实例容量/故障
+证据、metrics/introspection/operator 旧凭据退役、Resource Server 灰度与安全降级审批，以及把
+M4.2 操作审计接入生产级 IAM 职责分离和外部不可变存储。
+
+完成条件包括：PKCE S256 正反路径在真实 PostgreSQL 和 HTTP 会话中自动化执行；发布候选环境的
+Testcontainers 测试不跳过；高风险 online validation 在目标容量与故障注入下满足确定的延时/可用性
+目标；request/approve 与平台凭据在运营上真正分离并可轮换；外部审计副本可验证、可恢复；初始
+撤销 SLO 经多节点证据修正后形成正式错误预算。随后继续补齐 MFA、tenant ownership transfer、
+浏览器/平台 Client 控制面与签名密钥轮换。
 
 ## 6. 更新规则
 

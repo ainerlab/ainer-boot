@@ -8,6 +8,7 @@ import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 final class RevocationAwareOAuth2AuthorizationService implements OAuth2AuthorizationService {
 
@@ -18,12 +19,15 @@ final class RevocationAwareOAuth2AuthorizationService implements OAuth2Authoriza
 
     private final OAuth2AuthorizationService delegate;
     private final IdentityTokenStatusService identityTokenStatusService;
+    private final Predicate<String> registeredClientActive;
 
     RevocationAwareOAuth2AuthorizationService(
             OAuth2AuthorizationService delegate,
-            IdentityTokenStatusService identityTokenStatusService) {
+            IdentityTokenStatusService identityTokenStatusService,
+            Predicate<String> registeredClientActive) {
         this.delegate = delegate;
         this.identityTokenStatusService = identityTokenStatusService;
+        this.registeredClientActive = registeredClientActive;
     }
 
     @Override
@@ -43,7 +47,12 @@ final class RevocationAwareOAuth2AuthorizationService implements OAuth2Authoriza
 
     @Override
     public OAuth2Authorization findByToken(String token, OAuth2TokenType tokenType) {
-        return applyIdentityStatus(delegate.findByToken(token, tokenType));
+        OAuth2Authorization authorization = delegate.findByToken(token, tokenType);
+        if (authorization != null
+                && !registeredClientActive.test(authorization.getRegisteredClientId())) {
+            return null;
+        }
+        return applyIdentityStatus(authorization);
     }
 
     private OAuth2Authorization applyIdentityStatus(OAuth2Authorization authorization) {

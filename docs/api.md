@@ -90,11 +90,77 @@ M4.3 明确使用以下标准控制面端点：
 | Authorization Server | GET | `/internal/identity/access-event-recovery/tenants/{tenantId}/exhausted?page=1&size=20` | `actor_type=SERVICE` + `identity.access-events.replay.read` 或 `.read.all` | 查询无有效 lease 的真正耗尽事件 |
 | Authorization Server | POST | `/internal/identity/access-event-recovery/tenants/{tenantId}/replay-requests` | `actor_type=SERVICE` + `identity.access-events.replay.request` 或 `.request.all` | 创建 15 分钟默认有效的重放申请 |
 | Authorization Server | POST | `/internal/identity/access-event-recovery/tenants/{tenantId}/replay-requests/{requestId}/approvals` | `actor_type=SERVICE` + `identity.access-events.replay.approve` 或 `.approve.all` | 由不同服务批准并重置原事件 |
+| Authorization Server | POST | `/internal/oauth-service-clients` | tenantless `actor_type=SERVICE` + `oauth.clients.manage` + operator ID 白名单 | 创建 tenant-bound Client Credentials client，secret 只返回一次 |
+| Authorization Server | GET | `/internal/oauth-service-clients/{clientId}` | 同上 | 查询安全生命周期投影，不返回 secret/hash |
+| Authorization Server | POST | `/internal/oauth-service-clients/{clientId}/rotations` | 同上 | 以新 client ID 创建并行 replacement |
+| Authorization Server | POST | `/internal/oauth-service-clients/{clientId}/retirement` | 同上 | 显式退役，阻止新 Token 并让在线 Token 查询 inactive |
 | `ainer-server` | POST | `/internal/workspace-owner-recovery/tenants/{tenantId}/requests` | `actor_type=SERVICE` + `workspace.owner-recovery.request` 或 `.request.all` | 为无 ACTIVE OWNER 的 Workspace 申请恢复 |
 | `ainer-server` | POST | `/internal/workspace-owner-recovery/tenants/{tenantId}/requests/{requestId}/approvals` | `actor_type=SERVICE` + `workspace.owner-recovery.approve` 或 `.approve.all` | 不同服务批准并提升现有 ACTIVE 成员 |
 | `ainer-server` | GET | `/internal/workspace-authorization-audits/tenants/{tenantId}/exports` | `actor_type=SERVICE` + `workspace.audit.export` 或 `.export.all` + 可信 exporter `sub` | SIEM 按稳定游标拉取热/冷审计并集 |
 
 `identity.directory.read` 必须由 Token `tenant_id` 绑定路径 tenant；只有 `identity.directory.read.all` 可以跨 tenant 选择。Directory 响应只含 `tenantId`、`subjectId`、`username`、`displayName`、`role`。非 ACTIVE 精确查询返回 404 `AINER.IDENTITY.DIRECTORY_MEMBER_NOT_FOUND`，不得暴露密码哈希、锁定细节或 OAuth 数据。
+
+OAuth 服务客户端控制面默认关闭。它只接收 tenant UUID、`client_credentials` 服务 client 和配置
+白名单内 scope，不接受 redirect URI、Authorization Code、public client、平台 scope 或 `.all`
+scope。创建请求示例：
+
+```json
+{
+  "clientId": "orders-agent-v1",
+  "clientName": "Orders Agent",
+  "tenantId": "50000000-0000-0000-0000-000000000001",
+  "scopes": ["ai.invoke"],
+  "changeReference": "CHG-2026-1001"
+}
+```
+
+成功响应 `data` 结构如下；`clientSecret` 只在本次创建或轮换响应出现：
+
+```json
+{
+  "client": {
+    "clientId": "orders-agent-v1",
+    "clientName": "Orders Agent",
+    "tenantId": "50000000-0000-0000-0000-000000000001",
+    "scopes": ["ai.invoke"],
+    "status": "ACTIVE",
+    "replacesClientId": null,
+    "clientIdIssuedAt": "2026-07-23T00:00:00Z",
+    "clientSecretExpiresAt": "2026-10-21T00:00:00Z",
+    "createdAt": "2026-07-23T00:00:00Z",
+    "retiredAt": null
+  },
+  "clientSecret": "returned-once-and-never-queryable"
+}
+```
+
+轮换请求必须指定不同且未使用的新 ID：
+
+```json
+{
+  "replacementClientId": "orders-agent-v2",
+  "replacementClientName": "Orders Agent v2",
+  "changeReference": "CHG-2026-1002"
+}
+```
+
+轮换不自动退役旧 ID；调用方先把新 secret 写入 secret store、灰度部署并验证，再向
+`/{oldClientId}/retirement` 发送 `{"changeReference":"CHG-2026-1003"}`。退役不可逆，不提供
+DELETE 或重新激活。
+
+稳定模块错误码包括：
+
+| HTTP | code | 语义 |
+|---:|---|---|
+| 422 | `AINER.AUTHORIZATION.OAUTH_CLIENT_INVALID_REQUEST` | client ID/name、tenant、scope 数量或变更引用不合法 |
+| 422 | `AINER.AUTHORIZATION.OAUTH_CLIENT_SCOPE_NOT_ALLOWED` | 请求 scope 不在启动白名单 |
+| 404 | `AINER.AUTHORIZATION.OAUTH_CLIENT_NOT_FOUND` | 不是该控制面创建的 managed client |
+| 409 | `AINER.AUTHORIZATION.OAUTH_CLIENT_ALREADY_EXISTS` | 新 client ID 已存在 |
+| 409 | `AINER.AUTHORIZATION.OAUTH_CLIENT_NOT_ACTIVE` | 源 client 已退役 |
+| 409 | `AINER.AUTHORIZATION.OAUTH_CLIENT_STATE_CONFLICT` | 并发状态变化或协议记录不一致 |
+
+401/403 继续使用通用安全错误。完整密钥与离线 JWT 限制见 [`security.md`](security.md) 和
+[ADR-0013](decisions/0013-audited-oauth-service-client-lifecycle.md)。
 
 事件请求为版本化 JSON：
 

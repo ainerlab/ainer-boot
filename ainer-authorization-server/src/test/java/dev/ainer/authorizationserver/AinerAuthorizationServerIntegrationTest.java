@@ -75,6 +75,11 @@ import static org.assertj.core.api.Assertions.assertThat;
         properties = {
                 "ainer.security.authorization-server.issuer=https://auth.ainer.test",
                 "ainer.identity.directory-api.enabled=true",
+                "ainer.security.authorization-server.client-control.enabled=true",
+                "ainer.security.authorization-server.client-control.operator-client-ids="
+                        + "ainer-client-operator-test",
+                "ainer.security.authorization-server.client-control.allowed-scopes="
+                        + "ai.invoke,identity.directory.read",
                 "spring.main.banner-mode=off"
         })
 @Import(AinerAuthorizationServerIntegrationTest.TestKeyConfiguration.class)
@@ -83,6 +88,7 @@ class AinerAuthorizationServerIntegrationTest {
     private static final String CLIENT_ID = "ainer-machine-test";
     private static final String CLIENT_SECRET = "machine-secret-2026";
     private static final String TENANT_ID = "tenant:machine-test";
+    private static final String CLIENT_OPERATOR_ID = "ainer-client-operator-test";
 
     @Container
     private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(
@@ -135,6 +141,8 @@ class AinerAuthorizationServerIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM ainer_oauth_service_client_audit");
+        jdbcTemplate.update("DELETE FROM ainer_oauth_service_client");
         jdbcTemplate.update("DELETE FROM oauth2_authorization_consent");
         jdbcTemplate.update("DELETE FROM oauth2_authorization");
         jdbcTemplate.update("DELETE FROM oauth2_registered_client");
@@ -142,17 +150,145 @@ class AinerAuthorizationServerIntegrationTest {
         jdbcTemplate.update("DELETE FROM ainer_identity_tenant");
         jdbcTemplate.update("DELETE FROM ainer_identity_user");
         registeredClientRepository.save(machineClient());
+        registeredClientRepository.save(machineClient(
+                CLIENT_OPERATOR_ID, null, "oauth.clients.manage"));
     }
 
     @Test
     void migratesIdentityAndOfficialJdbcProtocolStores() {
-        assertThat(flyway.info().applied()).hasSize(5);
+        assertThat(flyway.info().applied()).hasSize(6);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_name IN ('oauth2_registered_client','oauth2_authorization',"
-                        + "'oauth2_authorization_consent')",
-                Integer.class)).isEqualTo(3);
+                        + "'oauth2_authorization_consent','ainer_oauth_service_client',"
+                        + "'ainer_oauth_service_client_audit')",
+                Integer.class)).isEqualTo(5);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
+    }
+
+    @Test
+    void managedServiceClientSupportsOneTimeSecretBlueGreenRotationAndRetirement() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        String operatorToken = accessToken(CLIENT_OPERATOR_ID, "oauth.clients.manage");
+
+        HttpResponse<String> created = internalPost(
+                "/internal/oauth-service-clients",
+                operatorToken,
+                Map.of(
+                        "clientId", "orders-agent-v1",
+                        "clientName", "Orders Agent",
+                        "tenantId", tenantId.toString(),
+                        "scopes", List.of("ai.invoke"),
+                        "changeReference", "CHG-2026-1001"));
+
+        assertThat(created.statusCode()).isEqualTo(200);
+        JsonNode createdBody = objectMapper.readTree(created.body());
+        String firstSecret = createdBody.path("data").path("clientSecret").stringValue();
+        assertThat(firstSecret).hasSizeGreaterThanOrEqualTo(43);
+        assertThat(createdBody.path("data").path("client").path("status").stringValue())
+                .isEqualTo("ACTIVE");
+        String firstHash = jdbcTemplate.queryForObject(
+                "SELECT client_secret FROM oauth2_registered_client WHERE client_id = ?",
+                String.class,
+                "orders-agent-v1");
+        assertThat(firstHash).isNotEqualTo(firstSecret);
+        assertThat(passwordEncoder.matches(firstSecret, firstHash)).isTrue();
+        HttpResponse<String> firstTokenResponse =
+                token("orders-agent-v1", firstSecret, "ai.invoke");
+        assertThat(firstTokenResponse.statusCode()).isEqualTo(200);
+        String firstAccessToken = objectMapper.readTree(firstTokenResponse.body())
+                .path("access_token").stringValue();
+        String introspectionClientId = "ainer-managed-introspection-test";
+        registeredClientRepository.save(machineClient(
+                introspectionClientId, null, true, "token.introspect"));
+        assertThat(objectMapper.readTree(introspect(firstAccessToken, introspectionClientId).body())
+                        .path("active").booleanValue())
+                .isTrue();
+
+        HttpResponse<String> rotated = internalPost(
+                "/internal/oauth-service-clients/orders-agent-v1/rotations",
+                operatorToken,
+                Map.of(
+                        "replacementClientId", "orders-agent-v2",
+                        "replacementClientName", "Orders Agent v2",
+                        "changeReference", "CHG-2026-1002"));
+
+        assertThat(rotated.statusCode()).isEqualTo(200);
+        JsonNode rotatedBody = objectMapper.readTree(rotated.body());
+        String replacementSecret = rotatedBody.path("data").path("clientSecret").stringValue();
+        assertThat(rotatedBody.path("data").path("client").path("replacesClientId").stringValue())
+                .isEqualTo("orders-agent-v1");
+        assertThat(token("orders-agent-v1", firstSecret, "ai.invoke").statusCode()).isEqualTo(200);
+        assertThat(token("orders-agent-v2", replacementSecret, "ai.invoke").statusCode()).isEqualTo(200);
+
+        HttpResponse<String> retired = internalPost(
+                "/internal/oauth-service-clients/orders-agent-v1/retirement",
+                operatorToken,
+                Map.of("changeReference", "CHG-2026-1003"));
+
+        assertThat(retired.statusCode()).isEqualTo(200);
+        assertThat(objectMapper.readTree(retired.body())
+                        .path("data").path("status").stringValue())
+                .isEqualTo("RETIRED");
+        assertThat(token("orders-agent-v1", firstSecret, "ai.invoke").statusCode()).isEqualTo(401);
+        assertThat(token("orders-agent-v2", replacementSecret, "ai.invoke").statusCode()).isEqualTo(200);
+        assertThat(registeredClientRepository.findByClientId("orders-agent-v1")).isNull();
+        assertThat(objectMapper.readTree(introspect(firstAccessToken, introspectionClientId).body())
+                        .path("active").booleanValue())
+                .isFalse();
+
+        HttpResponse<String> retiredView = internalGet(
+                "/internal/oauth-service-clients/orders-agent-v1", operatorToken);
+        assertThat(retiredView.statusCode()).isEqualTo(200);
+        assertThat(objectMapper.readTree(retiredView.body())
+                        .path("data").path("status").stringValue())
+                .isEqualTo("RETIRED");
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT operation FROM ainer_oauth_service_client_audit "
+                                + "WHERE client_id IN (?, ?)",
+                        String.class,
+                        "orders-agent-v1",
+                        "orders-agent-v2"))
+                .containsExactlyInAnyOrder("CREATED", "ROTATED", "RETIRED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                        + "WHERE table_name = 'ainer_oauth_service_client_audit' "
+                        + "AND column_name LIKE '%secret%'",
+                Integer.class)).isZero();
+    }
+
+    @Test
+    void clientControlRejectsTenantBoundOperatorAndUnapprovedScope() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        String tenantOperatorId = "tenant-client-operator-test";
+        registeredClientRepository.save(machineClient(
+                tenantOperatorId, tenantId.toString(), "oauth.clients.manage"));
+        String tenantOperatorToken = accessToken(tenantOperatorId, "oauth.clients.manage");
+
+        HttpResponse<String> forbidden = internalPost(
+                "/internal/oauth-service-clients",
+                tenantOperatorToken,
+                Map.of(
+                        "clientId", "forbidden-agent",
+                        "clientName", "Forbidden Agent",
+                        "tenantId", tenantId.toString(),
+                        "scopes", List.of("ai.invoke"),
+                        "changeReference", "CHG-2026-2001"));
+        assertThat(forbidden.statusCode()).isEqualTo(403);
+
+        String operatorToken = accessToken(CLIENT_OPERATOR_ID, "oauth.clients.manage");
+        HttpResponse<String> invalidScope = internalPost(
+                "/internal/oauth-service-clients",
+                operatorToken,
+                Map.of(
+                        "clientId", "privileged-agent",
+                        "clientName", "Privileged Agent",
+                        "tenantId", tenantId.toString(),
+                        "scopes", List.of("token.introspect"),
+                        "changeReference", "CHG-2026-2002"));
+        assertThat(invalidScope.statusCode()).isEqualTo(422);
+        assertThat(objectMapper.readTree(invalidScope.body()).path("code").stringValue())
+                .isEqualTo("AINER.AUTHORIZATION.OAUTH_CLIENT_SCOPE_NOT_ALLOWED");
     }
 
     @Test
@@ -409,6 +545,26 @@ class AinerAuthorizationServerIntegrationTest {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://127.0.0.1:%d/internal/identity/directory/tenants/%s/members/%s"
                         .formatted(port, tenantId, subjectId)))
+                .header("Authorization", "Bearer " + accessToken)
+                .GET()
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> internalPost(String path, String accessToken, Object body)
+            throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:%d%s".formatted(port, path)))
+                .header("Authorization", "Bearer " + accessToken)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> internalGet(String path, String accessToken) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:%d%s".formatted(port, path)))
                 .header("Authorization", "Bearer " + accessToken)
                 .GET()
                 .build();

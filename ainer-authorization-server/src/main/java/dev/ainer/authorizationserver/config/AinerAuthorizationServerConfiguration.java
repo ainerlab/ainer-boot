@@ -32,7 +32,6 @@ import org.springframework.security.oauth2.server.authorization.JdbcOAuth2Author
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
-import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
@@ -49,20 +48,24 @@ public class AinerAuthorizationServerConfiguration {
     public static final String CLIENT_TENANT_SETTING = "ainer.tenant-id";
     public static final String CLIENT_INTROSPECTION_ALLOWED_SETTING = "ainer.introspection-allowed";
     public static final String INTROSPECTION_CLIENT_SCOPE = "token.introspect";
+    public static final String CLIENT_CONTROL_MANAGE_SCOPE = "oauth.clients.manage";
 
     @Bean
-    RegisteredClientRepository registeredClientRepository(JdbcTemplate jdbcTemplate) {
-        return new JdbcRegisteredClientRepository(jdbcTemplate);
+    ManagedRegisteredClientRepository registeredClientRepository(JdbcTemplate jdbcTemplate) {
+        return new ManagedRegisteredClientRepository(jdbcTemplate);
     }
 
     @Bean
     OAuth2AuthorizationService authorizationService(
             JdbcTemplate jdbcTemplate,
-            RegisteredClientRepository registeredClientRepository,
+            ManagedRegisteredClientRepository registeredClientRepository,
             IdentityTokenStatusService identityTokenStatusService) {
         OAuth2AuthorizationService jdbc =
                 new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
-        return new RevocationAwareOAuth2AuthorizationService(jdbc, identityTokenStatusService);
+        return new RevocationAwareOAuth2AuthorizationService(
+                jdbc,
+                identityTokenStatusService,
+                registeredClientRepository::isActiveByRegisteredClientId);
     }
 
     @Bean
@@ -194,6 +197,19 @@ public class AinerAuthorizationServerConfiguration {
             RegisteredClientRepository registeredClientRepository,
             PasswordEncoder passwordEncoder) {
         return new AinerMetricsClientBootstrapRunner(
+                properties, registeredClientRepository, passwordEncoder);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "ainer.security.authorization-server.client-control-operator-bootstrap",
+            name = "enabled",
+            havingValue = "true")
+    AinerClientControlOperatorBootstrapRunner ainerClientControlOperatorBootstrapRunner(
+            AinerAuthorizationServerProperties properties,
+            RegisteredClientRepository registeredClientRepository,
+            PasswordEncoder passwordEncoder) {
+        return new AinerClientControlOperatorBootstrapRunner(
                 properties, registeredClientRepository, passwordEncoder);
     }
 

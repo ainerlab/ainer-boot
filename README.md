@@ -147,4 +147,6 @@ ainer-boot/
 
 M4.3 已为高风险 API 建立选择性在线撤销基线：本地 JWT 认证后按路径/方法执行 RFC 7662，无 active 正向缓存；inactive 返回 401，Authorization Server 依赖失败返回 503；人员 Token 同时受 Identity 当前状态与 revocation epoch 约束，普通业务 client 不能调用 introspection。
 
-生产指标代码基线现已开始落地：两个发行物提供受 JWT 保护的 Prometheus exporter，抓取凭据使用独立无 tenant metrics client。下一步仍需部署真实 Prometheus、dashboard/告警，并完成 Authorization Server 多实例容量、故障切换和旧凭据退役证据；随后继续 IAM 职责分离、外部不可变审计副本、多节点 SLO，以及人员账号/Client 控制面、tenant ownership transfer、Authorization Code + PKCE、MFA 与签名密钥轮换。
+生产指标代码基线现已开始落地：两个发行物提供受 JWT 保护的 Prometheus exporter，抓取凭据使用独立无 tenant metrics client。tenant-bound Client Credentials 也已具备默认关闭、服务端生成一次性 secret、scope/operator 双白名单、蓝绿轮换、显式退役和同事务审计的内部控制面；browser/OIDC 与平台 client 尚未纳管。
+
+下一步仍需部署真实 Prometheus、dashboard/告警，并完成 Authorization Server 多实例容量、故障切换和平台旧凭据退役证据；随后继续 IAM 职责分离、外部不可变审计副本、多节点 SLO、Authorization Code + PKCE 端到端、MFA、tenant ownership transfer 与签名密钥轮换。

@@ -167,6 +167,44 @@ export AINER_AUTHORIZATION_BOOTSTRAP_METRICS_CLIENT_SECRET='at-least-24-characte
 
 它只支持 Client Credentials，access token TTL 为 1 分钟，不携带 tenant，也没有 introspection 标记。创建完成后立即移除开关和明文 secret。Prometheus 应使用 OAuth2 配置从 secret file 获取 client secret，不能保存长期静态 Bearer Token。完整边界与尚未完成的 HA/轮换证据见 [ADR-0012](decisions/0012-production-observability-and-auth-availability.md)。
 
+### 5.4 受审计 tenant 服务 Client 控制面
+
+日常 tenant-bound 机器 client 可以使用默认关闭的内部控制面，不再通过环境变量提交调用方选择的
+secret。启用前必须先在受控初始化窗口建立专用、无 tenant 的 operator client；它只持有
+`oauth.clients.manage`，并把该 client ID 加入精确白名单：
+
+```bash
+export AINER_AUTHORIZATION_BOOTSTRAP_CLIENT_CONTROL_OPERATOR_ENABLED=true
+export AINER_AUTHORIZATION_BOOTSTRAP_CLIENT_CONTROL_OPERATOR_CLIENT_ID=ainer-client-operator
+export AINER_AUTHORIZATION_BOOTSTRAP_CLIENT_CONTROL_OPERATOR_CLIENT_SECRET='at-least-24-characters-secret'
+
+export AINER_AUTHORIZATION_CLIENT_CONTROL_ENABLED=true
+export AINER_AUTHORIZATION_CLIENT_CONTROL_OPERATOR_CLIENT_IDS=ainer-client-operator
+export AINER_AUTHORIZATION_CLIENT_CONTROL_ALLOWED_SCOPES=ai.invoke,identity.directory.read
+```
+
+首次启动成功后立即移除三个 operator bootstrap 环境变量和明文 secret；保留控制面开关与
+operator ID 白名单。operator bootstrap 重复运行不会覆盖已有 secret。
+
+控制面同时要求已验证的 `actor_type=SERVICE`、无 `tenant_id`、`oauth.clients.manage` scope 和精确
+operator ID；人员 Token、tenant-bound 服务或仅有 scope 但不在白名单的服务均被拒绝。operator
+client 不得兼任业务、introspection、metrics 或运维审批 client。
+
+创建只接受 tenant UUID、client ID/name、白名单内 scopes 和受限 `changeReference`。Authorization
+Server 生成至少 32 字节随机 secret，数据库只保存哈希，明文仅在创建响应返回一次；后续 GET、
+审计、日志和错误不得返回。调用方必须在收到响应后立即写入自己的 secret store，响应丢失时创建新
+client，不能设计“找回 secret”。
+
+轮换使用新 client ID：创建 replacement、部署新 secret、验证新旧 client 并行工作，再显式退役旧
+client。退役会立即阻止旧 client 获取新 Token，并让它的历史 Token 对 RFC 7662 introspection
+显示 inactive；只做离线 JWT 验证的低风险 API 仍可能在默认 5 分钟短 TTL 内接受既有 Token。
+生命周期和 `CREATED`/`ROTATED`/`RETIRED` 审计同事务写入，不物理删除历史 registered client。
+
+该控制面刻意不管理 browser/OIDC client、public client、redirect URI、metrics、introspection、
+operator、`.all` 跨 tenant scope 或既有 bootstrap client。后几类仍需要独立初始化和未来专门
+控制面，不能把本切片描述成“所有 OAuth Client 已纳管”。完整决策见
+[ADR-0013](decisions/0013-audited-oauth-service-client-lifecycle.md)。
+
 ## 6. 浏览器与人员身份
 
 协议装配支持 Authorization Code、PKCE、Refresh Token、Client Credentials 与 OIDC；实际可用授权类型仍由 registered client 白名单决定。禁止配置 password grant。
@@ -179,7 +217,9 @@ Identity Directory 只返回 ACTIVE tenant、ACTIVE user、ACTIVE membership 的
 
 Workspace 事件端点要求 `actor_type=SERVICE`、`identity.access-events.publish` 和精确可信 publisher `sub`。消费事务先插入 event receipt，再将同 tenant/subject、创建时间不晚于事件时间的 PENDING/ACTIVE membership 置为 `REVOKED`。重复 event ID 幂等成功，旧事件不影响后来创建的 membership，跨 tenant 不受影响。安全禁用可以让 OWNER 变为 REVOKED 并暂时留下无 ACTIVE OWNER 的 Workspace；这优先于继续放行已禁用账号，恢复/所有权处置必须使用后续专用流程。
 
-当前仍未提供公网注册、找回密码、MFA、租户切换和 client 控制台。Directory 与事件 adapter 均默认关闭且不共享数据库；完整投递决策见 [ADR-0009](decisions/0009-cross-runtime-access-revocation-delivery.md)。
+当前仍未提供公网注册、找回密码、MFA、租户切换和图形化 client 控制台；只有 tenant-bound
+Client Credentials 的内部生命周期 API 已落地。Directory 与事件 adapter 均默认关闭且不共享
+数据库；完整投递决策见 [ADR-0009](decisions/0009-cross-runtime-access-revocation-delivery.md)。
 
 M4.3 的 Authorization Server 在查找人员 authorization 时同时检查 tenant、user、membership 当前状态和同 tenant/subject 最新 access-event 时间。Token `issuedAt` 不晚于最新事件时会被在线视为 inactive；事件发生后签发且当前身份仍 ACTIVE 的 Token 才可继续。该 revocation epoch 利用现有 Identity 事务事实和索引，不新增 Token 表。选择性在线校验只覆盖配置的高风险请求，普通低风险 JWT API 仍存在自然到期窗口，因此不能宣称所有 API 都已强实时全局撤销。
 
@@ -206,4 +246,4 @@ mvn test
 
 Resource Server 的 401/403、可信 claim、伪造身份头以及 Workspace 应用授权测试不依赖 Docker。Identity、JDBC 协议表、Client Credentials 签发与 Workspace tenant SQL 测试使用 PostgreSQL Testcontainers；没有 Docker 时会明确跳过，不会改用 H2。
 
-M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存、inactive 401、在线依赖失败 503、专用 client 与普通 client 隔离、RFC 7009 撤销，以及 Identity epoch 的等于/前后边界。指标边界还要验证无 Token 401，USER/tenant-bound/missing-scope 403，专用 tenantless SERVICE 200，以及业务 Resource Server 关闭时仍不匿名公开。真实 PostgreSQL 和协议 smoke 证据维护在 [`project-status.md`](project-status.md)。
+M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存、inactive 401、在线依赖失败 503、专用 client 与普通 client 隔离、RFC 7009 撤销，以及 Identity epoch 的等于/前后边界。指标边界还要验证无 Token 401，USER/tenant-bound/missing-scope 403，专用 tenantless SERVICE 200，以及业务 Resource Server 关闭时仍不匿名公开。tenant 服务 client 控制面另需验证一次性 secret、scope 白名单、operator/tenant 隔离、蓝绿轮换、退役后新 Token 401、历史 Token introspection inactive 和无 secret 审计。真实 PostgreSQL 和协议 smoke 证据维护在 [`project-status.md`](project-status.md)。

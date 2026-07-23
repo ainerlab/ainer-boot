@@ -128,12 +128,34 @@ AI 默认关闭。启用时以下设置共同构成安全门禁：
 | `AINER_AUTHORIZATION_BOOTSTRAP_METRICS_ENABLED` | `false` | 只在建立专用 Prometheus client 的初始化窗口启用 |
 | `AINER_AUTHORIZATION_BOOTSTRAP_METRICS_CLIENT_ID` | 空 | bootstrap 开启时必填，必须与 introspection/业务 client 分离 |
 | `AINER_AUTHORIZATION_BOOTSTRAP_METRICS_CLIENT_SECRET` | 空 | 24..128 字符，secret 注入 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_CLIENT_CONTROL_OPERATOR_ENABLED` | `false` | 只在建立无 tenant 控制面 operator 的初始化窗口启用 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_CLIENT_CONTROL_OPERATOR_CLIENT_ID` | 空 | bootstrap 开启时必填，必须加入下方 operator 白名单 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_CLIENT_CONTROL_OPERATOR_CLIENT_SECRET` | 空 | 24..128 字符，secret 注入 |
+| `AINER_AUTHORIZATION_CLIENT_CONTROL_ENABLED` | `false` | 启用受审计 tenant 服务 client 内部控制面 |
+| `AINER_AUTHORIZATION_CLIENT_CONTROL_OPERATOR_CLIENT_IDS` | 空 | 启用时必填；无 tenant operator client ID 精确白名单，可逗号分隔 |
+| `AINER_AUTHORIZATION_CLIENT_CONTROL_ALLOWED_SCOPES` | `ai.invoke` | tenant 服务 client 可授 scope 白名单；禁止平台、控制面和 `.all` scope |
+| `AINER_AUTHORIZATION_CLIENT_CONTROL_ACCESS_TOKEN_TTL` | `5m` | managed client access token TTL，范围 30 秒至 15 分钟 |
+| `AINER_AUTHORIZATION_CLIENT_CONTROL_CLIENT_SECRET_TTL` | `90d` | managed client secret 有效期，范围 1 至 365 天 |
+| `AINER_AUTHORIZATION_CLIENT_CONTROL_SECRET_BYTES` | `32` | 服务端随机 secret 字节数，范围 32..64 |
 
-Bootstrap 是幂等初始化手段，不是长期管理 API。初始化完成后应关闭，并通过后续 Client 控制面完成生命周期管理。
+Bootstrap 是幂等初始化手段，不是长期管理 API。初始化完成后应关闭。新 tenant-bound 业务服务
+client 应使用受审计控制面；平台级 metrics/introspection、operator、`.all` 和既有 bootstrap
+client 尚不在该 API 的管理范围。
 
 introspection bootstrap 固定创建无 tenant、只有 `token.introspect` scope、`ainer.introspection-allowed=true` 的专用 client；其 access token TTL 为 1 分钟。端点还会再次拒绝带 tenant、额外业务 scope 或缺少显式标记的 client。普通 machine bootstrap 不具备 introspection 权限。
 
-metrics bootstrap 固定创建无 tenant、只有 `platform.metrics.read` scope、仅支持 Client Credentials 的专用 client；其 access token TTL 为 1 分钟，且没有 introspection 标记。它与 introspection client 必须使用不同 ID/secret。两个 bootstrap 都只创建不存在的 client，不会覆盖、轮换或停用已有记录。
+metrics bootstrap 固定创建无 tenant、只有 `platform.metrics.read` scope、仅支持 Client Credentials
+的专用 client；client-control operator bootstrap 固定创建无 tenant、只有
+`oauth.clients.manage` 的专用 client。两者 access token TTL 都是 1 分钟且没有 introspection
+标记。metrics、introspection、operator 必须使用不同 ID/secret。所有 bootstrap 都只创建不存在
+的 client，不会覆盖、轮换或停用已有记录。
+
+Client 控制面配置在启动时失败关闭：operator 白名单或 allowed scope 为空会拒绝启动；输入含
+`oauth.clients.manage`、`token.introspect`、`platform.metrics.read` 或任意 `.all` scope 也会
+拒绝启动。operator Token 还必须是无 tenant 的 SERVICE 并含 `oauth.clients.manage`。secret 由
+服务端生成且只在创建/轮换响应返回一次，不能把响应 body 记录到 ingress、APM 或工单。完整使用
+和限制见 [`security.md`](security.md) 与
+[ADR-0013](decisions/0013-audited-oauth-service-client-lifecycle.md)。
 
 Identity 内部 API 与 relay 配置：
 
@@ -155,7 +177,11 @@ Identity 内部 API 与 relay 配置：
 | `AINER_IDENTITY_ACCESS_EVENT_RECOVERY_ENABLED` | `false` | 暴露耗尽事件查询与双人审批重放端点 |
 | `AINER_IDENTITY_ACCESS_EVENT_RECOVERY_APPROVAL_TTL` | `15m` | 重放申请有效期，必须大于 0 且不超过 1 天 |
 
-Directory client 与 relay 应使用两个不同 client/secret，并分别只授予 `identity.directory.read.all` 与 `identity.access-events.publish`。当前 Client 管理控制面尚未完成，可以在两个受控初始化窗口使用不同 bootstrap client ID 建立它们；不得复用日常业务 client 或把 secret 写入 YAML。
+Directory client 与 relay 应使用两个不同 client/secret，并分别只授予
+`identity.directory.read.all` 与 `identity.access-events.publish`。跨 tenant Directory 的 `.all`
+client 不属于当前 tenant 服务控制面，仍需独立受控初始化；tenant-bound relay 可以在把
+`identity.access-events.publish` 纳入 allowed scopes 后通过控制面创建。不得复用日常业务 client
+或把 secret 写入 YAML。
 
 重放控制面与 relay 共用 `AINER_IDENTITY_ACCESS_EVENT_MAX_ATTEMPTS`，避免“自动重试尚未耗尽但人工控制面已视为耗尽”的配置分裂。查询、申请和批准分别使用 `identity.access-events.replay.read|request|approve`，平台操作使用对应 `.all`；request 与 approve 必须属于不同 Client，不能与 relay Client 复用。
 

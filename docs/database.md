@@ -25,6 +25,7 @@ UUID、时间、金额、约束和锁语义必须按 PostgreSQL 设计。SQL 参
 | `ainer_ai_*` | AI runtime |
 | `ainer_identity_*` | Identity |
 | `oauth2_*` | Authorization Server 协议存储 |
+| `ainer_oauth_*` | Authorization Server 的 Ainer-owned 生命周期与操作审计 |
 
 Identity Directory 是安全查询契约，不授权 Workspace 直接查询 `ainer_identity_*`。access-event outbox 的事实归 Identity 所有，下游消费状态不能反写 Identity 业务表。Workspace 只拥有 `ainer_workspace_identity_event_receipt` 与本地 membership 的 `REVOKED` 状态。
 
@@ -39,6 +40,19 @@ M4.2 新增表仍归各模块独立所有：
 | `ainer_workspace_authorization_audit_archive` | Workspace | 授权审计同库归档，保留原 audit ID 和调查字段 |
 
 M4.3 不新增表或 migration。人员 Token 在线状态先按主键检查 tenant、user、membership 当前状态，再按 `(tenant_id, subject_id, occurred_at DESC, id DESC)` 从 `ainer_identity_access_event` 读取最新事件时间。该查询复用 `idx_ainer_identity_access_event_subject`；`issuedAt` 早于或等于最新事件时 inactive。不得为此复制 OAuth Token 正文、建立第二张自研 Token 表或绕过 Identity 的事务事实。RFC 7009 仍修改 Spring Authorization Server 官方 `oauth2_authorization` 元数据。
+
+后续 tenant 服务 client 生命周期切片新增：
+
+| 表 | 所有者 | 用途 |
+|---|---|---|
+| `ainer_oauth_service_client` | Authorization Server | managed client 与官方 registered client 的关联、tenant、ACTIVE/RETIRED、replacement 和乐观版本 |
+| `ainer_oauth_service_client_audit` | Authorization Server | CREATED/ROTATED/RETIRED 操作、operator、request/change reference 和时间 |
+
+官方 `oauth2_registered_client` 仍是协议配置与 secret hash 的唯一存储；Ainer 表不复制 hash、
+Token、grant JSON 或 redirect URI。生命周期表以 `registered_client_id` 外键关联官方表，退役不
+删除协议记录。按 `client_id` 的认证查找会拒绝 RETIRED；按内部 ID 的 authorization 历史重建仍
+允许读取，再由 authorization service 把该 client 的 Token 在线视为 inactive。审计表故意没有
+secret 字段。
 
 ## 4. Migration 命名与不可变性
 

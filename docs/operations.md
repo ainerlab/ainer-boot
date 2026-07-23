@@ -102,6 +102,33 @@ scrape_configs:
 
 Authorization Server 多实例接受门禁至少包括：两实例共享 PostgreSQL、相同 active JWK、滚动更新、单节点中断、Token 签发/introspection/metrics 连续性、数据库中断与恢复，以及 `ainer-server` 高风险请求在依赖故障时保持 503 失败关闭。浏览器登录会话若依赖节点本地状态，入口必须显式使用粘性会话或后续设计共享会话；当前尚无多节点证据。
 
+### 2.5 tenant 服务 Client 生命周期
+
+控制面与 operator bootstrap 都默认关闭。空环境首次启用顺序：
+
+1. 在受控窗口配置独立 operator bootstrap，使用新 client ID、secret store 注入的 24..128 字符
+   secret，并同时把同一 ID 配入 `AINER_AUTHORIZATION_CLIENT_CONTROL_OPERATOR_CLIENT_IDS`；
+2. 启动 Authorization Server，确认 operator 只有 `oauth.clients.manage`、无 tenant、Token TTL
+   一分钟；随后立即移除 bootstrap 开关和明文 secret；
+3. 保持 `AINER_AUTHORIZATION_CLIENT_CONTROL_ENABLED=true`，只把明确审核过的 tenant 业务 scope
+   放入 allowed scopes；平台、operator、introspection、metrics 和 `.all` 不得加入；
+4. 用 operator 的短时 Token 调用创建 API，把一次性 `clientSecret` 直接写入调用方 secret
+   store；禁止进入 shell history、CI 日志、ingress/APM body、工单或聊天；
+5. 用新 client smoke 验证 Token 的 `actor_type=SERVICE`、tenant、audience、scope 和业务拒绝路径。
+
+轮换严格使用蓝绿顺序：
+
+1. 调用 `/{oldClientId}/rotations` 创建新 ID，保存一次性新 secret；
+2. 灰度部署新 ID/secret，并验证新旧 client 均能完成 Token 和业务 smoke；
+3. 完成所有实例切换，观察至少一个旧 Token TTL 与调用指标；
+4. 调用 `/{oldClientId}/retirement`，确认旧凭据换 Token 返回 401、旧 Token introspection 为
+   inactive、新 client 不受影响；
+5. 保留 registered client、生命周期和审计记录，不执行手工 DELETE。
+
+退役不可逆。误退役时创建全新 client，不手工把状态改回 ACTIVE。离线 JWT 可能活到最多配置的
+短 TTL；需要立即阻断的路径必须启用在线校验。当前 API 只管理由它创建的 tenant 服务 client，
+不能用于退役 operator、metrics、introspection、`.all` 或既有 bootstrap client。
+
 ## 3. 健康检查
 
 ```bash

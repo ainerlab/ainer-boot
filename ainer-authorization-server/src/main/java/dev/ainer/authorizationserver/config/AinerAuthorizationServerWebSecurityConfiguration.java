@@ -102,6 +102,9 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                                 "SCOPE_identity.access-events.replay.request.all",
                                 "SCOPE_identity.access-events.replay.approve",
                                 "SCOPE_identity.access-events.replay.approve.all")
+                        .requestMatchers("/internal/oauth-service-clients/**")
+                        .hasAuthority("SCOPE_" + AinerAuthorizationServerConfiguration
+                                .CLIENT_CONTROL_MANAGE_SCOPE)
                         .anyRequest().denyAll())
                 .csrf(csrf -> csrf.disable())
                 .requestCache(cache -> cache.disable())

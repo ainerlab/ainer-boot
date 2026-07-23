@@ -33,7 +33,8 @@ class RevocationAwareOAuth2AuthorizationServiceTest {
         IdentityTokenStatusService statusService = new IdentityTokenStatusService(
                 (tenantId, subjectId) -> Optional.of(new IdentityTokenStatus(true, ISSUED_AT.minusSeconds(1))));
 
-        OAuth2Authorization actual = new RevocationAwareOAuth2AuthorizationService(delegate, statusService)
+        OAuth2Authorization actual = new RevocationAwareOAuth2AuthorizationService(
+                        delegate, statusService, registeredClientId -> true)
                 .findByToken("access-token", OAuth2TokenType.ACCESS_TOKEN);
 
         assertThat(actual).isSameAs(authorization);
@@ -48,7 +49,8 @@ class RevocationAwareOAuth2AuthorizationServiceTest {
         IdentityTokenStatusService statusService = new IdentityTokenStatusService(
                 (tenantId, subjectId) -> Optional.of(new IdentityTokenStatus(true, ISSUED_AT)));
 
-        OAuth2Authorization actual = new RevocationAwareOAuth2AuthorizationService(delegate, statusService)
+        OAuth2Authorization actual = new RevocationAwareOAuth2AuthorizationService(
+                        delegate, statusService, registeredClientId -> true)
                 .findByToken("refresh-token", OAuth2TokenType.REFRESH_TOKEN);
 
         assertThat(actual).isNotSameAs(authorization);
@@ -66,10 +68,27 @@ class RevocationAwareOAuth2AuthorizationServiceTest {
                 });
 
         OAuth2Authorization actual = new RevocationAwareOAuth2AuthorizationService(
-                new StubAuthorizationService(authorization), statusService)
+                new StubAuthorizationService(authorization), statusService, registeredClientId -> true)
                 .findByToken("access-token", OAuth2TokenType.ACCESS_TOKEN);
 
         assertThat(actual).isSameAs(authorization);
+    }
+
+    @Test
+    void retiredClientAuthorizationIsHiddenFromTokenLookup() {
+        OAuth2Authorization authorization = authorization(Map.of("actor_type", "SERVICE"));
+        IdentityTokenStatusService statusService = new IdentityTokenStatusService(
+                (tenantId, subjectId) -> {
+                    throw new AssertionError("Retired client must be rejected before Identity lookup");
+                });
+
+        OAuth2Authorization actual = new RevocationAwareOAuth2AuthorizationService(
+                        new StubAuthorizationService(authorization),
+                        statusService,
+                        registeredClientId -> false)
+                .findByToken("access-token", OAuth2TokenType.ACCESS_TOKEN);
+
+        assertThat(actual).isNull();
     }
 
     private OAuth2Authorization userAuthorization() {
