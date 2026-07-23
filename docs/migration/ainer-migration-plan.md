@@ -110,7 +110,10 @@ Ainer 采用 strangler + vertical slice：
 - 已落地独立 Spring Authorization Server、外部 RSA key、JDBC client/authorization/consent 和 Client Credentials 测试。
 - Authorization Code + PKCE 已用测试专用 public client、真实 HTTP 登录会话和 PostgreSQL 完成
   S256 正反门禁；public client 不配置 Refresh Token，生产 browser/OIDC client 控制面、人员账号
-  控制面和 MFA 仍未完成。
+  控制面仍未完成。
+- 已建立默认关闭的 Passkey 协议基础：UV-required、RP/Origin 失败关闭、无凭证密码
+  bootstrap、已登记账号条件门禁、软撤销/最后凭证保护与审计；完整 authenticator ceremony、
+  受控首次登记、恢复码/管理员恢复、通知和 step-up policy 仍未完成。
 - 旧 Token 在过渡期通过边界适配，不复制旧 Token 表到 Ainer。
 
 ### M4：低耦合业务切片

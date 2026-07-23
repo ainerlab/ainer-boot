@@ -22,6 +22,8 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - 为两个发行物增加受保护的 Prometheus exporter，以及无 tenant、短 Token、最小 scope 的独立 metrics client bootstrap。
 - 增加 tenant 服务 Client 的一次性 secret、蓝绿轮换、显式退役和同事务审计控制面。
 - 增加 Authorization Code + PKCE 的真实浏览器会话与 PostgreSQL 协议门禁。
+- 增加默认关闭的 Passkey/WebAuthn 协议基础、UV-required options、条件人员门禁、JDBC
+  credential 生命周期、软撤销、最后凭证保护和审计。
 - 建立架构决策、HTTP API、开发、测试、数据库、配置、运行和发布文档体系。
 
 ### Security
@@ -36,6 +38,8 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - `/actuator/prometheus` 只接受无 tenant 的 SERVICE JWT 与 `platform.metrics.read`；关闭业务 Resource Server 也不会匿名公开指标。
 - PKCE public client 只允许 S256，拒绝缺失/`plain` challenge、错误 verifier、授权码重放和未注册回调；当前基线不向 public client 签发 refresh token。
 - JDBC authorization 仅对白名单内的 Ainer 人员主体开放 Jackson 多态反序列化，认证后擦除凭证且协议记录不保存 password 属性。
+- Passkey 生产 Origin 只允许 HTTPS 并受 RP ID scope 限制；已登记账号的 OAuth authorization
+  和凭证管理要求 WebAuthn 因子，最后一个 ACTIVE credential 不允许自助删除。
 - AI 审计默认不保存 prompt、模型输出、API key 或供应商错误正文。
 
 ### Fixed
@@ -47,7 +51,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - 当前仍为 `0.1.0-SNAPSHOT` foundation，不是生产就绪发行版。
 - 在线撤销只覆盖配置的高风险路径；普通低风险自包含 JWT 仍存在自然到期窗口。
 - Authorization Server 已成为高风险 API 的在线依赖；Prometheus 导出与独立抓取凭据已有代码基线，但生产高可用、容量、凭据退役轮换、dashboard 和告警路由尚未完成。
-- PKCE 自动化使用测试专用 public client；生产 browser/OIDC client 控制面、登录体验、MFA 与会话治理尚未完成。
+- PKCE 自动化使用测试专用 public client；Passkey 尚缺完整 authenticator ceremony、受控首次
+  enrollment、恢复码/管理员恢复、通知与多节点会话，生产 browser/OIDC client 控制面和登录
+  体验也尚未完成。
 - 审计归档仍位于同一 PostgreSQL 数据库，没有 WORM/法律保留、外部不可变副本、生产 SIEM 消费者和告警路由。
 - 正式 CI、制品发布、备份恢复、经真实流量验证的 SLO 与商业授权交付尚未建立。
 

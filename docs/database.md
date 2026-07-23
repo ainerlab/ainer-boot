@@ -13,7 +13,7 @@ UUID、时间、金额、约束和锁语义必须按 PostgreSQL 设计。SQL 参
 | 发行物 | 逻辑数据库 | 所属 migration | 当前数据 |
 |---|---|---|---|
 | `ainer-server` | 业务库 `ainer` | Workspace、AI runtime | workspace、成员、授权审计热/归档、OWNER 恢复审计、AI invocation |
-| `ainer-authorization-server` | 身份库 `ainer_auth` | Identity、OAuth authorization server | tenant、user、membership、access event/重放审计、client、authorization、consent |
+| `ainer-authorization-server` | 身份库 `ainer_auth` | Identity、OAuth authorization server | tenant、user、membership、access event/重放审计、client、authorization、consent、Passkey 协议/生命周期审计 |
 
 数据库名只是本地示例。生产可以改名，但两个发行物不得通过共享表形成隐式模块调用。未来拆服务时，每个模块保留自己的数据所有权，跨边界通过契约或可靠事件同步。
 
@@ -26,6 +26,8 @@ UUID、时间、金额、约束和锁语义必须按 PostgreSQL 设计。SQL 参
 | `ainer_identity_*` | Identity |
 | `oauth2_*` | Authorization Server 协议存储 |
 | `ainer_oauth_*` | Authorization Server 的 Ainer-owned 生命周期与操作审计 |
+| `user_entities` / `user_credentials` | Spring Security WebAuthn 官方 JDBC 协议存储 |
+| `ainer_passkey_*` | Authorization Server 的 Passkey 生命周期与操作审计 |
 
 Identity Directory 是安全查询契约，不授权 Workspace 直接查询 `ainer_identity_*`。access-event outbox 的事实归 Identity 所有，下游消费状态不能反写 Identity 业务表。Workspace 只拥有 `ainer_workspace_identity_event_receipt` 与本地 membership 的 `REVOKED` 状态。
 
@@ -53,6 +55,20 @@ Token、grant JSON 或 redirect URI。生命周期表以 `registered_client_id` 
 删除协议记录。按 `client_id` 的认证查找会拒绝 RETIRED；按内部 ID 的 authorization 历史重建仍
 允许读取，再由 authorization service 把该 client 的 Token 在线视为 inactive。审计表故意没有
 secret 字段。
+
+M4.6 Passkey 切片新增：
+
+| 表 | 所有者 | 用途 |
+|---|---|---|
+| `user_entities` | Spring Security WebAuthn adapter | username 与 WebAuthn opaque user handle |
+| `user_credentials` | Spring Security WebAuthn adapter | credential 公钥、计数器、transport、backup/attestation 协议材料 |
+| `ainer_passkey_credential` | Authorization Server | credential 与稳定 Identity subject 的 ACTIVE/REVOKED 生命周期 |
+| `ainer_passkey_credential_audit` | Authorization Server | REGISTERED/REVOKED、request ID 与发生时间 |
+
+`user_credentials` 不保存 authenticator 私钥或生物识别模板。Ainer 生命周期登记与官方协议记录在
+同一事务提交；认证更新时间不重复写生命周期审计。撤销不物理删除官方记录，读取只返回 ACTIVE
+credential。最后一个 ACTIVE credential 的自助撤销被拒绝；replacement 与旧 credential 通过
+同一 user entity 串行保护，避免并发删除把账号降级到零因子。
 
 ## 4. Migration 命名与不可变性
 

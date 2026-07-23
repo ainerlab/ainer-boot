@@ -117,6 +117,12 @@ AI 默认关闭。启用时以下设置共同构成安全门禁：
 | `AINER_AUTHORIZATION_SIGNING_KEY_ID` | 空 | 必填，轮换时使用新 ID |
 | `AINER_AUTHORIZATION_PRIVATE_KEY_LOCATION` | 空 | 必填，只读 PEM 资源位置 |
 | `AINER_AUTHORIZATION_PUBLIC_KEY_LOCATION` | 空 | 必填，PEM 资源位置 |
+| `AINER_AUTHORIZATION_PASSKEY_ENABLED` | `false` | 启用 Spring Security WebAuthn/Passkey 与条件人员门禁 |
+| `AINER_AUTHORIZATION_PASSKEY_RP_ID` | 空 | 启用时必填，小写 DNS 名；测试可用 `localhost` |
+| `AINER_AUTHORIZATION_PASSKEY_RP_NAME` | `Ainer` | 浏览器展示的 relying party 名称，1..100 字符 |
+| `AINER_AUTHORIZATION_PASSKEY_ALLOWED_ORIGINS` | 空 | 启用时必填，精确 Origin 列表，host 必须在 RP ID 范围 |
+| `AINER_AUTHORIZATION_PASSKEY_ALLOW_INSECURE_HTTP` | `false` | 仅允许 `localhost` 自动化测试显式设为 `true` |
+| `AINER_AUTHORIZATION_PASSKEY_CEREMONY_TIMEOUT` | `5m` | WebAuthn ceremony timeout，必须大于 0 且不超过 10 分钟 |
 | `AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_ENABLED` | `false` | 只在受控初始化窗口启用 |
 | `AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_CLIENT_ID` | 空 | bootstrap 开启时必填 |
 | `AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_CLIENT_SECRET` | 空 | 至少 24 字符，secret 注入 |
@@ -156,6 +162,12 @@ Client 控制面配置在启动时失败关闭：operator 白名单或 allowed s
 服务端生成且只在创建/轮换响应返回一次，不能把响应 body 记录到 ingress、APM 或工单。完整使用
 和限制见 [`security.md`](security.md) 与
 [ADR-0013](decisions/0013-audited-oauth-service-client-lifecycle.md)。
+
+Passkey 开关默认关闭。启用时 RP ID、RP name 和 Origin 缺失或越界会拒绝启动；Origin 不允许
+path、query、fragment 或 user-info。生产必须使用 HTTPS，`allow-insecure-http` 不能为普通
+HTTP 域名开后门。RP ID/Origin 是浏览器密码学信任边界，域名变更需要迁移和安全评审，不能当作
+普通 UI 配置临时切换。完整启用、降级和恢复限制见
+[ADR-0014](decisions/0014-passkey-first-human-authentication.md)。
 
 Identity 内部 API 与 relay 配置：
 

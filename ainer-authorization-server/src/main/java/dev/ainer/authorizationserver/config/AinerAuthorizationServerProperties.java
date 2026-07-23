@@ -2,6 +2,7 @@ package dev.ainer.authorizationserver.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,6 +12,7 @@ public class AinerAuthorizationServerProperties {
     private String issuer;
     private String audience = "ainer-api";
     private final SigningKey signingKey = new SigningKey();
+    private final Passkey passkey = new Passkey();
     private final MachineClientBootstrap machineClientBootstrap = new MachineClientBootstrap();
     private final IntrospectionClientBootstrap introspectionClientBootstrap =
             new IntrospectionClientBootstrap();
@@ -36,6 +38,10 @@ public class AinerAuthorizationServerProperties {
 
     public SigningKey getSigningKey() {
         return signingKey;
+    }
+
+    public Passkey getPasskey() {
+        return passkey;
     }
 
     public MachineClientBootstrap getMachineClientBootstrap() {
@@ -82,6 +88,66 @@ public class AinerAuthorizationServerProperties {
 
         public void setPublicKeyLocation(String publicKeyLocation) {
             this.publicKeyLocation = publicKeyLocation;
+        }
+    }
+
+    public static final class Passkey {
+
+        private boolean enabled;
+        private String rpId;
+        private String rpName = "Ainer";
+        private List<String> allowedOrigins = new ArrayList<>();
+        private boolean allowInsecureHttp;
+        private Duration ceremonyTimeout = Duration.ofMinutes(5);
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getRpId() {
+            return rpId;
+        }
+
+        public void setRpId(String rpId) {
+            this.rpId = rpId;
+        }
+
+        public String getRpName() {
+            return rpName;
+        }
+
+        public void setRpName(String rpName) {
+            this.rpName = rpName;
+        }
+
+        public List<String> getAllowedOrigins() {
+            return new ArrayList<>(allowedOrigins);
+        }
+
+        public void setAllowedOrigins(List<String> allowedOrigins) {
+            this.allowedOrigins = allowedOrigins == null
+                    ? new ArrayList<>()
+                    : new ArrayList<>(allowedOrigins);
+        }
+
+        public boolean isAllowInsecureHttp() {
+            return allowInsecureHttp;
+        }
+
+        public void setAllowInsecureHttp(boolean allowInsecureHttp) {
+            this.allowInsecureHttp = allowInsecureHttp;
+        }
+
+        public Duration getCeremonyTimeout() {
+            return ceremonyTimeout;
+        }
+
+        public void setCeremonyTimeout(Duration ceremonyTimeout) {
+            this.ceremonyTimeout = ceremonyTimeout;
         }
     }
 

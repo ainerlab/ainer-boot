@@ -80,6 +80,20 @@ AI runtime 默认关闭；启用后所有端点要求 `ai.invoke` scope。
 | POST | `/oauth2/introspect` | HTTP Basic；显式受信、只有 `token.introspect`、无 tenant 的专用 client | RFC 7662；返回 `active`，普通业务 client 返回 401 `invalid_client` |
 | POST | `/oauth2/revoke` | Spring Authorization Server 注册 client 认证 | RFC 7009；撤销官方 JDBC authorization 中的目标 Token |
 
+Passkey 显式启用后还装配以下 Spring Security WebAuthn 端点；它们同样不套 Ainer envelope：
+
+| Method | Path | 身份要求 | 语义 |
+|---|---|---|---|
+| POST | `/webauthn/register/options` | 已认证人员；已有 ACTIVE Passkey 时还需 WebAuthn 因子 | 生成短时 registration options；强制 UV 与 resident credential |
+| POST | `/webauthn/register` | 同上 + CSRF | 验证 attestation 并登记 credential |
+| DELETE | `/webauthn/register/{credentialId}` | credential owner + WebAuthn 因子 + CSRF | 软撤销非最后一个 ACTIVE credential |
+| POST | `/webauthn/authenticate/options` | 可匿名或已有 session | 生成短时 authentication options；强制 UV |
+| POST | `/login/webauthn` | 对应 session options + CSRF | 验证 assertion 并建立/追加 WebAuthn 认证因子 |
+
+credential ID 是可关联安全元数据，不应出现在普通日志。当前没有 Ainer 自研 registration JSON、
+恢复 API 或管理员凭证删除 API；完整边界见
+[ADR-0014](decisions/0014-passkey-first-human-authentication.md)。
+
 Authorization Code + PKCE 当前由自动化测试专用 registered client 证明，生产没有默认 browser client，
 也没有 browser/OIDC client 创建 API。不得把测试 client、测试 issuer 或测试 RSA key 带入发行环境。
 

@@ -124,7 +124,7 @@ M2 没有引入 Spring AI 或厂商 SDK，而是用 JDK 25 `HttpClient` 验证 O
 
 ## 8. Spring Security 7.1 协议验证
 
-M3/M4.5 已完成 Spring Authorization Server 与 Security 7 的当前最小闭环：外部 RSA key、官方
+M3/M4.6 已完成 Spring Authorization Server 与 Security 7 的当前最小闭环：外部 RSA key、官方
 JDBC client/authorization/consent、Client Credentials、人员 JWT、RFC 7662 introspection、
 RFC 7009 revocation、Authorization Code + PKCE，以及 Resource Server JWT + 选择性在线校验。
 真实 PostgreSQL 验证还覆盖 JDBC claim/人员 principal 反序列化、凭证不落协议记录和 Identity
@@ -133,6 +133,19 @@ revocation epoch。
 PKCE 证据覆盖测试专用 public client、S256、表单登录、授权码单次交换、错误 verifier、缺失或
 `plain` challenge 和未注册回调拒绝。它不代表生产 browser client 注册/轮换、登录 UI、MFA、
 Refresh Token 策略、设备码、Token Exchange、密钥轮换或多节点容量已经验证。
+
+Spring Security 7.1 WebAuthn 已在 Authorization Server 中完成依赖与协议装配验证。Ainer 使用
+官方 `JdbcPublicKeyCredentialUserEntityRepository` / `JdbcUserCredentialRepository` 协议格式，
+通过自有 wrapper 补 ACTIVE/REVOKED、软撤销、最后凭证保护和审计；creation/request options
+覆盖官方默认值并强制 `userVerification=required`。条件 MFA 只约束已登记人员的
+`/oauth2/authorize` 和凭证管理，不给 Client Credentials、internal API 或 metrics 增加人员因子
+要求。
+
+当前自动化真实执行 options、条件拒绝、PKCE bootstrap、`amr/auth_time` 和 JDBC 生命周期，但
+尚未完成虚拟 authenticator 的完整签名 ceremony 或真实设备矩阵。Ainer 没有用全局
+`@EnableMultiFactorAuthentication` 改写服务安全链，而是在 browser chain 精确为 password 与
+WebAuthn authentication filter 开启 factor accumulation；升级 Spring Security 时需要继续用
+真实 HTTP 门禁验证该扩展点。
 
 ## 9. 尚未验证，不得写成既定事实
 

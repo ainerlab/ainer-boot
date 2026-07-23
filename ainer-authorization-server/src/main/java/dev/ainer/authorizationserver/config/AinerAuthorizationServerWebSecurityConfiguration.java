@@ -1,10 +1,12 @@
 package dev.ainer.authorizationserver.config;
 
+import dev.ainer.authorizationserver.passkey.AinerPasskeyWebSecurity;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.security.AinerSecurityScopes;
 import dev.ainer.security.autoconfigure.AinerSecurityFailureWriter;
 import dev.ainer.security.authorization.PrometheusEndpointRequestMatcher;
 import dev.ainer.security.authorization.TenantlessServiceScopeAuthorizationManager;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -39,10 +41,12 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
             HttpSecurity http,
             JwtDecoder jwtDecoder,
             RegisteredClientRepository registeredClientRepository,
-            OAuth2AuthorizationService authorizationService) throws Exception {
+            OAuth2AuthorizationService authorizationService,
+            ObjectProvider<AinerPasskeyWebSecurity> passkeyProvider) throws Exception {
         AinerTokenIntrospectionAuthenticationProvider introspectionProvider =
                 new AinerTokenIntrospectionAuthenticationProvider(
                         registeredClientRepository, authorizationService);
+        AinerPasskeyWebSecurity passkey = passkeyProvider.getIfAvailable();
         http.oauth2AuthorizationServer(authorizationServer -> {
             http.securityMatcher(authorizationServer.getEndpointsMatcher());
             authorizationServer
@@ -69,7 +73,13 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                     }))
                     .oidc(Customizer.withDefaults());
         });
-        http.authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
+        http.authorizeHttpRequests(authorize -> {
+                    if (passkey != null) {
+                        authorize.requestMatchers("/oauth2/authorize")
+                                .access(passkey.authorizationManager());
+                    }
+                    authorize.anyRequest().authenticated();
+                })
                 .oauth2ResourceServer(resourceServer -> resourceServer
                         .jwt(jwt -> jwt.decoder(jwtDecoder)))
                 .exceptionHandling(exceptions -> {
@@ -78,6 +88,9 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                     exceptions.defaultAuthenticationEntryPointFor(
                             new LoginUrlAuthenticationEntryPoint("/login"), html);
                 });
+        if (passkey != null) {
+            http.webAuthn(passkey::configureProtocolChain);
+        }
         return http.build();
     }
 
@@ -151,11 +164,30 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
 
     @Bean
     @Order(4)
-    SecurityFilterChain authorizationServerDefaultSecurityFilterChain(HttpSecurity http) throws Exception {
-        http.authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                        .anyRequest().authenticated())
-                .formLogin(Customizer.withDefaults());
+    SecurityFilterChain authorizationServerDefaultSecurityFilterChain(
+            HttpSecurity http,
+            ObjectProvider<AinerPasskeyWebSecurity> passkeyProvider) throws Exception {
+        AinerPasskeyWebSecurity passkey = passkeyProvider.getIfAvailable();
+        http.authorizeHttpRequests(authorize -> {
+                    authorize.requestMatchers("/actuator/health/**", "/actuator/info").permitAll();
+                    if (passkey != null) {
+                        authorize.requestMatchers(
+                                        "/webauthn/authenticate/options",
+                                        "/login/webauthn")
+                                .permitAll()
+                                .requestMatchers(
+                                        "/webauthn/register",
+                                        "/webauthn/register/**")
+                                .access(passkey.authorizationManager());
+                    }
+                    authorize.anyRequest().authenticated();
+                });
+        if (passkey != null) {
+            http.formLogin(passkey::configureFormLogin);
+            http.webAuthn(passkey::configureBrowserChain);
+        } else {
+            http.formLogin(Customizer.withDefaults());
+        }
         return http.build();
     }
 }

@@ -129,6 +129,26 @@ Authorization Server 多实例接受门禁至少包括：两实例共享 Postgre
 短 TTL；需要立即阻断的路径必须启用在线校验。当前 API 只管理由它创建的 tenant 服务 client，
 不能用于退役 operator、metrics、introspection、`.all` 或既有 bootstrap client。
 
+### 2.6 M4.6 Passkey 灰度启用
+
+Passkey 默认关闭，首次启用不能只切一个开关：
+
+1. 先发布 migration 和代码，保持 `AINER_AUTHORIZATION_PASSKEY_ENABLED=false`，确认旧 PKCE、
+   Client Credentials、internal API 与 metrics smoke 不变；
+2. 配置最终 HTTPS 登录域名对应的小写 RP ID、精确 Origin、RP name 和 ceremony timeout；
+   反向代理必须保留正确外部 Origin，不能用内部容器域名代替；
+3. 在隔离环境用目标浏览器和真实/虚拟 authenticator 验证首次登记、Passkey 登录、第二凭证
+   replacement、旧凭证撤销、最后凭证拒绝、session 超时与 CSRF；
+4. 高权限账号启用前，建立受控首次 enrollment、丢失设备停用和人工恢复值班流程；当前没有
+   恢复码或管理员恢复 API；
+5. 小范围启用，监控登录失败、登记/撤销审计、数据库错误和恢复工单，再扩大账号范围；
+6. 多实例前验证粘性会话或另行设计共享 session；当前 WebAuthn options 存于 HTTP session，
+   不能假设任意节点无状态完成同一 ceremony。
+
+普通回滚可关闭功能并保留 `user_*`/`ainer_passkey_*` 表。对已登记账号关闭 Passkey 会把
+OAuth authorization 恢复为密码路径，属于安全降级，必须审批、通知并记录时间窗口；不得通过
+手工删除 lifecycle/credential 行解除门禁。
+
 ## 3. 健康检查
 
 ```bash
@@ -154,6 +174,7 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 - 检查 issuer 是否为 HTTPS；
 - 检查 RSA key ID、PEM 路径、文件权限和公私钥是否匹配；
 - 检查身份库与 OAuth 表 migration；
+- Passkey 开启时检查 RP ID、Origin、HTTPS、timeout 与代理外部域名；不要临时扩大 Origin；
 - 不把私钥内容粘贴到日志或工单。
 
 ### Resource Server 返回 401/403

@@ -21,6 +21,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0011](0011-selective-online-token-validation.md) | Accepted | 高风险 API 选择性在线 Token 校验 |
 | [0012](0012-production-observability-and-auth-availability.md) | Proposed | 生产指标访问与 Authorization Server 可用性边界 |
 | [0013](0013-audited-oauth-service-client-lifecycle.md) | Proposed | 受审计 OAuth tenant 服务客户端生命周期 |
+| [0014](0014-passkey-first-human-authentication.md) | Proposed | Passkey 优先的人员认证与条件 MFA 基线 |
 
 ## 何时需要 ADR
 

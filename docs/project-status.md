@@ -6,9 +6,9 @@
 
 ## 1. 当前阶段
 
-Foundation M4.5 Authorization Code + PKCE 端到端协议门禁已完成，下一阶段进入人员账号治理、
-MFA 与签名密钥生命周期设计。项目已经从纯设计文档进入可编译、可运行、可测试的 Spring Boot
-4.1 多模块工程，但尚未达到生产或商业发行就绪。
+Foundation M4.6 Passkey 协议与条件人员认证基线已完成，下一阶段进入受控首次登记、恢复和
+账号治理。项目已经从纯设计文档进入可编译、可运行、可测试的 Spring Boot 4.1 多模块工程，
+但尚未达到生产或商业发行就绪。
 
 ## 2. 已完成
 
@@ -41,12 +41,16 @@ MFA 与签名密钥生命周期设计。项目已经从纯设计文档进入可�
   authorization code 单次交换、错误 verifier、缺失/`plain` challenge 和非法 redirect URI 拒绝；
 - JDBC authorization 的 Ainer 人员 principal 精确 Jackson 白名单、认证后凭证擦除、协议记录
   password 排除，以及 public client 无 refresh token 基线；
-- ADR-0001 至 ADR-0011 已接受，ADR-0012 与 ADR-0013 处于 Proposed；架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
+- 默认关闭的 Spring Security Passkey/WebAuthn、严格 RP/Origin/UV 配置、按账号条件 MFA、
+  JDBC 协议与 ACTIVE/REVOKED 生命周期、软撤销、并发最后凭证保护和操作审计；
+- 人员 Token 的标准 `amr` / `auth_time` 基线，以及 browser chain 精确 factor accumulation，
+  不改变 Client Credentials、internal API 和 metrics 安全链；
+- ADR-0001 至 ADR-0011 已接受，ADR-0012 至 ADR-0014 处于 Proposed；架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
 
 ## 3. 最近验证证据
 
 2026-07-23 在 macOS Colima 0.10.3、Docker 29.5.2 与 Testcontainers 2.0.5 环境执行完整
-`mvn test`：14 个 Reactor 模块成功，170 个测试全部实际执行通过，0 failure、0 error、
+`mvn test`：14 个 Reactor 模块成功，180 个测试全部实际执行通过，0 failure、0 error、
 0 skipped。PostgreSQL 集成组使用 `postgres:18.3-alpine` 从空库启动并执行 Flyway，覆盖
 Identity、Workspace、AI runtime 与 Authorization Server。
 
@@ -64,6 +68,15 @@ access token 和 OIDC ID token；响应不含 refresh token。authorization code
 缺失/`plain` challenge 均失败，未注册 redirect URI 不发生外部跳转。真实 JDBC 往返暴露并修复
 了 Jackson 3 拒绝 Ainer 人员 principal 的问题；修复只增加精确类型白名单，并证明授权记录不含
 密码或 password 字段。
+
+本轮新增 Passkey 证据：Authorization Server 从空库执行七份 migration，创建 Spring 官方
+WebAuthn 协议表和 Ainer 生命周期/审计表。配置门禁拒绝 IP 型 RP ID、越界 Origin、普通 HTTP、
+重复 Origin、路径和过长 timeout；真实 HTTP registration options 强制 resident credential 与
+`userVerification=required`。无凭证账号仍可用密码完成 PKCE，Token 含 `amr=pwd` 和
+`auth_time`；登记合成 credential 后，仅密码不能取得 authorization code。JDBC 门禁验证登记、
+计数器/last-used 更新、replacement、软撤销、审计和协议记录保留；并发撤销两个 ACTIVE
+credential 时只允许一个成功，最后一个保持 ACTIVE。本轮尚未完成 authenticator 的真实签名
+ceremony，因此不能把这组证据表述为完整 Passkey 兼容性或生产 MFA。
 
 本轮新增指标安全证据：Resource Server 真实 HTTP 测试覆盖无 Token 401、USER/tenant-bound SERVICE/缺 scope 403、tenantless SERVICE 200，并使用自定义 management base path 证明路径配置不会绕过授权；路径 matcher 还覆盖 context path、尾斜杠和编码路径。业务 Resource Server 显式关闭时，真实 Prometheus endpoint 仍拒绝匿名并且不返回 JVM/process 指标。metrics bootstrap 测试证明只创建 Client Credentials、无 tenant、只有 `platform.metrics.read`、一分钟 Token、无 introspection 标记，重复运行不覆盖且弱 secret 失败关闭。Authorization Server 的真实 PostgreSQL 协议测试已实际验证专用/tenant-bound metrics Token 与 exporter 的 401/403/200，并同时覆盖 Client Credentials、OIDC discovery、专用 introspection、RFC 7009 与 Identity revocation epoch。
 
@@ -89,8 +102,9 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 - tenant-bound Client Credentials 已有生命周期控制面，但 browser/OIDC、平台级
   metrics/introspection/operator、`.all` 与既有 bootstrap client 尚未纳管，也没有列表分页、审计
   导出、双人审批或 UI；
-- Authorization Code + PKCE 已有自动化协议门禁，但生产 browser/OIDC client 控制面、品牌登录
-  UI、同意/会话治理、MFA、签名密钥轮换和恢复流程未完成；
+- Authorization Code + PKCE 与 Passkey 条件门禁已有自动化协议证据，但生产 browser/OIDC
+  client 控制面、品牌登录 UI、完整 authenticator ceremony、受控 enrollment、恢复/通知、
+  会话治理、step-up policy 和签名密钥轮换未完成；
 - tenant ownership transfer 的 Identity 控制面尚未完成。
 
 ### AI 平台
@@ -109,19 +123,21 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 ## 5. 下一里程碑
 
-M4.5 已完成 Authorization Code + PKCE 的真实浏览器协议链路与 JDBC 人员 principal 持久化
-边界。下一工程切片优先建立人员账号治理与 MFA 的威胁模型、恢复策略和最小控制面，并同步设计
+M4.6 已完成 Passkey 协议配置、条件人员门禁和 JDBC credential 生命周期基线。下一工程切片
+优先建立受控首次 enrollment、恢复码/管理员双人恢复、账号通知、限速和审计边界，并用虚拟
+authenticator 与真实设备补齐 registration/authentication 签名 ceremony；同时设计
 browser/OIDC client 的生产注册、redirect URI 变更和退役流程。
 
 生产并行工作仍包括真实 Prometheus 抓取、dashboard/告警、Authorization Server 多实例容量/故障
 证据、metrics/introspection/operator 旧凭据退役、Resource Server 灰度与安全降级审批，以及把
 M4.2 操作审计接入生产级 IAM 职责分离和外部不可变存储。
 
-完成条件包括：账号生命周期、MFA enrollment/challenge/recovery 与高风险操作 step-up 边界形成
-ADR 和真实数据库门禁；发布候选环境的 Testcontainers 测试不跳过；高风险 online validation 在
-目标容量与故障注入下满足确定的延时/可用性目标；request/approve 与平台凭据在运营上真正分离并
-可轮换；外部审计副本可验证、可恢复；初始撤销 SLO 经多节点证据修正后形成正式错误预算。随后
-继续补齐 tenant ownership transfer、浏览器/平台 Client 控制面与签名密钥轮换。
+完成条件包括：受控 enrollment、完整 ceremony、凭证丢失/被盗、恢复、通知和高风险操作
+step-up 边界形成 ADR 与真实数据库/浏览器门禁；发布候选环境的 Testcontainers 测试不跳过；
+高风险 online validation 在目标容量与故障注入下满足确定的延时/可用性目标；request/approve
+与平台凭据在运营上真正分离并可轮换；外部审计副本可验证、可恢复；初始撤销 SLO 经多节点证据
+修正后形成正式错误预算。随后继续补齐 tenant ownership transfer、浏览器/平台 Client 控制面与
+签名密钥轮换。
 
 ## 6. 更新规则
 

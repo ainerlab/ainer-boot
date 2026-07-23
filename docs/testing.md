@@ -104,6 +104,12 @@ mvn clean test
   错误 verifier、缺失/`plain` challenge 和未注册 redirect URI；
 - public client 不得出现 refresh token；人员 access token 必须包含稳定 `sub`、`tenant_id` 与
   `roles`，JDBC authorization 不得保存 password 属性或凭证。
+- Passkey 启用配置必须对 RP/Origin/HTTPS/timeout 失败关闭；registration 与 authentication
+  options 必须为 `userVerification=required`；
+- 无 ACTIVE Passkey 时密码 bootstrap 可以完成 PKCE，Token 含 `amr=pwd` 与 `auth_time`；存在
+  ACTIVE Passkey 时仅密码不得取得 authorization code；
+- Passkey 协议记录、ACTIVE 生命周期和 REGISTERED 审计同事务；计数器/last-used 更新不产生
+  重复登记审计；replacement 后旧凭证软撤销，并发撤销不能移除最后一个 ACTIVE 凭证。
 
 ### 数据与事务
 
@@ -135,4 +141,4 @@ mvn clean test
 
 合并前：受影响模块测试、完整 `mvn clean test`、`git diff --check`。
 
-发布前还必须确认：数据库测试未因 Docker 缺失而跳过、两个可执行发行物均能启动、Flyway 从空库成功、升级 migration 在备份副本成功、关键鉴权与健康检查通过。M4.2 还要在可运行 Testcontainers 的环境执行双人审批、锁定重检、归档回滚和游标边界集成测试。M4.3 还要在真实 PostgreSQL 上执行 Authorization Server 协议 smoke，证明专用/普通 introspection client 隔离、active、RFC 7009 撤销和 Identity epoch，并用接近真实规模数据检查 epoch 查询计划；M4.5 还要执行真实浏览器 HTTP 会话的 PKCE S256 正反门禁，并检查 JDBC authorization 不落凭证。生产可观测性切片还要用独立 metrics client 抓取两个真实 exporter，并验证多节点、Token endpoint/数据库故障和告警路由。手工 PostgreSQL 与 loopback 证据是补充，不取代发布候选环境中不跳过的自动门禁。当前验证快照见 [`project-status.md`](project-status.md)。
+发布前还必须确认：数据库测试未因 Docker 缺失而跳过、两个可执行发行物均能启动、Flyway 从空库成功、升级 migration 在备份副本成功、关键鉴权与健康检查通过。M4.2 还要在可运行 Testcontainers 的环境执行双人审批、锁定重检、归档回滚和游标边界集成测试。M4.3 还要在真实 PostgreSQL 上执行 Authorization Server 协议 smoke，证明专用/普通 introspection client 隔离、active、RFC 7009 撤销和 Identity epoch，并用接近真实规模数据检查 epoch 查询计划；M4.5 还要执行真实浏览器 HTTP 会话的 PKCE S256 正反门禁，并检查 JDBC authorization 不落凭证。M4.6 当前还必须执行 Passkey options、条件门禁和 JDBC 生命周期门禁；在宣称生产 MFA 前，必须另补虚拟 authenticator 与主流真实设备的完整 registration/authentication、丢失/被盗/同步凭证、恢复通知和多节点 session 证据。生产可观测性切片还要用独立 metrics client 抓取两个真实 exporter，并验证多节点、Token endpoint/数据库故障和告警路由。手工 PostgreSQL 与 loopback 证据是补充，不取代发布候选环境中不跳过的自动门禁。当前验证快照见 [`project-status.md`](project-status.md)。

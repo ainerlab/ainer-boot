@@ -1,6 +1,6 @@
 # Ainer 架构总览
 
-> 权威状态：M4.3 selective online token validation · 2026-07-23
+> 权威状态：M4.6 Passkey protocol foundation · 2026-07-23
 
 ## 1. 系统定位
 
@@ -26,10 +26,10 @@ ainer-server                         JWT Resource Server、Actuator、平台/内
 ├── ainer-starter-security           JWT 验证、SecurityContext 投影、401/403
 └── ainer-starter-web
 
-ainer-authorization-server           独立 OAuth 2.1/OIDC 发行物、Directory adapter、outbox relay
+ainer-authorization-server           独立 OAuth 2.1/OIDC 发行物、Passkey、Directory adapter、outbox relay
 ├── ainer-module-identity             用户、租户、Directory、禁用/撤销、可租约 outbox 与双人重放
 ├── Spring Security Authorization Server 7.1
-└── JDBC registered client / authorization / consent
+└── JDBC registered client / authorization / consent / WebAuthn credential
 
 ainer-starter-web -> ainer-spring -> ainer-core
 ainer-starter-persistence -> ainer-core
@@ -150,6 +150,10 @@ M3/M4 已形成以下边界：
 - 浏览器/移动端优先 Authorization Code + PKCE；机器调用使用 Client Credentials；实际 grant 由每个 registered client 白名单决定。设备可使用 Device Code，系统间委托可评估 Token Exchange。
 - M4.5 已用测试专用 public client 验证 PKCE S256、真实表单登录、授权码单次交换、错误 verifier
   与回调地址拒绝；生产 browser client 控制面、会话治理和登录 UI 仍是独立能力。
+- M4.6 使用 Spring Security 7.1 WebAuthn 建立默认关闭的 Passkey 协议基础：UV-required、
+  精确 RP/Origin、无凭证密码 bootstrap、已登记账号对 OAuth authorization/凭证管理的条件
+  WebAuthn 门禁，以及官方协议表外的 ACTIVE/REVOKED 生命周期、软撤销和审计。最后一个 ACTIVE
+  Passkey 不允许自助删除；完整 authenticator ceremony、恢复和多节点 session 尚未完成。
 - 短信、微信和企业身份源通过认证编排或标准扩展授权接入，不复活 password grant。
 - 业务模块从 `AuthenticatedActor` 获取 `sub`、`tenant_id` 和 authorities，不读取 JWT，也不接受客户端身份请求头。
 - AI API 已强制 `ai.invoke` scope。

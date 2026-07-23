@@ -225,7 +225,29 @@ M4.5 已用测试专用 public client 完成真实 HTTP 浏览器会话与 Postg
 测试直接检查授权记录不含密码或 password 字段。
 
 这些证据不创建生产默认 browser client，也不提供注册/轮换 API、品牌登录页、同意页、租户选择、
-会话管理或 MFA。测试 issuer、测试 client 和测试 RSA key 不能用于发行环境。
+会话治理或完整 MFA。测试 issuer、测试 client 和测试 RSA key 不能用于发行环境。
+
+M4.6 增加默认关闭的 Passkey/WebAuthn 协议基础。启用时：
+
+- RP ID 必须是小写 DNS 名或 `localhost`，Origin host 必须等于 RP ID 或位于其子域；生产只接受
+  HTTPS，显式 HTTP 例外只允许 `localhost` 自动化测试；
+- registration 与 authentication options 都强制 `userVerification=required`，使用 resident
+  credential；私钥和本地生物识别模板不进入 Ainer；
+- 无 ACTIVE Passkey 的账号可用密码完成首次 bootstrap；一旦存在 ACTIVE Passkey，
+  `/oauth2/authorize` 和 `/webauthn/register...` 凭证管理必须完成 WebAuthn 因子；
+- `/webauthn/register/options`、`/webauthn/register`、
+  `/webauthn/authenticate/options` 与 `/login/webauthn` 使用 Spring Security 标准协议响应，
+  不套 Ainer JSON envelope；
+- 协议凭证保存在 Spring 官方 JDBC 表，Ainer 生命周期表只补充稳定 subject、ACTIVE/REVOKED、
+  时间和审计。删除是软撤销；最后一个 ACTIVE Passkey 不允许自助删除，轮换必须先登记
+  replacement；
+- 密码人员 Token 写标准 `amr=pwd`；完成 UV-required WebAuthn 后计划写 IANA 已登记的
+  `mfa,pop`，并以最新因子时间写 `auth_time`。
+
+本切片尚未用虚拟 authenticator 或真实设备完成完整签名 ceremony，也没有受控首次登记、恢复码、
+管理员恢复、恢复通知、登录限速、step-up 有效期或多节点 session 证据。TOTP 只保留为后续受限
+恢复 fallback 的候选，不能作为抗钓鱼主因子。完整决策和威胁模型见
+[ADR-0014](decisions/0014-passkey-first-human-authentication.md)。
 
 人员账号由 `ainer-module-identity` 保存 delegating password hash、状态和唯一默认租户。Authorization Server 的 `UserDetailsService` 从该端口加载账号，签发时把稳定 UUID 写入 `sub`，把默认租户写入 `tenant_id`，并把成员角色写入 `roles`。
 
@@ -235,8 +257,9 @@ Identity Directory 只返回 ACTIVE tenant、ACTIVE user、ACTIVE membership 的
 
 Workspace 事件端点要求 `actor_type=SERVICE`、`identity.access-events.publish` 和精确可信 publisher `sub`。消费事务先插入 event receipt，再将同 tenant/subject、创建时间不晚于事件时间的 PENDING/ACTIVE membership 置为 `REVOKED`。重复 event ID 幂等成功，旧事件不影响后来创建的 membership，跨 tenant 不受影响。安全禁用可以让 OWNER 变为 REVOKED 并暂时留下无 ACTIVE OWNER 的 Workspace；这优先于继续放行已禁用账号，恢复/所有权处置必须使用后续专用流程。
 
-当前仍未提供公网注册、找回密码、MFA、租户切换和图形化 client 控制台；只有 tenant-bound
-Client Credentials 的内部生命周期 API 已落地，PKCE public client 仅存在于自动化测试。
+当前仍未提供公网注册、找回密码、完整 MFA/恢复、租户切换和图形化 client 控制台；只有
+Passkey 协议/条件门禁基础与 tenant-bound Client Credentials 内部生命周期 API 已落地，PKCE
+public client 仅存在于自动化测试。
 Directory 与事件 adapter 均默认关闭且不共享数据库；完整投递决策见
 [ADR-0009](decisions/0009-cross-runtime-access-revocation-delivery.md)。
 
@@ -265,4 +288,4 @@ mvn test
 
 Resource Server 的 401/403、可信 claim、伪造身份头以及 Workspace 应用授权测试不依赖 Docker。Identity、JDBC 协议表、Client Credentials 签发与 Workspace tenant SQL 测试使用 PostgreSQL Testcontainers；没有 Docker 时会明确跳过，不会改用 H2。
 
-M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存、inactive 401、在线依赖失败 503、专用 client 与普通 client 隔离、RFC 7009 撤销，以及 Identity epoch 的等于/前后边界。指标边界还要验证无 Token 401，USER/tenant-bound/missing-scope 403，专用 tenantless SERVICE 200，以及业务 Resource Server 关闭时仍不匿名公开。tenant 服务 client 控制面另需验证一次性 secret、scope 白名单、operator/tenant 隔离、蓝绿轮换、退役后新 Token 401、历史 Token introspection inactive 和无 secret 审计。PKCE 门禁必须使用真实 HTTP 会话和 PostgreSQL，覆盖 S256 正反路径、登录 CSRF、授权码重放、redirect URI、人员 claims、无 refresh token 以及协议记录不落凭证。真实 PostgreSQL 和协议 smoke 证据维护在 [`project-status.md`](project-status.md)。
+M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存、inactive 401、在线依赖失败 503、专用 client 与普通 client 隔离、RFC 7009 撤销，以及 Identity epoch 的等于/前后边界。指标边界还要验证无 Token 401，USER/tenant-bound/missing-scope 403，专用 tenantless SERVICE 200，以及业务 Resource Server 关闭时仍不匿名公开。tenant 服务 client 控制面另需验证一次性 secret、scope 白名单、operator/tenant 隔离、蓝绿轮换、退役后新 Token 401、历史 Token introspection inactive 和无 secret 审计。PKCE 门禁必须使用真实 HTTP 会话和 PostgreSQL，覆盖 S256 正反路径、登录 CSRF、授权码重放、redirect URI、人员 claims、无 refresh token 以及协议记录不落凭证。Passkey 基线还必须覆盖配置失败关闭、UV-required options、无凭证 bootstrap、已登记账号条件拦截、生命周期/审计同事务、软撤销、replacement 与最后凭证保护；完整 authenticator ceremony 和恢复路径仍是后续门禁。真实 PostgreSQL 和协议 smoke 证据维护在 [`project-status.md`](project-status.md)。

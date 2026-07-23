@@ -40,6 +40,13 @@ ainer:
         key-id: ${AINER_AUTHORIZATION_SIGNING_KEY_ID:}
         private-key-location: ${AINER_AUTHORIZATION_PRIVATE_KEY_LOCATION:}
         public-key-location: ${AINER_AUTHORIZATION_PUBLIC_KEY_LOCATION:}
+      passkey:
+        enabled: ${AINER_AUTHORIZATION_PASSKEY_ENABLED:false}
+        rp-id: ${AINER_AUTHORIZATION_PASSKEY_RP_ID:}
+        rp-name: ${AINER_AUTHORIZATION_PASSKEY_RP_NAME:Ainer}
+        allowed-origins: ${AINER_AUTHORIZATION_PASSKEY_ALLOWED_ORIGINS:}
+        allow-insecure-http: ${AINER_AUTHORIZATION_PASSKEY_ALLOW_INSECURE_HTTP:false}
+        ceremony-timeout: ${AINER_AUTHORIZATION_PASSKEY_CEREMONY_TIMEOUT:5m}
       machine-client-bootstrap:
         enabled: ${AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_ENABLED:false}
         client-id: ${AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_CLIENT_ID:}

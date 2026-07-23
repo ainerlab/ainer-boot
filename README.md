@@ -1,6 +1,6 @@
 # Ainer Boot
 
-> 正式品牌：Ainer · M4.3 selective online token validation · 2026-07-23 · JDK 25 + Spring Boot 4.1.0
+> 正式品牌：Ainer · M4.6 Passkey protocol foundation · 2026-07-23 · JDK 25 + Spring Boot 4.1.0
 
 Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 AI 时代的企业应用平台底座。它从模块化单体开始，通过明确的契约、适配器和独立发行物演进为服务化系统；它不继承 yudao、BladeX、Dante 或 Snowy 的代码与框架范式。
 
@@ -21,7 +21,7 @@ Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 
 | `ainer-module-workspace` | ✅ | 可信租户资源、成员治理、幂等撤销、OWNER 恢复、授权审计热/归档与 SIEM 契约 |
 | `ainer-module-ai-runtime` | ✅ | OpenAI-compatible 网关、SSE、策略、预算与用量/费用审计 |
 | `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、可选 Directory client、撤销 consumer/SLO、OWNER 恢复与审计运营端点 |
-| `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、受限 introspection/RFC 7009、独立 metrics client、Identity 状态感知、Directory/relay 与 JDBC 协议仓库 |
+| `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、受限 introspection/RFC 7009、Identity 状态感知与受审计 JDBC 协议仓库 |
 
 当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
 
@@ -153,6 +153,13 @@ Authorization Code + PKCE 已建立真实 PostgreSQL 与浏览器 HTTP 会话门
 授权码单次交换和回调地址拒绝；该证据使用测试专用 public client，不代表生产 browser client
 控制面或登录体验已经交付。
 
+M4.6 已建立默认关闭的 Passkey 协议基础：启用时强制 WebAuthn user verification、精确 RP/
+Origin、已登记账号的条件授权门禁，以及凭证软撤销、replacement、最后凭证保护和操作审计。
+这不是完整生产 MFA：受控首次登记、真实设备兼容矩阵、恢复码/管理员恢复、通知、step-up 策略和
+多节点会话仍未完成，详见
+[ADR-0014](docs/decisions/0014-passkey-first-human-authentication.md)。
+
 下一步仍需部署真实 Prometheus、dashboard/告警，并完成 Authorization Server 多实例容量、故障
 切换和平台旧凭据退役证据；随后继续 IAM 职责分离、外部不可变审计副本、多节点 SLO、人员账号
-治理、MFA、tenant ownership transfer、browser/OIDC client 控制面与签名密钥轮换。
+恢复治理、Passkey 完整 ceremony/恢复、tenant ownership transfer、browser/OIDC client
+控制面与签名密钥轮换。
