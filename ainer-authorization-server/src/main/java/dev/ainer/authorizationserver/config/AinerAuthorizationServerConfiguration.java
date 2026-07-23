@@ -37,6 +37,7 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,11 +62,27 @@ public class AinerAuthorizationServerConfiguration {
             ManagedRegisteredClientRepository registeredClientRepository,
             IdentityTokenStatusService identityTokenStatusService) {
         OAuth2AuthorizationService jdbc =
-                new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+                jdbcAuthorizationService(jdbcTemplate, registeredClientRepository);
         return new RevocationAwareOAuth2AuthorizationService(
                 jdbc,
                 identityTokenStatusService,
                 registeredClientRepository::isActiveByRegisteredClientId);
+    }
+
+    private JdbcOAuth2AuthorizationService jdbcAuthorizationService(
+            JdbcTemplate jdbcTemplate,
+            RegisteredClientRepository registeredClientRepository) {
+        JsonMapper jsonMapper = AinerOAuth2AuthorizationJsonMapperFactory.create();
+        JdbcOAuth2AuthorizationService jdbc =
+                new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+        jdbc.setAuthorizationRowMapper(
+                new JdbcOAuth2AuthorizationService.JsonMapperOAuth2AuthorizationRowMapper(
+                        registeredClientRepository,
+                        jsonMapper));
+        jdbc.setAuthorizationParametersMapper(
+                new JdbcOAuth2AuthorizationService.JsonMapperOAuth2AuthorizationParametersMapper(
+                        jsonMapper));
+        return jdbc;
     }
 
     @Bean

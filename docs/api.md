@@ -71,12 +71,17 @@ AI runtime 默认关闭；启用后所有端点要求 `ai.invoke` scope。
 
 `ainer-authorization-server` 暴露 Spring Authorization Server 的标准 OAuth 2.1/OIDC 端点，具体启用能力和密钥要求见 [`security.md`](security.md)。协议端点遵循标准响应，不套 Ainer JSON envelope。
 
-M4.3 明确使用以下标准控制面端点：
+当前明确验证以下标准协议端点：
 
 | Method | Path | Client 要求 | 语义 |
 |---|---|---|---|
+| GET | `/oauth2/authorize` | 精确注册 redirect URI 的 public client；`requireProofKey=true` | Authorization Code + PKCE；只接受 S256，缺失/`plain` challenge 失败 |
+| POST | `/oauth2/token` | public client 传 `client_id`、authorization code、redirect URI 和正确 `code_verifier` | 授权码只能成功交换一次；测试基线返回 access/id token，不返回 refresh token |
 | POST | `/oauth2/introspect` | HTTP Basic；显式受信、只有 `token.introspect`、无 tenant 的专用 client | RFC 7662；返回 `active`，普通业务 client 返回 401 `invalid_client` |
 | POST | `/oauth2/revoke` | Spring Authorization Server 注册 client 认证 | RFC 7009；撤销官方 JDBC authorization 中的目标 Token |
+
+Authorization Code + PKCE 当前由自动化测试专用 registered client 证明，生产没有默认 browser client，
+也没有 browser/OIDC client 创建 API。不得把测试 client、测试 issuer 或测试 RSA key 带入发行环境。
 
 人员 Token 的 introspection 还检查 Identity tenant/user/membership 当前状态和最新 revocation epoch。inactive 原因不向调用方细分。Resource Server 对匹配高风险规则的 inactive 返回 Ainer 401；introspection 依赖失败返回 503 `AINER.SECURITY.ONLINE_VALIDATION_UNAVAILABLE`。保护规则和配置见 [`configuration.md`](configuration.md)。
 

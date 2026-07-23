@@ -108,7 +108,9 @@ Ainer 采用 strangler + vertical slice：
 - 已落地 ACTIVE tenant member Directory 安全投影、账号禁用、非 OWNER membership 撤销和同事务 access-event outbox。
 - 已落地默认开启、可显式关闭的 Resource Server starter，以及统一 401/403。
 - 已落地独立 Spring Authorization Server、外部 RSA key、JDBC client/authorization/consent 和 Client Credentials 测试。
-- Authorization Code + PKCE、Refresh Token 与 OIDC 由标准协议装配提供；仍需补浏览器端到端测试、人员账号控制面和 MFA。
+- Authorization Code + PKCE 已用测试专用 public client、真实 HTTP 登录会话和 PostgreSQL 完成
+  S256 正反门禁；public client 不配置 Refresh Token，生产 browser/OIDC client 控制面、人员账号
+  控制面和 MFA 仍未完成。
 - 旧 Token 在过渡期通过边界适配，不复制旧 Token 表到 Ainer。
 
 ### M4：低耦合业务切片

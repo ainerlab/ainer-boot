@@ -148,6 +148,8 @@ M3/M4 已形成以下边界：
 - `ainer-server` 默认作为 OAuth2 Resource Server，验证 issuer、签名、有效期和 audience。
 - `ainer-authorization-server` 是独立发行物，协议数据使用 Spring Security JDBC repository。
 - 浏览器/移动端优先 Authorization Code + PKCE；机器调用使用 Client Credentials；实际 grant 由每个 registered client 白名单决定。设备可使用 Device Code，系统间委托可评估 Token Exchange。
+- M4.5 已用测试专用 public client 验证 PKCE S256、真实表单登录、授权码单次交换、错误 verifier
+  与回调地址拒绝；生产 browser client 控制面、会话治理和登录 UI 仍是独立能力。
 - 短信、微信和企业身份源通过认证编排或标准扩展授权接入，不复活 password grant。
 - 业务模块从 `AuthenticatedActor` 获取 `sub`、`tenant_id` 和 authorities，不读取 JWT，也不接受客户端身份请求头。
 - AI API 已强制 `ai.invoke` scope。

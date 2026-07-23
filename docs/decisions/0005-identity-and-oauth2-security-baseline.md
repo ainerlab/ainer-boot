@@ -43,7 +43,10 @@ M3 foundation 已按两段落地：
 1. 先交付 `ainer-security`、Resource Server starter、JWT 契约与 AI Gateway 的可信身份改造；
 2. 再交付 Identity PostgreSQL 模型、独立 Authorization Server、JDBC 协议存储与端到端签发测试。
 
-两段现已完成：AI API 不再接受自报租户/主体，Identity、独立 Authorization Server、JDBC 协议存储和 Client Credentials 自动化契约均已进入代码。Authorization Code + PKCE 的浏览器端到端验证、人员身份控制面、MFA 和密钥轮换仍属于后续 hardening，不能将测试 issuer 或测试 key 当作生产签发方案。
+两段现已完成：AI API 不再接受自报租户/主体，Identity、独立 Authorization Server、JDBC
+协议存储、Client Credentials 与 Authorization Code + PKCE 浏览器自动化契约均已进入代码。
+PKCE 证据使用测试专用 public client；生产 browser/OIDC client 控制面、人员身份控制面、MFA
+和密钥轮换仍属于后续 hardening，不能将测试 issuer、client 或 key 当作生产签发方案。
 
 ## 后果
 

@@ -149,4 +149,10 @@ M4.3 已为高风险 API 建立选择性在线撤销基线：本地 JWT 认证�
 
 生产指标代码基线现已开始落地：两个发行物提供受 JWT 保护的 Prometheus exporter，抓取凭据使用独立无 tenant metrics client。tenant-bound Client Credentials 也已具备默认关闭、服务端生成一次性 secret、scope/operator 双白名单、蓝绿轮换、显式退役和同事务审计的内部控制面；browser/OIDC 与平台 client 尚未纳管。
 
-下一步仍需部署真实 Prometheus、dashboard/告警，并完成 Authorization Server 多实例容量、故障切换和平台旧凭据退役证据；随后继续 IAM 职责分离、外部不可变审计副本、多节点 SLO、Authorization Code + PKCE 端到端、MFA、tenant ownership transfer 与签名密钥轮换。
+Authorization Code + PKCE 已建立真实 PostgreSQL 与浏览器 HTTP 会话门禁，覆盖 S256、登录、
+授权码单次交换和回调地址拒绝；该证据使用测试专用 public client，不代表生产 browser client
+控制面或登录体验已经交付。
+
+下一步仍需部署真实 Prometheus、dashboard/告警，并完成 Authorization Server 多实例容量、故障
+切换和平台旧凭据退役证据；随后继续 IAM 职责分离、外部不可变审计副本、多节点 SLO、人员账号
+治理、MFA、tenant ownership transfer、browser/OIDC client 控制面与签名密钥轮换。

@@ -124,9 +124,15 @@ M2 没有引入 Spring AI 或厂商 SDK，而是用 JDK 25 `HttpClient` 验证 O
 
 ## 8. Spring Security 7.1 协议验证
 
-M3/M4.3 已完成 Spring Authorization Server 与 Security 7 的当前最小闭环：外部 RSA key、官方 JDBC client/authorization/consent、Client Credentials、人员 JWT、RFC 7662 introspection、RFC 7009 revocation，以及 Resource Server JWT + 选择性在线校验。真实 PostgreSQL 18.4 启动验证还覆盖了 JDBC claim 反序列化和 Identity revocation epoch。
+M3/M4.5 已完成 Spring Authorization Server 与 Security 7 的当前最小闭环：外部 RSA key、官方
+JDBC client/authorization/consent、Client Credentials、人员 JWT、RFC 7662 introspection、
+RFC 7009 revocation、Authorization Code + PKCE，以及 Resource Server JWT + 选择性在线校验。
+真实 PostgreSQL 验证还覆盖 JDBC claim/人员 principal 反序列化、凭证不落协议记录和 Identity
+revocation epoch。
 
-这证明当前 Ainer 装配，不代表所有 OIDC 流程已经验证。Authorization Code + PKCE 浏览器端到端、MFA、设备码、Token Exchange、密钥轮换和多节点容量仍需独立证据。
+PKCE 证据覆盖测试专用 public client、S256、表单登录、授权码单次交换、错误 verifier、缺失或
+`plain` challenge 和未注册回调拒绝。它不代表生产 browser client 注册/轮换、登录 UI、MFA、
+Refresh Token 策略、设备码、Token Exchange、密钥轮换或多节点容量已经验证。
 
 ## 9. 尚未验证，不得写成既定事实
 

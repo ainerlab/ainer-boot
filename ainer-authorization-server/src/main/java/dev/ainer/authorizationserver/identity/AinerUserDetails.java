@@ -1,19 +1,21 @@
 package dev.ainer.authorizationserver.identity;
 
+import org.springframework.security.core.CredentialsContainer;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-public final class AinerUserDetails implements UserDetails {
+public final class AinerUserDetails implements UserDetails, CredentialsContainer {
 
     private final UUID subjectId;
     private final UUID tenantId;
     private final String username;
-    private final String password;
+    private String password;
     private final boolean enabled;
     private final boolean accountNonLocked;
     private final List<GrantedAuthority> authorities;
@@ -29,7 +31,7 @@ public final class AinerUserDetails implements UserDetails {
         this.subjectId = Objects.requireNonNull(subjectId, "subjectId");
         this.tenantId = Objects.requireNonNull(tenantId, "tenantId");
         this.username = Objects.requireNonNull(username, "username");
-        this.password = Objects.requireNonNull(password, "password");
+        this.password = password;
         this.enabled = enabled;
         this.accountNonLocked = accountNonLocked;
         this.authorities = List.copyOf(authorities);
@@ -45,12 +47,17 @@ public final class AinerUserDetails implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return authorities;
+        return new ArrayList<>(authorities);
     }
 
     @Override
     public String getPassword() {
         return password;
+    }
+
+    @Override
+    public void eraseCredentials() {
+        password = null;
     }
 
     @Override

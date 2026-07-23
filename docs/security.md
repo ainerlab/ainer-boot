@@ -209,6 +209,24 @@ operator、`.all` 跨 tenant scope 或既有 bootstrap client。后几类仍需�
 
 协议装配支持 Authorization Code、PKCE、Refresh Token、Client Credentials 与 OIDC；实际可用授权类型仍由 registered client 白名单决定。禁止配置 password grant。
 
+M4.5 已用测试专用 public client 完成真实 HTTP 浏览器会话与 PostgreSQL 端到端门禁：
+
+- client 使用 `ClientAuthenticationMethod.NONE`、Authorization Code、精确 redirect URI 和
+  `requireProofKey=true`；
+- 只接受 S256，缺失 challenge、`plain`、错误 verifier 和未注册 redirect URI 均被拒绝；
+- 表单登录包含 cookie/CSRF，会签发带稳定 `sub`、`tenant_id`、`roles` 的 access token 与 OIDC
+  ID token；authorization code 只能交换一次；
+- public client 不注册 Refresh Token grant，响应不得出现 refresh token。需要长期浏览器会话时应
+  先明确 BFF、会话与轮换策略，不能给 SPA 注入 client secret。
+
+官方 JDBC authorization 的 JsonMapper 使用隔离配置，只在 Spring Security 自带白名单之外精确
+允许 `AinerUserDetails`，没有放宽全局包名或 `Object` 子类型。人员主体实现
+`CredentialsContainer`，认证成功后擦除 password hash；持久化 mixin 忽略 password 属性，集成
+测试直接检查授权记录不含密码或 password 字段。
+
+这些证据不创建生产默认 browser client，也不提供注册/轮换 API、品牌登录页、同意页、租户选择、
+会话管理或 MFA。测试 issuer、测试 client 和测试 RSA key 不能用于发行环境。
+
 人员账号由 `ainer-module-identity` 保存 delegating password hash、状态和唯一默认租户。Authorization Server 的 `UserDetailsService` 从该端口加载账号，签发时把稳定 UUID 写入 `sub`，把默认租户写入 `tenant_id`，并把成员角色写入 `roles`。
 
 Identity Directory 只返回 ACTIVE tenant、ACTIVE user、ACTIVE membership 的 tenant、subject、username、display name 和 role，不返回密码哈希、账号锁定细节或 OAuth 协议数据。默认关闭的 HTTP adapter 要求服务 JWT：`identity.directory.read` 只能查询 Token `tenant_id`，`identity.directory.read.all` 才能选择路径中的任意 tenant。人员 Token 即使误含 scope 也会被拒绝。`ainer-server` 可选 Directory client 使用 OAuth 2.0 Client Credentials，在启用时于创建 Workspace 邀请前验证目标是 ACTIVE Directory member；404 拒绝邀请，身份或传输故障按 503 关闭失败。
@@ -218,8 +236,9 @@ Identity Directory 只返回 ACTIVE tenant、ACTIVE user、ACTIVE membership 的
 Workspace 事件端点要求 `actor_type=SERVICE`、`identity.access-events.publish` 和精确可信 publisher `sub`。消费事务先插入 event receipt，再将同 tenant/subject、创建时间不晚于事件时间的 PENDING/ACTIVE membership 置为 `REVOKED`。重复 event ID 幂等成功，旧事件不影响后来创建的 membership，跨 tenant 不受影响。安全禁用可以让 OWNER 变为 REVOKED 并暂时留下无 ACTIVE OWNER 的 Workspace；这优先于继续放行已禁用账号，恢复/所有权处置必须使用后续专用流程。
 
 当前仍未提供公网注册、找回密码、MFA、租户切换和图形化 client 控制台；只有 tenant-bound
-Client Credentials 的内部生命周期 API 已落地。Directory 与事件 adapter 均默认关闭且不共享
-数据库；完整投递决策见 [ADR-0009](decisions/0009-cross-runtime-access-revocation-delivery.md)。
+Client Credentials 的内部生命周期 API 已落地，PKCE public client 仅存在于自动化测试。
+Directory 与事件 adapter 均默认关闭且不共享数据库；完整投递决策见
+[ADR-0009](decisions/0009-cross-runtime-access-revocation-delivery.md)。
 
 M4.3 的 Authorization Server 在查找人员 authorization 时同时检查 tenant、user、membership 当前状态和同 tenant/subject 最新 access-event 时间。Token `issuedAt` 不晚于最新事件时会被在线视为 inactive；事件发生后签发且当前身份仍 ACTIVE 的 Token 才可继续。该 revocation epoch 利用现有 Identity 事务事实和索引，不新增 Token 表。选择性在线校验只覆盖配置的高风险请求，普通低风险 JWT API 仍存在自然到期窗口，因此不能宣称所有 API 都已强实时全局撤销。
 
@@ -246,4 +265,4 @@ mvn test
 
 Resource Server 的 401/403、可信 claim、伪造身份头以及 Workspace 应用授权测试不依赖 Docker。Identity、JDBC 协议表、Client Credentials 签发与 Workspace tenant SQL 测试使用 PostgreSQL Testcontainers；没有 Docker 时会明确跳过，不会改用 H2。
 
-M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存、inactive 401、在线依赖失败 503、专用 client 与普通 client 隔离、RFC 7009 撤销，以及 Identity epoch 的等于/前后边界。指标边界还要验证无 Token 401，USER/tenant-bound/missing-scope 403，专用 tenantless SERVICE 200，以及业务 Resource Server 关闭时仍不匿名公开。tenant 服务 client 控制面另需验证一次性 secret、scope 白名单、operator/tenant 隔离、蓝绿轮换、退役后新 Token 401、历史 Token introspection inactive 和无 secret 审计。真实 PostgreSQL 和协议 smoke 证据维护在 [`project-status.md`](project-status.md)。
+M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存、inactive 401、在线依赖失败 503、专用 client 与普通 client 隔离、RFC 7009 撤销，以及 Identity epoch 的等于/前后边界。指标边界还要验证无 Token 401，USER/tenant-bound/missing-scope 403，专用 tenantless SERVICE 200，以及业务 Resource Server 关闭时仍不匿名公开。tenant 服务 client 控制面另需验证一次性 secret、scope 白名单、operator/tenant 隔离、蓝绿轮换、退役后新 Token 401、历史 Token introspection inactive 和无 secret 审计。PKCE 门禁必须使用真实 HTTP 会话和 PostgreSQL，覆盖 S256 正反路径、登录 CSRF、授权码重放、redirect URI、人员 claims、无 refresh token 以及协议记录不落凭证。真实 PostgreSQL 和协议 smoke 证据维护在 [`project-status.md`](project-status.md)。

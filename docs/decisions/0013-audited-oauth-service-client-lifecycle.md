@@ -131,7 +131,8 @@ bootstrap 或未来专门流程建立；operator bootstrap 只授予 `oauth.clie
 
 最新完整测试数量记录在 [`project-status.md`](../project-status.md)。未完成项包括 operator 职责分离
 的生产证据、外围响应日志脱敏验证、审计外部副本、平台 client 生命周期、浏览器/OIDC client
-控制面和 Authorization Code + PKCE 端到端。本 ADR 在评审这些边界前保持 Proposed。
+控制面。Authorization Code + PKCE 已由测试专用 public client 完成协议门禁，但不属于本服务
+client 控制面。本 ADR 在评审剩余边界前保持 Proposed。
 
 ## 参考
 
