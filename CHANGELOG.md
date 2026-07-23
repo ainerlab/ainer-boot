@@ -34,6 +34,10 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - `/actuator/prometheus` 只接受无 tenant 的 SERVICE JWT 与 `platform.metrics.read`；关闭业务 Resource Server 也不会匿名公开指标。
 - AI 审计默认不保存 prompt、模型输出、API key 或供应商错误正文。
 
+### Fixed
+
+- 修复 Identity access-event 新记录遗漏 `available_at`，确保状态变化与可领取 outbox 事实可在同一事务写入真实 PostgreSQL。
+
 ### Known limitations
 
 - 当前仍为 `0.1.0-SNAPSHOT` foundation，不是生产就绪发行版。

@@ -86,9 +86,10 @@ metrics Token 不携带 tenant 或业务 scope，secret 只能从 secret store �
 - Resource Server 显式关闭时指标仍拒绝；
 - metrics bootstrap 的固定 scope、无 tenant、短 TTL、幂等和弱 secret 失败关闭；
 - 两个发行物均包含 Prometheus registry，且 exposure 未扩大到其他 endpoint；
-- 完整 `mvn clean test` 的 14 个 Reactor 模块成功：157 个测试，110 个实际通过，47 个因本机无 Docker 明确跳过，0 failure、0 error。
+- macOS Colima/Testcontainers 环境中的完整 Reactor 门禁实际执行全部 PostgreSQL 集成组；
+- Authorization Server 真实 PostgreSQL 协议测试实际验证专用/tenant-bound metrics Token 对 exporter 的 401/403/200，并覆盖 Client Credentials、OIDC discovery、专用 introspection、RFC 7009 与 Identity revocation epoch。
 
-Authorization Server PostgreSQL 协议测试已加入专用/tenant-bound metrics Token 对实际 exporter 的 401/403/200 验证，但本机无 Docker，因此该用例尚未实际执行。未完成项仍包括：Docker 环境中不跳过的 Testcontainers、真实 Prometheus 抓取、多节点容量/故障注入、dashboard/告警路由和旧 client 退役证据。完成前本 ADR 保持 Proposed。
+最新动态测试数量与环境版本记录在 [`project-status.md`](../project-status.md)。未完成项仍包括：独立发布候选环境门禁、真实 Prometheus OAuth2 抓取、多节点容量/故障注入、dashboard/告警路由和旧 client 退役证据。完成前本 ADR 保持 Proposed。
 
 ## 参考
 

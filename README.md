@@ -23,7 +23,7 @@ Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 
 | `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、可选 Directory client、撤销 consumer/SLO、OWNER 恢复与审计运营端点 |
 | `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、受限 introspection/RFC 7009、独立 metrics client、Identity 状态感知、Directory/relay 与 JDBC 协议仓库 |
 
-当前版本已经通过完整 Reactor 测试；M1/M2 曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。M3 至 M4.3 增加 Identity、服务身份、Directory/outbox、Workspace 撤销、双人恢复、审计归档和选择性在线 Token 校验测试；当前机器没有 Docker 时数据库测试会明确跳过。本轮还在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
+当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
 
 ## 架构立场
 

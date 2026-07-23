@@ -44,8 +44,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-import java.time.Instant;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -145,7 +147,8 @@ class IdentityModuleIntegrationTest {
                         + "(id, event_type, tenant_id, subject_id, payload_version, occurred_at, "
                         + "publication_status, attempt_count, available_at) "
                         + "VALUES (?, 'IDENTITY_MEMBERSHIP_REVOKED', ?, ?, 1, ?, 'PENDING', 0, ?)",
-                UUID.randomUUID(), identity.tenantId(), identity.subjectId(), revokedAt, revokedAt);
+                UUID.randomUUID(), identity.tenantId(), identity.subjectId(),
+                databaseTimestamp(revokedAt), databaseTimestamp(revokedAt));
 
         assertThat(tokenStatusService.isAccessTokenActive(
                 identity.tenantId(), identity.subjectId(), revokedAt.minusNanos(1))).isFalse();
@@ -155,9 +158,9 @@ class IdentityModuleIntegrationTest {
                 identity.tenantId(), identity.subjectId(), revokedAt.plusNanos(1))).isTrue();
 
         jdbcTemplate.update(
-                "UPDATE ainer_identity_membership SET status = 'DISABLED', updated_at = ? "
+                "UPDATE ainer_identity_membership SET status = 'DISABLED', updated_at = CURRENT_TIMESTAMP "
                         + "WHERE tenant_id = ? AND user_id = ?",
-                revokedAt.plusSeconds(1), identity.tenantId(), identity.subjectId());
+                identity.tenantId(), identity.subjectId());
         assertThat(tokenStatusService.isAccessTokenActive(
                 identity.tenantId(), identity.subjectId(), revokedAt.plusSeconds(2))).isFalse();
     }
@@ -201,14 +204,17 @@ class IdentityModuleIntegrationTest {
                 .containsEntry("event_type", delivery.event().type().name())
                 .containsEntry("tenant_id", identity.tenantId())
                 .containsEntry("subject_id", identity.subjectId())
-                .containsEntry("payload_version", (short) 1)
                 .containsEntry("publication_status", "PENDING")
                 .containsEntry("attempt_count", 0)
                 .containsEntry("last_error_code", null);
         assertThat(jdbcTemplate.queryForObject(
+                "SELECT payload_version FROM ainer_identity_access_event WHERE id = ?",
+                Integer.class,
+                delivery.event().id())).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
                 "SELECT occurred_at = ? FROM ainer_identity_access_event WHERE id = ?",
                 Boolean.class,
-                occurredAt,
+                databaseTimestamp(occurredAt),
                 delivery.event().id())).isTrue();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ainer_identity_security_operation_audit "
@@ -375,12 +381,12 @@ class IdentityModuleIntegrationTest {
                         + "(id, username, password_hash, display_name, status, created_at, updated_at) "
                         + "VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)",
                 memberId, "member@example.com", passwordEncoder.encode("strong-password-2026"),
-                "Member", now, now);
+                "Member", databaseTimestamp(now), databaseTimestamp(now));
         jdbcTemplate.update(
                 "INSERT INTO ainer_identity_membership "
                         + "(tenant_id, user_id, role, is_default, status, joined_at, updated_at) "
                         + "VALUES (?, ?, 'MEMBER', true, 'ACTIVE', ?, ?)",
-                owner.tenantId(), memberId, now, now);
+                owner.tenantId(), memberId, databaseTimestamp(now), databaseTimestamp(now));
 
         assertThat(lifecycleService.revokeMembership(owner.tenantId(), memberId)).isTrue();
         assertThat(directoryService.findActiveMember(owner.tenantId(), memberId)).isEmpty();
@@ -409,6 +415,10 @@ class IdentityModuleIntegrationTest {
         assertThat(service.findAccountByUsername(identity.username()).orElseThrow().enabled()).isTrue();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ainer_identity_access_event", Integer.class)).isZero();
+    }
+
+    private static OffsetDateTime databaseTimestamp(Instant instant) {
+        return instant.atOffset(ZoneOffset.UTC);
     }
 
     @SpringBootConfiguration

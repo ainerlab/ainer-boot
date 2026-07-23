@@ -63,10 +63,10 @@
     <insert id="insertAccessEvent">
         INSERT INTO ainer_identity_access_event (
             id, event_type, tenant_id, subject_id, payload_version,
-            occurred_at, publication_status, attempt_count
+            occurred_at, publication_status, attempt_count, available_at
         ) VALUES (
             #{id}, #{eventType}, #{tenantId}, #{subjectId}, #{payloadVersion},
-            #{occurredAt}, #{publicationStatus}, #{attemptCount}
+            #{occurredAt}, #{publicationStatus}, #{attemptCount}, #{occurredAt}
         )
     </insert>
 

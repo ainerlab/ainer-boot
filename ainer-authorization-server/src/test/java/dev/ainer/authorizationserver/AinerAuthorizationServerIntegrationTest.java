@@ -30,6 +30,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
@@ -58,8 +59,9 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -144,7 +146,7 @@ class AinerAuthorizationServerIntegrationTest {
 
     @Test
     void migratesIdentityAndOfficialJdbcProtocolStores() {
-        assertThat(flyway.info().applied()).hasSize(4);
+        assertThat(flyway.info().applied()).hasSize(5);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_name IN ('oauth2_registered_client','oauth2_authorization',"
@@ -168,7 +170,7 @@ class AinerAuthorizationServerIntegrationTest {
         assertThat(jwt.getSubject()).isEqualTo(CLIENT_ID);
         assertThat(jwt.getClaimAsString("actor_type")).isEqualTo("SERVICE");
         assertThat(jwt.getClaimAsString("tenant_id")).isEqualTo(TENANT_ID);
-        assertThat(String.valueOf(jwt.getClaim("scope"))).contains("ai.invoke");
+        assertThat(jwt.getClaimAsStringList("scope")).contains("ai.invoke");
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM oauth2_authorization", Integer.class))
                 .isEqualTo(1);
     }
@@ -226,10 +228,10 @@ class AinerAuthorizationServerIntegrationTest {
                 .authorizedScopes(Set.of("workspace.write"))
                 .token(accessToken, metadata -> metadata.put(
                         OAuth2Authorization.Token.CLAIMS_METADATA_NAME,
-                        Map.of(
+                        new LinkedHashMap<>(Map.of(
                                 "actor_type", "USER",
                                 "sub", identity.subjectId().toString(),
-                                "tenant_id", identity.tenantId().toString())))
+                                "tenant_id", identity.tenantId().toString()))))
                 .build();
         authorizationService.save(authorization);
 
@@ -237,6 +239,8 @@ class AinerAuthorizationServerIntegrationTest {
         identityAccessLifecycleService.disableUser(identity.subjectId());
         HttpResponse<String> inactive = introspect(accessToken.getTokenValue(), introspectionClientId);
 
+        assertThat(active.statusCode()).isEqualTo(200);
+        assertThat(inactive.statusCode()).isEqualTo(200);
         assertThat(objectMapper.readTree(active.body()).path("active").booleanValue()).isTrue();
         assertThat(objectMapper.readTree(inactive.body()).path("active").booleanValue()).isFalse();
     }
@@ -449,6 +453,11 @@ class AinerAuthorizationServerIntegrationTest {
                     .keyID("test-key")
                     .build();
             return new ImmutableJWKSet<>(new JWKSet(rsaKey));
+        }
+
+        @Bean
+        JwtEncoder testJwtEncoder(JWKSource<SecurityContext> testJwkSource) {
+            return new NimbusJwtEncoder(testJwkSource);
         }
     }
 }

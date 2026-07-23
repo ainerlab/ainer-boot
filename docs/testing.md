@@ -52,6 +52,18 @@ Surefire XML 报告位于各模块 `target/surefire-reports/`。`target/` 是构
 
 本地迭代允许跳过，但必须在结果中说明。发布候选必须在 Docker 可用环境运行，确认 PostgreSQL 集成测试实际执行；在 CI 尚未自动阻止跳过前，这是人工发布门禁。
 
+macOS 使用 Colima 时，Docker CLI context 本身不会自动成为 Testcontainers 的 socket 配置。先启动运行时，再把实际 Colima socket 和容器内 Docker socket 显式传给 Maven；将示例中的 `your-name` 替换为本机短用户名：
+
+```bash
+colima start --cpu 4 --memory 8 --runtime docker
+
+DOCKER_HOST=unix:///Users/your-name/.colima/default/docker.sock \
+TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock \
+mvn clean test
+```
+
+启动后可用 `colima status` 与 `docker context inspect colima` 核对 runtime 和 socket。最终仍以 Surefire 报告中的 `skipped=0` 为准，不能仅根据 Docker daemon 可访问就宣称数据库测试已执行。
+
 出现 Testcontainers 失败时依次检查：
 
 1. Docker daemon 是否可访问；

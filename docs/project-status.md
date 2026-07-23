@@ -33,15 +33,15 @@ Foundation M4.3 选择性在线 Token 校验工程基线已完成，下一阶段
 
 ## 3. 最近验证证据
 
-2026-07-23 执行完整 `mvn clean test`：14 个 Reactor 模块成功，157 个测试，0 failure，0 error；其中 110 个实际执行通过，47 个 Testcontainers 测试因当前机器没有 Docker 而明确跳过。
+2026-07-23 在 macOS Colima 0.10.3、Docker 29.5.2 与 Testcontainers 2.0.5 环境执行完整 `mvn clean test`：14 个 Reactor 模块成功，157 个测试全部实际执行通过，0 failure、0 error、0 skipped。PostgreSQL 集成组使用 `postgres:18.3-alpine` 从空库启动并执行 Flyway，覆盖 Identity、Workspace、AI runtime 与 Authorization Server。
 
-本轮新增指标安全证据：Resource Server 真实 HTTP 测试覆盖无 Token 401、USER/tenant-bound SERVICE/缺 scope 403、tenantless SERVICE 200，并使用自定义 management base path 证明路径配置不会绕过授权；路径 matcher 还覆盖 context path、尾斜杠和编码路径。业务 Resource Server 显式关闭时，真实 Prometheus endpoint 仍拒绝匿名并且不返回 JVM/process 指标。metrics bootstrap 测试证明只创建 Client Credentials、无 tenant、只有 `platform.metrics.read`、一分钟 Token、无 introspection 标记，重复运行不覆盖且弱 secret 失败关闭。Authorization Server 的真实 PostgreSQL 协议测试已加入专用/tenant-bound metrics Token 与实际 exporter 的 401/403/200 验证，但本机无 Docker，因此该新增协议用例与同组七个用例一并明确跳过。
+本轮新增指标安全证据：Resource Server 真实 HTTP 测试覆盖无 Token 401、USER/tenant-bound SERVICE/缺 scope 403、tenantless SERVICE 200，并使用自定义 management base path 证明路径配置不会绕过授权；路径 matcher 还覆盖 context path、尾斜杠和编码路径。业务 Resource Server 显式关闭时，真实 Prometheus endpoint 仍拒绝匿名并且不返回 JVM/process 指标。metrics bootstrap 测试证明只创建 Client Credentials、无 tenant、只有 `platform.metrics.read`、一分钟 Token、无 introspection 标记，重复运行不覆盖且弱 secret 失败关闭。Authorization Server 的真实 PostgreSQL 协议测试已实际验证专用/tenant-bound metrics Token 与 exporter 的 401/403/200，并同时覆盖 Client Credentials、OIDC discovery、专用 introspection、RFC 7009 与 Identity revocation epoch。
 
 同日使用本机真实 PostgreSQL 18.4 从空库执行 Identity 四份、Workspace 八份全量 migration。除 M4.1 的 outbox 领取/撤销证据外，本轮实际执行了耗尽原事件双人重放事务、REVOKED OWNER 提升新 OWNER 事务、安全操作审计约束，以及授权审计归档 CTE、热冷统一查询和导出审计。原事件内容保持不变，旧 OWNER 保持 REVOKED，归档后热表 0/归档表 3；两个一次性数据库均已删除。loopback HTTP 测试实际验证 Client Credentials Token 获取/缓存和 Bearer 事件发布。
 
 M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份 migration 并实际启动发行物。协议 smoke 证明普通 client introspection 返回 401、专用 client 对新 Token 返回 `active=true`、RFC 7009 revocation 返回 200 且随后 `active=false`。真实 JDBC 往返同时暴露并修复了 Boot 4/Jackson 3 对 JDK 私有不可变 claim 集合的反序列化拒绝。对 5,000 条合成 access event 的 revocation epoch 查询使用 `idx_ainer_identity_access_event_subject` Index Only Scan，实测执行约 0.036 ms；旧/等于 epoch 的 Token inactive，事件后的 Token active，membership 禁用后当前身份 inactive。一次性数据库和 RSA 测试密钥目录均已删除。
 
-该结果证明当前源码基线可构建，且关键 migration 已在真实 PostgreSQL 执行；它不替代 Docker 环境中的完整发布候选测试，也不证明生产容量、备份恢复或高可用。
+该结果证明当前源码基线可构建，且全部自动化 PostgreSQL 集成组已在本地 Docker-compatible runtime 中实际执行；它仍不是独立发布候选环境的证据，也不证明生产容量、备份恢复或高可用。
 
 ## 4. 已知缺口
 
@@ -72,7 +72,7 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 - 没有具名模块维护者矩阵、`CODEOWNERS` 和正式审查责任分配；
 - 没有生产备份恢复、容量测试、正式错误预算/告警路由和灾难恢复演练；
 - 没有稳定版兼容政策、商业许可证文本和付费产品交付系统；
-- Testcontainers 在当前本地机器因 Docker 缺失会跳过。
+- Testcontainers 仍使用 `disabledWithoutDocker`；本机 Colima 已能完整执行，但正式 CI 尚未建立“数据库测试不得跳过”的自动门禁。
 
 ## 5. 下一里程碑
 
