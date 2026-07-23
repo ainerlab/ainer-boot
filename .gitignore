@@ -1,0 +1,21 @@
+.idea/
+.vscode/
+.DS_Store
+target/
+.flattened-pom.xml
+*.iml
+*.log
+
+# Local secrets and private key material
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+application-local.yml
+application-local.yaml
+application-secrets.yml
+application-secrets.yaml

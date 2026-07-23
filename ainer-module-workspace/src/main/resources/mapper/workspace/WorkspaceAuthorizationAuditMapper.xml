@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.workspace.workspace.infrastructure.mybatis.WorkspaceAuthorizationAuditMapper">
+
+    <resultMap id="workspaceAuthorizationAuditRow"
+               type="dev.ainer.module.workspace.workspace.infrastructure.mybatis.WorkspaceAuthorizationAuditRow">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="actorSubjectId" column="actor_subject_id"/>
+        <result property="targetSubjectId" column="target_subject_id"/>
+        <result property="action" column="action"/>
+        <result property="decision" column="decision"/>
+        <result property="reasonCode" column="reason_code"/>
+        <result property="occurredAt" column="occurred_at"/>
+    </resultMap>
+
+    <resultMap id="workspaceAuthorizationAuditOperationalStatusRow"
+               type="dev.ainer.module.workspace.workspace.infrastructure.mybatis.WorkspaceAuthorizationAuditOperationalStatusRow">
+        <result property="hot" column="hot"/>
+        <result property="archived" column="archived"/>
+        <result property="deniedInWindow" column="denied_in_window"/>
+        <result property="ownerlessWorkspaces" column="ownerless_workspaces"/>
+        <result property="oldestHotAt" column="oldest_hot_at"/>
+    </resultMap>
+
+    <insert id="insert">
+        INSERT INTO ainer_workspace_authorization_audit (
+            id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+            action, decision, reason_code, occurred_at
+        ) VALUES (
+            #{id}, #{tenantId}, #{workspaceId}, #{actorSubjectId}, #{targetSubjectId},
+            #{action}, #{decision}, #{reasonCode}, #{occurredAt}
+        )
+    </insert>
+
+    <select id="selectPage" resultMap="workspaceAuthorizationAuditRow">
+        SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+               action, decision, reason_code, occurred_at
+        FROM (
+            SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+                   action, decision, reason_code, occurred_at
+            FROM ainer_workspace_authorization_audit
+            UNION ALL
+            SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+                   action, decision, reason_code, occurred_at
+            FROM ainer_workspace_authorization_audit_archive
+        ) audit
+        WHERE tenant_id = #{tenantId}
+          AND workspace_id = #{workspaceId}
+        ORDER BY occurred_at DESC, id DESC
+        LIMIT #{limit}
+        OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT SUM(total)
+        FROM (
+            SELECT COUNT(*) AS total
+            FROM ainer_workspace_authorization_audit
+            WHERE tenant_id = #{tenantId}
+              AND workspace_id = #{workspaceId}
+            UNION ALL
+            SELECT COUNT(*) AS total
+            FROM ainer_workspace_authorization_audit_archive
+            WHERE tenant_id = #{tenantId}
+              AND workspace_id = #{workspaceId}
+        ) counts
+    </select>
+
+    <delete id="archiveBefore">
+        WITH candidates AS MATERIALIZED (
+            SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+                   action, decision, reason_code, occurred_at
+            FROM ainer_workspace_authorization_audit
+            WHERE occurred_at &lt; #{cutoff}
+            ORDER BY occurred_at, id
+            LIMIT #{limit}
+            FOR UPDATE SKIP LOCKED
+        ), archived AS (
+            INSERT INTO ainer_workspace_authorization_audit_archive (
+                id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+                action, decision, reason_code, occurred_at, archived_at
+            )
+            SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+                   action, decision, reason_code, occurred_at, #{archivedAt}
+            FROM candidates
+            ON CONFLICT (id) DO NOTHING
+            RETURNING id
+        )
+        DELETE FROM ainer_workspace_authorization_audit hot
+        USING candidates
+        WHERE hot.id = candidates.id
+          AND (
+              EXISTS (SELECT 1 FROM archived WHERE archived.id = hot.id)
+              OR EXISTS (
+                  SELECT 1
+                  FROM ainer_workspace_authorization_audit_archive archive
+                  WHERE archive.id = hot.id
+              )
+          )
+    </delete>
+
+    <select id="exportAfter" resultMap="workspaceAuthorizationAuditRow">
+        SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+               action, decision, reason_code, occurred_at
+        FROM (
+            SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+                   action, decision, reason_code, occurred_at
+            FROM ainer_workspace_authorization_audit
+            UNION ALL
+            SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+                   action, decision, reason_code, occurred_at
+            FROM ainer_workspace_authorization_audit_archive
+        ) audit
+        WHERE tenant_id = #{tenantId}
+        <if test="afterOccurredAt != null and afterId != null">
+          AND (occurred_at, id) &gt; (#{afterOccurredAt}, #{afterId})
+        </if>
+        ORDER BY occurred_at, id
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectOperationalStatus" resultMap="workspaceAuthorizationAuditOperationalStatusRow">
+        SELECT
+            (SELECT COUNT(*) FROM ainer_workspace_authorization_audit) AS hot,
+            (SELECT COUNT(*) FROM ainer_workspace_authorization_audit_archive) AS archived,
+            (
+                SELECT COUNT(*)
+                FROM (
+                    SELECT decision, occurred_at FROM ainer_workspace_authorization_audit
+                    UNION ALL
+                    SELECT decision, occurred_at FROM ainer_workspace_authorization_audit_archive
+                ) decisions
+                WHERE decision = 'DENIED'
+                  AND occurred_at &gt;= #{deniedSince}
+            ) AS denied_in_window,
+            (
+                SELECT COUNT(*)
+                FROM ainer_workspace workspace
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM ainer_workspace_member member
+                    WHERE member.tenant_id = workspace.tenant_id
+                      AND member.workspace_id = workspace.id
+                      AND member.role = 'OWNER'
+                      AND member.status = 'ACTIVE'
+                )
+            ) AS ownerless_workspaces,
+            (SELECT MIN(occurred_at) FROM ainer_workspace_authorization_audit) AS oldest_hot_at
+    </select>
+</mapper>

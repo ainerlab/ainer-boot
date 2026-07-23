@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: ainer-authorization-server
+  main:
+    allow-circular-references: false
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+server:
+  port: ${AINER_AUTHORIZATION_SERVER_PORT:9000}
+  shutdown: graceful
+
+ainer:
+  identity:
+    enabled: true
+    directory-api:
+      enabled: ${AINER_IDENTITY_DIRECTORY_API_ENABLED:false}
+    access-event-relay:
+      enabled: ${AINER_IDENTITY_ACCESS_EVENT_RELAY_ENABLED:false}
+      workspace-base-url: ${AINER_IDENTITY_ACCESS_EVENT_WORKSPACE_BASE_URL:}
+      token-uri: ${AINER_IDENTITY_ACCESS_EVENT_TOKEN_URI:}
+      client-id: ${AINER_IDENTITY_ACCESS_EVENT_CLIENT_ID:}
+      client-secret: ${AINER_IDENTITY_ACCESS_EVENT_CLIENT_SECRET:}
+      scope: ${AINER_IDENTITY_ACCESS_EVENT_SCOPE:identity.access-events.publish}
+      allow-insecure-http: ${AINER_IDENTITY_ACCESS_EVENT_ALLOW_INSECURE_HTTP:false}
+      fixed-delay: ${AINER_IDENTITY_ACCESS_EVENT_FIXED_DELAY:5s}
+      lease-duration: ${AINER_IDENTITY_ACCESS_EVENT_LEASE_DURATION:30s}
+      retry-delay: ${AINER_IDENTITY_ACCESS_EVENT_RETRY_DELAY:30s}
+      max-attempts: ${AINER_IDENTITY_ACCESS_EVENT_MAX_ATTEMPTS:10}
+      batch-size: ${AINER_IDENTITY_ACCESS_EVENT_BATCH_SIZE:50}
+    access-event-recovery:
+      enabled: ${AINER_IDENTITY_ACCESS_EVENT_RECOVERY_ENABLED:false}
+      approval-ttl: ${AINER_IDENTITY_ACCESS_EVENT_RECOVERY_APPROVAL_TTL:15m}
+      max-attempts: ${AINER_IDENTITY_ACCESS_EVENT_MAX_ATTEMPTS:10}
+  security:
+    authorization-server:
+      issuer: ${AINER_AUTHORIZATION_SERVER_ISSUER:}
+      audience: ${AINER_AUTHORIZATION_SERVER_AUDIENCE:ainer-api}
+      signing-key:
+        key-id: ${AINER_AUTHORIZATION_SIGNING_KEY_ID:}
+        private-key-location: ${AINER_AUTHORIZATION_PRIVATE_KEY_LOCATION:}
+        public-key-location: ${AINER_AUTHORIZATION_PUBLIC_KEY_LOCATION:}
+      machine-client-bootstrap:
+        enabled: ${AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_ENABLED:false}
+        client-id: ${AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_CLIENT_ID:}
+        client-secret: ${AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_CLIENT_SECRET:}
+        tenant-id: ${AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_TENANT_ID:}
+        scopes: ${AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_SCOPES:ai.invoke}
+      introspection-client-bootstrap:
+        enabled: ${AINER_AUTHORIZATION_BOOTSTRAP_INTROSPECTION_ENABLED:false}
+        client-id: ${AINER_AUTHORIZATION_BOOTSTRAP_INTROSPECTION_CLIENT_ID:}
+        client-secret: ${AINER_AUTHORIZATION_BOOTSTRAP_INTROSPECTION_CLIENT_SECRET:}
+
+mybatis:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

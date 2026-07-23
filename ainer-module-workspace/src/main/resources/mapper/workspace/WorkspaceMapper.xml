@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.workspace.workspace.infrastructure.mybatis.WorkspaceMapper">
+
+    <resultMap id="workspaceRow" type="dev.ainer.module.workspace.workspace.infrastructure.mybatis.WorkspaceRow">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="name" column="name"/>
+        <result property="version" column="version"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <insert id="insert">
+        INSERT INTO ainer_workspace (id, tenant_id, name, version, created_at, updated_at)
+        VALUES (#{id}, #{tenantId}, #{name}, #{version}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="updateName">
+        UPDATE ainer_workspace
+        SET name = #{name},
+            version = version + 1,
+            updated_at = #{updatedAt}
+        WHERE tenant_id = #{tenantId}
+          AND id = #{id}
+          AND version = #{expectedVersion}
+    </update>
+
+    <select id="selectById" resultMap="workspaceRow">
+        SELECT id, tenant_id, name, version, created_at, updated_at
+        FROM ainer_workspace
+        WHERE tenant_id = #{tenantId}
+          AND id = #{id}
+    </select>
+
+    <select id="selectByIdForUpdate" resultMap="workspaceRow">
+        SELECT id, tenant_id, name, version, created_at, updated_at
+        FROM ainer_workspace
+        WHERE tenant_id = #{tenantId}
+          AND id = #{id}
+        FOR UPDATE
+    </select>
+
+    <select id="selectPage" resultMap="workspaceRow">
+        SELECT workspace.id,
+               workspace.tenant_id,
+               workspace.name,
+               workspace.version,
+               workspace.created_at,
+               workspace.updated_at
+        FROM ainer_workspace workspace
+        INNER JOIN ainer_workspace_member member
+                ON member.tenant_id = workspace.tenant_id
+               AND member.workspace_id = workspace.id
+        WHERE workspace.tenant_id = #{tenantId}
+          AND member.subject_id = #{subjectId}
+          AND member.status = 'ACTIVE'
+        ORDER BY workspace.created_at DESC, workspace.id DESC
+        LIMIT #{limit}
+        OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM ainer_workspace workspace
+        INNER JOIN ainer_workspace_member member
+                ON member.tenant_id = workspace.tenant_id
+               AND member.workspace_id = workspace.id
+        WHERE workspace.tenant_id = #{tenantId}
+          AND member.subject_id = #{subjectId}
+          AND member.status = 'ACTIVE'
+    </select>
+</mapper>

@@ -1,0 +1,96 @@
+spring:
+  application:
+    name: ainer-server
+  main:
+    allow-circular-references: false
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AINER_SECURITY_ISSUER_URI:}
+          audiences: ${AINER_SECURITY_AUDIENCES:ainer-api}
+
+server:
+  shutdown: graceful
+
+ainer:
+  runtime:
+    mode: monolith
+  workspace:
+    enabled: ${AINER_WORKSPACE_ENABLED:true}
+    owner-recovery:
+      enabled: ${AINER_WORKSPACE_OWNER_RECOVERY_ENABLED:false}
+      approval-ttl: ${AINER_WORKSPACE_OWNER_RECOVERY_APPROVAL_TTL:15m}
+    authorization-audit-retention:
+      enabled: ${AINER_WORKSPACE_AUDIT_RETENTION_ENABLED:false}
+      hot-retention: ${AINER_WORKSPACE_AUDIT_HOT_RETENTION:90d}
+      fixed-delay: ${AINER_WORKSPACE_AUDIT_RETENTION_FIXED_DELAY:5m}
+      denied-window: ${AINER_WORKSPACE_AUDIT_DENIED_WINDOW:5m}
+      batch-size: ${AINER_WORKSPACE_AUDIT_ARCHIVE_BATCH_SIZE:500}
+    authorization-audit-export:
+      enabled: ${AINER_WORKSPACE_AUDIT_EXPORT_ENABLED:false}
+      trusted-exporter-subject: ${AINER_WORKSPACE_AUDIT_TRUSTED_EXPORTER:}
+    access-event-consumer:
+      enabled: ${AINER_WORKSPACE_ACCESS_EVENT_CONSUMER_ENABLED:false}
+      trusted-publisher-subject: ${AINER_WORKSPACE_ACCESS_EVENT_TRUSTED_PUBLISHER:}
+      max-future-skew: ${AINER_WORKSPACE_ACCESS_EVENT_MAX_FUTURE_SKEW:5m}
+      propagation-slo: ${AINER_WORKSPACE_ACCESS_EVENT_PROPAGATION_SLO:60s}
+  identity:
+    directory-client:
+      enabled: ${AINER_IDENTITY_DIRECTORY_CLIENT_ENABLED:false}
+      base-url: ${AINER_IDENTITY_DIRECTORY_BASE_URL:}
+      token-uri: ${AINER_IDENTITY_DIRECTORY_TOKEN_URI:}
+      client-id: ${AINER_IDENTITY_DIRECTORY_CLIENT_ID:}
+      client-secret: ${AINER_IDENTITY_DIRECTORY_CLIENT_SECRET:}
+      scope: ${AINER_IDENTITY_DIRECTORY_SCOPE:identity.directory.read.all}
+      allow-insecure-http: ${AINER_IDENTITY_DIRECTORY_ALLOW_INSECURE_HTTP:false}
+  security:
+    resource-server:
+      enabled: ${AINER_SECURITY_RESOURCE_SERVER_ENABLED:true}
+      online-validation:
+        enabled: ${AINER_SECURITY_ONLINE_VALIDATION_ENABLED:false}
+        introspection-uri: ${AINER_SECURITY_ONLINE_VALIDATION_INTROSPECTION_URI:}
+        client-id: ${AINER_SECURITY_ONLINE_VALIDATION_CLIENT_ID:}
+        client-secret: ${AINER_SECURITY_ONLINE_VALIDATION_CLIENT_SECRET:}
+        connect-timeout: ${AINER_SECURITY_ONLINE_VALIDATION_CONNECT_TIMEOUT:2s}
+        read-timeout: ${AINER_SECURITY_ONLINE_VALIDATION_READ_TIMEOUT:2s}
+        allow-insecure-http: ${AINER_SECURITY_ONLINE_VALIDATION_ALLOW_INSECURE_HTTP:false}
+        always-protected-paths: ${AINER_SECURITY_ONLINE_VALIDATION_ALWAYS_PATHS:/internal/**,/api/workspaces/*/authorization-audits}
+        mutating-protected-paths: ${AINER_SECURITY_ONLINE_VALIDATION_MUTATING_PATHS:/api/workspaces/**,/api/ai/**}
+        mutating-methods: ${AINER_SECURITY_ONLINE_VALIDATION_MUTATING_METHODS:POST,PUT,PATCH,DELETE}
+  ai:
+    enabled: ${AINER_AI_ENABLED:false}
+    provider:
+      name: ${AINER_AI_PROVIDER_NAME:openai-compatible}
+      base-url: ${AINER_AI_BASE_URL:}
+      api-key: ${AINER_AI_API_KEY:}
+      default-model: ${AINER_AI_DEFAULT_MODEL:}
+      allowed-models: ${AINER_AI_ALLOWED_MODELS:}
+      connect-timeout: ${AINER_AI_CONNECT_TIMEOUT:5s}
+      request-timeout: ${AINER_AI_REQUEST_TIMEOUT:60s}
+      allow-insecure-http: ${AINER_AI_ALLOW_INSECURE_HTTP:false}
+    limits:
+      requests-per-minute: ${AINER_AI_REQUESTS_PER_MINUTE:60}
+      tenant-daily-budget: ${AINER_AI_TENANT_DAILY_BUDGET:10.00}
+      max-prompt-characters: ${AINER_AI_MAX_PROMPT_CHARACTERS:100000}
+    pricing:
+      currency: ${AINER_AI_CURRENCY:USD}
+      input-per-million-tokens: ${AINER_AI_INPUT_PER_MILLION_TOKENS:0}
+      output-per-million-tokens: ${AINER_AI_OUTPUT_PER_MILLION_TOKENS:0}
+
+mybatis:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

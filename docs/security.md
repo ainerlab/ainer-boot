@@ -1,0 +1,195 @@
+# Ainer Identity 与 OAuth 2.1 使用基线
+
+> 适用版本：M4.3 selective online token validation · 2026-07-23
+
+## 1. 已落地边界
+
+Ainer 使用两个独立运行时：
+
+- `ainer-server`：OAuth 2.0 Resource Server，验证 Bearer JWT 的签名、issuer、有效期和 audience；
+- `ainer-authorization-server`：基于 Spring Security 7.1 Authorization Server 的 OAuth 2.1 / OIDC 签发服务。
+
+业务模块只依赖 `AuthenticatedActor`。`sub` 投影为主体，`tenant_id` 投影为当前租户，scope 按 Spring Security 规则成为 `SCOPE_*` authority。AI API 要求 `SCOPE_ai.invoke`；Workspace 读取和写入分别要求 `SCOPE_workspace.read`、`SCOPE_workspace.write`，并继续检查数据库资源角色。外部传入的 `X-Ainer-Tenant-Id`、`X-Ainer-Subject-Id` 不再参与身份解析。
+
+Client Credentials access token 额外携带 `actor_type=SERVICE`，人员 access token 携带 `actor_type=USER`。内部 Directory 与撤销事件端点不仅检查 scope，还强制 `SERVICE`，防止人员 Token 因误授 scope 进入服务控制面。
+
+Identity PostgreSQL 模型包含用户、租户和成员关系。OAuth registered client、authorization 与 consent 使用 Spring Security 官方 JDBC repository 和独立协议表；Ainer 不创建自研 Token 表。
+
+## 2. Resource Server
+
+`ainer-server` 默认开启安全。至少提供：
+
+```bash
+export AINER_SECURITY_ISSUER_URI=https://auth.example.com
+export AINER_SECURITY_AUDIENCES=ainer-api
+```
+
+issuer 可以是 Ainer Authorization Server，也可以是兼容 OIDC 的企业身份源。启用安全但没有可用 `JwtDecoder` 时应用必须启动失败。只有隔离的本机开发/自动化测试才可显式设置：
+
+```bash
+export AINER_SECURITY_RESOURCE_SERVER_ENABLED=false
+```
+
+关闭 Ainer Resource Server 后，starter 会提供明确的 permit-all 链，避免 Spring Boot 因 Security 位于 classpath 而生成随机密码和 Basic Login。生产发行配置不得关闭；依赖 `AuthenticatedActor` 的 Workspace/AI 能力也不得借此获得匿名回退身份。
+
+AI 请求示例：
+
+```bash
+curl -i -X POST http://127.0.0.1:8080/api/ai/chat/completions \
+  -H "Authorization: Bearer ${AINER_ACCESS_TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"USER","content":"介绍 Ainer"}]}'
+```
+
+Token 缺失或无效返回 401；Token 已验证但缺少合法 `tenant_id` 或 `ai.invoke` scope 返回 403。两类响应都使用 Ainer `ApiResponse` 并携带 request ID。
+
+### 2.1 高风险请求在线校验
+
+M4.3 保留 JWT 本地签名、issuer、audience 和时间校验，并在认证成功后对高风险请求追加 RFC 7662 introspection。默认规则是：
+
+- 所有 `/internal/**`；
+- Workspace 授权审计读取；
+- `/api/workspaces/**` 与 `/api/ai/**` 的 `POST`、`PUT`、`PATCH`、`DELETE`。
+
+普通读取继续只做本地 JWT 校验。在线校验默认关闭；启用示例：
+
+```bash
+export AINER_SECURITY_ONLINE_VALIDATION_ENABLED=true
+export AINER_SECURITY_ONLINE_VALIDATION_INTROSPECTION_URI=https://auth.example.com/oauth2/introspect
+export AINER_SECURITY_ONLINE_VALIDATION_CLIENT_ID=ainer-resource-introspection
+export AINER_SECURITY_ONLINE_VALIDATION_CLIENT_SECRET='use-secret-injection'
+```
+
+每次匹配请求都在线查询，不缓存 `active=true`。inactive 统一返回 401，不暴露不存在、过期或撤销原因；连接超时、凭据错误或响应不可解析返回 503 `AINER.SECURITY.ONLINE_VALIDATION_UNAVAILABLE`，不得退回仅凭 JWT 放行。在线结果只决定当前请求是否继续，业务层仍使用原 JWT 投影的 `AuthenticatedActor`。
+
+生产 introspection URI 必须 HTTPS；HTTP 例外只允许显式开启后的 loopback 测试。路径、方法、连接与读取超时可配置，完整键见 [`configuration.md`](configuration.md)，上线顺序与回滚约束见 [`operations.md`](operations.md)。完整决策见 [ADR-0011](decisions/0011-selective-online-token-validation.md)。
+
+## 3. Workspace 资源授权
+
+Workspace 使用“能力 scope + 资源关系”双层授权：
+
+| 操作 | 必需 scope | 资源角色 |
+|---|---|---|
+| 创建 Workspace | `workspace.write` | 创建者自动成为 OWNER |
+| 查询详情、分页 | `workspace.read` | OWNER / ADMIN / MEMBER |
+| 重命名、邀请、角色变更、移除 | `workspace.write` | OWNER / ADMIN |
+| 接受本人邀请 | `workspace.read` | 同 tenant 且 `sub` 等于受邀主体 |
+| 转移所有权 | `workspace.write` | 当前 OWNER，目标必须是 ACTIVE 成员 |
+
+HTTP 创建请求只有 `name`，tenant 和 owner 由 JWT 的 `tenant_id` / `sub` 产生。通用成员接口只能邀请 ADMIN 或 MEMBER，邀请初始为 `PENDING`，不产生任何资源访问权。受邀主体必须使用同 tenant 且 `sub` 与邀请目标一致的已验证 token 接受，才会变为 `ACTIVE`。这复用可信 Identity Provider 的主体证明，同时避免 Workspace 读取 Identity 私有表。
+
+角色变更只能在 ADMIN/MEMBER 之间进行；移除非 OWNER 成员会立即撤销后续访问。所有权只能由当前 OWNER 通过专用事务转移：事务先锁定 Workspace，把旧 OWNER 降为 ADMIN，再提升一个 ACTIVE 成员；部分唯一索引保证最多一个 ACTIVE OWNER。跨租户或非 ACTIVE 成员访问返回 404，已经是 ACTIVE 成员但角色不足返回 403。
+
+创建、改名、邀请、接受、角色变化、移除、所有权转移的允许决策，以及资源授权拒绝，都会记录 actor、target、tenant、Workspace、action、decision、稳定 reason code 和时间。审计使用独立事务且不外键关联 Workspace；受保护写操作不能在审计失败时继续。普通成功读取不逐条审计，避免在当前阶段制造无界访问日志。
+
+审计查询使用 `workspace.audit.read` scope，并继续要求查询者是目标 Workspace 的 ACTIVE OWNER/ADMIN。查询 SQL 同时绑定 tenant 与 workspace，按时间和 UUID 稳定倒序分页；成功或拒绝读取审计的决策也进入审计。M4.2 的后台任务可将超过热保留期的记录在同一业务库内原子迁移到归档表，普通查询仍统一读取热表与归档表。默认关闭的 SIEM 拉取端点使用 `(occurredAt, id)` 游标，并为每批导出追加安全操作审计。
+
+每个 Workspace SQL 都显式绑定 tenant；成员分页同时绑定 subject 和 `ACTIVE` 状态。完整设计见 [ADR-0006](decisions/0006-workspace-tenant-authorization-baseline.md) 与 [ADR-0007](decisions/0007-workspace-membership-lifecycle-and-audit.md)。PostgreSQL RLS 仍是未来纵深防御选项，当前不能把尚未验证的连接池租户会话当作安全边界。
+
+## 4. Authorization Server
+
+Authorization Server 使用独立 PostgreSQL 数据库或独立 schema 所属权。启动前配置 datasource、HTTPS issuer 与 RSA 签名密钥：
+
+```bash
+export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/ainer_auth
+export SPRING_DATASOURCE_USERNAME=ainer_auth
+export SPRING_DATASOURCE_PASSWORD='use-secret-injection'
+export AINER_AUTHORIZATION_SERVER_ISSUER=https://auth.example.com
+export AINER_AUTHORIZATION_SERVER_AUDIENCE=ainer-api
+export AINER_AUTHORIZATION_SIGNING_KEY_ID=ainer-signing-2026-01
+export AINER_AUTHORIZATION_PRIVATE_KEY_LOCATION=file:/run/secrets/ainer-private.pem
+export AINER_AUTHORIZATION_PUBLIC_KEY_LOCATION=file:/run/secrets/ainer-public.pem
+
+mvn -pl ainer-authorization-server -am spring-boot:run
+```
+
+私钥必须是 PKCS#8 PEM，公钥必须是 X.509 SubjectPublicKeyInfo PEM。开发环境可生成：
+
+```bash
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out ainer-private.pem
+openssl pkey -in ainer-private.pem -pubout -out ainer-public.pem
+```
+
+密钥文件不得提交。生产环境应由 secret manager 挂载只读文件，并建立双 key 发布、旧 Token 验证窗口和定期轮换流程；当前最小装配加载一对 RSA key，不等同于完整 KMS 生命周期。
+
+Flyway 会创建 Identity 表和 Spring Security JDBC 协议表。应用没有默认管理员、默认用户、默认 client 或默认 secret，空库启动后不会凭空获得可用凭证。
+
+## 5. 显式 Client 引导
+
+### 5.1 业务机器 Client
+
+为了让全新环境完成第一条 Client Credentials 链路，提供一次性、默认关闭的机器 client 引导：
+
+```bash
+export AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_ENABLED=true
+export AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_CLIENT_ID=ainer-local-agent
+export AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_CLIENT_SECRET='at-least-24-characters-secret'
+export AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_TENANT_ID=tenant:local
+export AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_SCOPES=ai.invoke,workspace.read,workspace.write
+```
+
+首次启动会用 delegating password encoder 保存 secret 哈希，并创建仅支持 `client_credentials` 的 client；同一 `client_id` 再次启动不会覆盖或轮换 secret。成功后立即从运行环境移除 bootstrap 开关和明文 secret。正式控制台落地后，应通过有审计的 client 管理用例替代一次性引导。
+
+获取 Token：
+
+```bash
+curl -u 'ainer-local-agent:at-least-24-characters-secret' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=client_credentials&scope=ai.invoke' \
+  https://auth.example.com/oauth2/token
+```
+
+### 5.2 在线校验专用 Client
+
+Resource Server 必须使用独立 introspection client。它不绑定 tenant、不携带业务 scope，只拥有 `token.introspect`，并在 registered client settings 中显式标记 `ainer.introspection-allowed=true`。普通机器 client 即使拥有有效 secret 也会从 `/oauth2/introspect` 得到协议级 401 `invalid_client`。
+
+受控初始化窗口可以启用独立 bootstrap：
+
+```bash
+export AINER_AUTHORIZATION_BOOTSTRAP_INTROSPECTION_ENABLED=true
+export AINER_AUTHORIZATION_BOOTSTRAP_INTROSPECTION_CLIENT_ID=ainer-resource-introspection
+export AINER_AUTHORIZATION_BOOTSTRAP_INTROSPECTION_CLIENT_SECRET='at-least-24-characters-secret'
+```
+
+初始化完成后立即移除开关和明文 secret。不得用普通 machine bootstrap 建立该 client，也不得给它增加 tenant 或业务 scope。RFC 7009 `/oauth2/revoke` 继续使用 Spring Authorization Server 官方授权元数据；M4.3 没有创建自研 Token 表。
+
+## 6. 浏览器与人员身份
+
+协议装配支持 Authorization Code、PKCE、Refresh Token、Client Credentials 与 OIDC；实际可用授权类型仍由 registered client 白名单决定。禁止配置 password grant。
+
+人员账号由 `ainer-module-identity` 保存 delegating password hash、状态和唯一默认租户。Authorization Server 的 `UserDetailsService` 从该端口加载账号，签发时把稳定 UUID 写入 `sub`，把默认租户写入 `tenant_id`，并把成员角色写入 `roles`。
+
+Identity Directory 只返回 ACTIVE tenant、ACTIVE user、ACTIVE membership 的 tenant、subject、username、display name 和 role，不返回密码哈希、账号锁定细节或 OAuth 协议数据。默认关闭的 HTTP adapter 要求服务 JWT：`identity.directory.read` 只能查询 Token `tenant_id`，`identity.directory.read.all` 才能选择路径中的任意 tenant。人员 Token 即使误含 scope 也会被拒绝。`ainer-server` 可选 Directory client 使用 OAuth 2.0 Client Credentials，在启用时于创建 Workspace 邀请前验证目标是 ACTIVE Directory member；404 拒绝邀请，身份或传输故障按 503 关闭失败。
+
+账号禁用会阻止后续人员 token 签发，非 OWNER tenant membership 可以被撤销。每次实际状态变化与 `ainer_identity_access_event` outbox 在同一事务提交；事件只保存 tenant、subject、类型、版本和时间。relay 通过短事务使用 `FOR UPDATE SKIP LOCKED` 领取并提交 lease，随后在事务外通过 HTTPS + Client Credentials 投递；成功或失败确认使用 event ID 与 lease owner 条件更新。
+
+Workspace 事件端点要求 `actor_type=SERVICE`、`identity.access-events.publish` 和精确可信 publisher `sub`。消费事务先插入 event receipt，再将同 tenant/subject、创建时间不晚于事件时间的 PENDING/ACTIVE membership 置为 `REVOKED`。重复 event ID 幂等成功，旧事件不影响后来创建的 membership，跨 tenant 不受影响。安全禁用可以让 OWNER 变为 REVOKED 并暂时留下无 ACTIVE OWNER 的 Workspace；这优先于继续放行已禁用账号，恢复/所有权处置必须使用后续专用流程。
+
+当前仍未提供公网注册、找回密码、MFA、租户切换和 client 控制台。Directory 与事件 adapter 均默认关闭且不共享数据库；完整投递决策见 [ADR-0009](decisions/0009-cross-runtime-access-revocation-delivery.md)。
+
+M4.3 的 Authorization Server 在查找人员 authorization 时同时检查 tenant、user、membership 当前状态和同 tenant/subject 最新 access-event 时间。Token `issuedAt` 不晚于最新事件时会被在线视为 inactive；事件发生后签发且当前身份仍 ACTIVE 的 Token 才可继续。该 revocation epoch 利用现有 Identity 事务事实和索引，不新增 Token 表。选择性在线校验只覆盖配置的高风险请求，普通低风险 JWT API 仍存在自然到期窗口，因此不能宣称所有 API 都已强实时全局撤销。
+
+## 7. 安全运维控制面
+
+Identity 耗尽事件重放与 Workspace OWNER 恢复是默认关闭的高风险能力。两者都采用短时两阶段流程：一个 SERVICE JWT 主体持有 request scope 建立申请，另一个 `sub` 不同的 SERVICE JWT 主体持有 approve scope 审批并在同一事务内执行。默认有效期为 15 分钟，tenant-bound scope 只能操作 Token 中的 tenant，只有显式 `.all` scope 允许跨 tenant。
+
+必须把 request 与 approve scope 授予不同的 Client Credentials client，并由不同责任人保管凭据。代码中的 `sub` 不同检查只是技术底线，不会自动建立组织上的职责分离。`incidentReference` 只接受受限安全标识，不得填写 Token、密码、客户正文或自由文本故障细节。
+
+Identity 只重置仍属于 `PENDING`/`FAILED`、无有效 lease 且已达最大尝试数的原事件。原 event ID、tenant、subject、类型、版本和发生时间保持不变，仅清理 lease/错误并恢复为可领取状态；因此下游 receipt 幂等语义仍有效。
+
+OWNER 恢复只在 Workspace 无 ACTIVE OWNER、至少有一个 REVOKED OWNER，且目标是同 tenant/Workspace 的 ACTIVE 非 OWNER 成员时可执行。审批事务会锁定 Workspace 并重新检查条件；旧的 REVOKED OWNER 保持 REVOKED，不会因恢复流程重新获得访问权。
+
+申请和成功执行阶段写入模块所属数据库的安全操作审计。当前的同库归档不是 WORM、数字签名或法律意义的不可抵赖；生产发行仍需要独立权限域、对象锁或等价不可变副本。完整决策见 [ADR-0010](decisions/0010-security-operations-and-audit-lifecycle.md)。
+
+## 8. 验证
+
+```bash
+mvn -pl ainer-framework/ainer-starter-security -am test
+mvn -pl ainer-authorization-server -am test
+mvn -pl ainer-module-workspace -am test
+mvn test
+```
+
+Resource Server 的 401/403、可信 claim、伪造身份头以及 Workspace 应用授权测试不依赖 Docker。Identity、JDBC 协议表、Client Credentials 签发与 Workspace tenant SQL 测试使用 PostgreSQL Testcontainers；没有 Docker 时会明确跳过，不会改用 H2。
+
+M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存、inactive 401、在线依赖失败 503、专用 client 与普通 client 隔离、RFC 7009 撤销，以及 Identity epoch 的等于/前后边界。真实 PostgreSQL 和协议 smoke 证据维护在 [`project-status.md`](project-status.md)。

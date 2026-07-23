@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.workspace.workspace.infrastructure.mybatis.WorkspaceSecurityOperationAuditMapper">
+    <insert id="insert">
+        INSERT INTO ainer_workspace_security_operation_audit (
+            id, operation_id, tenant_id, workspace_id, target_subject_id,
+            operation_type, phase, actor_service_id, incident_reference,
+            record_count, occurred_at
+        ) VALUES (
+            #{id}, #{operationId}, #{tenantId}, #{workspaceId}, #{targetSubjectId},
+            #{operationType}, #{phase}, #{actorServiceId}, #{incidentReference},
+            #{recordCount}, #{occurredAt}
+        )
+    </insert>
+</mapper>

@@ -1,461 +1,152 @@
-# Aurora 工程约定
+# Ainer 工程约定
 
-> 状态:**DRAFT v0.2** · 日期:2026-07-22
-> 适用范围:aurora-boot 全工程(framework + module + server)
-> 文档骨架借鉴 BladeX-Tool/CLAUDE.md(章节组织)
-> **范式立场**:不预设继承 yudao,主动改 7 缺陷(见 `design/paradigm-redesign.md`)
-> 协作语言:**中文**
-> ⚠️ 注:§3-§5 的部分代码示例仍沿用旧命名(UserDO/SaveReqVO 等),将随阶段 2 代码落地一并改为新命名(Entity/CreateReq 等)。**规则以 §2 命名规范和 `paradigm-redesign.md` 为准。**
+> 适用状态：M4.3 selective online token validation
 
----
+## 1. 基本原则
 
-## 0. 协作准则
+- 先形成可测试的最小闭环，再抽象 Starter。
+- 业务代码按 feature 聚合，不建立全局 controller/service/repository 巨型目录。
+- 依赖只能指向更稳定的层；framework 不能依赖业务。
+- 使用构造器注入，禁止字段注入和跨模块 Service 互注。
+- 循环依赖是设计错误，`allow-circular-references=false`。
 
-1. **范式立场优先**:本工程**不预设继承 yudao**,主动改掉 yudao 7 缺陷(循环依赖/数据权限粗/token 自造/命名分层乱/模块边界不清/错误码/异常处理)。写代码前必读 `design/paradigm-redesign.md`。
-2. **模仿优先**:编写新功能前,先读现有同类代码,复用既有抽象(BaseEntity/BaseMapperX/CommonResult/XxxApi)。
-3. **最小改动**:重构与功能新增分离,一个 PR 不做两件事。
-4. **Boot4 纪律**:符合 Boot4+JDK25 适配(见 `boot4-migration-notes.md`),禁止 javax.*(除 JDK 内置)、禁止 spring.factories 自动装配。
+## 2. Java 与构建
 
----
+- JDK 25，Maven 3.9+；根 POM 使用 Enforcer 校验。
+- 使用 `maven.compiler.release=25` 和 `-parameters`。
+- 生产代码使用 `jakarta.*`；仅 JDK 自带处理器 API 保留 `javax.*`。
+- 子模块依赖不写版本，统一由 `ainer-dependencies` 管理。
+- 使用 `${revision}` 的子模块通过 Flatten Maven Plugin 发布可消费 POM；`install` 后的 POM 不得残留未解析 `${revision}`。
+- `ainer-core` 禁止出现 Spring、Servlet、ORM、Jackson 注解依赖。
 
-## 1. 工程定位与架构
+## 3. 包与类型命名
 
-### 1.1 工程性质
+框架：
 
-- **framework 层**(`aurora-framework/`):提供 starter,是"基础设施提供者",不含业务 CRUD。**core→spring 分层**(吸收 dante-engine)。
-- **业务层**(`aurora-module-*/`):**kernel vs business 分离**(缺陷5)。`module-kernel` 只放纯技术,业务模块各自独立。
-- **启动层**(`aurora-server/`):空壳,靠 pom 依赖决定启动范围。
-
-### 1.2 核心理解要点(必须记住)
-
-1. **BOM 管版本**:`aurora-dependencies` 是唯一版本源,子模块 pom **禁止写版本号**。
-2. **core 是最底层**:`aurora-core` 零 Spring 依赖;`aurora-common` 不反向依赖业务模块;跨模块契约放 `common/biz/`(依赖倒置)。
-3. **跨模块契约单向**(缺陷1):业务间用 `integration/api/XxxApi`(**单向**,禁 Service 互注);"完成后通知"走**领域事件**;框架反调业务用 `common/biz/*CommonApi`(依赖倒置)。详见 `design` §5。
-4. **starter 用 `@AutoConfiguration`**:装配走 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`,**不写 spring.factories 的 EnableAutoConfiguration**。
-5. **循环依赖零容忍**(缺陷1):`allow-circular-references: false`,`@Lazy` 禁用(除非充分理由+注释),跨域走 api 接口/事件。
-
----
-
-## 2. 命名规范
-
-### 2.1 包名
-
-- 框架:`cn.aurora.framework.<层>.<功能>`(如 `cn.aurora.framework.mybatis.core.mapper`)
-- 业务:`cn.aurora.module.<模块名>.<层>.<功能>`(如 `cn.aurora.module.kernel.controller.admin.dept`)— **≤4 层包**(缺陷4)
-- 启动:`cn.aurora.server`
-- common 跨模块契约:`cn.aurora.framework.common.biz.<源模块>.<功能>`(如 `cn.aurora.framework.common.biz.kernel.oauth2`)
-
-### 2.2 类名后缀词典(按角色)
-
-| 角色 | 后缀 | 示例 |
-|---|---|---|
-| 配置类 | `AutoConfiguration` / `Properties` | `AuroraRedisAutoConfiguration`、`WebProperties` |
-| 工具类 | `Util` / `Utils` | `BeanUtils`、`DateUtils` |
-| 拦截器 | `Interceptor` | `TenantDatabaseInterceptor` |
-| 处理器 | `Handler` | `DefaultFieldHandler`、`GlobalExceptionHandler` |
-| 过滤器 | `Filter` | `TokenAuthenticationFilter` |
-| 常量 | `Constants` / `Constant` | `RedisKeyConstants` |
-| 枚举 | `Enum` / `Type` | `UserTypeEnum`、`CommonStatusEnum` |
-| ★ 实体 | **`Entity`**(**原 DO**,缺陷4) | `UserEntity extends BaseEntity` |
-| ★ 视图对象 | **`Resp`/`CreateReq`/`UpdateReq`/`PageReq`**(**原 RespVO 等 7 种,缺陷4**) | `UserResp`、`UserCreateReq`、`UserPageReq` |
-| 数据传输 | `DTO` | `UserRespDTO`(跨模块,MapStruct 生成) |
-| Mapper | `Mapper` | `UserMapper extends BaseMapperX<UserEntity>` |
-| Service 接口 | `Service` | `UserService` |
-| Service 实现 | `ServiceImpl` | `UserServiceImpl` |
-| Controller | `Controller` | `UserController` |
-| 跨模块契约接口 | `Api` | `DeptApi`(业务间)、`OAuth2TokenCommonApi`(框架反调) |
-| 转换器 | `Convert` | `UserConvert`(@Mapper,MapStruct) |
-| ★ 领域事件 | **`Event`**(缺陷1) | `OrderCreatedEvent`(`event/` 包) |
-| Redis DAO | `RedisDAO` | `UserRedisDAO` |
-| 异常 | `Exception` | `ServiceException`、`ServerException` |
-
-### 2.3 变量与常量
-
-- 变量:**语义化**,避免 `data1`/`temp`/`obj`。
-- 常量:`UPPER_SNAKE_CASE`,定义在 `interface XxxConstants` 或枚举中。
-- 表名:`<前缀>_<下划线命名>`,逻辑删除字段统一 `deleted`(Boolean),审计字段统一 `create_time/update_time/creator/updater`。
-
-### 2.4 VO 命名约定(★ 收敛,缺陷4)
-
-> yudao 有 7 种 VO 后缀(ReqVO/RespVO/PageReqVO/SaveReqVO/SimpleRespVO/ExportReqVO/ExcelVO)。Aurora **收敛到 3 种**。
-
-| 类型 | 命名 | 用途 |
-|---|---|---|
-| ★ 写请求 | `XxxCreateReq` / `XxxUpdateReq`(或合并 `XxxSaveReq`) | 新增/修改入参 |
-| ★ 读响应 | `XxxResp` | 接口返回(列表/详情共用,字段按需) |
-| ★ 分页请求 | `XxxPageReq extends PageReq` | 分页查询(条件 + 分页参数)→ `PageResult<XxxResp>` |
-| ~~SimpleRespVO~~ | 取消,用 `XxxResp` + 字段过滤 | — |
-| ~~ExportReqVO/ExcelVO~~ | 取消,用 `XxxPageReq` + 导出注解 | — |
-
-VO 放对应 controller 子包下(`controller/admin/vo/`),不再按领域再分一层(消除 yudao 6 层包)。
-
----
-
-## 3. 编码规范
-
-### 3.1 格式(.editorconfig)
-
-- 缩进:4 空格(Java)/ 2 空格(yaml/vue)
-- 编码:UTF-8
-- 换行:LF
-- 列宽:120
-
-### 3.2 类级注解顺序(Controller 示例)
-
-```java
-@Tag(name = "管理后台 - 用户")
-@RestController
-@RequestMapping("/system/user")
-@Validated
-public class UserController { ... }
+```text
+dev.ainer.core.*
+dev.ainer.spring.*
+dev.ainer.web.*
 ```
 
-### 3.3 字段级注解顺序(DO 示例)
+业务：
+
+```text
+dev.ainer.module.<module>.<feature>.<layer>
+```
+
+常用后缀：
+
+| 角色 | 后缀 |
+|---|---|
+| HTTP 请求 | `CreateRequest`、`UpdateRequest`、`PageRequest` |
+| HTTP 响应 | `Response` |
+| 跨模块契约 | `Command`、`Query`、`Result` |
+| MyBatis 持久化数据行 | `Row` |
+| JPA 持久化实体（未来如需） | `Entity` |
+| 应用用例 | `UseCase` 或有业务含义的动词名 |
+| 端口 | `Repository`、`Gateway`、`Publisher` |
+| 基础设施实现 | `MybatisRepository`、`HttpGateway` |
+| 自动配置 | `AutoConfiguration` |
+| 配置属性 | `Properties` |
+
+不使用 `DO`、`ReqVO`、`RespVO`、`CommonApi` 等来源特定的历史命名。
+
+## 4. 模型边界
+
+- HTTP 模型、应用命令、领域对象、持久化实体是不同职责，可在简单场景复用，但不能为了少写类而泄漏框架注解。
+- DTO 必须显式设计；MapStruct 生成的是映射实现，不是 DTO。
+- 领域对象优先不可变；ORM 实体根据框架要求使用普通类。
+- 不返回 `Map`、`JSONObject` 或 Entity 作为公共契约。
+
+## 5. HTTP
+
+- REST 路径使用名词和标准方法，不使用 `/create`、`/update`、`/delete` 模拟动作。
+- Controller 只负责协议转换、校验和调用用例，不写事务与业务规则。
+- HTTP status 保持真实语义；错误响应使用稳定 `AINER.<MODULE>.<ERROR>` 代码。
+- 未知异常只向客户端返回通用消息，在服务端日志中通过 request ID 定位。
+- 接受外部 `X-Request-Id` 时必须校验字符和长度，防止日志注入。
+
+## 6. 错误码
+
+模块错误码示例：
 
 ```java
-@TableName("system_user")
-@Data
-@EqualsAndHashCode(callSuper = true)
-@ToString(callSuper = true)
-public class UserDO extends BaseDO {
-    @TableId
-    private Long id;
-
-    @Schema(description = "用户名称", requiredMode = Schema.RequiredMode.REQUIRED, example = "小趣")
-    private String name;
+public enum WorkspaceErrorCode implements ErrorCode {
+    MEMBER_ALREADY_EXISTS(
+            "AINER.WORKSPACE.MEMBER_ALREADY_EXISTS",
+            "成员已经存在",
+            409);
 }
 ```
 
-### 3.4 Lombok
+- 代码发布后不得改变原语义。
+- 启动时注册并检查重复。
+- 禁止使用模块 hash、人工数字段位或散落常量接口。
 
-- DO:`@Data` + `@EqualsAndHashCode(callSuper = true)` + `@ToString(callSuper = true)`(继承 BaseDO 时)。
-- Service Impl:`@Service` + 必要时 `@Slf4j`。
-- 禁止 `@Builder` 滥用(默认走 setter/全参构造)。
+## 7. Spring 与 Starter
 
-### 3.5 Java 特性(JDK 25)
+- 使用 `@AutoConfiguration`。
+- 在 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` 登记。
+- 使用 `@ConditionalOnMissingBean` 提供可替换默认实现。
+- 自动配置必须有 `ApplicationContextRunner` 测试，至少覆盖默认、开启、关闭和非法配置。
+- `spring.factories` 只在 Boot 仍明确要求的非自动配置扩展点使用。
 
-- 允许:record(用于不可变 DTO)、switch 表达式、var(局部变量类型推断,仅限明显场景)、text block。
-- 禁止:在 DO/VO 上用 record(与 MyBatis-Plus/Lombok 注解冲突)。
+## 8. 数据库
 
-### 3.6 Import 分组
+- PostgreSQL 是真实测试目标。
+- migration 使用 `VyyyyMMddHHmm__description.sql`，一个文件做一件事；已发布 migration 不修改。
+- SQL 使用参数绑定。权限条件不得通过字符串拼接进入 SQL。
+- `CREATE INDEX CONCURRENTLY` 与事务 migration 分开执行。
+- 集成测试使用 Testcontainers PostgreSQL，禁止依赖 H2 compatibility mode 证明兼容性。
+- MyBatis adapter 位于业务模块 infrastructure；应用与领域层不依赖 Mapper。
+- `ainer-starter-persistence` 只提供 MyBatis/Flyway/PostgreSQL/UUID 共性装配，不放业务 Row、Mapper、Repository 或 migration。
+- PostgreSQL UUID 使用显式 TypeHandler 并以 `Types.OTHER` 绑定，不能假设驱动或框架自动完成转换。
+- 事务边界位于应用用例；涉及聚合与附属记录的写入必须有失败回滚测试。
 
-顺序:java.* → javax.*(仅 JDK 内置)→ jakarta.* → org.springframework.* → 第三方 → cn.aurora.*。组间空行。
+## 9. 安全与隐私
 
-### 3.7 异常处理
+- 密码、Token、API key、完整手机号和模型敏感输入禁止写日志。
+- 密钥来自 KMS/Vault/环境注入，不进入源码和默认 YAML。
+- 字段加密采用带认证的加密模式，每条记录使用唯一 nonce，并携带 key version。
+- 权限拒绝默认关闭，不能因为用户上下文缺失而静默放行。
+- 资源 tenant/owner 只来自 `AuthenticatedActor`，不能由请求体、查询参数或普通请求头指定。
+- 所有租户资源 Repository 方法和 SQL 必须显式接收并绑定 tenant；scope 不能替代资源成员关系与所有权校验。
+- 跨租户或非成员查询优先返回 404 防止资源枚举；已确认成员但操作权限不足返回 403。
+- 邀请记录不能直接获得资源访问权；目标主体必须使用同 tenant 的可信身份完成激活，授权查询只认 ACTIVE 成员。
+- OWNER 的授予、降级和移除必须通过具有锁、回滚与数据库唯一约束的专用所有权用例，不能复用通用成员更新。
+- 高价值授权变更必须记录允许与拒绝决策。审计记录与业务访问日志分离；受保护写操作不能吞掉审计失败。
+- 审计查询必须有独立 scope、资源管理员校验以及 tenant/resource 双条件；读取审计本身也需要审计。
+- Identity Directory 只允许返回显式安全投影，禁止复用包含 password hash、锁定状态或 OAuth 协议字段的账号对象。
+- 跨运行时撤销使用同事务 outbox 与幂等消费者。普通 `@Async`/`@TransactionalEventListener` 不能单独承担不可丢失通知。
+- 自包含 JWT 不得被描述为数据库状态变化后立即失效；实时撤销必须有在线校验机制。
 
-- **后端只 throw**:`throw exception(ErrorCode)` 或 `throw exception(ErrorCode, args)`。
-- **全局兜底**:`GlobalExceptionHandler` 统一转 `CommonResult.error(...)`。
-- **禁止**:Controller 内手动 `try-catch` 后返回 `CommonResult.error(...)`(除非有特殊降级需求)。
-- **禁止**:`catch (Exception e)` 吞异常(必须 log 或 rethrow)。
+## 10. AI
 
----
+- 业务模块通过 `ModelProvider` / 应用服务等 Ainer 端口调用 AI，不直接依赖厂商 SDK或供应商 DTO。
+- 每次调用记录租户、主体、请求 ID、模型、Token/费用、耗时、状态和策略决策。
+- Prompt 和模型输出正文默认不落库、不写日志；只允许记录不可逆 fingerprint 与治理元数据。
+- Provider API key 只通过 secret 注入，默认 URL 必须为 HTTPS；原始供应商错误正文不得向外传播。
+- 流式调用必须有明确的最终 usage/完成语义；没有供应商 usage 时必须标记估算，不能伪装成实际计量。
+- 预算预占必须在调用 provider 前完成。集群级预算使用共享存储作为权威账本；进程内限流必须明确标注 node-local。
+- 价格是受控运维配置，必须记录币种与每百万输入/输出 Token 单价；不能把某个供应商的临时价格硬编码到领域层。
+- 外部 tenant/subject header 不能充当身份凭证；应用上下文最终来自已认证 principal 与可信租户解析。
+- 工具必须声明权限、输入 schema、超时和幂等策略。
+- RAG 检索必须执行租户和资源权限过滤，不能在生成答案后再补权限。
 
-## 4. 框架开发规范(framework 层)
+## 11. 测试
 
-### 4.1 新建 Starter 的目录结构
-
-```
-aurora-starter-<feature>/
-└── src/main/java/cn/aurora/framework/<feature>/
-    ├── config/                    @AutoConfiguration 配置类
-    ├── properties/ 或 props/     @ConfigurationProperties
-    ├── annotation/                自定义注解(@TenantIgnore 等)
-    ├── aspect/                    AOP 切面
-    ├── interceptor/               拦截器
-    ├── handler/                   处理器(DefaultDBFieldHandler 等)
-    ├── filter/                    Filter
-    ├── constant/                  常量
-    ├── exception/                 框架异常
-    └── util/                      工具类
-└── src/main/resources/
-    └── META-INF/spring/
-        └── org.springframework.boot.autoconfigure.AutoConfiguration.imports
-```
-
-### 4.2 自动配置类写法
-
-```java
-@AutoConfiguration
-@ConditionalOnClass(RedisTemplate.class)
-@ConditionalOnBean(RedisConnectionFactory.class)
-public class AuroraRedisAutoConfiguration {
-
-    @Bean
-    @ConditionalOnMissingBean(name = "redisTemplate")
-    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
-        // ...
-    }
-}
-```
-
-**要点**:
-- 类标 `@AutoConfiguration`(非 `@Configuration`)
-- 用 `@ConditionalOnMissingBean` 允许下游覆盖
-- 在 imports 文件登记,**不写 spring.factories**
-- 需要前置/后置:`@AutoConfiguration(before = Xxx.class)` / `@AutoConfiguration(after = Yyy.class)`
-
-### 4.3 向后兼容要求(Breaking Change 清单)
-
-改动以下任一项,**必须升 major 版本 + 全模块回归**:
-- 改 public API 签名(BaseDO/BaseMapperX/CommonResult/*Api 的方法)
-- 改配置 key(application.yaml 属性)
-- 改 Bean 名称 / `@ConditionalOnXxx` 条件
-- 升级 major 依赖(Spring Boot / MyBatis-Plus / Redisson)
-
----
-
-## 5. 业务模块开发规范(module 层)
-
-### 5.1 新增业务模块步骤
-
-1. 参考标准模块:`aurora-module-system`(最完整样本)
-2. 先读现有代码,复用 BaseDO/BaseMapperX/CommonResult/*Api
-3. 用代码生成器(阶段 5 完成)一键生成骨架,再补业务逻辑
-
-### 5.2 分层与包结构
-
-详见 `architecture.md` §3.3 和 `design/aurora-scaffold-design.md` §4.1。核心:
-
-```
-module/<name>/
-├── controller/{admin,app}/<feature>/
-├── service/<feature>/
-├── dal/{dataobject,mysql,redis}/<feature>/
-├── api/<feature>/              ← 跨模块契约(业务间)
-├── convert/<feature>/          ← MapStruct(复杂映射)
-├── enums/
-├── framework/                  ← 本模块 Spring 配置
-├── job/ (可选)
-└── mq/ (可选)
-```
-
-### 5.3 Controller 约定
-
-```java
-@Tag(name = "管理后台 - 用户")
-@RestController
-@RequestMapping("/system/user")
-@Validated
-public class UserController {
-
-    @Resource
-    private UserService userService;
-
-    @PostMapping("/create")
-    @Operation(summary = "新增用户")
-    @PreAuthorize("@ss.hasPermission('system:user:create')")
-    public CommonResult<Long> createUser(@Valid @RequestBody UserSaveReqVO reqVO) {
-        return success(userService.createUser(reqVO));
-    }
-
-    @GetMapping("/page")
-    @Operation(summary = "用户分页")
-    @PreAuthorize("@ss.hasPermission('system:user:query')")
-    public CommonResult<PageResult<UserRespVO>> getUserPage(@Valid UserPageReqVO reqVO) {
-        return success(userService.getUserPage(reqVO));
-    }
-}
-```
-
-**要点**:
-- 返回 `CommonResult<T>`,用 `success(T)` / `error(ErrorCode)`
-- `@PreAuthorize("@ss.hasPermission('module:feature:action')")` 做权限
-- admin 端路径 `/admin-api/<module>/<feature>`(自动绑定前缀),app 端 `/app-api/...`
-- 复杂入参用 `@Valid @RequestBody *ReqVO`,分页用 `@Valid *PageReqVO`(extends PageParam)
-
-### 5.4 Service 约定
-
-```java
-public interface UserService {
-    Long createUser(UserSaveReqVO reqVO);
-    PageResult<UserRespVO> getUserPage(UserPageReqVO reqVO);
-}
-
-@Service
-public class UserServiceImpl implements UserService {
-
-    @Resource
-    private UserMapper userMapper;
-
-    @Override
-    public Long createUser(UserSaveReqVO reqVO) {
-        // 校验
-        validateUserExists(...);
-        // 转换 + 插入
-        UserDO user = BeanUtils.toBean(reqVO, UserDO.class);
-        userMapper.insert(user);
-        return user.getId();
-    }
-
-    @Override
-    public PageResult<UserRespVO> getUserPage(UserPageReqVO reqVO) {
-        PageResult<UserDO> result = userMapper.selectPage(reqVO, new LambdaQueryWrapperX<UserDO>()
-            .likeIfPresent(UserDO::getName, reqVO.getName()));
-        return new PageResult<>(BeanUtils.toBean(result.getList(), UserRespVO.class), result.getTotal());
-    }
-}
-```
-
-**要点**:
-- 简单转换用 `BeanUtils.toBean`(hutool 封装)
-- 复杂映射用 MapStruct `Convert`
-- **throw ServiceException** 表示业务错误,不手动返回 error
-- Mapper 查询用 `LambdaQueryWrapperX` 的 `xxxIfPresent`(值为空不拼条件)
-
-### 5.5 Mapper 约定
-
-```java
-public interface UserMapper extends BaseMapperX<UserDO> {
-
-    default UserDO selectByMobile(String mobile) {
-        return selectOne(UserDO::getMobile, mobile);
-    }
-}
-```
-
-**要点**:
-- `extends BaseMapperX<T>`(自带 selectPage/selectOne/insertBatch 等)
-- 单字段查询用 default 方法 + `selectOne(SFunction, value)`
-- 复杂 SQL 写 XML(同包 `XxxMapper.xml`,PostgreSQL 语法)
-
-### 5.6 跨模块调用约定(★ 单向,缺陷1)
-
-- **业务间**:注入 `XxxApi`(`integration/api/`,Local 实现/未来 Feign),返回 `*RespDTO`(绝不返回 Entity)。**依赖单向**:A→B 允许,B 不得反向依赖 A。
-- **反向通知**:"完成 A 后触发 B" 用**领域事件**(`event/XxxEvent` + `@EventListener`),A 不持有 B 的引用。**禁止**用 Service 互注处理此类联动。
-- **框架反调业务**:starter 注入 `XxxCommonApi`(接口在 common/biz,实现在业务模块)。
-- **禁止**:跨模块/跨域直接 `@Resource` 别的 Service(制造循环依赖);`@Lazy` 默认禁用,极少场景需用必须注释理由。
-
----
-
-## 6. 数据库规范
-
-### 6.1 表设计
-
-- 表名:`<模块前缀>_<下划线命名>`(如 `system_user`、`mall_product_spu`)
-- 必含字段:`id`(bigint,雪花)、`create_time`、`update_time`、`creator`、`updater`、`deleted`(Boolean,逻辑删除)
-- 多租户表额外:`tenant_id`(bigint)
-- 主键:`@TableId`(默认雪花 ASSIGN_ID)
-- 逻辑删除:`@TableLogic deleted`(Boolean)
-
-### 6.2 索引命名
-
-- 普通索引:`idx_<字段>`
-- 唯一索引:`uk_<字段>`
-- 联合索引:`idx_<字段1>_<字段2>`
-
-### 6.3 Migration(SQL)
-
-- 文件命名:`V<YYYYMMDD>_<seq>__<desc>.sql`(Flyway 风格,PostgreSQL 语法)
-- 一个文件做一件事
-- 已执行 migration **不得修改**,新增 migration 修正
-- `INSERT` 用 `ON CONFLICT DO NOTHING`(防重复执行)
-- `CREATE INDEX CONCURRENTLY` 不允许在事务 migration 内
-
----
-
-## 7. 缓存规范
-
-- `@Cacheable` 用于普通配置/元数据缓存
-- 细粒度控制用 RedisDAO 模式:`Service -> XxxRedisDAO -> StringRedisTemplate / RedissonClient`
-- **禁止** Service 直接注入 `StringRedisTemplate` / `RedissonClient`
-- key 定义在 `RedisKeyConstants`,**禁止硬编码**
-- 用 `StringRedisTemplate`,非 `RedisTemplate`
-
----
-
-## 8. 日志规范
-
-- 类:`@Slf4j`(Lombok)
-- 级别:ERROR(异常)/ WARN(可预期异常)/ INFO(关键业务节点)/ DEBUG(调试)
-- 占位符:`log.info("用户登录,userId={},mobile={}", userId, mobile);`(**禁止字符串拼接**)
-- 敏感信息(密码/token/手机号全量)**禁止**打日志
-
----
-
-## 9. 构建与验证
-
-### 9.1 编译验证
+- 测试名称描述行为，不描述方法实现。
+- 修复缺陷必须先增加可复现测试。
+- 重要 Starter、数据库适配、认证和 AI provider 需要失败路径测试。
+- AI provider 合约至少覆盖请求字段、Bearer header、非流式、SSE、最终 usage、usage fallback、超时/限流和错误脱敏。
+- AI 数据集成测试至少覆盖 migration、预算并发暴露、拒绝/失败审计和租户隔离。
+- 全量验收命令：
 
 ```bash
-# 全量编译
-mvn clean compile -Dmaven.test.skip=true
-
-# 单模块编译(含依赖)
-mvn clean compile -pl aurora-module-system -am
-
-# 打 fat jar
-mvn clean package -Dmaven.test.skip=true
+mvn test
 ```
 
-### 9.2 启动
+## 12. Git
 
-```bash
-mvn -pl aurora-server -am spring-boot:run -Dspring-boot.run.profiles=local
-```
-
-### 9.3 测试
-
-```bash
-mvn test                              # 全量
-mvn test -Dtest=UserServiceTest#testCreateUser   # 单测
-```
-
-单测基座:`aurora-starter-test` 提供 `BaseDbUnitTest`(H2 + redis mock)。
-
-### 9.4 循环依赖检查(★ 零容忍,缺陷1)
-
-> Aurora 与 yudao 根本不同:`allow-circular-references: false`(yudao 是 true),循环依赖 = 设计错误,**编译/启动即失败**,不兜底。
-
-若出现循环依赖报错,**必须重构**,不允许 `@Lazy` 掩盖:
-1. **领域事件破环**(首选):把"A 完成后通知 B"改为 A 发 `event/XxxEvent`,B 用 `@EventListener` 监听。A 不依赖 B。
-2. **api 契约解耦**:把跨域的 Service 直调改为 `integration/api/XxxApi` 单向接口。
-3. **合并同域 Service**:若两个 Service 本属同一聚合(如 yudao 的 SPU↔SKU),合并为一个 Service 或重新划分子域。
-4. **仅在极少数有充分架构理由时**(如框架基础设施与业务的引导期依赖),经评审可用 `@Lazy`,**必须注释说明**。
-
-`@Lazy` 默认视为坏味道,PR review 重点检查。
-
----
-
-## 10. Git 提交规范
-
-格式:`type(scope): 中文描述`
-
-- type:`feat` / `fix` / `refactor` / `chore` / `docs` / `test` / `perf` / `style`
-- scope:模块名(如 `aurora-starter-redis` / `aurora-module-system`)
-- 描述:中文,动词开头
-
-示例:
-```
-feat(aurora-starter-redis): 适配 Redisson 4.6 + Jackson3
-fix(aurora-module-system): 用户分页 deptId 条件未生效
-refactor(aurora-common): 抽取 OAuth2TokenCommonApi 到 biz 包
-docs(design): 补充 Boot4 适配备忘
-chore(aurora-dependencies): 升级 mybatis-plus-spring-boot4-starter 3.5.16
-```
-
----
-
-## 11. 框架组件速查表
-
-| 组件 | 用途 | 示例 |
-|---|---|---|
-| `CommonResult.success(T)` | 成功响应 | `return success(userService.create(reqVO));` |
-| `CommonResult.error(ErrorCode)` | 失败响应(框架兜底,业务用 throw) | — |
-| `throw exception(ErrorCode)` | 抛业务异常 | `throw exception(USER_NOT_EXISTS);` |
-| `BeanUtils.toBean(src, Target.class)` | DO↔VO 转换 | `BeanUtils.toBean(do, UserRespVO.class)` |
-| `BaseMapperX.selectPage(pageParam, wrapper)` | 分页查询 | `userMapper.selectPage(reqVO, wrapper)` |
-| `LambdaQueryWrapperX.likeIfPresent(...)` | 条件构造(值为空不拼) | `new LambdaQueryWrapperX<UserDO>().likeIfPresent(UserDO::getName, name)` |
-| `@PreAuthorize("@ss.hasPermission('x:y:z')")` | 权限校验 | Controller 方法上 |
-| `@TenantIgnore` | 跳过租户隔离 | Mapper 方法/Service 方法上 |
-| `@DataPermission` | 数据权限 | Service 方法上 |
-| `@Resource XxxApi` | 跨模块调用 | 注入业务 Api |
-| `@Resource XxxCommonApi` | 框架反调业务 | starter 注入 |
-
----
-
-## 12. 风格一致性
-
-1. **模仿优先**:先读 `aurora-module-system` / `aurora-module-infra` 的同类代码,再动手。
-2. **查找复用**:新需求先 grep 是否已有抽象可用(BaseMapperX/LambdaQueryWrapperX/BeanUtils)。
-3. **最小改动**:不重构无关代码。
-4. **交互语言**:全程中文。
+提交格式：`type(scope): 中文描述`。一次提交只表达一个可审查的意图，禁止把格式化、重构和新功能混在一起。

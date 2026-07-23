@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.identity.account.infrastructure.mybatis.IdentityMapper">
+
+    <resultMap id="identityAccountRow"
+               type="dev.ainer.module.identity.account.infrastructure.mybatis.IdentityAccountRow">
+        <id property="subjectId" column="subject_id"/>
+        <result property="username" column="username"/>
+        <result property="passwordHash" column="password_hash"/>
+        <result property="userStatus" column="user_status"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="tenantStatus" column="tenant_status"/>
+        <result property="membershipStatus" column="membership_status"/>
+        <result property="role" column="role"/>
+    </resultMap>
+
+    <resultMap id="identityDirectoryRow"
+               type="dev.ainer.module.identity.account.infrastructure.mybatis.IdentityDirectoryRow">
+        <id property="subjectId" column="subject_id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="username" column="username"/>
+        <result property="displayName" column="display_name"/>
+        <result property="role" column="role"/>
+    </resultMap>
+
+    <resultMap id="identityMembershipRow"
+               type="dev.ainer.module.identity.account.infrastructure.mybatis.IdentityMembershipRow">
+        <id property="tenantId" column="tenant_id"/>
+        <id property="userId" column="user_id"/>
+        <result property="role" column="role"/>
+        <result property="defaultTenant" column="is_default"/>
+        <result property="status" column="status"/>
+        <result property="joinedAt" column="joined_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="identityTokenStatusRow"
+               type="dev.ainer.module.identity.account.infrastructure.mybatis.IdentityTokenStatusRow">
+        <result property="tenantStatus" column="tenant_status"/>
+        <result property="userStatus" column="user_status"/>
+        <result property="membershipStatus" column="membership_status"/>
+        <result property="latestRevokedAt" column="latest_revoked_at"/>
+    </resultMap>
+
+    <insert id="insertTenant">
+        INSERT INTO ainer_identity_tenant (id, code, name, status, created_at, updated_at)
+        VALUES (#{id}, #{code}, #{name}, #{status}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <insert id="insertUser">
+        INSERT INTO ainer_identity_user (id, username, password_hash, display_name, status, created_at, updated_at)
+        VALUES (#{id}, #{username}, #{passwordHash}, #{displayName}, #{status}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <insert id="insertMembership">
+        INSERT INTO ainer_identity_membership
+            (tenant_id, user_id, role, is_default, status, joined_at, updated_at)
+        VALUES (#{tenantId}, #{userId}, #{role}, #{defaultTenant}, #{status}, #{joinedAt}, #{updatedAt})
+    </insert>
+
+    <insert id="insertAccessEvent">
+        INSERT INTO ainer_identity_access_event (
+            id, event_type, tenant_id, subject_id, payload_version,
+            occurred_at, publication_status, attempt_count
+        ) VALUES (
+            #{id}, #{eventType}, #{tenantId}, #{subjectId}, #{payloadVersion},
+            #{occurredAt}, #{publicationStatus}, #{attemptCount}
+        )
+    </insert>
+
+    <select id="selectAccountByUsername" resultMap="identityAccountRow">
+        SELECT u.id AS subject_id,
+               u.username,
+               u.password_hash,
+               u.status AS user_status,
+               m.tenant_id,
+               t.status AS tenant_status,
+               m.status AS membership_status,
+               m.role
+        FROM ainer_identity_user u
+        JOIN ainer_identity_membership m
+          ON m.user_id = u.id
+         AND m.is_default = true
+        JOIN ainer_identity_tenant t
+          ON t.id = m.tenant_id
+        WHERE u.username = #{username}
+    </select>
+
+    <select id="selectActiveDirectoryEntry" resultMap="identityDirectoryRow">
+        SELECT m.tenant_id,
+               u.id AS subject_id,
+               u.username,
+               u.display_name,
+               m.role
+        FROM ainer_identity_membership m
+        JOIN ainer_identity_user u ON u.id = m.user_id
+        JOIN ainer_identity_tenant t ON t.id = m.tenant_id
+        WHERE m.tenant_id = #{tenantId}
+          AND m.user_id = #{subjectId}
+          AND m.status = 'ACTIVE'
+          AND u.status = 'ACTIVE'
+          AND t.status = 'ACTIVE'
+    </select>
+
+    <select id="searchActiveDirectory" resultMap="identityDirectoryRow">
+        SELECT m.tenant_id,
+               u.id AS subject_id,
+               u.username,
+               u.display_name,
+               m.role
+        FROM ainer_identity_membership m
+        JOIN ainer_identity_user u ON u.id = m.user_id
+        JOIN ainer_identity_tenant t ON t.id = m.tenant_id
+        WHERE m.tenant_id = #{tenantId}
+          AND m.status = 'ACTIVE'
+          AND u.status = 'ACTIVE'
+          AND t.status = 'ACTIVE'
+          AND (
+              u.username LIKE #{likePattern} ESCAPE '!'
+              OR lower(u.display_name) LIKE #{likePattern} ESCAPE '!'
+          )
+        ORDER BY u.username, u.id
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectTokenStatus" resultMap="identityTokenStatusRow">
+        SELECT t.status AS tenant_status,
+               u.status AS user_status,
+               m.status AS membership_status,
+               (
+                   SELECT e.occurred_at
+                   FROM ainer_identity_access_event e
+                   WHERE e.tenant_id = m.tenant_id
+                     AND e.subject_id = m.user_id
+                   ORDER BY e.occurred_at DESC, e.id DESC
+                   LIMIT 1
+               ) AS latest_revoked_at
+        FROM ainer_identity_membership m
+        JOIN ainer_identity_user u ON u.id = m.user_id
+        JOIN ainer_identity_tenant t ON t.id = m.tenant_id
+        WHERE m.tenant_id = #{tenantId}
+          AND m.user_id = #{subjectId}
+    </select>
+
+    <select id="selectUserStatusForUpdate" resultType="string">
+        SELECT status
+        FROM ainer_identity_user
+        WHERE id = #{subjectId}
+        FOR UPDATE
+    </select>
+
+    <select id="selectActiveMembershipTenantIds" resultType="java.util.UUID">
+        SELECT tenant_id
+        FROM ainer_identity_membership
+        WHERE user_id = #{subjectId}
+          AND status = 'ACTIVE'
+        ORDER BY tenant_id
+    </select>
+
+    <update id="updateUserStatus">
+        UPDATE ainer_identity_user
+        SET status = #{newStatus},
+            updated_at = #{updatedAt}
+        WHERE id = #{subjectId}
+          AND status = #{expectedStatus}
+    </update>
+
+    <select id="selectMembershipForUpdate" resultMap="identityMembershipRow">
+        SELECT tenant_id, user_id, role, is_default, status, joined_at, updated_at
+        FROM ainer_identity_membership
+        WHERE tenant_id = #{tenantId}
+          AND user_id = #{subjectId}
+        FOR UPDATE
+    </select>
+
+    <update id="updateMembershipStatus">
+        UPDATE ainer_identity_membership
+        SET status = #{newStatus},
+            updated_at = #{updatedAt}
+        WHERE tenant_id = #{tenantId}
+          AND user_id = #{subjectId}
+          AND status = #{expectedStatus}
+    </update>
+</mapper>

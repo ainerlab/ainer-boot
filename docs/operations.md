@@ -1,0 +1,188 @@
+# Ainer 运行与故障处理手册
+
+> 文档类型：运行手册 · 状态：基础版 · 最近核对：2026-07-23 · 适用版本：`0.1.x`
+
+本手册覆盖当前两个 Spring Boot 发行物的构建、启动和基础诊断。生产部署平台、监控后端、备份系统和灾难恢复尚未选型，因此未验证的命令不能写成生产 SOP。
+
+## 1. 构建产物
+
+```bash
+mvn clean package
+```
+
+可执行 JAR：
+
+```text
+ainer-server/target/ainer-server-0.1.0-SNAPSHOT.jar
+ainer-authorization-server/target/ainer-authorization-server-0.1.0-SNAPSHOT.jar
+```
+
+发布应使用固定版本而不是 `SNAPSHOT`，详见 [`releasing.md`](releasing.md)。
+
+## 2. 启动顺序
+
+1. 确认目标数据库可连接且已有可恢复备份；
+2. 启动 Authorization Server，等待 migration 与健康检查成功；
+3. 验证 issuer 元数据和 JWK；
+4. 启动 `ainer-server`；
+5. 验证业务健康、JWT audience 和关键授权拒绝路径；
+6. AI 启用时再验证 provider 连通性、预算与错误脱敏。
+
+当前没有自动化生产部署管线，上述顺序是验收要求，不代表已经形成可直接执行的生产发布脚本。
+
+### 2.1 M4.1 跨运行时撤销上线顺序
+
+Directory、relay、consumer 全部默认关闭。首次启用严格按以下顺序：
+
+1. 先发布包含 Workspace `REVOKED`/receipt migration 的 `ainer-server`，保持 consumer 关闭；
+2. 为 Directory client 与 Identity relay 分别创建 Client Credentials client，使用不同 secret，分别只授予 `identity.directory.read.all` 与 `identity.access-events.publish`；
+3. 在 `ainer-server` 启用 access-event consumer，并把 trusted publisher 配成 relay client ID；
+4. 在 Authorization Server 启用 Directory API；按需要在 `ainer-server` 启用 Directory client；
+5. 验证服务/人员 Token 拒绝、tenant 隔离和重复事件 smoke；
+6. 最后启用 Identity relay，观察积压、失败、耗尽和 Workspace 实际撤销指标。
+
+relay 的 Token endpoint 可以是同一 Authorization Server 的外部 HTTPS issuer 地址。回滚时先关闭 relay，保留 outbox 和 receipt；不要删除失败/耗尽记录。consumer schema 向前保留，待投递根因解决后再通过 M4.2 双人审批控制面重放。
+
+### 2.2 M4.2 安全运维上线顺序
+
+重放、OWNER 恢复、归档与 SIEM 导出全部默认关闭。首次上线按以下顺序：
+
+1. 先执行 Identity 和 Workspace 新 migration，发布应用但保持所有 M4.2 开关关闭；
+2. 分别创建 replay request、replay approve、OWNER recovery request、OWNER recovery approve 和 SIEM exporter client；
+3. 确保 request/approve scope 不在同一 client，凭据由不同责任人保管，同时审查 `.all` 跨 tenant scope 的必要性；
+4. 先启用 SIEM 导出，从最早游标回放，按 audit ID 去重并持久化 checkpoint；
+5. 在备份恢复的接近真实规模数据库上验证 batch size、WAL、锁等待和查询计划，确认外部副本后再启用热数据归档；
+6. 最后按事故响应流程启用重放与 OWNER 恢复控制面，完成服务身份、tenant 和过期拒绝 smoke。
+
+回滚应用时只关闭控制面与后台任务，保留申请、安全操作审计和归档表。不得为回滚而删除历史记录。
+
+### 2.3 M4.3 选择性在线撤销上线顺序
+
+在线校验默认关闭。首次启用严格按以下顺序：
+
+1. 先发布含 revocation-aware authorization service 和专用 introspection client 限制的 Authorization Server，保持 Resource Server 在线校验关闭；
+2. 通过独立 bootstrap 或受审计的 Client 控制面建立专用 client，确认它没有 tenant、没有业务 scope，只有 `token.introspect` 与显式 introspection 标记；
+3. 使用 HTTPS 验证专用 client 可查询 active、普通 client 得到 401 `invalid_client`，并验证 RFC 7009 撤销后变为 inactive；
+4. 验证人员账号/成员禁用后的旧 Token inactive，以及事件后新签发 Token 的边界；
+5. 在 `ainer-server` 配置 URI、专用凭据、2 秒级超时和保护规则，先灰度单实例，再验证低风险不在线查询、高风险 active/inactive/依赖失败三类路径；
+6. 观察在线校验放行、inactive、失败和延时指标，完成容量与告警门禁后再扩大实例和流量。
+
+回滚时优先修复 Authorization Server 或网络依赖。关闭 Resource Server 在线校验会恢复 JWT 自然到期窗口，属于安全降级，必须独立批准、记录开始/结束时间并保持 Identity access-event 和 OAuth authorization 元数据不变。不得通过删除撤销事件或重建 client 规避故障。
+
+## 3. 健康检查
+
+```bash
+curl -fsS http://127.0.0.1:8080/actuator/health
+curl -fsS http://127.0.0.1:9000/actuator/health
+```
+
+当前公开 `health` 和 `info`。健康为 `UP` 只证明应用存活与已注册健康组件状态，不能替代登录、发 Token、Workspace 授权和 AI 调用 smoke test。
+
+## 4. 启动失败诊断
+
+### Flyway 失败
+
+- 停止继续部署，不修改已执行 migration；
+- 记录失败版本、SQLSTATE 和目标 schema 历史；
+- 在数据库副本复现并用新 migration 修复；
+- 不直接删除 Flyway history 或手工标记成功。
+
+### Authorization Server 失败
+
+- 检查 issuer 是否为 HTTPS；
+- 检查 RSA key ID、PEM 路径、文件权限和公私钥是否匹配；
+- 检查身份库与 OAuth 表 migration；
+- 不把私钥内容粘贴到日志或工单。
+
+### Resource Server 返回 401/403
+
+- 401：检查 Token 签名、issuer、audience、有效期、`sub` 和 `tenant_id`；匹配高风险规则时还要检查 introspection client 与 Identity 当前状态/epoch；
+- 403：检查 scope，再检查 Workspace ACTIVE membership 与角色；
+- 用 `X-Request-Id` 关联请求，不记录完整 Bearer Token。
+
+### 高风险在线校验返回 503
+
+- 确认 Authorization Server 健康、TLS、DNS、连接/读取超时和 `/oauth2/introspect` 可达；
+- 确认使用独立 introspection client，secret 未过期，client 只有 `token.introspect` 且无 tenant；
+- 对照 `ainer.security.online.validation.failed` 与 `.duration`，区分持续依赖故障和容量/延时问题；
+- 不把完整 Token、client secret 或 introspection 原始响应写入日志和事件记录；
+- 不自动回退到离线 JWT 放行。确需临时关闭时按安全降级流程批准并持续追踪恢复。
+
+### AI 调用失败
+
+- 检查模块是否启用、HTTPS base URL、模型白名单和预算；
+- 区分策略拒绝、连接超时、provider 失败和客户端断开；
+- 只记录稳定错误码和调用 ID，不记录 API key、prompt 或供应商原始正文。
+
+### 耗尽事件恢复
+
+1. 先确认耗尽是下游故障、鉴权、网络还是不可重试契约问题；未解决根因时不得反复重放；
+2. 使用 read scope 按 tenant 查询真正耗尽且无有效 lease 的事件，记录安全 `incidentReference`；
+3. request client 创建申请，独立 approve client 在有效期内复核 event/tenant/事故后执行；
+4. 观察原 event ID 的 relay 发布、Workspace receipt 和传播时延，不创建新事件规避幂等。
+
+### REVOKED OWNER 恢复
+
+1. 先确认原 OWNER 的 Identity 状态和撤销事实，不得通过恢复流程重新激活原主体；
+2. 确认 Workspace 无 ACTIVE OWNER，并选择同 tenant/Workspace 的 ACTIVE 非 OWNER 成员；
+3. request client 创建申请，由另一 approve client 复核事故和目标成员后执行；
+4. 验证新成员是唯一 ACTIVE OWNER、原 OWNER 仍是 REVOKED，并查看请求/执行审计。
+
+## 5. 优雅停机
+
+两个发行物启用 graceful shutdown，当前 shutdown phase 超时为 20 秒。终止前应停止接收新流量，等待短请求和事务完成。SSE、长时间模型请求和 outbox relay 上线后必须重新验证超时，而不是假设 20 秒长期适用。
+
+## 6. 数据保护
+
+生产上线前必须另行完成并演练：
+
+- PostgreSQL 自动备份、保留期和加密；
+- point-in-time recovery 或等价恢复策略；
+- 身份库与业务库一致的恢复点选择；
+- RSA 私钥备份、访问审计和轮换；
+- outbox 积压与重复消费恢复；
+- Workspace 授权审计的最终保留/删除策略、法律保留和外部不可变副本。
+
+这些能力当前属于缺口，不能仅凭应用测试宣称已具备灾难恢复能力。
+
+## 7. 最小事件记录模板
+
+发生故障时记录：时间线、版本与配置摘要、影响 tenant/功能范围、request/event/invocation ID、HTTP/稳定错误码、数据库 migration 状态、采取的动作、恢复证据和后续预防项。记录中必须移除密码、Token、私钥、API key、prompt 和客户敏感正文。
+
+## 8. 当前可观测性与告警基线
+
+已有 request ID、Actuator health/info、AI invocation 审计、Workspace 授权审计以及以下 Micrometer 指标：
+
+| 指标 | 类型 | 含义 |
+|---|---|---|
+| `ainer.identity.access.events.published` | Counter | relay 成功确认总数 |
+| `ainer.identity.access.events.failed` | Counter | 投递失败并安排重试总数 |
+| `ainer.identity.access.events.relay.cycle.failed` | Counter | relay 周期自身失败总数 |
+| `ainer.identity.access.events.pending` | Gauge | 未达上限的 PENDING 数 |
+| `ainer.identity.access.events.failed.current` | Gauge | 未达上限、仍可重试的 FAILED 数 |
+| `ainer.identity.access.events.exhausted` | Gauge | 已达最大尝试且不再自动领取的数 |
+| `ainer.identity.access.events.oldest.ready.age.seconds` | Gauge | 最老可领取事件积压年龄 |
+| `ainer.workspace.identity.access.events.received` | Counter | consumer 成功处理总数，含重复 |
+| `ainer.workspace.identity.access.events.duplicates` | Counter | receipt 命中的重复总数 |
+| `ainer.workspace.identity.access.memberships.revoked` | Counter | 实际进入 REVOKED 的 membership 总数 |
+| `ainer.workspace.identity.access.events.propagation` | Timer | 事件发生至首次成功消费的端到端时延，含可配置 SLO bucket |
+| `ainer.identity.access.events.replay.requested` / `.executed` | Counter | 重放申请/成功执行数 |
+| `ainer.workspace.owner.recovery.requested` / `.executed` | Counter | OWNER 恢复申请/成功执行数 |
+| `ainer.workspace.authorization.audit.archived` | Counter | 从热表完成归档的数量 |
+| `ainer.workspace.authorization.audit.archive.failed` | Counter | 归档周期失败数 |
+| `ainer.workspace.authorization.audit.hot` | Gauge | 当前热表记录数 |
+| `ainer.workspace.authorization.audit.archive.current` | Gauge | 当前归档表记录数 |
+| `ainer.workspace.authorization.audit.denied.window` | Gauge | 配置时间窗口内的 DENIED 数 |
+| `ainer.workspace.authorization.audit.oldest.hot.age.seconds` | Gauge | 最旧热审计的年龄 |
+| `ainer.workspace.ownerless` | Gauge | 无 ACTIVE OWNER 的 Workspace 数 |
+| `ainer.workspace.authorization.audit.exported` | Counter | SIEM 导出批次成功返回的记录数 |
+| `ainer.security.online.validation.allowed` | Counter | 高风险请求在线判定 active 并继续的数量 |
+| `ainer.security.online.validation.inactive` | Counter | 在线判定 inactive 并返回 401 的数量 |
+| `ainer.security.online.validation.failed` | Counter | introspection 依赖失败并返回 503 的数量 |
+| `ainer.security.online.validation.duration` | Timer | 每次高风险 introspection 调用耗时，不包含后续业务处理 |
+
+初始建议目标是：滚动 30 天内 99% 的首次成功 Workspace 撤销消费在可配置的 60 秒内完成。Timer 只包含已成功样本，因此必须同时使用 `exhausted == 0`、最老可领取年龄不超过 60 秒和 relay cycle 无持续失败作为完整性守门。这是尚未用真实流量验证的初始 SLO，不是正式错误预算。
+
+初始告警条件至少包括：`exhausted > 0` 立即告警、最老可领取年龄持续超过 60 秒、`ownerless > 0` 立即告警、archive failure 增长，以及 DENIED 窗口值明显超过环境基线。DENIED 阈值必须根据正常流量建基线，不能在未观测环境中伪造通用数字。
+
+在线校验初始告警至少包括 `.failed` 持续增长、`.inactive` 异常突增和 `.duration` 接近读取超时；阈值必须由压测和真实流量建立。当前 Actuator 仍只公开 health/info，尚未配置生产指标 exporter、统一 dashboard、告警路由、trace 和结构化日志 schema。指标、归档代码和 SIEM 拉取 API 存在，不等于生产监控或外部不可变审计链路已经完成。

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.workspace.workspace.infrastructure.mybatis.WorkspaceOwnerRecoveryMapper">
+
+    <resultMap id="recoveryRequestRow"
+               type="dev.ainer.module.workspace.workspace.infrastructure.mybatis.WorkspaceOwnerRecoveryRequestRow">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="newOwnerSubjectId" column="new_owner_subject_id"/>
+        <result property="requestedBy" column="requested_by"/>
+        <result property="approvedBy" column="approved_by"/>
+        <result property="incidentReference" column="incident_reference"/>
+        <result property="status" column="status"/>
+        <result property="requestedAt" column="requested_at"/>
+        <result property="expiresAt" column="expires_at"/>
+        <result property="executedAt" column="executed_at"/>
+    </resultMap>
+
+    <update id="expireOpenRequests">
+        UPDATE ainer_workspace_owner_recovery_request
+        SET status = 'EXPIRED'
+        WHERE tenant_id = #{tenantId}
+          AND workspace_id = #{workspaceId}
+          AND status = 'REQUESTED'
+          AND expires_at &lt;= #{now}
+    </update>
+
+    <insert id="insert">
+        INSERT INTO ainer_workspace_owner_recovery_request (
+            id, tenant_id, workspace_id, new_owner_subject_id, requested_by, approved_by,
+            incident_reference, status, requested_at, expires_at, executed_at
+        ) VALUES (
+            #{id}, #{tenantId}, #{workspaceId}, #{newOwnerSubjectId}, #{requestedBy}, #{approvedBy},
+            #{incidentReference}, #{status}, #{requestedAt}, #{expiresAt}, #{executedAt}
+        )
+    </insert>
+
+    <select id="selectForUpdate" resultMap="recoveryRequestRow">
+        SELECT id, tenant_id, workspace_id, new_owner_subject_id, requested_by, approved_by,
+               incident_reference, status, requested_at, expires_at, executed_at
+        FROM ainer_workspace_owner_recovery_request
+        WHERE tenant_id = #{tenantId}
+          AND id = #{requestId}
+        FOR UPDATE
+    </select>
+
+    <update id="markExecuted">
+        UPDATE ainer_workspace_owner_recovery_request
+        SET status = 'EXECUTED',
+            approved_by = #{approvedBy},
+            executed_at = #{executedAt}
+        WHERE id = #{requestId}
+          AND status = 'REQUESTED'
+          AND expires_at &gt; #{executedAt}
+          AND requested_by &lt;&gt; #{approvedBy}
+    </update>
+</mapper>
