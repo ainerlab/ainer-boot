@@ -27,6 +27,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - 增加默认关闭的 Passkey 恢复：自助恢复码（高熵、一次性、bcrypt 哈希、per-subject 失败锁定）
   与管理员双人恢复（复刻 Workspace owner recovery 的 request/approve 骨架）。恢复码赎回或管理员
   恢复批准会吊销目标账号全部 ACTIVE Passkey，越过最后凭证保护，用户可重新 bootstrap。
+- 增加默认关闭的登录限速（node-local 固定窗口，按客户端 IP 节流登录类端点，超额 429
+  `AINER.COMMON.RATE_LIMITED` + `Retry-After`）与默认 `optional` 的受控首次 Passkey enrollment
+  （`require-invite` 模式下首登需操作员预授权，成功后授权置 `CONSUMED`，replacement 不受影响）。
 - 建立架构决策、HTTP API、开发、测试、数据库、配置、运行和发布文档体系。
 
 ### Security

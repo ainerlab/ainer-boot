@@ -15,7 +15,13 @@ public enum PasskeyErrorCode implements ErrorCode {
     RECOVERY_REQUEST_EXPIRED(
             "AINER.PASSKEY.RECOVERY_REQUEST_EXPIRED", "Passkey 管理员恢复请求已过期", 409),
     RECOVERY_NOT_REQUIRED(
-            "AINER.PASSKEY.RECOVERY_NOT_REQUIRED", "该账号当前没有 ACTIVE Passkey 需要恢复", 409);
+            "AINER.PASSKEY.RECOVERY_NOT_REQUIRED", "该账号当前没有 ACTIVE Passkey 需要恢复", 409),
+    ENROLLMENT_GRANT_REQUIRED(
+            "AINER.PASSKEY.ENROLLMENT_GRANT_REQUIRED", "首枚 Passkey 登记需要有效的 enrollment 授权", 409),
+    ENROLLMENT_GRANT_NOT_FOUND(
+            "AINER.PASSKEY.ENROLLMENT_GRANT_NOT_FOUND", "enrollment 授权不存在", 404),
+    ENROLLMENT_GRANT_CONFLICT(
+            "AINER.PASSKEY.ENROLLMENT_GRANT_CONFLICT", "enrollment 授权状态已变化", 409);
 
     private final String code;
     private final String defaultMessage;

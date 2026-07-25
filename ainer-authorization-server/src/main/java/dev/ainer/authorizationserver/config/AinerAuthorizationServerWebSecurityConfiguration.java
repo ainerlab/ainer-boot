@@ -124,6 +124,10 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                                 "SCOPE_passkey.recovery.request.all",
                                 "SCOPE_passkey.recovery.approve",
                                 "SCOPE_passkey.recovery.approve.all")
+                        .requestMatchers("/internal/passkey-enrollment/**")
+                        .hasAnyAuthority(
+                                "SCOPE_passkey.enrollment.manage",
+                                "SCOPE_passkey.enrollment.manage.all")
                         .anyRequest().denyAll())
                 .csrf(csrf -> csrf.disable())
                 .requestCache(cache -> cache.disable())
@@ -172,7 +176,9 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
     @Order(4)
     SecurityFilterChain authorizationServerDefaultSecurityFilterChain(
             HttpSecurity http,
-            ObjectProvider<AinerPasskeyWebSecurity> passkeyProvider) throws Exception {
+            ObjectProvider<AinerPasskeyWebSecurity> passkeyProvider,
+            ObjectProvider<dev.ainer.authorizationserver.ratelimit.AinerLoginRateLimitFilter> rateLimitFilterProvider)
+            throws Exception {
         AinerPasskeyWebSecurity passkey = passkeyProvider.getIfAvailable();
         http.authorizeHttpRequests(authorize -> {
                     authorize.requestMatchers("/actuator/health/**", "/actuator/info").permitAll();
@@ -188,6 +194,13 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                     }
                     authorize.anyRequest().authenticated();
                 });
+        dev.ainer.authorizationserver.ratelimit.AinerLoginRateLimitFilter rateLimitFilter =
+                rateLimitFilterProvider.getIfAvailable();
+        if (rateLimitFilter != null) {
+            http.addFilterAfter(
+                    rateLimitFilter,
+                    org.springframework.security.web.context.SecurityContextHolderFilter.class);
+        }
         if (passkey != null) {
             http.formLogin(passkey::configureFormLogin);
             http.webAuthn(passkey::configureBrowserChain);

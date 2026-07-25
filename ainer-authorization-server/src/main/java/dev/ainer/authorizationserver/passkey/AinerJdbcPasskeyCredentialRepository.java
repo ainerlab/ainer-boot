@@ -1,5 +1,6 @@
 package dev.ainer.authorizationserver.passkey;
 
+import dev.ainer.core.error.BusinessException;
 import dev.ainer.module.identity.account.application.IdentityAccount;
 import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.web.request.RequestIdFilter;
@@ -35,6 +36,7 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
     private final IdentityApplicationService identityService;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
+    private final boolean requireEnrollmentGrant;
 
     public AinerJdbcPasskeyCredentialRepository(
             JdbcTemplate jdbcTemplate,
@@ -42,12 +44,23 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
             IdentityApplicationService identityService,
             PlatformTransactionManager transactionManager,
             Clock clock) {
+        this(jdbcTemplate, userEntities, identityService, transactionManager, clock, false);
+    }
+
+    public AinerJdbcPasskeyCredentialRepository(
+            JdbcTemplate jdbcTemplate,
+            PublicKeyCredentialUserEntityRepository userEntities,
+            IdentityApplicationService identityService,
+            PlatformTransactionManager transactionManager,
+            Clock clock,
+            boolean requireEnrollmentGrant) {
         this.jdbcTemplate = jdbcTemplate;
         this.delegate = new JdbcUserCredentialRepository(jdbcTemplate);
         this.userEntities = userEntities;
         this.identityService = identityService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.clock = clock;
+        this.requireEnrollmentGrant = requireEnrollmentGrant;
     }
 
     @Override
@@ -181,6 +194,7 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
                 .orElseThrow(() -> new IllegalStateException(
                         "Ainer passkey registration requires an active identity account"));
         Instant now = clock.instant();
+        requireEnrollmentGrantIfFirstEnrollment(account.subjectId(), now);
         delegate.save(credentialRecord);
         jdbcTemplate.update(
                 """
@@ -256,6 +270,32 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
                 record.subjectId(),
                 "REVOKED",
                 now);
+    }
+
+        private void requireEnrollmentGrantIfFirstEnrollment(UUID subjectId, Instant now) {
+        if (!requireEnrollmentGrant) {
+            return;
+        }
+        Integer activeCount = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM ainer_passkey_credential
+                WHERE subject_id = ? AND status = 'ACTIVE'
+                """,
+                Integer.class, subjectId);
+        if (activeCount != null && activeCount > 0) {
+            return;
+        }
+        int consumed = jdbcTemplate.update(
+                """
+                UPDATE ainer_passkey_enrollment_grant
+                SET status = 'CONSUMED', consumed_at = ?
+                WHERE subject_id = ? AND status = 'ACTIVE'
+                """,
+                Timestamp.from(now), subjectId);
+        if (consumed != 1) {
+            throw new BusinessException(PasskeyErrorCode.ENROLLMENT_GRANT_REQUIRED);
+        }
     }
 
     private void requireActive(Bytes credentialId) {

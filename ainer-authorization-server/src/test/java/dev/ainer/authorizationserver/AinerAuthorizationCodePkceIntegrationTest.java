@@ -5,7 +5,9 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import dev.ainer.authorizationserver.passkey.AinerJdbcPasskeyCredentialRepository;
 import dev.ainer.authorizationserver.passkey.AinerPasskeyAdminRecoveryService;
+import dev.ainer.authorizationserver.passkey.AinerPasskeyEnrollmentGrantService;
 import dev.ainer.authorizationserver.passkey.AinerPasskeyRecoveryCodeService;
 import dev.ainer.authorizationserver.passkey.WebAuthnCeremony;
 import dev.ainer.core.error.BusinessException;
@@ -22,6 +24,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -63,7 +66,7 @@ import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
-import java.time.Duration;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -154,11 +157,21 @@ class AinerAuthorizationCodePkceIntegrationTest {
     @Autowired
     private AinerPasskeyAdminRecoveryService adminRecoveryService;
 
+    @Autowired
+    private AinerPasskeyEnrollmentGrantService enrollmentGrantService;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private Clock clock;
+
     private ProvisionedIdentity identity;
 
     @BeforeEach
     void setUp() {
         jdbcTemplate.update("DELETE FROM ainer_passkey_security_operation_audit");
+        jdbcTemplate.update("DELETE FROM ainer_passkey_enrollment_grant");
         jdbcTemplate.update("DELETE FROM ainer_passkey_recovery_lockout");
         jdbcTemplate.update("DELETE FROM ainer_passkey_recovery_request");
         jdbcTemplate.update("DELETE FROM ainer_passkey_recovery_code");
@@ -498,6 +511,30 @@ class AinerAuthorizationCodePkceIntegrationTest {
         assertThatThrownBy(() -> adminRecoveryService.approveAndExecute(
                 "service-c", tenantId, request.id()))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void requireInviteEnrollmentGateBlocksFirstEnrollmentUntilGranted() {
+        AinerJdbcPasskeyCredentialRepository gatedRepo = new AinerJdbcPasskeyCredentialRepository(
+                jdbcTemplate, userEntityRepository, identityService, transactionManager, clock, true);
+        UUID tenantId = identity.tenantId();
+        UUID subjectId = identity.subjectId();
+
+        assertThatThrownBy(() -> gatedRepo.save(credential()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("enrollment");
+
+        enrollmentGrantService.grant("operator-a", tenantId, subjectId, "invite-001");
+        gatedRepo.save(credential());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM ainer_passkey_enrollment_grant WHERE subject_id = ?",
+                String.class, subjectId)).isEqualTo("CONSUMED");
+
+        CredentialRecord replacement = credential();
+        gatedRepo.save(replacement);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_passkey_credential WHERE subject_id = ? AND status = 'ACTIVE'",
+                Integer.class, subjectId)).isEqualTo(2);
     }
 
     @Test

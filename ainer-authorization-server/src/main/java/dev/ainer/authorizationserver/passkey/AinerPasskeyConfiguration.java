@@ -26,7 +26,7 @@ import java.time.Clock;
         prefix = "ainer.security.authorization-server.passkey",
         name = "enabled",
         havingValue = "true")
-@EnableConfigurationProperties(AinerPasskeyRecoveryProperties.class)
+@EnableConfigurationProperties({AinerPasskeyRecoveryProperties.class, AinerPasskeyEnrollmentProperties.class})
 public class AinerPasskeyConfiguration {
 
     @Bean
@@ -47,13 +47,15 @@ public class AinerPasskeyConfiguration {
             PublicKeyCredentialUserEntityRepository userEntities,
             IdentityApplicationService identityService,
             PlatformTransactionManager transactionManager,
-            Clock clock) {
+            Clock clock,
+            AinerPasskeyEnrollmentProperties enrollmentProperties) {
         return new AinerJdbcPasskeyCredentialRepository(
                 jdbcTemplate,
                 userEntities,
                 identityService,
                 transactionManager,
-                clock);
+                clock,
+                enrollmentProperties.isRequireInvite());
     }
 
     @Bean
@@ -117,5 +119,13 @@ public class AinerPasskeyConfiguration {
             Clock clock) {
         return new AinerPasskeyAdminRecoveryService(
                 jdbcTemplate, credentialRepository, transactionManager, clock);
+    }
+
+    @Bean
+    AinerPasskeyEnrollmentGrantService ainerPasskeyEnrollmentGrantService(
+            JdbcTemplate jdbcTemplate,
+            PlatformTransactionManager transactionManager,
+            Clock clock) {
+        return new AinerPasskeyEnrollmentGrantService(jdbcTemplate, transactionManager, clock);
     }
 }

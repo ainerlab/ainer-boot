@@ -6,9 +6,9 @@
 
 ## 1. 当前阶段
 
-Foundation M4.6 Passkey 协议、条件人员认证基线、Phase A 真实签名 ceremony 端到端门禁与凭证
-管理条件 MFA 门禁，以及 Phase B 恢复码与管理员双人恢复已完成。下一阶段进入限速、受控首次
-登记和账号通知。项目已经从纯设计文档进入可编译、可运行、可测试的 Spring Boot 4.1 多模块工程，
+Foundation M4.6 Passkey 协议、条件人员认证基线、Phase A 真实签名 ceremony、Phase B 恢复码与
+管理员双人恢复，以及 Phase C 登录限速与受控首次 enrollment 已完成。下一阶段进入账号通知与
+step-up policy。项目已经从纯设计文档进入可编译、可运行、可测试的 Spring Boot 4.1 多模块工程，
 但尚未达到生产或商业发行就绪。
 
 ## 2. 已完成
@@ -54,13 +54,23 @@ Foundation M4.6 Passkey 协议、条件人员认证基线、Phase A 真实签名
 - 默认关闭的 Passkey 恢复：自助恢复码（首次登记后签发，高熵一次性、bcrypt 哈希、per-subject
   失败锁定），赎回即吊销该账号全部 ACTIVE Passkey 并写安全操作审计；管理员双人恢复复刻
   Workspace owner recovery 的 request/approve 骨架，approve 吊销目标全部 ACTIVE Passkey；
+- 默认关闭的登录限速（node-local 固定窗口，按客户端 IP 节流 `/login`、`/login/webauthn`，
+  超额 429）与默认 `optional` 的受控首次 Passkey enrollment（`require-invite` 模式下首登需操作员
+  预授权，成功后授权置 CONSUMED，replacement 不受影响）；
 - ADR-0001 至 ADR-0011 已接受，ADR-0012 至 ADR-0014 处于 Proposed；架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
 
 ## 3. 最近验证证据
 
 2026-07-25 在 macOS Colima、Testcontainers 2.0.5 与 `postgres:18.3-alpine` 环境执行完整
-`mvn test`：14 个 Reactor 模块成功，184 个测试全部实际执行通过，0 failure、0 error、
+`mvn test`：14 个 Reactor 模块成功，188 个测试全部实际执行通过，0 failure、0 error、
 0 skipped。
+
+本轮 Phase C 新增限速与受控 enrollment 证据：限速器单元测试覆盖窗口内放行、超额拒绝、不同 key
+独立计数、跨窗口复位与 `Retry-After` 取整；受控首次 enrollment 在真实 PostgreSQL 上验证
+`require-invite` 模式——无授权的首枚 Passkey 登记被拒（`ENROLLMENT_GRANT_REQUIRED`），操作员建立
+授权后首登成功且授权同事务置 `CONSUMED`，已有 ACTIVE Passkey 的 replacement 不受影响。限速明确为
+node-local（全仓无 Redis），多实例需共享存储留待后续。限速 filter 的端到端 HTTP 429 与 enrollment
+控制面 HTTP 级拒绝路径仍是后续门禁。
 
 本轮 Phase B 新增 Passkey 恢复证据：恢复码自助流程在真实 HTTP 会话与 PostgreSQL 上跑通——
 真实 Passkey 登记后签发 8 枚高熵一次性恢复码（明文仅返回一次，库内只存 bcrypt 哈希），
@@ -164,11 +174,11 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 ## 5. 下一里程碑
 
 M4.6 已完成 Passkey 协议配置、条件人员门禁、JDBC credential 生命周期基线、Phase A 真实签名
-ceremony 端到端门禁与凭证管理条件 MFA 门禁，以及 Phase B 恢复码与管理员双人恢复。虚拟
-authenticator 的 registration/authentication 签名 ceremony 已用 webauthn4j 在自动化测试中真实
-跑通；真实设备/浏览器兼容矩阵仍待补。下一工程切片优先建立通用限速框架（登录/options/恢复端点）、
-受控首次 enrollment（高权限账号邀请/审批 gate）和账号通知（含联系字段与可达通道），随后继续
-browser/OIDC client 的生产注册、redirect URI 变更和退役流程。
+ceremony 端到端门禁与凭证管理条件 MFA 门禁、Phase B 恢复码与管理员双人恢复，以及 Phase C 登录
+限速与受控首次 enrollment。虚拟 authenticator 的 registration/authentication 签名 ceremony 已用
+webauthn4j 在自动化测试中真实跑通；真实设备/浏览器兼容矩阵仍待补。下一工程切片优先建立账号通知
+（含联系字段与可达通道）与 resource server 端 step-up policy，随后继续 browser/OIDC client 的
+生产注册、redirect URI 变更和退役流程。
 
 生产并行工作仍包括真实 Prometheus 抓取、dashboard/告警、Authorization Server 多实例容量/故障
 证据、metrics/introspection/operator 旧凭据退役、Resource Server 灰度与安全降级审批，以及把
