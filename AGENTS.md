@@ -153,3 +153,15 @@ docs(architecture): 修正服务化装配边界
 ```
 
 全程使用中文与用户沟通。
+
+## Cursor Cloud specific instructions
+
+面向已跑过 update script（`mvn -q -B -DskipTests dependency:go-offline`）的后续 Cloud Agent。工具链、PostgreSQL、Docker 已随快照安装完毕，标准构建/测试/运行命令见 `docs/development.md` 与 `docs/testing.md`，此处只记录非显而易见的坑：
+
+- 工具链：JDK 25 装在 `/opt/jdk-25`，Maven 3.9 装在 `/opt/maven`，均已通过 `/usr/local/bin` 软链接与 `~/.bashrc`（`JAVA_HOME`/`PATH`）暴露。enforcer 要求 JDK 精确为 25；系统自带的 JDK 21 不会被优先使用。
+- 服务需每个会话手动启动（禁止写进 update script）：`sudo pg_ctlcluster 18 main start`（数据持久在快照里：库 `ainer`、`ainer_auth`，角色同名，密码 `local-only-password`）；`sudo dockerd`（后台，供 Testcontainers 集成测试；不启动时带 `disabledWithoutDocker=true` 的数据库测试会跳过而非用 H2）。
+- Docker 权限：`ubuntu` 已在 `docker` 组（新登录 shell 生效）。若某个 shell 仍报 socket 权限错误，执行一次 `sudo chmod 666 /var/run/docker.sock` 即可（dockerd 重启后需重做）。
+- **`spring-boot:run` 不能带 `-am`**：`mvn -pl <app> -am spring-boot:run` 会在所有 reactor 模块上执行 run 目标，库模块无 main class 直接报 “Unable to find a suitable main class”。正确做法：先 `mvn -q -B -DskipTests install` 装好全部模块，再 `mvn -q -pl ainer-server spring-boot:run` / `mvn -q -pl ainer-authorization-server spring-boot:run`（不带 `-am`）。
+- Resource Server 的 issuer 校验坑：`AINER_SECURITY_ISSUER_URI` 指向的 HTTPS issuer（如 `https://auth.local.example`）本机不可达，若只配它，`ainer-server` 会因 OIDC discovery 失败起不来。本地改为设置 `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://127.0.0.1:9000/oauth2/jwks` 直连授权服务器 JWKS，绕过 discovery。
+- `machine-client-bootstrap` 默认 scope 只有 `ai.invoke`；要创建 Workspace 需通过 `AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_SCOPES=workspace.read,workspace.write` 显式加上。
+- 现成的本地运行素材在 `/home/ubuntu/ainer-local/`（不在仓库内）：`auth-server.env`、`app-server.env` 两个环境文件，以及授权服务器用的 `ainer-private.pem` / `ainer-public.pem`。端到端最小验证：先 source `auth-server.env` 启动授权服务器，用 client_credentials 调 `http://127.0.0.1:9000/oauth2/token` 拿 JWT，再 source `app-server.env` 启动 `ainer-server`，`POST http://127.0.0.1:8080/api/workspaces` 创建 Workspace。
