@@ -185,6 +185,11 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
         if (passkey != null) {
             http.formLogin(passkey::configureFormLogin);
             http.webAuthn(passkey::configureBrowserChain);
+            // WebAuthn 协议 filter 在授权 filter 之前短路，凭证管理端点必须显式补一道条件 MFA 门禁。
+            // 锚定 CsrfFilter 之后：CSRF 已校验、会话认证已恢复，且仍在 WebAuthn 协议 filter 之前。
+            http.addFilterAfter(
+                    passkey.credentialManagementGateFilter(),
+                    org.springframework.security.web.csrf.CsrfFilter.class);
         } else {
             http.formLogin(Customizer.withDefaults());
         }

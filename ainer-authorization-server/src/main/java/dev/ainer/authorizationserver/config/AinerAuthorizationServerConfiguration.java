@@ -16,8 +16,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.FactorGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -39,6 +41,7 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
+import org.springframework.security.web.webauthn.api.PublicKeyCredentialUserEntity;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
@@ -154,7 +157,8 @@ public class AinerAuthorizationServerConfiguration {
 
     @Bean
     OAuth2TokenCustomizer<JwtEncodingContext> ainerJwtTokenCustomizer(
-            AinerAuthorizationServerProperties properties) {
+            AinerAuthorizationServerProperties properties,
+            AinerUserDetailsService userDetailsService) {
         return context -> {
             if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
                 String audience = properties.getAudience();
@@ -163,15 +167,15 @@ public class AinerAuthorizationServerConfiguration {
                 }
                 context.getClaims().audience(new ArrayList<>(List.of(audience)));
             }
-            Object principal = context.getPrincipal().getPrincipal();
-            if (principal instanceof AinerUserDetails user) {
+            Authentication authentication = context.getPrincipal();
+            AinerUserDetails user = ainerUserDetails(authentication, userDetailsService);
+            if (user != null) {
                 context.getClaims()
                         .subject(user.subjectId().toString())
                         .claim("actor_type", "USER")
                         .claim("tenant_id", user.tenantId().toString())
                         .claim("roles", new ArrayList<>(roleNames(user)));
-                List<FactorGrantedAuthority> factors = context.getPrincipal()
-                        .getAuthorities().stream()
+                List<FactorGrantedAuthority> factors = authentication.getAuthorities().stream()
                         .filter(FactorGrantedAuthority.class::isInstance)
                         .map(FactorGrantedAuthority.class::cast)
                         .toList();
@@ -200,6 +204,24 @@ public class AinerAuthorizationServerConfiguration {
                 }
             }
         };
+    }
+
+    private static AinerUserDetails ainerUserDetails(
+            Authentication authentication,
+            AinerUserDetailsService userDetailsService) {
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof AinerUserDetails user) {
+            return user;
+        }
+        // Passkey 用户经 WebAuthn 认证后，主体是协议 PublicKeyCredentialUserEntity（只含 username），
+        // 需经 Identity 解析为 AinerUserDetails 才能投影稳定 sub/tenant_id/roles。
+        if (principal instanceof PublicKeyCredentialUserEntity webAuthnUser) {
+            UserDetails loaded = userDetailsService.loadUserByUsername(webAuthnUser.getName());
+            if (loaded instanceof AinerUserDetails ainerUser) {
+                return ainerUser;
+            }
+        }
+        return null;
     }
 
     @Bean

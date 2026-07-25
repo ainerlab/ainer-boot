@@ -138,11 +138,18 @@ Flyway 无条件创建协议和治理表，功能保持默认关闭。生产启�
 - 已登记账号仅凭密码不能取得 authorization code；
 - JDBC 测试验证登记/计数更新时间不重复审计、replacement 后软撤销、协议记录保留和最后凭证
   删除拒绝；并发撤销两个 ACTIVE credential 时只允许一个成功。
+- 虚拟 authenticator（webauthn4j）驱动真实 registration/authentication 签名 ceremony，端到端
+  走通 Spring Security 7.1 的 `Webauthn4JRelyingPartyOperations` 签名校验；Passkey 用户完成
+  授权码流程后 access token 携带 `amr=pwd,mfa,pop`、`auth_time`、稳定 `sub`/`tenant_id`/`roles`。
+- 凭证管理端点 `/webauthn/register/**` 的条件 MFA 门禁在 HTTP 层真实生效：已登记账号缺因子时
+  `register/options` 与 `DELETE register/{id}` 均 302 到 `/login`，首次 bootstrap 不受影响。
+- 这组真实 ceremony 测试同时揭露并修复了三个此前被合成 CredentialRecord 掩盖的缺陷：OAuth2
+  授权记录反序列化 `WebAuthnAuthentication`（注册 `WebauthnJacksonModule`）、Passkey Token 缺
+  Ainer claims（customizer 解析 WebAuthn principal）、以及凭证管理门禁被协议 filter 短路。
 
 尚未完成：
 
-- 虚拟 authenticator 与主流真实设备的完整 registration/authentication 签名 ceremony；
-- Passkey 登录后 Token 的 `amr=mfa,pop` 端到端证据；
+- 主流真实设备的完整 registration/authentication 签名 ceremony 与浏览器兼容矩阵；
 - 受控首因子 enrollment、恢复码/管理员双人恢复、通知、限速和风控；
 - 同步/非同步 Passkey、backup state、克隆信号和多节点 session 的容量/故障验证。
 

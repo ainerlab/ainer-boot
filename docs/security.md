@@ -234,20 +234,25 @@ M4.6 增加默认关闭的 Passkey/WebAuthn 协议基础。启用时：
 - registration 与 authentication options 都强制 `userVerification=required`，使用 resident
   credential；私钥和本地生物识别模板不进入 Ainer；
 - 无 ACTIVE Passkey 的账号可用密码完成首次 bootstrap；一旦存在 ACTIVE Passkey，
-  `/oauth2/authorize` 和 `/webauthn/register...` 凭证管理必须完成 WebAuthn 因子；
+  `/oauth2/authorize` 和 `/webauthn/register/**` 凭证管理必须完成 WebAuthn 因子。由于 Spring
+  Security WebAuthn 协议 filter 在授权 filter 之前短路，凭证管理端点由专用
+  `AinerPasskeyCredentialManagementGateFilter` 在协议 filter 之前显式运行条件 MFA
+  `AuthorizationManager`，缺因子时重定向到登录入口；
 - `/webauthn/register/options`、`/webauthn/register`、
   `/webauthn/authenticate/options` 与 `/login/webauthn` 使用 Spring Security 标准协议响应，
   不套 Ainer JSON envelope；
 - 协议凭证保存在 Spring 官方 JDBC 表，Ainer 生命周期表只补充稳定 subject、ACTIVE/REVOKED、
   时间和审计。删除是软撤销；最后一个 ACTIVE Passkey 不允许自助删除，轮换必须先登记
   replacement；
-- 密码人员 Token 写标准 `amr=pwd`；完成 UV-required WebAuthn 后计划写 IANA 已登记的
-  `mfa,pop`，并以最新因子时间写 `auth_time`。
+- 密码人员 Token 写标准 `amr=pwd`；完成 UV-required WebAuthn 后实际写 IANA 已登记的
+  `mfa,pop`，并以最新因子时间写 `auth_time`。Passkey 用户走授权码流程后，Token 正确携带
+  稳定 `sub`/`tenant_id`/`roles`（customizer 按 username 解析 WebAuthn principal）。
 
-本切片尚未用虚拟 authenticator 或真实设备完成完整签名 ceremony，也没有受控首次登记、恢复码、
-管理员恢复、恢复通知、登录限速、step-up 有效期或多节点 session 证据。TOTP 只保留为后续受限
-恢复 fallback 的候选，不能作为抗钓鱼主因子。完整决策和威胁模型见
-[ADR-0014](decisions/0014-passkey-first-human-authentication.md)。
+真实签名 ceremony 已用 webauthn4j 虚拟 authenticator 在自动化测试中端到端跑通（attestation
++ assertion 闭环、`amr=pwd,mfa,pop` 与凭证管理门禁均在 HTTP 层验证）。本切片仍未覆盖主流
+真实设备/浏览器兼容矩阵，也没有受控首次登记、恢复码、管理员恢复、恢复通知、登录限速、step-up
+有效期或多节点 session 证据。TOTP 只保留为后续受限恢复 fallback 的候选，不能作为抗钓鱼主因子。
+完整决策和威胁模型见 [ADR-0014](decisions/0014-passkey-first-human-authentication.md)。
 
 人员账号由 `ainer-module-identity` 保存 delegating password hash、状态和唯一默认租户。Authorization Server 的 `UserDetailsService` 从该端口加载账号，签发时把稳定 UUID 写入 `sub`，把默认租户写入 `tenant_id`，并把成员角色写入 `roles`。
 

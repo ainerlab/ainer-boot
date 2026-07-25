@@ -1,14 +1,13 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-07-23 · 工程版本：`0.1.0-SNAPSHOT`
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-07-25 · 工程版本：`0.1.0-SNAPSHOT`
 
 本文只记录当前事实和验证证据，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
 ## 1. 当前阶段
 
-Foundation M4.6 Passkey 协议与条件人员认证基线已完成，下一阶段进入受控首次登记、恢复和
-账号治理。项目已经从纯设计文档进入可编译、可运行、可测试的 Spring Boot 4.1 多模块工程，
-但尚未达到生产或商业发行就绪。
+Foundation M4.6 Passkey 协议与条件人员认证基线已完成，并已补齐 Phase A 真实签名 ceremony
+端到端门禁与凭证管理条件 MFA 门禁。下一阶段进入受控首次登记、恢复和账号治理。项目已经从纯设计文档进入可编译、可运行、可测试的 Spring Boot 4.1 多模块工程，但尚未达到生产或商业发行就绪。
 
 ## 2. 已完成
 
@@ -45,9 +44,32 @@ Foundation M4.6 Passkey 协议与条件人员认证基线已完成，下一阶�
   JDBC 协议与 ACTIVE/REVOKED 生命周期、软撤销、并发最后凭证保护和操作审计；
 - 人员 Token 的标准 `amr` / `auth_time` 基线，以及 browser chain 精确 factor accumulation，
   不改变 Client Credentials、internal API 和 metrics 安全链；
+- Passkey 真实签名 ceremony 端到端门禁：虚拟 authenticator 驱动 registration/authentication
+  签名闭环，Passkey 用户走授权码流程后 access token 携带 `amr=pwd,mfa,pop`、`auth_time`、
+  稳定 `sub`/`tenant_id`/`roles`；
+- 凭证管理端点（`/webauthn/register/**`）真正受条件 MFA 门禁保护，已登记账号在缺因子时
+  无法登记或删除凭证；
 - ADR-0001 至 ADR-0011 已接受，ADR-0012 至 ADR-0014 处于 Proposed；架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
 
 ## 3. 最近验证证据
+
+2026-07-25 在 macOS Colima、Testcontainers 2.0.5 与 `postgres:18.3-alpine` 环境执行完整
+`mvn test`：14 个 Reactor 模块成功，182 个测试全部实际执行通过，0 failure、0 error、
+0 skipped。
+
+本轮 Phase A 新增 Passkey 真实签名 ceremony 端到端证据：用 webauthn4j 虚拟 authenticator
+驱动 `/webauthn/register`（真实 attestation）与 `/login/webauthn`（真实 assertion）闭环，
+真实走通 Spring Security 7.1 的 `Webauthn4JRelyingPartyOperations` 签名校验代码路径；
+Passkey 用户完成授权码流程后，access token 携带 `amr=pwd,mfa,pop`、`auth_time`、稳定
+`sub`（subjectId UUID）、`tenant_id` 与 `roles`。这组测试同时揭露并修复了三个此前被合成
+CredentialRecord 测试掩盖的真实缺陷：OAuth2 授权记录无法反序列化 `WebAuthnAuthentication`
+主体（注册 `WebauthnJacksonModule`）、Passkey 用户 token 因 customizer 不认 WebAuthn
+principal 而缺 Ainer claims（customizer 改为按 username 解析 `AinerUserDetails`），以及
+凭证管理端点 `/webauthn/register/**` 因协议 filter 在授权 filter 之前短路而未被条件 MFA
+门禁保护（新增 `AinerPasskeyCredentialManagementGateFilter`，锚定 `CsrfFilter` 之后、协议
+filter 之前）。HTTP 层门禁测试覆盖：已登记账号在缺因子时 `/webauthn/register/options` 与
+`DELETE /webauthn/register/{id}` 均 302 到 `/login`，凭证不被新增或删除；首次 bootstrap
+（未登记账号）不受影响。本轮尚未覆盖真实设备/浏览器兼容矩阵。
 
 2026-07-23 在 macOS Colima 0.10.3、Docker 29.5.2 与 Testcontainers 2.0.5 环境执行完整
 `mvn test`：14 个 Reactor 模块成功，180 个测试全部实际执行通过，0 failure、0 error、
@@ -123,10 +145,11 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 ## 5. 下一里程碑
 
-M4.6 已完成 Passkey 协议配置、条件人员门禁和 JDBC credential 生命周期基线。下一工程切片
-优先建立受控首次 enrollment、恢复码/管理员双人恢复、账号通知、限速和审计边界，并用虚拟
-authenticator 与真实设备补齐 registration/authentication 签名 ceremony；同时设计
-browser/OIDC client 的生产注册、redirect URI 变更和退役流程。
+M4.6 已完成 Passkey 协议配置、条件人员门禁、JDBC credential 生命周期基线，以及 Phase A
+真实签名 ceremony 端到端门禁与凭证管理条件 MFA 门禁。虚拟 authenticator 的 registration/
+authentication 签名 ceremony 已用 webauthn4j 在自动化测试中真实跑通；真实设备/浏览器兼容
+矩阵仍待补。下一工程切片优先建立恢复码/管理员双人恢复、账号通知、限速、受控首次 enrollment
+和审计边界（Phase B 起），随后继续 browser/OIDC client 的生产注册、redirect URI 变更和退役流程。
 
 生产并行工作仍包括真实 Prometheus 抓取、dashboard/告警、Authorization Server 多实例容量/故障
 证据、metrics/introspection/operator 旧凭据退役、Resource Server 灰度与安全降级审批，以及把

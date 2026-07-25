@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.ainer.authorizationserver.identity.AinerUserDetails;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.jackson.SecurityJacksonModules;
+import org.springframework.security.web.webauthn.jackson.WebauthnJacksonModule;
 import tools.jackson.databind.JacksonModule;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
@@ -28,6 +29,10 @@ final class AinerOAuth2AuthorizationJsonMapperFactory {
         List<JacksonModule> modules = new ArrayList<>(SecurityJacksonModules.getModules(
                 AinerOAuth2AuthorizationJsonMapperFactory.class.getClassLoader(),
                 validator));
+        // spring-security-webauthn 的 Jackson 模块未通过 ServiceLoader 自动发现；Passkey 用户走授权码流程后，授权记录需往返 WebAuthnAuthentication 主体，必须显式注册并把其类型加入多态白名单。
+        WebauthnJacksonModule webauthnModule = new WebauthnJacksonModule();
+        webauthnModule.configurePolymorphicTypeValidator(validator);
+        modules.add(webauthnModule);
         modules.add(new SimpleModule("ainer-oauth2-authorization")
                 .setMixInAnnotation(AinerUserDetails.class, AinerUserDetailsMixin.class));
         return JsonMapper.builder().addModules(modules).build();

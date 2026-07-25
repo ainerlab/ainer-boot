@@ -43,6 +43,10 @@ public final class AinerPasskeyWebSecurity {
         return authorizationManager;
     }
 
+    public AinerPasskeyCredentialManagementGateFilter credentialManagementGateFilter() {
+        return new AinerPasskeyCredentialManagementGateFilter(authorizationManager);
+    }
+
     public void configureProtocolChain(WebAuthnConfigurer<HttpSecurity> webAuthn) {
         configure(webAuthn);
         webAuthn.disableDefaultRegistrationPage(true);

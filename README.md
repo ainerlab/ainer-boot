@@ -1,6 +1,6 @@
 # Ainer Boot
 
-> 正式品牌：Ainer · M4.6 Passkey protocol foundation · 2026-07-23 · JDK 25 + Spring Boot 4.1.0
+> 正式品牌：Ainer · M4.6 Passkey ceremony + 条件门禁加固 · 2026-07-25 · JDK 25 + Spring Boot 4.1.0
 
 Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 AI 时代的企业应用平台底座。它从模块化单体开始，通过明确的契约、适配器和独立发行物演进为服务化系统；它不继承 yudao、BladeX、Dante 或 Snowy 的代码与框架范式。
 
@@ -154,9 +154,11 @@ Authorization Code + PKCE 已建立真实 PostgreSQL 与浏览器 HTTP 会话门
 控制面或登录体验已经交付。
 
 M4.6 已建立默认关闭的 Passkey 协议基础：启用时强制 WebAuthn user verification、精确 RP/
-Origin、已登记账号的条件授权门禁，以及凭证软撤销、replacement、最后凭证保护和操作审计。
-这不是完整生产 MFA：受控首次登记、真实设备兼容矩阵、恢复码/管理员恢复、通知、step-up 策略和
-多节点会话仍未完成，详见
+Origin、已登记账号的条件授权门禁，以及凭证软撤销、replacement、最后凭证保护和操作审计。Phase A
+补齐了真实签名 ceremony 端到端门禁（webauthn4j 虚拟 authenticator 驱动 attestation/assertion
+闭环，`amr=pwd,mfa,pop` 在 HTTP 层验证）与凭证管理条件 MFA 门禁，并修复了此前被合成测试掩盖的
+授权记录反序列化、Passkey Token claims 与凭证管理门禁三个缺陷。这仍不是完整生产 MFA：主流真实
+设备兼容矩阵、受控首次登记、恢复码/管理员恢复、通知、step-up 策略和多节点会话仍未完成，详见
 [ADR-0014](docs/decisions/0014-passkey-first-human-authentication.md)。
 
 下一步仍需部署真实 Prometheus、dashboard/告警，并完成 Authorization Server 多实例容量、故障

@@ -17,6 +17,7 @@
         <mybatis-spring-boot.version>4.0.0</mybatis-spring-boot.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <archunit.version>1.4.2</archunit.version>
+        <webauthn4j.version>0.31.6.RELEASE</webauthn4j.version>
     </properties>
 
     <dependencyManagement>
@@ -93,6 +94,11 @@
                 <groupId>com.tngtech.archunit</groupId>
                 <artifactId>archunit</artifactId>
                 <version>${archunit.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.webauthn4j</groupId>
+                <artifactId>webauthn4j-test</artifactId>
+                <version>${webauthn4j.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

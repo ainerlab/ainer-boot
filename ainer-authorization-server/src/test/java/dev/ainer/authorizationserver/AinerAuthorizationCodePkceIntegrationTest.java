@@ -5,6 +5,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import dev.ainer.authorizationserver.passkey.WebAuthnCeremony;
 import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.module.identity.account.application.ProvisionTenantOwnerCommand;
 import dev.ainer.module.identity.account.application.ProvisionedIdentity;
@@ -382,6 +383,65 @@ class AinerAuthorizationCodePkceIntegrationTest {
                 Integer.class)).isEqualTo(1);
     }
 
+    @Test
+    void webAuthnCeremonyRegistersAndAuthenticatesWithMfaAndPopAmr() throws Exception {
+        WebAuthnCeremony ceremony = new WebAuthnCeremony(objectMapper);
+        BrowserSession browser = newBrowser();
+        String csrf = login(browser);
+
+        WebAuthnCeremony.Registration registration = ceremony.register(
+                webAuthnOptions(browser, csrf, "/webauthn/register/options"));
+        postWebAuthnJson(browser, csrf, "/webauthn/register", registration.payload());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_passkey_credential WHERE status = 'ACTIVE'",
+                Integer.class)).isEqualTo(1);
+
+        String requestOptions = webAuthnOptions(browser, csrf, "/webauthn/authenticate/options");
+        String assertionPayload = ceremony.authenticate(requestOptions, registration.credentialId());
+        HttpResponse<String> webAuthnLogin = postWebAuthnJson(
+                browser, csrf, "/login/webauthn", assertionPayload);
+        assertThat(webAuthnLogin.statusCode()).isIn(200, 302);
+
+        String code = authorizeWithExistingSession(browser, VERIFIER);
+        HttpResponse<String> tokenResponse = exchange(code, VERIFIER, REDIRECT_URI);
+        assertThat(tokenResponse.statusCode()).isEqualTo(200);
+        Jwt accessToken = jwtDecoder.decode(
+                objectMapper.readTree(tokenResponse.body()).path("access_token").stringValue());
+        assertThat(accessToken.getClaimAsStringList("amr")).containsExactly("pwd", "mfa", "pop");
+        assertThat(accessToken.getClaimAsInstant("auth_time")).isNotNull();
+        assertThat(accessToken.getSubject()).isEqualTo(identity.subjectId().toString());
+    }
+
+    @Test
+    void credentialManagementRequiresWebAuthnFactorForRegisteredAccount() throws Exception {
+        CredentialRecord registered = credential();
+        userCredentialRepository.save(registered);
+        BrowserSession browser = newBrowser();
+        String csrf = login(browser);
+
+        HttpResponse<String> secondOptions = postWebAuthnJson(
+                browser, csrf, "/webauthn/register/options", "{}");
+        assertThat(secondOptions.statusCode()).isEqualTo(302);
+        assertThat(secondOptions.headers().firstValue("Location").orElseThrow())
+                .contains("/login");
+        assertThat(secondOptions.body()).doesNotContain("challenge");
+
+        HttpResponse<String> deleteAttempt = browser.client().send(
+                HttpRequest.newBuilder()
+                        .uri(localUri("/webauthn/register/"
+                                + registered.getCredentialId().toBase64UrlString()))
+                        .header("X-CSRF-TOKEN", csrf)
+                        .DELETE()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(deleteAttempt.statusCode()).isEqualTo(302);
+        assertThat(deleteAttempt.headers().firstValue("Location").orElseThrow())
+                .contains("/login");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_passkey_credential WHERE status = 'ACTIVE'",
+                Integer.class)).isEqualTo(1);
+    }
+
     private RegisteredClient browserClient() {
         return RegisteredClient.withId(UUID.randomUUID().toString())
                 .clientId(CLIENT_ID)
@@ -439,6 +499,39 @@ class AinerAuthorizationCodePkceIntegrationTest {
                         .POST(HttpRequest.BodyPublishers.ofString(loginForm))
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
+    }
+
+    private String webAuthnOptions(BrowserSession browser, String csrf, String path)
+            throws Exception {
+        HttpResponse<String> response = postWebAuthnJson(browser, csrf, path, "{}");
+        assertThat(response.statusCode()).isEqualTo(200);
+        return response.body();
+    }
+
+    private HttpResponse<String> postWebAuthnJson(
+            BrowserSession browser, String csrf, String path, String body) throws Exception {
+        return browser.client().send(
+                HttpRequest.newBuilder()
+                        .uri(localUri(path))
+                        .header("Content-Type", "application/json")
+                        .header("X-CSRF-TOKEN", csrf)
+                        .POST(HttpRequest.BodyPublishers.ofString(body))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+    }
+
+    private String authorizeWithExistingSession(BrowserSession browser, String verifier)
+            throws Exception {
+        String state = UUID.randomUUID().toString();
+        URI requestUri = authorizationUri(REDIRECT_URI, challenge(verifier), "S256", state);
+        HttpResponse<String> authorized = sendGet(browser.client(), requestUri);
+        assertThat(authorized.statusCode()).isEqualTo(302);
+        URI callback = URI.create(authorized.headers().firstValue("Location").orElseThrow());
+        assertThat(callback.toString()).startsWith(REDIRECT_URI);
+        Map<String, String> parameters = queryParameters(callback);
+        assertThat(parameters.get("state")).isEqualTo(state);
+        assertThat(parameters).containsKey("code").doesNotContainKey("error");
+        return parameters.get("code");
     }
 
     private String authorize(BrowserSession browser, String verifier, String redirectUri)

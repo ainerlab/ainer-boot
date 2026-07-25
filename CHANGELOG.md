@@ -45,6 +45,17 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 ### Fixed
 
 - 修复 Identity access-event 新记录遗漏 `available_at`，确保状态变化与可领取 outbox 事实可在同一事务写入真实 PostgreSQL。
+- 修复 OAuth2 授权记录无法反序列化 Passkey 用户的 `WebAuthnAuthentication` 主体：显式注册
+  `WebauthnJacksonModule` 并把其协议主体类型加入多态白名单，否则任何 Passkey 用户走授权码
+  流程都会在换 Token 时失败。
+- 修复 Passkey 登录用户签发的 access token 缺少 Ainer claims：token customizer 此前只识别
+  密码登录的 `AinerUserDetails` 主体，不识别 WebAuthn 的 `PublicKeyCredentialUserEntity`；
+  现按 username 解析为 `AinerUserDetails`，Token 正确携带稳定 `sub`、`tenant_id`、`roles`、
+  `amr=pwd,mfa,pop` 与 `auth_time`。
+- 修复凭证管理端点 `/webauthn/register/**` 未被条件 MFA 门禁保护：Spring Security WebAuthn
+  协议 filter 在授权 filter 之前短路，已登记账号原本只用密码即可登记或删除凭证；新增
+  `AinerPasskeyCredentialManagementGateFilter` 在协议 filter 之前显式运行同一
+  `AuthorizationManager`，缺因子时重定向到登录入口，未登记账号的首次 bootstrap 不受影响。
 
 ### Known limitations
 
