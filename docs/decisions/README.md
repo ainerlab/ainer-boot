@@ -22,6 +22,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0012](0012-production-observability-and-auth-availability.md) | Proposed | 生产指标访问与 Authorization Server 可用性边界 |
 | [0013](0013-audited-oauth-service-client-lifecycle.md) | Proposed | 受审计 OAuth tenant 服务客户端生命周期 |
 | [0014](0014-passkey-first-human-authentication.md) | Proposed | Passkey 优先的人员认证与条件 MFA 基线 |
+| [0015](0015-passkey-recovery.md) | Accepted | Passkey 恢复（恢复码 + 管理员双人恢复） |
 
 ## 何时需要 ADR
 

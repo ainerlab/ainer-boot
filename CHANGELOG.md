@@ -24,6 +24,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - 增加 Authorization Code + PKCE 的真实浏览器会话与 PostgreSQL 协议门禁。
 - 增加默认关闭的 Passkey/WebAuthn 协议基础、UV-required options、条件人员门禁、JDBC
   credential 生命周期、软撤销、最后凭证保护和审计。
+- 增加默认关闭的 Passkey 恢复：自助恢复码（高熵、一次性、bcrypt 哈希、per-subject 失败锁定）
+  与管理员双人恢复（复刻 Workspace owner recovery 的 request/approve 骨架）。恢复码赎回或管理员
+  恢复批准会吊销目标账号全部 ACTIVE Passkey，越过最后凭证保护，用户可重新 bootstrap。
 - 建立架构决策、HTTP API、开发、测试、数据库、配置、运行和发布文档体系。
 
 ### Security

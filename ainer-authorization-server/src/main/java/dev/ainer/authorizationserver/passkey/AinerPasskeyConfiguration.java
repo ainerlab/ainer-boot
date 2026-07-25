@@ -3,9 +3,11 @@ package dev.ainer.authorizationserver.passkey;
 import dev.ainer.authorizationserver.config.AinerAuthorizationServerProperties;
 import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.webauthn.api.AuthenticatorSelectionCriteria;
 import org.springframework.security.web.webauthn.api.PublicKeyCredentialRpEntity;
 import org.springframework.security.web.webauthn.api.ResidentKeyRequirement;
@@ -24,6 +26,7 @@ import java.time.Clock;
         prefix = "ainer.security.authorization-server.passkey",
         name = "enabled",
         havingValue = "true")
+@EnableConfigurationProperties(AinerPasskeyRecoveryProperties.class)
 public class AinerPasskeyConfiguration {
 
     @Bean
@@ -39,7 +42,7 @@ public class AinerPasskeyConfiguration {
     }
 
     @Bean
-    UserCredentialRepository userCredentialRepository(
+    AinerJdbcPasskeyCredentialRepository userCredentialRepository(
             JdbcTemplate jdbcTemplate,
             PublicKeyCredentialUserEntityRepository userEntities,
             IdentityApplicationService identityService,
@@ -85,5 +88,34 @@ public class AinerPasskeyConfiguration {
             PublicKeyCredentialUserEntityRepository userEntities,
             UserCredentialRepository userCredentials) {
         return new AinerPasskeyWebSecurity(settings, userEntities, userCredentials);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "ainer.security.authorization-server.passkey.recovery",
+            name = "self-service-enabled",
+            havingValue = "true")
+    AinerPasskeyRecoveryCodeService ainerPasskeyRecoveryCodeService(
+            JdbcTemplate jdbcTemplate,
+            PasswordEncoder passwordEncoder,
+            AinerJdbcPasskeyCredentialRepository credentialRepository,
+            PlatformTransactionManager transactionManager,
+            Clock clock) {
+        return new AinerPasskeyRecoveryCodeService(
+                jdbcTemplate, passwordEncoder, credentialRepository, transactionManager, clock);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "ainer.security.authorization-server.passkey.recovery",
+            name = "enabled",
+            havingValue = "true")
+    AinerPasskeyAdminRecoveryService ainerPasskeyAdminRecoveryService(
+            JdbcTemplate jdbcTemplate,
+            AinerJdbcPasskeyCredentialRepository credentialRepository,
+            PlatformTransactionManager transactionManager,
+            Clock clock) {
+        return new AinerPasskeyAdminRecoveryService(
+                jdbcTemplate, credentialRepository, transactionManager, clock);
     }
 }

@@ -151,7 +151,7 @@ public class AinerAuthorizationServerConfiguration {
     }
 
     @Bean
-    UserDetailsService ainerUserDetailsService(IdentityApplicationService identityService) {
+    AinerUserDetailsService ainerUserDetailsService(IdentityApplicationService identityService) {
         return new AinerUserDetailsService(identityService);
     }
 

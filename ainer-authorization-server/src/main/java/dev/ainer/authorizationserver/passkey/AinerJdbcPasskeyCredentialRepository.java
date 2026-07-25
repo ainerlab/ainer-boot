@@ -56,6 +56,46 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
         transactionTemplate.executeWithoutResult(status -> revoke(credentialId));
     }
 
+    /**
+     * 吊销某 subject 的全部 ACTIVE Passkey，越过“最后凭证保护”。仅在已验证的恢复上下文
+     * （恢复码自助恢复或管理员双人恢复）内调用；普通自助删除仍走 {@link #delete(Bytes)}。
+     * 返回实际吊销数。同事务为每枚凭证写 REVOKED 审计；恢复语义本身记在安全操作审计。
+     */
+    public int revokeAllActiveForSubject(UUID subjectId) {
+        Assert.notNull(subjectId, "subjectId cannot be null");
+        return transactionTemplate.execute(status -> {
+            List<ActiveCredential> active = jdbcTemplate.query(
+                    """
+                    SELECT credential_id, user_entity_user_id
+                    FROM ainer_passkey_credential
+                    WHERE subject_id = ? AND status = 'ACTIVE'
+                    FOR UPDATE
+                    """,
+                    (resultSet, rowNumber) -> new ActiveCredential(
+                            resultSet.getString("credential_id"),
+                            resultSet.getString("user_entity_user_id")),
+                    subjectId);
+            if (active.isEmpty()) {
+                return 0;
+            }
+            Instant now = clock.instant();
+            int changed = jdbcTemplate.update(
+                    """
+                    UPDATE ainer_passkey_credential
+                    SET status = ?, revoked_at = ?, updated_at = ?, version = version + 1
+                    WHERE subject_id = ? AND status = 'ACTIVE'
+                    """,
+                    REVOKED,
+                    Timestamp.from(now),
+                    Timestamp.from(now),
+                    subjectId);
+            for (ActiveCredential credential : active) {
+                audit(credential.credentialId(), credential.userEntityUserId(), subjectId, REVOKED, now);
+            }
+            return changed;
+        });
+    }
+
     @Override
     public void save(CredentialRecord credentialRecord) {
         Assert.notNull(credentialRecord, "credentialRecord cannot be null");
@@ -257,5 +297,8 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
     }
 
     private record CredentialLifecycle(String userEntityUserId, UUID subjectId) {
+    }
+
+    private record ActiveCredential(String credentialId, String userEntityUserId) {
     }
 }

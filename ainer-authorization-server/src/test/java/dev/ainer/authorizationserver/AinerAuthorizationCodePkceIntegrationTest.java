@@ -5,7 +5,10 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import dev.ainer.authorizationserver.passkey.AinerPasskeyAdminRecoveryService;
+import dev.ainer.authorizationserver.passkey.AinerPasskeyRecoveryCodeService;
 import dev.ainer.authorizationserver.passkey.WebAuthnCeremony;
+import dev.ainer.core.error.BusinessException;
 import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.module.identity.account.application.ProvisionTenantOwnerCommand;
 import dev.ainer.module.identity.account.application.ProvisionedIdentity;
@@ -61,6 +64,8 @@ import java.security.MessageDigest;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -87,6 +92,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
                 "ainer.security.authorization-server.passkey.rp-name=Ainer Test",
                 "ainer.security.authorization-server.passkey.allowed-origins=http://localhost",
                 "ainer.security.authorization-server.passkey.allow-insecure-http=true",
+                "ainer.security.authorization-server.passkey.recovery.enabled=true",
+                "ainer.security.authorization-server.passkey.recovery.self-service-enabled=true",
                 "spring.main.banner-mode=off"
         })
 @Import(AinerAuthorizationCodePkceIntegrationTest.TestKeyConfiguration.class)
@@ -141,10 +148,20 @@ class AinerAuthorizationCodePkceIntegrationTest {
     @Autowired
     private UserCredentialRepository userCredentialRepository;
 
+    @Autowired
+    private AinerPasskeyRecoveryCodeService recoveryCodeService;
+
+    @Autowired
+    private AinerPasskeyAdminRecoveryService adminRecoveryService;
+
     private ProvisionedIdentity identity;
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM ainer_passkey_security_operation_audit");
+        jdbcTemplate.update("DELETE FROM ainer_passkey_recovery_lockout");
+        jdbcTemplate.update("DELETE FROM ainer_passkey_recovery_request");
+        jdbcTemplate.update("DELETE FROM ainer_passkey_recovery_code");
         jdbcTemplate.update("DELETE FROM ainer_passkey_credential_audit");
         jdbcTemplate.update("DELETE FROM ainer_passkey_credential");
         jdbcTemplate.update("DELETE FROM user_credentials");
@@ -410,6 +427,77 @@ class AinerAuthorizationCodePkceIntegrationTest {
         assertThat(accessToken.getClaimAsStringList("amr")).containsExactly("pwd", "mfa", "pop");
         assertThat(accessToken.getClaimAsInstant("auth_time")).isNotNull();
         assertThat(accessToken.getSubject()).isEqualTo(identity.subjectId().toString());
+    }
+
+    @Test
+    void recoveryCodesRedeemRevokesAllPasskeysAndWritesAudit() throws Exception {
+        WebAuthnCeremony ceremony = new WebAuthnCeremony(objectMapper);
+        BrowserSession browser = newBrowser();
+        String csrf = login(browser);
+        WebAuthnCeremony.Registration registration = ceremony.register(
+                webAuthnOptions(browser, csrf, "/webauthn/register/options"));
+        postWebAuthnJson(browser, csrf, "/webauthn/register", registration.payload());
+        postWebAuthnJson(browser, csrf, "/login/webauthn",
+                ceremony.authenticate(webAuthnOptions(browser, csrf, "/webauthn/authenticate/options"),
+                        registration.credentialId()));
+
+        HttpResponse<String> issuance = postWebAuthnJson(browser, csrf, "/passkey/recovery-codes", "{}");
+        assertThat(issuance.statusCode()).isEqualTo(200);
+        JsonNode codesNode = objectMapper.readTree(issuance.body()).path("data").path("recoveryCodes");
+        List<String> codes = new ArrayList<>();
+        codesNode.forEach(node -> codes.add(node.stringValue()));
+        assertThat(codes).hasSize(8);
+
+        BrowserSession recoveryBrowser = newBrowser();
+        String recoveryCsrf = login(recoveryBrowser);
+        HttpResponse<String> redeem = postWebAuthnJson(
+                recoveryBrowser, recoveryCsrf, "/passkey/recovery-codes/redeem",
+                "{\"code\":\"" + codes.getFirst() + "\"}");
+        assertThat(redeem.statusCode()).isEqualTo(200);
+        assertThat(objectMapper.readTree(redeem.body()).path("data").path("redeemed").booleanValue()).isTrue();
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_passkey_credential WHERE subject_id = ? AND status = 'ACTIVE'",
+                Integer.class, identity.subjectId())).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_passkey_recovery_code WHERE subject_id = ? AND status = 'USED'",
+                Integer.class, identity.subjectId())).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_passkey_security_operation_audit"
+                        + " WHERE subject_id = ? AND operation_type = 'SELF_RECOVERY'",
+                Integer.class, identity.subjectId())).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    void adminRecoveryRequiresTwoServicesAndRevokesAllPasskeys() throws Exception {
+        WebAuthnCeremony ceremony = new WebAuthnCeremony(objectMapper);
+        BrowserSession browser = newBrowser();
+        String csrf = login(browser);
+        WebAuthnCeremony.Registration registration = ceremony.register(
+                webAuthnOptions(browser, csrf, "/webauthn/register/options"));
+        postWebAuthnJson(browser, csrf, "/webauthn/register", registration.payload());
+        UUID tenantId = identity.tenantId();
+        UUID subjectId = identity.subjectId();
+
+        AinerPasskeyAdminRecoveryService.RecoveryRequest request = adminRecoveryService.requestRecovery(
+                "service-a", tenantId, subjectId, "incident-001", Duration.ofMinutes(15));
+        assertThat(request.status()).isEqualTo("REQUESTED");
+        assertThatThrownBy(() -> adminRecoveryService.approveAndExecute(
+                "service-a", tenantId, request.id()))
+                .isInstanceOf(BusinessException.class);
+        AinerPasskeyAdminRecoveryService.RecoveryRequest executed = adminRecoveryService.approveAndExecute(
+                "service-b", tenantId, request.id());
+        assertThat(executed.status()).isEqualTo("EXECUTED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_passkey_credential WHERE subject_id = ? AND status = 'ACTIVE'",
+                Integer.class, subjectId)).isZero();
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT phase FROM ainer_passkey_security_operation_audit"
+                        + " WHERE operation_id = ? ORDER BY occurred_at, id",
+                String.class, request.id())).containsExactly("REQUESTED", "EXECUTED");
+        assertThatThrownBy(() -> adminRecoveryService.approveAndExecute(
+                "service-c", tenantId, request.id()))
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test

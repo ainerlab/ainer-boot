@@ -118,6 +118,12 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                         .requestMatchers("/internal/oauth-service-clients/**")
                         .hasAuthority("SCOPE_" + AinerAuthorizationServerConfiguration
                                 .CLIENT_CONTROL_MANAGE_SCOPE)
+                        .requestMatchers("/internal/passkey-recovery/**")
+                        .hasAnyAuthority(
+                                "SCOPE_passkey.recovery.request",
+                                "SCOPE_passkey.recovery.request.all",
+                                "SCOPE_passkey.recovery.approve",
+                                "SCOPE_passkey.recovery.approve.all")
                         .anyRequest().denyAll())
                 .csrf(csrf -> csrf.disable())
                 .requestCache(cache -> cache.disable())

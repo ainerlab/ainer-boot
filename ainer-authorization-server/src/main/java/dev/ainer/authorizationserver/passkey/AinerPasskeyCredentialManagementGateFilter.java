@@ -49,7 +49,9 @@ public final class AinerPasskeyCredentialManagementGateFilter extends OncePerReq
 
     private static boolean isCredentialManagement(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return "/webauthn/register".equals(path) || path.startsWith("/webauthn/register/");
+        return "/webauthn/register".equals(path)
+                || path.startsWith("/webauthn/register/")
+                || "/passkey/recovery-codes".equals(path);
     }
 }
 

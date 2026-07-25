@@ -141,6 +141,14 @@ class AinerAuthorizationServerIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM ainer_passkey_security_operation_audit");
+        jdbcTemplate.update("DELETE FROM ainer_passkey_recovery_lockout");
+        jdbcTemplate.update("DELETE FROM ainer_passkey_recovery_request");
+        jdbcTemplate.update("DELETE FROM ainer_passkey_recovery_code");
+        jdbcTemplate.update("DELETE FROM ainer_passkey_credential_audit");
+        jdbcTemplate.update("DELETE FROM ainer_passkey_credential");
+        jdbcTemplate.update("DELETE FROM user_credentials");
+        jdbcTemplate.update("DELETE FROM user_entities");
         jdbcTemplate.update("DELETE FROM ainer_oauth_service_client_audit");
         jdbcTemplate.update("DELETE FROM ainer_oauth_service_client");
         jdbcTemplate.update("DELETE FROM oauth2_authorization_consent");
@@ -156,14 +164,16 @@ class AinerAuthorizationServerIntegrationTest {
 
     @Test
     void migratesIdentityAndOfficialJdbcProtocolStores() {
-        assertThat(flyway.info().applied()).hasSize(7);
+        assertThat(flyway.info().applied()).hasSize(8);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_name IN ('oauth2_registered_client','oauth2_authorization',"
                         + "'oauth2_authorization_consent','ainer_oauth_service_client',"
                         + "'ainer_oauth_service_client_audit','user_entities','user_credentials',"
-                        + "'ainer_passkey_credential','ainer_passkey_credential_audit')",
-                Integer.class)).isEqualTo(9);
+                        + "'ainer_passkey_credential','ainer_passkey_credential_audit',"
+                        + "'ainer_passkey_recovery_code','ainer_passkey_recovery_lockout',"
+                        + "'ainer_passkey_recovery_request','ainer_passkey_security_operation_audit')",
+                Integer.class)).isEqualTo(13);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
     }
 
