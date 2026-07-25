@@ -30,6 +30,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - 增加默认关闭的登录限速（node-local 固定窗口，按客户端 IP 节流登录类端点，超额 429
   `AINER.COMMON.RATE_LIMITED` + `Retry-After`）与默认 `optional` 的受控首次 Passkey enrollment
   （`require-invite` 模式下首登需操作员预授权，成功后授权置 `CONSUMED`，replacement 不受影响）。
+- 增加默认关闭的 resource server step-up 授权策略（`RecentStrongAuthenticationFilter`：高风险
+  路径要求人员 Token 的 `amr` 含强因子且 `auth_time` 在 `max-auth-age` 内，否则 403
+  `AINER.SECURITY.RECENT_STRONG_AUTHENTICATION_REQUIRED`）。
 - 建立架构决策、HTTP API、开发、测试、数据库、配置、运行和发布文档体系。
 
 ### Security

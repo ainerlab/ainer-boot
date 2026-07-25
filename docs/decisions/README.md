@@ -24,6 +24,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0014](0014-passkey-first-human-authentication.md) | Proposed | Passkey 优先的人员认证与条件 MFA 基线 |
 | [0015](0015-passkey-recovery.md) | Accepted | Passkey 恢复（恢复码 + 管理员双人恢复） |
 | [0016](0016-login-rate-limit-and-controlled-enrollment.md) | Accepted | 登录限速与受控首次 Passkey Enrollment |
+| [0017](0017-resource-server-step-up-policy.md) | Accepted | Resource Server Step-up 授权策略 |
 
 ## 何时需要 ADR
 

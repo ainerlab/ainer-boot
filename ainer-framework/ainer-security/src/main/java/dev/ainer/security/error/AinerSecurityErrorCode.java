@@ -7,7 +7,11 @@ public enum AinerSecurityErrorCode implements ErrorCode {
     ONLINE_VALIDATION_UNAVAILABLE(
             "AINER.SECURITY.ONLINE_VALIDATION_UNAVAILABLE",
             "身份状态校验暂时不可用",
-            503);
+            503),
+    RECENT_STRONG_AUTHENTICATION_REQUIRED(
+            "AINER.SECURITY.RECENT_STRONG_AUTHENTICATION_REQUIRED",
+            "需要完成近期强认证后才能执行该操作",
+            403);
 
     private final String code;
     private final String defaultMessage;

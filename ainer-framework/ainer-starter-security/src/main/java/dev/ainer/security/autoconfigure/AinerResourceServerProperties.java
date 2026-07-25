@@ -15,6 +15,7 @@ public class AinerResourceServerProperties {
     private String subjectClaim = "sub";
     private String tenantClaim = "tenant_id";
     private final OnlineValidation onlineValidation = new OnlineValidation();
+    private final StepUp stepUp = new StepUp();
     private List<String> publicPaths = new ArrayList<>(List.of(
             "/api/platform/info",
             "/actuator/health/**",
@@ -46,6 +47,10 @@ public class AinerResourceServerProperties {
 
     public OnlineValidation getOnlineValidation() {
         return onlineValidation;
+    }
+
+    public StepUp getStepUp() {
+        return stepUp;
     }
 
     public List<String> getPublicPaths() {
@@ -211,6 +216,103 @@ public class AinerResourceServerProperties {
         private static void requirePositive(Duration value, String name) {
             if (value == null || value.isZero() || value.isNegative()) {
                 throw new IllegalStateException("Ainer online token validation " + name + " must be positive");
+            }
+        }
+
+        private static <T> List<T> mutableCopy(List<T> values) {
+            return values == null ? new ArrayList<>() : new ArrayList<>(values);
+        }
+    }
+
+    public static final class StepUp {
+
+        private boolean enabled;
+        private Duration maxAuthAge = Duration.ofMinutes(15);
+        private List<String> requiredAmr = new ArrayList<>(List.of("mfa"));
+        private List<String> alwaysProtectedPaths = new ArrayList<>();
+        private List<String> mutatingProtectedPaths = new ArrayList<>();
+        private List<HttpMethod> mutatingMethods = new ArrayList<>(List.of(
+                HttpMethod.POST,
+                HttpMethod.PUT,
+                HttpMethod.PATCH,
+                HttpMethod.DELETE));
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public Duration getMaxAuthAge() {
+            return maxAuthAge;
+        }
+
+        public void setMaxAuthAge(Duration maxAuthAge) {
+            this.maxAuthAge = maxAuthAge;
+        }
+
+        public List<String> getRequiredAmr() {
+            return requiredAmr;
+        }
+
+        public void setRequiredAmr(List<String> requiredAmr) {
+            this.requiredAmr = mutableCopy(requiredAmr);
+        }
+
+        public List<String> getAlwaysProtectedPaths() {
+            return alwaysProtectedPaths;
+        }
+
+        public void setAlwaysProtectedPaths(List<String> alwaysProtectedPaths) {
+            this.alwaysProtectedPaths = mutableCopy(alwaysProtectedPaths);
+        }
+
+        public List<String> getMutatingProtectedPaths() {
+            return mutatingProtectedPaths;
+        }
+
+        public void setMutatingProtectedPaths(List<String> mutatingProtectedPaths) {
+            this.mutatingProtectedPaths = mutableCopy(mutatingProtectedPaths);
+        }
+
+        public List<HttpMethod> getMutatingMethods() {
+            return mutatingMethods;
+        }
+
+        public void setMutatingMethods(List<HttpMethod> mutatingMethods) {
+            this.mutatingMethods = mutableCopy(mutatingMethods);
+        }
+
+        void validate() {
+            if (!enabled) {
+                return;
+            }
+            requirePositive(maxAuthAge, "max-auth-age");
+            if (maxAuthAge.toHours() > 24) {
+                throw new IllegalStateException("Ainer step-up max-auth-age must be at most 24 hours");
+            }
+            if (requiredAmr == null || requiredAmr.isEmpty() || requiredAmr.stream().anyMatch(String::isBlank)) {
+                throw new IllegalStateException("Ainer step-up required-amr must be a non-empty list");
+            }
+            validatePaths(alwaysProtectedPaths, "always-protected paths");
+            validatePaths(mutatingProtectedPaths, "mutating-protected paths");
+            if (alwaysProtectedPaths.isEmpty()
+                    && (mutatingProtectedPaths.isEmpty() || mutatingMethods.isEmpty())) {
+                throw new IllegalStateException("Ainer step-up requires at least one protected rule");
+            }
+        }
+
+        private static void validatePaths(List<String> paths, String name) {
+            if (paths != null && paths.stream().anyMatch(path -> path == null || !path.startsWith("/"))) {
+                throw new IllegalStateException("Ainer step-up " + name + " are invalid");
+            }
+        }
+
+        private static void requirePositive(Duration value, String name) {
+            if (value == null || value.isZero() || value.isNegative()) {
+                throw new IllegalStateException("Ainer step-up " + name + " must be positive");
             }
         }
 

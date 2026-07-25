@@ -7,9 +7,10 @@
 ## 1. 当前阶段
 
 Foundation M4.6 Passkey 协议、条件人员认证基线、Phase A 真实签名 ceremony、Phase B 恢复码与
-管理员双人恢复，以及 Phase C 登录限速与受控首次 enrollment 已完成。下一阶段进入账号通知与
-step-up policy。项目已经从纯设计文档进入可编译、可运行、可测试的 Spring Boot 4.1 多模块工程，
-但尚未达到生产或商业发行就绪。
+管理员双人恢复、Phase C 登录限速与受控首次 enrollment，以及 Phase D resource server step-up
+授权策略已完成。Passkey 完整化的代码主线（A–D）落地，剩余的是账号通知（Phase E）、真实设备
+兼容矩阵与生产可观测/HA。项目已经从纯设计文档进入可编译、可运行、可测试的 Spring Boot 4.1
+多模块工程，但尚未达到生产或商业发行就绪。
 
 ## 2. 已完成
 
@@ -57,13 +58,23 @@ step-up policy。项目已经从纯设计文档进入可编译、可运行、可
 - 默认关闭的登录限速（node-local 固定窗口，按客户端 IP 节流 `/login`、`/login/webauthn`，
   超额 429）与默认 `optional` 的受控首次 Passkey enrollment（`require-invite` 模式下首登需操作员
   预授权，成功后授权置 CONSUMED，replacement 不受影响）；
+- 默认关闭的 resource server step-up 授权策略（`RecentStrongAuthenticationFilter`：高风险路径
+  要求人员 Token 的 `amr` 含强因子且 `auth_time` 在 `max-auth-age` 内，否则 403
+  `AINER.SECURITY.RECENT_STRONG_AUTHENTICATION_REQUIRED`），首次让 Ainer 签发的 `amr`/`auth_time`
+  真正参与授权决策；
 - ADR-0001 至 ADR-0011 已接受，ADR-0012 至 ADR-0014 处于 Proposed；架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
 
 ## 3. 最近验证证据
 
 2026-07-25 在 macOS Colima、Testcontainers 2.0.5 与 `postgres:18.3-alpine` 环境执行完整
-`mvn test`：14 个 Reactor 模块成功，188 个测试全部实际执行通过，0 failure、0 error、
+`mvn test`：14 个 Reactor 模块成功，195 个测试全部实际执行通过，0 failure、0 error、
 0 skipped。
+
+本轮 Phase D 新增 resource server step-up 证据：`RecentStrongAuthenticationFilter` 单元测试覆盖
+`amr` 含必需因子且 `auth_time` 新鲜放行、密码 Token 缺 `mfa` 返回 403（错误体含特定错误码）、
+`auth_time` 过期/缺失拒绝、缺 `amr` 拒绝、非 JWT 认证拒绝、非受保护路径不节流，以及 `StepUp`
+配置校验拒绝空规则/空 `required-amr`/超 24 小时 `max-auth-age`。这是 resource server 第一次消费
+Authorization Server 在 Phase A 签发的 `amr`/`auth_time`。filter 默认关闭，与在线校验 filter 同锚点。
 
 本轮 Phase C 新增限速与受控 enrollment 证据：限速器单元测试覆盖窗口内放行、超额拒绝、不同 key
 独立计数、跨窗口复位与 `Retry-After` 取整；受控首次 enrollment 在真实 PostgreSQL 上验证
@@ -174,11 +185,10 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 ## 5. 下一里程碑
 
 M4.6 已完成 Passkey 协议配置、条件人员门禁、JDBC credential 生命周期基线、Phase A 真实签名
-ceremony 端到端门禁与凭证管理条件 MFA 门禁、Phase B 恢复码与管理员双人恢复，以及 Phase C 登录
-限速与受控首次 enrollment。虚拟 authenticator 的 registration/authentication 签名 ceremony 已用
-webauthn4j 在自动化测试中真实跑通；真实设备/浏览器兼容矩阵仍待补。下一工程切片优先建立账号通知
-（含联系字段与可达通道）与 resource server 端 step-up policy，随后继续 browser/OIDC client 的
-生产注册、redirect URI 变更和退役流程。
+ceremony 端到端门禁与凭证管理条件 MFA 门禁、Phase B 恢复码与管理员双人恢复、Phase C 登录限速
+与受控首次 enrollment，以及 Phase D resource server step-up 授权策略。Passkey 完整化代码主线
+（A–D）落地。下一工程切片是账号通知（Phase E：含 Identity 联系字段与可达通道）、真实设备/浏览器
+兼容矩阵、browser/OIDC client 生产控制面，以及生产 Prometheus/HA/告警。
 
 生产并行工作仍包括真实 Prometheus 抓取、dashboard/告警、Authorization Server 多实例容量/故障
 证据、metrics/introspection/operator 旧凭据退役、Resource Server 灰度与安全降级审批，以及把

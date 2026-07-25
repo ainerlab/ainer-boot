@@ -90,11 +90,29 @@ public class AinerResourceServerAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(
+            prefix = "ainer.security.resource-server.step-up",
+            name = "enabled",
+            havingValue = "true")
+    RecentStrongAuthenticationFilter ainerRecentStrongAuthenticationFilter(
+            AinerResourceServerProperties properties,
+            ObjectProvider<MeterRegistry> meterRegistry,
+            ObjectMapper objectMapper) {
+        AinerResourceServerProperties.StepUp stepUp = properties.getStepUp();
+        stepUp.validate();
+        return new RecentStrongAuthenticationFilter(
+                stepUp,
+                new AinerSecurityFailureWriter(objectMapper),
+                meterRegistry.getIfAvailable());
+    }
+
+    @Bean
     @ConditionalOnMissingBean
     public SecurityFilterChain ainerResourceServerSecurityFilterChain(
             HttpSecurity http,
             AinerResourceServerProperties properties,
             ObjectProvider<OnlineAccessTokenValidationFilter> onlineValidationFilter,
+            ObjectProvider<RecentStrongAuthenticationFilter> stepUpFilter,
             Environment environment,
             ObjectMapper objectMapper) throws Exception {
         AinerSecurityFailureWriter failureWriter = new AinerSecurityFailureWriter(objectMapper);
@@ -121,6 +139,10 @@ public class AinerResourceServerAutoConfiguration {
         OnlineAccessTokenValidationFilter filter = onlineValidationFilter.getIfAvailable();
         if (filter != null) {
             http.addFilterAfter(filter, BearerTokenAuthenticationFilter.class);
+        }
+        RecentStrongAuthenticationFilter stepUp = stepUpFilter.getIfAvailable();
+        if (stepUp != null) {
+            http.addFilterAfter(stepUp, BearerTokenAuthenticationFilter.class);
         }
         return http.build();
     }
