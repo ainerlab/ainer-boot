@@ -93,14 +93,14 @@ Authorization Code + PKCE S256、无 Refresh Token、default tenant/OWNER claims
 同日对 `dev@a22e121` 做了只读三方兼容审计：两条线共享 `981b0b4` 基点；M4.8A 修改 140 个
 路径，Admin 基线修改 34 个路径，重叠 13 个。把成员 active authorization 夹具从通用
 `actorToken` 中隔离后，主 Authorization Server 集成测试已可自动合并，并保留 M4.8A 的
-tenantless SERVICE Token 语义。`git merge-tree` 仍报告 8 个文本冲突：唯一代码冲突位于
-`AinerAuthorizationServerWebSecurityConfiguration`，合并时必须保留 M4.8A activation chain
-为 `@Order(3)`、Ainer Admin member/revoke + active gate chain 为 `@Order(4)`，并顺延 metrics
-与 default chain；其余 7 个是 README、Changelog、ADR 索引和状态文档，需要合并两边事实。
+tenantless SERVICE Token 语义。Security 配置也通过保持原成员安全链 bean 名消除了顺序附近的
+文本冲突。最终 `git merge-tree` 只剩 7 个 README、Changelog、ADR 索引和状态文档冲突；代码、POM、
+`application.yaml`、Admin 新类/OpenAPI 与 M4.8A migration 均可文本自动合并，且没有 migration
+版本碰撞。自动合并会保留 M4.8A activation chain 的较高顺序，并把原成员安全链扩展为 Ainer
+Admin member/revoke + active gate，不需要建立第二条重叠 matcher。
 文档解冲突必须保留 `a22e121` 的 `docs/README.md` 目录门面，并把本轮新增的
 `ainer-admin-integration.md` 接入其唯一权威入口 `docs/00-overview.md`，不能恢复旧的双导航。
-POM、`application.yaml`、Admin 新类/OpenAPI 与 M4.8A migration 没有文本冲突或 migration
-版本碰撞。因本阶段明确禁止合并，尚未形成 `a22e121 + Ainer Admin` 的组合编译/全量测试证据；
+因本阶段明确禁止合并，尚未形成 `a22e121 + Ainer Admin` 的组合编译/全量测试证据；
 集成时必须解冲突后重新计算测试数并执行零跳过 `mvn test`。
 
 本轮 M4.7 新增 Identity 管理面证据：Identity 模块从空库执行 6 份 migration，真实 PostgreSQL
