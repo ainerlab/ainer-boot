@@ -148,7 +148,7 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
 
     @Bean
     @Order(3)
-    SecurityFilterChain ainerAdminApiSecurityFilterChain(
+    SecurityFilterChain tenantMemberApiSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder jwtDecoder,
             OAuth2AuthorizationService authorizationService,
