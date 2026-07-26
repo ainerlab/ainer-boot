@@ -75,6 +75,10 @@ POST 请求还包含 `role` 与安全格式 `reasonCode`；PATCH 包含 `role`�
 409。每次成功写操作与 `reasonCode`、request ID 一起进入同事务成员安全审计。分页从 1 开始，
 `size=1..100`。
 
+以上每个请求在 JWT 验证之后还会查询 Authorization Server 官方 authorization，确认当前
+access token 仍为 active；未知、过期、显式撤销或 Identity 当前状态失效统一返回 401，
+查询依赖失败返回 503 `AINER.SECURITY.ONLINE_VALIDATION_UNAVAILABLE`，不会退回仅凭 JWT 放行。
+
 ## 6. 当前 access token 自助撤销
 
 | Method | Path | Scope | Actor | 说明 |
@@ -85,7 +89,7 @@ POST 请求还包含 `role` 与安全格式 `reasonCode`；PATCH 包含 `role`�
 `{"revoked":true}`。Token 不存在、已过期或已撤销统一返回 401
 `AINER.COMMON.UNAUTHENTICATED`，`SERVICE` actor 返回 403。实现更新 Spring Authorization
 Server 官方 JDBC authorization，不建立 Ainer 自定义 Token 表，也不撤销当前 authorization
-可能关联的其他 token。
+可能关联的其他 token。该端点也经过同一 active gate。
 
 ## 7. AI API
 

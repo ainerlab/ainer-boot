@@ -283,7 +283,9 @@ Identity Directory 只返回 ACTIVE tenant、ACTIVE user、ACTIVE membership 的
 等于可信 claim，以及数据库中的 ACTIVE OWNER/ADMIN 调用者关系。写操作不能授予或修改 OWNER；
 新增、重新激活、角色变更和移除都与 actor/target/tenant/reason/request ID 审计同事务提交。
 该 API 位于 Identity 权威数据库所在的 Authorization Server；业务 Resource Server 不复制
-Identity 表。对管理 API 的 step-up/在线校验策略仍需在 browser/OIDC client 切片中单独接入。
+Identity 表。Ainer Admin API 在本地 JWT 验证后逐请求查询官方 authorization repository；
+未知、过期、撤销、client 退役或 Identity 当前状态失效统一 401，查询依赖失败统一 503
+`AINER.SECURITY.ONLINE_VALIDATION_UNAVAILABLE`，不会降级为只检查 JWT。
 
 `POST /api/me/access-token-revocations` 为 USER bearer 提供当前 access token 的窄自助撤销。
 端点不接收任意 token 参数，不要求 public browser client 伪造 client authentication，也不扩大

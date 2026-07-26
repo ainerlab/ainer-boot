@@ -23,6 +23,8 @@ import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2ErrorAuthenticationFailureHandler;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
@@ -149,6 +151,7 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
     SecurityFilterChain ainerAdminApiSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder jwtDecoder,
+            OAuth2AuthorizationService authorizationService,
             ObjectMapper objectMapper) throws Exception {
         AinerSecurityFailureWriter failureWriter = new AinerSecurityFailureWriter(objectMapper);
         http.securityMatcher(
@@ -168,6 +171,12 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                                 failureWriter.write(request, response, StandardErrorCode.UNAUTHENTICATED))
                         .accessDeniedHandler((request, response, exception) ->
                                 failureWriter.write(request, response, StandardErrorCode.FORBIDDEN)));
+        http.addFilterAfter(
+                new AinerAdminAccessTokenActiveFilter(
+                        new DefaultBearerTokenResolver(),
+                        authorizationService,
+                        failureWriter),
+                BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 
