@@ -68,7 +68,7 @@ tenant 成员管理 API、同事务审计与首个平台 tenant/OWNER 严格 boo
   tenant claim + 实时 ACTIVE OWNER/ADMIN 四重门禁，所有实际写入同事务审计且不允许通用接口修改 OWNER；
 - 首个平台 tenant/OWNER 使用默认关闭、严格幂等、不覆盖密码且由 PostgreSQL transaction advisory
   lock 串行化的 Authorization Server bootstrap；业务 Server 不装配 Identity migration；
-- ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0018 已接受，ADR-0012 至 ADR-0014 处于 Proposed；
+- ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0019 已接受，ADR-0012 至 ADR-0014 处于 Proposed；
   架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
 
 ## 3. 最近验证证据
@@ -196,22 +196,29 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 ## 5. 下一里程碑
 
-M4.7 的下一工程切片优先是 Identity OWNER 专用转移与平台级 tenant/user SERVICE 控制面，以补齐
-成员治理不能处理 OWNER 和不能创建后续租户的边界。并行推进账号通知（Passkey Phase E，含
-Identity 联系字段与可达通道）、真实设备/浏览器兼容矩阵、browser/OIDC client 生产控制面，以及
-生产 Prometheus/HA/告警。
+M4.8 已形成并接受
+[ADR-0019](decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)，
+按依赖顺序拆为三个切片：先完成 tenantless SERVICE 的 tenant/user 幂等供应、一次性激活和通知
+outbox；再完成 Authorization Server 人员多租户上下文选择，使 `is_default` 只承担首次登录落点；
+最后完成当前 OWNER 发起、目标 ACTIVE ADMIN 强认证接受的 Identity OWNER 专用转移。不能先做
+OWNER 转移，因为现有人员 Token 仍只从默认 membership 取得 tenant，上下文选择是目标本人接受
+转移的协议前提。
 
-生产并行工作仍包括真实 Prometheus 抓取、dashboard/告警、Authorization Server 多实例容量/故障
-证据、metrics/introspection/operator 旧凭据退役、Resource Server 灰度与安全降级审批，以及把
-M4.2 操作审计接入生产级 IAM 职责分离和外部不可变存储。
+M4.8 与商业 entitlement 保持正交：Identity `OWNER/ADMIN/MEMBER` 只表达授权角色，Community /
+Pro / Enterprise、license、订阅和配额留给后续独立 entitlement 边界。生产并行工作仍包括真实
+Prometheus 抓取、dashboard/告警、Authorization Server 多实例容量/故障证据、browser/OIDC client
+生产控制面、真实设备/浏览器兼容矩阵、metrics/introspection/operator 旧凭据退役、Resource Server
+灰度与安全降级审批，以及把 M4.2 操作审计接入生产级 IAM 职责分离和外部不可变存储。
 
-完成条件包括：OWNER 转移与平台控制面形成独立 ADR、最小 scope、双人或等价高风险门禁和真实
-PostgreSQL/HTTP 证据；Passkey 通知、真实设备与多节点 session 完成验证；发布候选环境的
-Testcontainers 测试不跳过；
+完成条件包括：平台供应使用独立 tenantless SERVICE operator、最小 scope、幂等键、一次性激活
+凭据与真实 PostgreSQL/HTTP 证据；tenant selection 支持并行会话且不能由请求参数伪造 claim；
+OWNER 转移具备双方强认证、单一未完成请求、数据库唯一 ACTIVE OWNER、同事务审计和双方旧 Token
+撤销证据；Passkey 通知、真实设备与多节点 session 完成验证；发布候选环境的 Testcontainers
+测试不跳过；
 高风险 online validation 在目标容量与故障注入下满足确定的延时/可用性目标；request/approve
 与平台凭据在运营上真正分离并可轮换；外部审计副本可验证、可恢复；初始撤销 SLO 经多节点证据
-修正后形成正式错误预算。随后继续补齐 tenant ownership transfer、浏览器/平台 Client 控制面与
-签名密钥轮换。
+修正后形成正式错误预算。随后继续补齐浏览器/平台 Client 控制面、签名密钥轮换与独立商业
+entitlement 内核。
 
 ## 6. 更新规则
 

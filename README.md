@@ -165,7 +165,13 @@ OWNER/ADMIN 关系；所有写入同事务审计，通用接口不能操作 OWNE
 关闭的严格幂等 bootstrap 创建，部分占用或状态漂移会失败关闭，详见
 [ADR-0018](docs/decisions/0018-management-authorization-and-tenant-member-management.md)。
 
-下一步仍需部署真实 Prometheus、dashboard/告警，并完成 Authorization Server 多实例容量、故障
-切换和平台旧凭据退役证据；随后继续 IAM 职责分离、外部不可变审计副本、多节点 SLO、恢复通知与
-真实设备兼容矩阵、tenant ownership transfer、平台级 tenant/user 管理、browser/OIDC client
-控制面与签名密钥轮换。
+M4.8 的已接受设计见
+[ADR-0019](docs/decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)：
+按“平台 tenant/user 幂等供应与一次性激活 → 人员多租户上下文选择 → OWNER 双方强认证转移”
+推进。该顺序避免把 `is_default` 当作跨设备租户切换状态，也避免在目标管理员无法取得目标 tenant
+Token 时提前实现不可本人确认的 OWNER 转移。租户角色与未来 Community / Pro / Enterprise
+entitlement 保持独立。
+
+生产并行工作仍需部署真实 Prometheus、dashboard/告警，并完成 Authorization Server 多实例容量、
+故障切换和平台旧凭据退役证据；随后继续 IAM 职责分离、外部不可变审计副本、多节点 SLO、
+恢复通知与真实设备兼容矩阵、browser/OIDC client 控制面和签名密钥轮换。

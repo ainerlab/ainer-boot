@@ -26,6 +26,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0016](0016-login-rate-limit-and-controlled-enrollment.md) | Accepted | 登录限速与受控首次 Passkey Enrollment |
 | [0017](0017-resource-server-step-up-policy.md) | Accepted | Resource Server Step-up 授权策略 |
 | [0018](0018-management-authorization-and-tenant-member-management.md) | Accepted | 管理授权模型与租户成员管理 |
+| [0019](0019-identity-provisioning-tenant-context-and-ownership-governance.md) | Accepted | Identity 供应、租户上下文与所有权治理 |
 
 ## 何时需要 ADR
 

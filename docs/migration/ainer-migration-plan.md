@@ -118,6 +118,9 @@ Ainer 采用 strangler + vertical slice：
 - Identity 权威运行时已提供 tenant 成员列表、加入、角色变更与软移除 API，使用 USER capability
   scope + 可信 tenant claim + ACTIVE OWNER/ADMIN 资源角色并同事务审计；首个平台 tenant/OWNER
   使用默认关闭、严格幂等且带事务 advisory lock 的 Authorization Server bootstrap。
+- 下一阶段按 [ADR-0019](../decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)
+  依次推进平台 tenant/user 幂等供应与一次性激活、Authorization Server 租户上下文选择、Identity
+  OWNER 双方确认转移；`is_default` 只保留为首次登录落点，不作为并行会话的租户切换机制。
 - 旧 Token 在过渡期通过边界适配，不复制旧 Token 表到 Ainer。
 
 ### M4：低耦合业务切片
