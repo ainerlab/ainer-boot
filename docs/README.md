@@ -1,6 +1,6 @@
 # Ainer 文档中心
 
-> 文档类型：导航与治理 · 状态：生效 · 最近核对：2026-07-23 · 适用版本：`0.1.x`
+> 文档类型：导航与治理 · 状态：生效 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
 
 本目录是 Ainer Boot 的长期知识入口。文档不只解释“现在有什么”，还必须说明约束、证据、未完成边界和未来如何安全修改。
 
@@ -10,7 +10,7 @@
 |---|---|---|---|
 | 产品入口 | 说明定位、能力和最短启动路径 | [`README.md`](../README.md) | 用户可见能力变化时更新 |
 | 长期规范 | 约束架构、接口、编码、数据和测试方式 | [`architecture.md`](architecture.md)、[`api.md`](api.md)、[`conventions.md`](conventions.md)、[`database.md`](database.md)、[`testing.md`](testing.md) | 代码与规范必须同一变更交付 |
-| 开发与运维 | 说明开发、配置、运行和发布步骤 | [`development.md`](development.md)、[`configuration.md`](configuration.md)、[`operations.md`](operations.md)、[`releasing.md`](releasing.md) | 命令、配置或发行物变化时更新 |
+| 开发与运维 | 说明开发、配置、运行、集成和发布步骤 | [`development.md`](development.md)、[`configuration.md`](configuration.md)、[`operations.md`](operations.md)、[`ainer-admin-integration.md`](ainer-admin-integration.md)、[`releasing.md`](releasing.md) | 命令、配置、集成契约或发行物变化时更新 |
 | 决策记录 | 保存重要设计的背景、选择和后果 | [`decisions/README.md`](decisions/README.md) | 已接受 ADR 不改写结论，以新 ADR 取代 |
 | 阶段状态 | 记录已完成、验证证据、风险和下一步 | [`project-status.md`](project-status.md)、[`CHANGELOG.md`](../CHANGELOG.md) | 每个里程碑和发布候选更新 |
 | 专题设计 | 深入描述某一能力 | [`security.md`](security.md)、[`ai-gateway.md`](ai-gateway.md) | 对应能力或威胁模型变化时更新 |
@@ -49,6 +49,7 @@
 1. [`security.md`](security.md)
 2. ADR-0005 至 ADR-0012
 3. [`configuration.md`](configuration.md)
+4. 涉及官方管理应用时阅读 [`ainer-admin-integration.md`](ainer-admin-integration.md)
 
 ### AI 能力变更
 

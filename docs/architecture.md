@@ -1,6 +1,6 @@
 # Ainer 架构总览
 
-> 权威状态：M4.7 tenant member control plane · 2026-07-26
+> 权威状态：M4.7 + Ainer Admin backend integration baseline · 2026-07-26
 
 ## 1. 系统定位
 
@@ -123,6 +123,17 @@ domain -> Java standard library only
 
 它不负责拆库、启动网关、生成服务、改变事务边界或保证分布式一致性。
 
+### 5.1 官方参考管理应用
+
+Ainer Admin 不作为 Ainer Boot 的新 Java 模块或第三个后端发行物。它是 Ainer Studio 中
+`ainer-studio/templates/ainer-admin` 的前端模板，通过 `/ainer-admin/` 同源入口连接
+`ainer-authorization-server` 的 OAuth/OIDC 与 Identity 成员 API。Boot 负责协议、client、身份、
+授权、OpenAPI 和 active gate；Studio 负责前端源码、Blocks、预览和交付。
+
+第一版同源反代只改变边缘路由，不改变 Identity 数据所有权，也不把前端静态资源引入
+Authorization Server JAR。完整部署边界见
+[`ainer-admin-integration.md`](ainer-admin-integration.md)。
+
 ## 6. HTTP 与错误模型
 
 成功响应和错误响应都使用 `ApiResponse<T>`：
@@ -156,6 +167,9 @@ M3/M4 已形成以下边界：
 - 浏览器/移动端优先 Authorization Code + PKCE；机器调用使用 Client Credentials；实际 grant 由每个 registered client 白名单决定。设备可使用 Device Code，系统间委托可评估 Token Exchange。
 - M4.5 已用测试专用 public client 验证 PKCE S256、真实表单登录、授权码单次交换、错误 verifier
   与回调地址拒绝；生产 browser client 控制面、会话治理和登录 UI 仍是独立能力。
+- Ainer Admin 在 `dev` profile 下使用固定 public client、PKCE S256、default tenant 与四个最小
+  scope；成员 API 在 JWT 后继续读取官方 authorization active 状态，当前 access token 可自助
+  撤销。该开发 client 与同源自动化证据不等于生产 browser client 生命周期控制面。
 - M4.6 使用 Spring Security 7.1 WebAuthn 建立默认关闭的 Passkey 主线：UV-required、真实签名
   ceremony、条件 MFA、ACTIVE/REVOKED 生命周期、恢复码/管理员双人恢复、受控首次 enrollment、
   登录限速和 Resource Server step-up。最后一个 ACTIVE Passkey 不允许普通自助删除；真实设备

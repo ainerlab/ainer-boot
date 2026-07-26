@@ -1,6 +1,6 @@
 # Ainer 运行与故障处理手册
 
-> 文档类型：运行手册 · 状态：基础版 · 最近核对：2026-07-23 · 适用版本：`0.1.x`
+> 文档类型：运行手册 · 状态：基础版 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
 
 本手册覆盖当前两个 Spring Boot 发行物的构建、启动和基础诊断。生产部署平台、监控后端、备份系统和灾难恢复尚未选型，因此未验证的命令不能写成生产 SOP。
 
@@ -162,6 +162,18 @@ OAuth authorization 恢复为密码路径，属于安全降级，必须审批、
 4. 重启验证严格幂等：完整匹配时不改密码；tenant code 或 username 部分占用、状态漂移时必须启动失败，
    不得手工补记录后继续；
 5. 后续 tenant/user 平台管理等待专用 SERVICE 控制面，不反复开启首租户 bootstrap。
+
+### 2.8 Ainer Admin 同源入口
+
+Ainer Admin 固定部署在 `/ainer-admin/`，OAuth/OIDC、登录、当前 Token 撤销和 tenant 成员 API
+通过同一公开 HTTPS origin 反代到 Authorization Server。上线前必须验证外部 issuer、Host/scheme、
+精确 callback/logout URI、session cookie、`Location`、no-store 与 SPA fallback 边界；不得用全局
+CORS 掩盖代理路径错误。
+
+登录、Token 交换和 `/connect/logout` 必须复用同一浏览器 cookie session，否则 ID token 的
+`sid` 无法与登录 session 完成可靠注销。完整路由表、退出失败语义、开发 fixture 和 smoke
+见 [`ainer-admin-integration.md`](ainer-admin-integration.md)。当前只形成契约和自动化证据，
+尚未在选定的生产 ingress 上完成部署验收。
 
 ## 3. 健康检查
 

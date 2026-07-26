@@ -38,6 +38,14 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   所有实际写入同事务记录成员安全审计。
 - 增加默认关闭的首个平台 tenant/OWNER bootstrap：完整状态严格幂等、部分占用失败关闭、不会
   覆盖密码，并以 PostgreSQL 事务 advisory lock 串行化多实例初始化。
+- 增加 `dev` profile 下默认关闭的 `ainer-admin-dev` public client 与双用户开发 fixture，固定
+  Authorization Code + PKCE S256、Ainer Admin 回调、四个最小 scope、default tenant 和无
+  Refresh Token 策略。
+- 增加当前 access token 自助撤销与 Ainer Admin 成员 API active gate；成员请求逐次读取官方
+  authorization，inactive 返回 401，在线依赖故障返回 503 且不降级。
+- 增加 `ainer-admin-v1.yaml`、固定 Maven TypeScript SDK 生成入口，以及同一 browser session 的
+  PKCE → 成员治理 → revoke → OIDC logout PostgreSQL 端到端门禁。
+- 增加 `/ainer-admin/` 同源反代、登录回调、SDK 装配、退出顺序与开发初始化的长期集成手册。
 - 建立架构决策、HTTP API、开发、测试、数据库、配置、运行和发布文档体系。
 
 ### Security
@@ -58,6 +66,8 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   membership；成员管理的 scope 不能替代实时 tenant 资源角色，通用接口不能修改 OWNER。
 - Resource Server 必须从 JWT 取得显式 `actor_type=USER|SERVICE`；step-up 仅认可 USER，
   匿名请求保留标准 401，未来 `auth_time` 不能超过受控 clock skew。
+- Ainer Admin browser client 无 secret、只允许 PKCE S256；成员 API 与当前 Token 撤销均要求
+  官方 authorization 仍 active，同源登录、Token 交换和 logout 复用同一 browser session。
 - AI 审计默认不保存 prompt、模型输出、API key 或供应商错误正文。
 
 ### Fixed
@@ -86,7 +96,8 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - 当前仍为 `0.1.0-SNAPSHOT` foundation，不是生产就绪发行版。
 - 在线撤销只覆盖配置的高风险路径；普通低风险自包含 JWT 仍存在自然到期窗口。
 - Authorization Server 已成为高风险 API 的在线依赖；Prometheus 导出与独立抓取凭据已有代码基线，但生产高可用、容量、凭据退役轮换、dashboard 和告警路由尚未完成。
-- PKCE 自动化使用测试专用 public client；Passkey 代码主线已有虚拟 authenticator 签名 ceremony、
+- PKCE 自动化除通用测试 client 外已覆盖固定的 Ainer Admin 开发 public client；Passkey 代码
+  主线已有虚拟 authenticator 签名 ceremony、
   受控 enrollment、恢复与 step-up，但尚缺恢复通知、主流真实设备矩阵、共享限流与多节点会话；
   生产 browser/OIDC client 控制面和登录体验也尚未完成。
 - tenant ownership transfer、平台级 tenant/user 管理和成员管理 UI 尚未完成。

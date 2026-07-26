@@ -108,7 +108,8 @@ mvn -pl ainer-authorization-server -Painer-admin-sdk generate-resources
 SDK 只覆盖成员 JSON API 与当前 token 自助撤销，OAuth/OIDC 登录和 logout 继续使用标准协议客户端。
 OpenAPI 使用相对 `/` 表达同源入口；由于生成器会为该合法相对地址写入 `http://localhost`
 兜底值，Ainer Admin 必须在 SDK `Configuration` 中显式传入 `window.location.origin`，
-并通过 `accessToken` 回调读取内存中的当前 access token。
+并通过 `accessToken` 回调读取内存中的当前 access token。登录、退出、SDK 装配和反向代理的
+完整运行契约见 [`ainer-admin-integration.md`](ainer-admin-integration.md)。
 
 ## 7. AI API
 

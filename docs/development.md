@@ -1,6 +1,6 @@
 # Ainer 本地开发手册
 
-> 文档类型：开发操作 · 状态：生效 · 最近核对：2026-07-23 · 适用版本：`0.1.x`
+> 文档类型：开发操作 · 状态：生效 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
 
 ## 1. 环境要求
 
@@ -85,6 +85,10 @@ mvn -pl ainer-authorization-server -am spring-boot:run
 ```
 
 默认监听 `9000`。issuer 必须是显式 HTTPS URL；私钥不得提交到仓库。
+
+Ainer Admin 本地联调需要 `dev` profile 下显式创建 public client 与开发身份，并通过同源入口
+复用浏览器 cookie session。固定 URI、环境变量、SDK 生成和完整 PKCE/logout 流程见
+[`ainer-admin-integration.md`](ainer-admin-integration.md)；不要为本地联调开启全局 CORS。
 
 ## 6. 日常开发循环
 

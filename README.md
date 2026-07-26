@@ -1,6 +1,6 @@
 # Ainer Boot
 
-> 正式品牌：Ainer · M4.7 tenant member control plane · 2026-07-26 · JDK 25 + Spring Boot 4.1.0
+> 正式品牌：Ainer · Ainer Admin backend integration baseline · 2026-07-26 · JDK 25 + Spring Boot 4.1.0
 
 Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 AI 时代的企业应用平台底座。它从模块化单体开始，通过明确的契约、适配器和独立发行物演进为服务化系统；它不继承 yudao、BladeX、Dante 或 Snowy 的代码与框架范式。
 
@@ -21,7 +21,7 @@ Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 
 | `ainer-module-workspace` | ✅ | 可信租户资源、成员治理、幂等撤销、OWNER 恢复、授权审计热/归档与 SIEM 契约 |
 | `ainer-module-ai-runtime` | ✅ | OpenAI-compatible 网关、SSE、策略、预算与用量/费用审计 |
 | `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、可选 Directory client、撤销 consumer/SLO、OWNER 恢复与审计运营端点 |
-| `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、Identity 租户成员 API、受限 introspection/RFC 7009 与受审计 JDBC 协议仓库 |
+| `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、Ainer Admin 开发 client/fixture、成员 API active gate、自助撤销、OpenAPI/SDK、受限 introspection/RFC 7009 与受审计 JDBC 协议仓库 |
 
 当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
 
@@ -139,7 +139,8 @@ ainer-boot/
 6. [测试与质量门禁](docs/testing.md)
 7. [数据库与 Migration 手册](docs/database.md)
 8. [配置与秘密管理](docs/configuration.md)
-9. [ADR 索引与模板](docs/decisions/README.md)
+9. [Ainer Admin 集成手册](docs/ainer-admin-integration.md)
+10. [ADR 索引与模板](docs/decisions/README.md)
 
 运行和发布分别见 [运行与故障处理手册](docs/operations.md) 与 [版本和发布规范](docs/releasing.md)。参与规则见 [CONTRIBUTING.md](CONTRIBUTING.md)，阶段变化见 [CHANGELOG.md](CHANGELOG.md)。
 
@@ -164,6 +165,13 @@ M4.7 首个管理面切片已经落地：Identity 所属的 `ainer-authorization
 OWNER/ADMIN 关系；所有写入同事务审计，通用接口不能操作 OWNER。首个平台 tenant/OWNER 可用默认
 关闭的严格幂等 bootstrap 创建，部分占用或状态漂移会失败关闭，详见
 [ADR-0018](docs/decisions/0018-management-authorization-and-tenant-member-management.md)。
+
+Ainer Admin 后端融合基线已经收口：`dev` profile 提供固定 `ainer-admin-dev` public client 与
+安全开发身份 fixture；成员 API 逐请求校验官方 authorization active 状态；当前 access token
+可自助撤销；`ainer-admin-v1.yaml` 可严格校验并生成 TypeScript SDK。同一 browser client 的真实
+PostgreSQL 端到端测试已覆盖 PKCE → 成员列表/添加/双向改角色/软移除 → revoke → OIDC logout。
+第一版采用 `/ainer-admin/` 同源反代、不启用 Refresh Token 或全局 CORS，完整契约见
+[Ainer Admin 集成手册](docs/ainer-admin-integration.md)。
 
 M4.8 的已接受设计见
 [ADR-0019](docs/decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)：

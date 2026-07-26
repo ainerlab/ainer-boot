@@ -6,10 +6,11 @@
 
 ## 1. 当前阶段
 
-Foundation M4.7 首个管理面切片已经落地：M4.6 Passkey 代码主线（真实签名 ceremony、恢复、
-受控 enrollment、登录限速与 Resource Server step-up）完成安全收口；Identity 权威运行时新增
-tenant 成员管理 API、同事务审计与首个平台 tenant/OWNER 严格 bootstrap。当前工程是可编译、
-可运行、可用真实 PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到生产或商业发行就绪。
+Foundation M4.7 与 Ainer Admin 后端融合基线已经落地：M4.6 Passkey 代码主线（真实签名
+ceremony、恢复、受控 enrollment、登录限速与 Resource Server step-up）完成安全收口；Identity
+权威运行时提供 tenant 成员治理；固定开发 browser client、开发身份、Token 自助撤销、成员 API
+active gate、OpenAPI/SDK 与完整浏览器链路测试已经形成。当前工程是可编译、可运行、可用真实
+PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到生产或商业发行就绪。
 
 ## 2. 已完成
 
@@ -68,14 +69,26 @@ tenant 成员管理 API、同事务审计与首个平台 tenant/OWNER 严格 boo
   tenant claim + 实时 ACTIVE OWNER/ADMIN 四重门禁，所有实际写入同事务审计且不允许通用接口修改 OWNER；
 - 首个平台 tenant/OWNER 使用默认关闭、严格幂等、不覆盖密码且由 PostgreSQL transaction advisory
   lock 串行化的 Authorization Server bootstrap；业务 Server 不装配 Identity migration；
-- ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0019 已接受，ADR-0012 至 ADR-0014 处于 Proposed；
+- Ainer Admin `dev` public client、双用户 fixture、当前 access token 自助撤销、成员 API
+  active gate、`ainer-admin-v1.yaml` 与 TypeScript SDK 生成入口；
+- 同一 `ainer-admin-dev` browser session 的 PKCE → default tenant → 成员列表/添加/双向改角色/
+  软移除 → revoke → OIDC logout 真实 PostgreSQL 端到端门禁；
+- ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0019 与 ADR-0022 已接受，ADR-0012 至 ADR-0014 处于 Proposed；
   架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
 
 ## 3. 最近验证证据
 
 2026-07-26 在 macOS Colima、Testcontainers 2.0.5 与 `postgres:18.3-alpine` 环境执行完整
-`mvn test`：14 个 Reactor 模块成功，208 个测试全部实际执行通过，0 failure、0 error、
+`mvn test`：14 个 Reactor 模块成功，222 个测试全部实际执行通过，0 failure、0 error、
 0 skipped。
+
+本轮 Ainer Admin 证据使用固定 `ainer-admin-dev` public client、同一 HTTP cookie session 与
+`postgres:18.3-alpine` 从空库执行 Authorization Server 13 份 migration。端到端覆盖
+Authorization Code + PKCE S256、无 Refresh Token、default tenant/OWNER claims、成员 GET、添加
+已有用户、MEMBER → ADMIN → MEMBER、软移除与 `[ADDED, ROLE_CHANGED, ROLE_CHANGED, REMOVED]`
+审计；自助撤销后旧 access token 被 active gate 返回 401，ID token 仍可完成
+`/connect/logout` 并精确返回 `/ainer-admin/auth/logged-out`。全量回归还把旧成员 API 集成测试
+从“只签名 JWT”改为持久化真实 active authorization，避免测试绕过新的在线活性边界。
 
 本轮 M4.7 新增 Identity 管理面证据：Identity 模块从空库执行 6 份 migration，真实 PostgreSQL
 覆盖成员列表、按 username/subjectId 加入、角色变更、软移除、DISABLED 重激活、OWNER 保护与每次
@@ -177,8 +190,10 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
   受控 enrollment 和 Resource Server step-up 已有自动化证据，但生产 browser/OIDC client 控制面、
   品牌登录 UI、恢复通知、真实设备矩阵、共享限流、多节点会话和签名密钥轮换未完成；
 - tenant ownership transfer、平台级 tenant/user 控制面和成员管理 UI 尚未完成；
-- tenant 成员 API 位于 Authorization Server，但其 step-up/在线校验接入要随生产 browser/OIDC
-  client 策略单独完成，当前不能把业务 Server 的默认 step-up 规则误认为覆盖该端点。
+- tenant 成员 API 位于 Authorization Server，已对 Ainer Admin access token 强制 active gate；
+  step-up 仍未接入该端点，不能把业务 Server 的默认 step-up 规则误认为覆盖它；
+- Ainer Admin 同源代理已有契约但尚未在选定生产 ingress 上完成 HTTPS、Cookie、重定向和缓存
+  验收；`ainer-admin-dev` 与开发身份不能替代生产 browser client 生命周期和正式开户。
 
 ### AI 平台
 

@@ -1,6 +1,6 @@
 # Ainer Identity 与 OAuth 2.1 使用基线
 
-> 适用版本：M4.7 tenant member control plane · 2026-07-26
+> 适用版本：M4.7 + Ainer Admin backend integration baseline · 2026-07-26
 
 ## 1. 已落地边界
 
@@ -298,7 +298,8 @@ Workspace 事件端点要求 `actor_type=SERVICE`、`identity.access-events.publ
 
 当前仍未提供公网注册、找回密码、恢复通知、租户切换和图形化 client 控制台；Passkey
 协议/条件门禁、恢复、受控 enrollment、step-up、租户成员管理与 tenant-bound Client
-Credentials 内部生命周期 API 已落地，PKCE public client 仅存在于自动化测试。
+Credentials 内部生命周期 API 已落地。除通用测试 client 外，`dev` profile 已提供固定的
+`ainer-admin-dev` public client；它不是生产 browser client 控制面。
 Directory 与事件 adapter 均默认关闭且不共享数据库；完整投递决策见
 [ADR-0009](decisions/0009-cross-runtime-access-revocation-delivery.md)。
 
@@ -340,3 +341,7 @@ M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存�
 429 和 step-up 的 200/401/403。租户成员管理还要以真实 PostgreSQL + HTTP 覆盖 USER/SERVICE、
 scope、跨 tenant、实时资源角色与审计。真实 PostgreSQL 和协议 smoke 证据维护在
 [`project-status.md`](project-status.md)。
+
+Ainer Admin 还必须以同一个 browser cookie session 覆盖 PKCE、成员操作、当前 access token
+撤销和 OIDC logout；完整同源集成与验收命令见
+[`ainer-admin-integration.md`](ainer-admin-integration.md)。

@@ -197,6 +197,8 @@ fixture 严格创建两个不同的 Identity 信任根：OWNER 属于 `ainer-adm
 `ainer-admin-member-home` 为 default OWNER，因此两人均可正常登录，但第二用户初始不是 Admin
 主 tenant 成员。初始化复用 Identity 的严格幂等 bootstrap；任何部分占用或状态漂移都会失败关闭，
 不会覆盖密码。完成后关闭开关并移除环境中的明文密码。该能力不得用于生产开户。
+前端回调、同源路由和联调顺序见
+[`ainer-admin-integration.md`](ainer-admin-integration.md)。
 
 首个平台 tenant/OWNER 引导也运行在 Authorization Server，默认关闭：
 
