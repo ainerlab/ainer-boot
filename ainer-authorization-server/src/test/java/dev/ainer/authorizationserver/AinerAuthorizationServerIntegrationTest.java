@@ -478,7 +478,7 @@ class AinerAuthorizationServerIntegrationTest {
                 "member-target", "Member Target", "target@member-api.dev", "Member Target");
         ProvisionedIdentity outsider = provision(
                 "member-outsider", "Member Outsider", "outsider@member-api.dev", "Member Outsider");
-        String ownerToken = actorToken(
+        String ownerToken = activeActorToken(
                 owner.subjectId().toString(),
                 owner.tenantId().toString(),
                 "USER",
@@ -510,7 +510,7 @@ class AinerAuthorizationServerIntegrationTest {
         assertForbidden(memberRequest(
                 "GET",
                 memberPath(owner, ""),
-                actorToken(
+                activeActorToken(
                         target.subjectId().toString(),
                         owner.tenantId().toString(),
                         "USER",
@@ -519,7 +519,7 @@ class AinerAuthorizationServerIntegrationTest {
         assertForbidden(memberRequest(
                 "GET",
                 memberPath(owner, ""),
-                actorToken(
+                activeActorToken(
                         owner.subjectId().toString(),
                         owner.tenantId().toString(),
                         "SERVICE",
@@ -528,7 +528,7 @@ class AinerAuthorizationServerIntegrationTest {
         assertForbidden(memberRequest(
                 "GET",
                 memberPath(owner, ""),
-                actorToken(
+                activeActorToken(
                         outsider.subjectId().toString(),
                         outsider.tenantId().toString(),
                         "USER",
@@ -705,32 +705,37 @@ class AinerAuthorizationServerIntegrationTest {
             String actorType,
             String scope) {
         Instant now = Instant.now();
-        JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
+        JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer("https://auth.ainer.test")
                 .subject(subjectId)
                 .audience(List.of("ainer-api"))
                 .issuedAt(now)
                 .expiresAt(now.plus(Duration.ofMinutes(5)))
                 .claim("actor_type", actorType)
-                .claim("scope", scope);
-        if (tenantId != null) {
-            claims.claim("tenant_id", tenantId);
-        }
-        JwtClaimsSet jwtClaims = claims.build();
-        Map<String, Object> authorizationClaims = new LinkedHashMap<>();
-        authorizationClaims.put("actor_type", actorType);
-        authorizationClaims.put("sub", subjectId);
-        authorizationClaims.put("scope", scope);
-        if (tenantId != null) {
-            authorizationClaims.put("tenant_id", tenantId);
-        }
-        String tokenValue = jwtEncoder.encode(JwtEncoderParameters.from(jwtClaims)).getTokenValue();
+                .claim("tenant_id", tenantId)
+                .claim("scope", scope)
+                .build();
+        return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+    }
+
+    private String activeActorToken(
+            String subjectId,
+            String tenantId,
+            String actorType,
+            String scope) {
+        String tokenValue = actorToken(subjectId, tenantId, actorType, scope);
+        Jwt jwt = jwtDecoder.decode(tokenValue);
         OAuth2AccessToken accessToken = new OAuth2AccessToken(
                 OAuth2AccessToken.TokenType.BEARER,
                 tokenValue,
-                now,
-                now.plus(Duration.ofMinutes(5)),
+                jwt.getIssuedAt(),
+                jwt.getExpiresAt(),
                 Set.copyOf(List.of(scope.split(" "))));
+        Map<String, Object> authorizationClaims = new LinkedHashMap<>();
+        authorizationClaims.put("actor_type", actorType);
+        authorizationClaims.put("sub", subjectId);
+        authorizationClaims.put("tenant_id", tenantId);
+        authorizationClaims.put("scope", scope);
         OAuth2Authorization authorization = OAuth2Authorization
                 .withRegisteredClient(registeredClientRepository.findByClientId(CLIENT_ID))
                 .principalName(subjectId)
