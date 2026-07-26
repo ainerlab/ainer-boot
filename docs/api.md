@@ -138,9 +138,186 @@ Authorization Code + PKCE 当前由自动化测试专用 registered client 证�
 | Authorization Server | GET | `/internal/oauth-service-clients/{clientId}` | 同上 | 查询安全生命周期投影，不返回 secret/hash |
 | Authorization Server | POST | `/internal/oauth-service-clients/{clientId}/rotations` | 同上 | 以新 client ID 创建并行 replacement |
 | Authorization Server | POST | `/internal/oauth-service-clients/{clientId}/retirement` | 同上 | 显式退役，阻止新 Token 并让在线 Token 查询 inactive |
+| Authorization Server | POST | `/internal/platform/identity/tenant-provisioning-requests` | tenantless `actor_type=SERVICE` + `platform.tenants.write` + `platform.users.write` + operator ID 白名单 | 幂等预留 tenant/OWNER；创建 grant/加密通知但不创建核心身份、不返回激活材料 |
+| Authorization Server | GET | `/internal/platform/identity/tenant-provisioning-requests/{id}` | tenantless `actor_type=SERVICE` + `platform.tenants.read` + `platform.users.read` + operator ID 白名单 | 查询安全状态投影并惰性收口过期请求 |
+| Authorization Server | POST | `/internal/platform/identity/tenant-provisioning-requests/{id}/cancellations` | tenantless `actor_type=SERVICE` + `platform.tenants.write` + `platform.users.write` + operator ID 白名单 | 显式、幂等地关闭未完成申请并销毁仍可解密的通知 payload |
+| Authorization Server | GET | `/internal/platform/identity/tenants?page=1&size=20` | tenantless `actor_type=SERVICE` + `platform.tenants.read` + operator ID 白名单 | 分页读取 tenant 安全投影；`size=1..100` |
+| Authorization Server | GET | `/internal/platform/identity/users?page=1&size=20` | tenantless `actor_type=SERVICE` + `platform.users.read` + operator ID 白名单 | 分页读取用户安全投影；`size=1..100`，不返回 password hash |
+| Authorization Server | POST | `/internal/identity/tenant-provisioning-notification-receipts` | tenantless `actor_type=SERVICE` + `identity.provisioning-notifications.receipts.write` + gateway client ID 白名单 | 为已 `PUBLISHED` 通知登记唯一 `DELIVERED|FAILED` 终态 |
+| Authorization Server | POST | `/api/identity/tenant-activations/{grantId}/consumptions` | 一次性激活 secret；无需既有登录 | 新用户设置首个长期密码，原子创建 ACTIVE tenant/user/OWNER |
+| Authorization Server | POST | `/api/me/tenant-provisioning-requests/{id}/acceptances` | `actor_type=USER` + `identity.provisioning.accept` + 目标 subject 本人 | 已有 ACTIVE 用户接受新 tenant，原子创建 tenant/OWNER，不生成新密码 |
 | `ainer-server` | POST | `/internal/workspace-owner-recovery/tenants/{tenantId}/requests` | `actor_type=SERVICE` + `workspace.owner-recovery.request` 或 `.request.all` | 为无 ACTIVE OWNER 的 Workspace 申请恢复 |
 | `ainer-server` | POST | `/internal/workspace-owner-recovery/tenants/{tenantId}/requests/{requestId}/approvals` | `actor_type=SERVICE` + `workspace.owner-recovery.approve` 或 `.approve.all` | 不同服务批准并提升现有 ACTIVE 成员 |
 | `ainer-server` | GET | `/internal/workspace-authorization-audits/tenants/{tenantId}/exports` | `actor_type=SERVICE` + `workspace.audit.export` 或 `.export.all` + 可信 exporter `sub` | SIEM 按稳定游标拉取热/冷审计并集 |
+
+Authorization Server 还会向配置的通知网关 URI 发起出站 POST。该网关不是 Identity 私有表的读取者，
+而是独立通知域；请求使用无 tenant 的 Client Credentials Token，唯一 scope 为
+`identity.provisioning-notifications.publish`，并把 UUIDv7 `notificationId` 同时写入
+`Idempotency-Key`。网关必须校验 issuer/audience、`actor_type=SERVICE`、无 tenant、该 scope 和
+精确 relay client subject。版本 1 envelope 示例：
+
+```json
+{
+  "notificationId": "019c0000-0000-7000-8000-000000000010",
+  "notificationType": "NEW_USER_ACTIVATION",
+  "templateVersion": 1,
+  "provisioningRequestId": "019c0000-0000-7000-8000-000000000001",
+  "tenantId": "019c0000-0000-7000-8000-000000000002",
+  "subjectId": "019c0000-0000-7000-8000-000000000003",
+  "deliveryTarget": {
+    "channel": "EMAIL",
+    "recipientReference": "owner@acme.example"
+  },
+  "activation": {
+    "grantId": "019c0000-0000-7000-8000-000000000004",
+    "secret": "<一次性高熵激活值>"
+  },
+  "expiresAt": "2026-07-27T04:00:00Z"
+}
+```
+
+已有用户通知的 channel 是 `IDENTITY_SUBJECT`，`recipientReference` 为目标 subject UUID，
+`activation` 为 `null`。网关必须在返回 2xx 前持久化请求并按 `notificationId` 去重；重复请求也
+返回成功。2xx 只表示通知域已接管，不能解释为最终邮件/短信送达。Identity 随后销毁本地可解密
+payload；网关若未先持久化，就无法要求 Identity 再次取回激活明文。
+
+通知网关取得供应商终态后，可通过另一组独立 Client Credentials credential 回传最小回执：
+
+```json
+{
+  "eventId": "provider-event-20260726-001",
+  "notificationId": "019c0000-0000-7000-8000-000000000010",
+  "status": "FAILED",
+  "occurredAt": "2026-07-26T05:10:00Z",
+  "failureCode": "MAILBOX_UNAVAILABLE"
+}
+```
+
+第一版只接受 `DELIVERED` 和 `FAILED`。`DELIVERED` 的 `failureCode` 必须为空，`FAILED` 必须携带
+1..96 字符的受限稳定码；回调不接受正文、联系地址、供应商原始 payload、Token、secret 或自由
+文本错误。`occurredAt` 最多可比 Ainer 接收时间晚五分钟。只有 outbox 已经是 `PUBLISHED` 且
+`publishedAt` 已写入时才可登记；回调抢先到达会返回 409，网关应稍后用同一事件重试。
+
+首次成功响应示例：
+
+```json
+{
+  "id": "019c0000-0000-7000-8000-000000000020",
+  "notificationId": "019c0000-0000-7000-8000-000000000010",
+  "eventId": "provider-event-20260726-001",
+  "status": "FAILED",
+  "failureCode": "MAILBOX_UNAVAILABLE",
+  "occurredAt": "2026-07-26T05:10:00Z",
+  "receivedAt": "2026-07-26T05:10:02Z",
+  "created": true
+}
+```
+
+`(gateway client ID,eventId)` 和 `notificationId` 都是幂等边界。相同事实回放返回原回执并令
+`created=false`；相同事件对应不同 payload、或同一 notification 出现矛盾终态返回 409。HTTP
+成功和数据库回执只证明外部网关提供了规范化供应商事实；`DELIVERED` 不证明自然人阅读、邮箱所有权
+或商业开户完成。稳定错误包括：
+
+| HTTP | code | 语义 |
+|---:|---|---|
+| 400 | `AINER.COMMON.INVALID_REQUEST` | JSON、枚举、UUID 文本或 Bean Validation 不合法 |
+| 422 | `AINER.IDENTITY.INVALID_NOTIFICATION_RECEIPT` | UUID 不是 v7、终态与失败码关系错误或时间越界 |
+| 404 | `AINER.IDENTITY.NOTIFICATION_RECEIPT_NOT_FOUND` | notification 不存在 |
+| 409 | `AINER.IDENTITY.NOTIFICATION_RECEIPT_STATE_CONFLICT` | notification 尚未被网关持久接收 |
+| 409 | `AINER.IDENTITY.NOTIFICATION_RECEIPT_IDEMPOTENCY_CONFLICT` | 事件重放内容不同或 notification 已有不同终态 |
+
+平台预配控制面默认关闭。POST 必须携带 1..128 字符安全格式的 `Idempotency-Key`，请求示例：
+
+```json
+{
+  "tenantCode": "acme-next",
+  "tenantName": "Acme Next",
+  "ownerUsername": "owner@acme.example",
+  "ownerDisplayName": "Acme Owner",
+  "deliveryChannel": "EMAIL",
+  "deliveryAddress": "owner@acme.example",
+  "changeReference": "ORDER-2026-001"
+}
+```
+
+同一 operator 与幂等键、同一规范化业务请求返回原 request，`data.created=false`；相同键但
+tenant/name/owner/change reference 任一规范化值不同返回 409。首次成功和幂等重放都返回 200，
+安全投影示例：
+
+```json
+{
+  "id": "019c0000-0000-7000-8000-000000000001",
+  "tenantId": "019c0000-0000-7000-8000-000000000002",
+  "tenantCode": "acme-next",
+  "tenantName": "Acme Next",
+  "ownerSubjectId": "019c0000-0000-7000-8000-000000000003",
+  "ownerUsername": "owner@acme.example",
+  "ownerDisplayName": "Acme Owner",
+  "ownerUserExists": false,
+  "status": "REQUESTED",
+  "requestedByServiceId": "platform-identity-operator",
+  "changeReference": "ORDER-2026-001",
+  "requestedAt": "2026-07-26T04:00:00Z",
+  "expiresAt": "2026-07-27T04:00:00Z",
+  "completedAt": null,
+  "created": true
+}
+```
+
+`REQUESTED` 只是不可授权的预留，不表示 tenant/user/membership 已存在。新用户请求的有效期采用
+较短的 activation TTL；已有用户采用 request TTL。到期请求在读取、接受或后续冲突检查时惰性转为
+`EXPIRED`；使用原幂等键仍返回原请求，重新申请必须使用新键。响应不包含 `idempotencyKey`、
+request fingerprint、联系地址、密码、激活 secret 或密文。新用户的 secret 由通知 publisher
+消费 outbox 后送达，API 不提供读取或补查端点。
+
+取消使用显式子资源，不提供通用 PATCH：
+
+```json
+{
+  "changeReference": "ORDER-2026-001-CANCEL"
+}
+```
+
+只有 `REQUESTED` 会迁移为 `CANCELLED`。新用户 request 必须同时把唯一 ACTIVE grant 迁移为
+`CANCELLED`，否则整个事务失败关闭；PENDING/FAILED 通知进入 `CANCELLED` 并立即销毁可解密
+payload。通知若已经 `PUBLISHED`，其 payload 已销毁但下游通知无法召回，grant 仍会失效。重复取消
+已 `CANCELLED` 的 request 返回同一终态且不重复审计；`EXPIRED` 同样保持终态，`ACTIVATED` 返回
+409。响应中的 `changeReference` 仍是原申请引用，取消引用只进入唯一 `CANCELLED` 阶段审计。
+
+tenant/user 列表沿用统一 `items/page/size/total` 结构，页码从 1 开始、单页最大 100，并分别按
+`code,id` 与 `username,id` 稳定排序。tenant item 只含 `id/code/name/status/createdAt/updatedAt`；
+user item 只含 `subjectId/username/displayName/status/createdAt/updatedAt`。列表读取 Identity
+核心事实，不包含尚未激活的 provisioning reservation，也不返回 membership、密码哈希、OAuth
+协议记录、通知目标或激活材料。
+
+新用户消费请求：
+
+```json
+{
+  "activationSecret": "<43 字符以上的一次性高熵值>",
+  "password": "<用户本人选择的长期密码>"
+}
+```
+
+成功后返回 request/tenant/subject 与 `ACTIVATED` 状态。secret 错误会增加该 grant 的失败次数；
+达到上限后 grant 进入 `LOCKED`、request 进入 `CANCELLED`，且不创建核心 Identity。成功消费后
+同一 secret 重放返回 401。已有 ACTIVE 用户不使用 secret，必须用其本人 USER Token 调用接受端点；
+新 membership 不覆盖该用户原有 `is_default=true` tenant。
+
+稳定错误包括：
+
+| HTTP | code | 语义 |
+|---:|---|---|
+| 400 | `AINER.COMMON.INVALID_REQUEST` | 缺少必填 header/body 或传输层校验失败 |
+| 422 | `AINER.IDENTITY.INVALID_TENANT_PROVISIONING_REQUEST` | 字段规范化后的业务输入不合法 |
+| 404 | `AINER.IDENTITY.TENANT_PROVISIONING_NOT_FOUND` | request ID 不存在 |
+| 409 | `AINER.IDENTITY.TENANT_PROVISIONING_IDEMPOTENCY_CONFLICT` | 相同 operator/幂等键对应不同请求 |
+| 409 | `AINER.IDENTITY.TENANT_PROVISIONING_CONFLICT` | tenant code 或开放的新用户标识预留冲突 |
+| 409 | `AINER.IDENTITY.TENANT_PROVISIONING_USER_CONFLICT` | 已有用户不是 ACTIVE |
+| 409 | `AINER.IDENTITY.TENANT_PROVISIONING_STATE_CONFLICT` | 并发状态变化导致请求无法按预期收口 |
+| 401 | `AINER.IDENTITY.TENANT_ACTIVATION_CREDENTIAL_INVALID` | grant/secret 无效、过期、锁定或已消费 |
+| 422 | `AINER.IDENTITY.TENANT_ACTIVATION_PASSWORD_INVALID` | 新用户初始密码不符合当前最小策略 |
+| 403 | `AINER.IDENTITY.TENANT_PROVISIONING_ACCEPTANCE_FORBIDDEN` | 非预留目标 USER 尝试接受 |
 
 `identity.directory.read` 必须由 Token `tenant_id` 绑定路径 tenant；只有 `identity.directory.read.all` 可以跨 tenant 选择。Directory 响应只含 `tenantId`、`subjectId`、`username`、`displayName`、`role`。非 ACTIVE 精确查询返回 404 `AINER.IDENTITY.DIRECTORY_MEMBER_NOT_FOUND`，不得暴露密码哈希、锁定细节或 OAuth 数据。
 
@@ -222,7 +399,8 @@ DELETE 或重新激活。
 `eventType` 当前只有 `IDENTITY_USER_DISABLED`、`IDENTITY_MEMBERSHIP_REVOKED`。成功响应的 `data` 含 `eventId`、`duplicate`、`affectedMemberships`；重复 event ID 返回 200 且不重复修改。超过允许未来时钟偏差的事件返回 400。该端点不提供恢复语义，也不允许普通人员 Token 调用。
 
 账号禁用仍是 Identity 应用用例，尚未开放远程管理 HTTP API；tenant membership 的租户内管理
-已经通过第 5 节 USER API 开放，平台级跨租户管理仍未开放。
+已经通过第 5 节 USER API 开放。平台级跨租户能力当前包含预配申请/查询/显式取消、tenant/user
+安全分页及随后由用户本人完成的激活，不包含禁用、恢复或直接修改。
 
 重放申请请求体：
 

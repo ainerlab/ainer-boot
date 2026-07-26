@@ -4,6 +4,7 @@ import dev.ainer.core.error.BusinessException;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.module.identity.IdentityModuleConfiguration;
 import dev.ainer.module.identity.account.application.AddTenantMemberCommand;
+import dev.ainer.module.identity.account.application.CreateTenantProvisioningCommand;
 import dev.ainer.module.identity.account.application.IdentityAccessLifecycleService;
 import dev.ainer.module.identity.account.application.IdentityAccessEventDelivery;
 import dev.ainer.module.identity.account.application.IdentityAccessEventOutboxService;
@@ -19,10 +20,29 @@ import dev.ainer.module.identity.account.application.IdentityRepository;
 import dev.ainer.module.identity.account.application.IdentityTokenStatusService;
 import dev.ainer.module.identity.account.application.MemberPage;
 import dev.ainer.module.identity.account.application.MemberSummary;
+import dev.ainer.module.identity.account.application.NotificationGatewayActor;
+import dev.ainer.module.identity.account.application.PlatformIdentityQueryService;
+import dev.ainer.module.identity.account.application.PlatformProvisioningActor;
 import dev.ainer.module.identity.account.application.ProvisionTenantOwnerCommand;
 import dev.ainer.module.identity.account.application.ProvisionedIdentity;
 import dev.ainer.module.identity.account.application.TenantMemberManagementService;
+import dev.ainer.module.identity.account.application.TenantProvisioningCancellationResult;
+import dev.ainer.module.identity.account.application.TenantProvisioningCompletion;
+import dev.ainer.module.identity.account.application.TenantProvisioningNotification;
+import dev.ainer.module.identity.account.application.TenantProvisioningNotificationDeliveryStatus;
+import dev.ainer.module.identity.account.application.TenantProvisioningNotificationOutboxEntry;
+import dev.ainer.module.identity.account.application.TenantProvisioningNotificationOutboxService;
+import dev.ainer.module.identity.account.application.TenantProvisioningNotificationPayloadProtector;
+import dev.ainer.module.identity.account.application.TenantProvisioningNotificationPublicationException;
+import dev.ainer.module.identity.account.application.TenantProvisioningNotificationPublisher;
+import dev.ainer.module.identity.account.application.TenantProvisioningNotificationReceiptCommand;
+import dev.ainer.module.identity.account.application.TenantProvisioningNotificationReceiptService;
+import dev.ainer.module.identity.account.application.TenantProvisioningNotificationRelay;
 import dev.ainer.module.identity.account.application.TenantOwnerBootstrapResult;
+import dev.ainer.module.identity.account.application.TenantProvisioningRequest;
+import dev.ainer.module.identity.account.application.TenantProvisioningResult;
+import dev.ainer.module.identity.account.application.TenantProvisioningPolicy;
+import dev.ainer.module.identity.account.application.TenantProvisioningService;
 import dev.ainer.module.identity.account.domain.IdentityAccessEvent;
 import dev.ainer.module.identity.account.domain.IdentityStatus;
 import dev.ainer.module.identity.account.domain.IdentityTenant;
@@ -30,6 +50,7 @@ import dev.ainer.module.identity.account.domain.IdentityUser;
 import dev.ainer.module.identity.account.domain.TenantMembership;
 import dev.ainer.module.identity.account.domain.TenantRole;
 import dev.ainer.module.identity.account.infrastructure.mybatis.MybatisIdentityRepository;
+import dev.ainer.module.identity.account.infrastructure.security.AesGcmTenantProvisioningNotificationPayloadProtector;
 import dev.ainer.security.AinerSecurityScopes;
 import dev.ainer.security.actor.AuthenticatedActor;
 import org.flywaydb.core.Flyway;
@@ -43,6 +64,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -52,14 +74,22 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -70,6 +100,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         properties = {
                 "ainer.identity.enabled=true",
                 "mybatis.mapper-locations=classpath*:/mapper/**/*.xml",
+                "spring.profiles.active=identity-module-integration-test",
                 "spring.main.banner-mode=off"
         })
 class IdentityModuleIntegrationTest {
@@ -110,6 +141,21 @@ class IdentityModuleIntegrationTest {
     private TenantMemberManagementService memberService;
 
     @Autowired
+    private TenantProvisioningService provisioningService;
+
+    @Autowired
+    private PlatformIdentityQueryService platformIdentityQueryService;
+
+    @Autowired
+    private TenantProvisioningNotificationOutboxService provisioningNotificationOutboxService;
+
+    @Autowired
+    private TenantProvisioningNotificationPayloadProtector provisioningNotificationProtector;
+
+    @Autowired
+    private TenantProvisioningNotificationReceiptService provisioningNotificationReceiptService;
+
+    @Autowired
     private ControllableIdentityRepository identityRepository;
 
     @Autowired
@@ -123,6 +169,12 @@ class IdentityModuleIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM ainer_identity_platform_operation_audit");
+        jdbcTemplate.update(
+                "DELETE FROM ainer_identity_notification_delivery_receipt");
+        jdbcTemplate.update("DELETE FROM ainer_identity_notification_outbox");
+        jdbcTemplate.update("DELETE FROM ainer_identity_activation_grant");
+        jdbcTemplate.update("DELETE FROM ainer_identity_tenant_provisioning_request");
         jdbcTemplate.update("DELETE FROM ainer_identity_member_audit");
         jdbcTemplate.update("DELETE FROM ainer_identity_security_operation_audit");
         jdbcTemplate.update("DELETE FROM ainer_identity_access_event_replay_request");
@@ -134,16 +186,928 @@ class IdentityModuleIntegrationTest {
 
     @Test
     void migrationCreatesIdentitySchema() {
-        assertThat(flyway.info().applied()).hasSize(6);
+        assertThat(flyway.info().applied()).hasSize(9);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_name IN ('ainer_identity_tenant','ainer_identity_user',"
                         + "'ainer_identity_membership','ainer_identity_access_event',"
                         + "'ainer_identity_access_event_replay_request',"
                         + "'ainer_identity_security_operation_audit',"
-                        + "'ainer_identity_member_audit')",
-                Integer.class)).isEqualTo(7);
+                        + "'ainer_identity_member_audit',"
+                        + "'ainer_identity_tenant_provisioning_request',"
+                        + "'ainer_identity_platform_operation_audit',"
+                        + "'ainer_identity_activation_grant',"
+                        + "'ainer_identity_notification_outbox',"
+                        + "'ainer_identity_notification_delivery_receipt')",
+                Integer.class)).isEqualTo(12);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
+    }
+
+    @Test
+    void tenantProvisioningReservesIdentityIdempotentlyWithoutPollutingCoreTables() {
+        PlatformProvisioningActor actor =
+                new PlatformProvisioningActor("platform-operator", null, "req-provision-1");
+        CreateTenantProvisioningCommand command = new CreateTenantProvisioningCommand(
+                "ACME-NEXT",
+                " Acme Next ",
+                "OWNER@ACME-NEXT.DEV",
+                " Acme Owner ",
+                "EMAIL",
+                "owner@acme-next.dev",
+                "idem-acme-next",
+                "ORDER-2026-001");
+
+        TenantProvisioningResult created =
+                provisioningService.create(command, actor, provisioningPolicy(Duration.ofDays(7)));
+        TenantProvisioningResult replayed = provisioningService.create(
+                command,
+                new PlatformProvisioningActor(
+                        "platform-operator", null, "req-provision-retry"),
+                provisioningPolicy(Duration.ofDays(7)));
+
+        assertThat(created.created()).isTrue();
+        assertThat(replayed.created()).isFalse();
+        assertThat(replayed.request()).isEqualTo(created.request());
+        assertThat(created.request())
+                .extracting(
+                        TenantProvisioningRequest::tenantCode,
+                        TenantProvisioningRequest::tenantName,
+                        TenantProvisioningRequest::ownerUsername,
+                        TenantProvisioningRequest::ownerDisplayName,
+                        TenantProvisioningRequest::ownerUserExists,
+                        TenantProvisioningRequest::status)
+                .containsExactly(
+                        "acme-next",
+                        "Acme Next",
+                        "owner@acme-next.dev",
+                        "Acme Owner",
+                        false,
+                        "REQUESTED");
+        assertThat(created.request().requestFingerprint()).matches("[a-f0-9]{64}");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_tenant", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_user", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_membership", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_tenant_provisioning_request",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_activation_grant",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_notification_outbox",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_tenant_provisioning_request "
+                        + "WHERE uuid_extract_version(id) = 7 "
+                        + "AND uuid_extract_version(tenant_id) = 7 "
+                        + "AND uuid_extract_version(owner_subject_id) = 7",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_platform_operation_audit "
+                        + "WHERE operation_id = ? AND phase = 'REQUESTED'",
+                Integer.class,
+                created.request().id())).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                        + "WHERE table_name IN ("
+                        + "'ainer_identity_tenant_provisioning_request',"
+                        + "'ainer_identity_platform_operation_audit',"
+                        + "'ainer_identity_activation_grant',"
+                        + "'ainer_identity_notification_outbox') "
+                        + "AND (column_name LIKE '%password%' "
+                        + "OR column_name = 'activation_secret' "
+                        + "OR column_name = 'delivery_address' "
+                        + "OR column_name = 'recipient_reference' "
+                        + "OR column_name LIKE '%token%')",
+                Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT column_name FROM information_schema.columns "
+                        + "WHERE table_name = 'ainer_identity_activation_grant' "
+                        + "AND column_name LIKE '%secret%'",
+                String.class)).containsExactly("secret_hash");
+        assertIdentityError(
+                () -> service.ensureTenantOwner(new ProvisionTenantOwnerCommand(
+                        "acme-next",
+                        "Bootstrap Collision",
+                        "bootstrap-owner@example.com",
+                        "bootstrap-password-2026",
+                        "Bootstrap Owner")),
+                IdentityErrorCode.TENANT_BOOTSTRAP_STATE_CONFLICT);
+    }
+
+    @Test
+    void platformCancellationClosesGrantDestroysNotificationAndAuditsOnce() {
+        TenantProvisioningResult created = createProvisioning(
+                "cancel-next",
+                "Cancel Next",
+                "cancel-owner@example.com",
+                "Cancel Owner",
+                "idem-cancel-next",
+                "req-cancel-create",
+                provisioningPolicy(Duration.ofDays(7)));
+        PlatformProvisioningActor actor =
+                new PlatformProvisioningActor(
+                        "platform-operator",
+                        null,
+                        "req-cancel-command");
+
+        TenantProvisioningCancellationResult cancelled = provisioningService.cancel(
+                created.request().id(),
+                "ORDER-CANCEL-2026-001",
+                actor);
+        TenantProvisioningCancellationResult replayed = provisioningService.cancel(
+                created.request().id(),
+                "ORDER-CANCEL-2026-REPLAY",
+                new PlatformProvisioningActor(
+                        "platform-operator",
+                        null,
+                        "req-cancel-replay"));
+
+        assertThat(cancelled.cancelled()).isTrue();
+        assertThat(cancelled.request().status()).isEqualTo("CANCELLED");
+        assertThat(replayed.cancelled()).isFalse();
+        assertThat(replayed.request().status()).isEqualTo("CANCELLED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM ainer_identity_activation_grant "
+                        + "WHERE provisioning_request_id = ?",
+                String.class,
+                created.request().id())).isEqualTo("CANCELLED");
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT publication_status, payload_key_version, "
+                        + "octet_length(protected_payload) AS payload_length, "
+                        + "payload_destroyed_at IS NOT NULL AS payload_destroyed "
+                        + "FROM ainer_identity_notification_outbox "
+                        + "WHERE provisioning_request_id = ?",
+                created.request().id()))
+                .containsEntry("publication_status", "CANCELLED")
+                .containsEntry("payload_key_version", "destroyed")
+                .containsEntry("payload_length", 32)
+                .containsEntry("payload_destroyed", true);
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT actor_type, actor_id, request_id, change_reference "
+                        + "FROM ainer_identity_platform_operation_audit "
+                        + "WHERE operation_id = ? AND phase = 'CANCELLED'",
+                created.request().id()))
+                .containsEntry("actor_type", "SERVICE")
+                .containsEntry("actor_id", "platform-operator")
+                .containsEntry("request_id", "req-cancel-command")
+                .containsEntry("change_reference", "ORDER-CANCEL-2026-001");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_platform_operation_audit "
+                        + "WHERE operation_id = ? AND phase = 'CANCELLED'",
+                Integer.class,
+                created.request().id())).isEqualTo(1);
+
+        TenantProvisioningResult corrupted = createProvisioning(
+                "cancel-corrupted",
+                "Cancel Corrupted",
+                "cancel-corrupted@example.com",
+                "Cancel Corrupted Owner",
+                "idem-cancel-corrupted",
+                "req-cancel-corrupted",
+                provisioningPolicy(Duration.ofDays(7)));
+        jdbcTemplate.update(
+                "DELETE FROM ainer_identity_activation_grant "
+                        + "WHERE provisioning_request_id = ?",
+                corrupted.request().id());
+
+        assertIdentityError(
+                () -> provisioningService.cancel(
+                        corrupted.request().id(),
+                        "ORDER-CANCEL-CORRUPTED",
+                        actor),
+                IdentityErrorCode.TENANT_PROVISIONING_STATE_CONFLICT);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM ainer_identity_tenant_provisioning_request "
+                        + "WHERE id = ?",
+                String.class,
+                corrupted.request().id())).isEqualTo("REQUESTED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT publication_status FROM ainer_identity_notification_outbox "
+                        + "WHERE provisioning_request_id = ?",
+                String.class,
+                corrupted.request().id())).isEqualTo("PENDING");
+    }
+
+    @Test
+    void platformQueryReturnsBoundedSafeTenantAndUserProjections() {
+        provision(
+                "directory-alpha",
+                "Directory Alpha",
+                "alpha-owner@example.com",
+                "Alpha Owner");
+        provision(
+                "directory-beta",
+                "Directory Beta",
+                "beta-owner@example.com",
+                "Beta Owner");
+        PlatformProvisioningActor actor =
+                new PlatformProvisioningActor(
+                        "platform-operator",
+                        null,
+                        "req-platform-directory");
+
+        var firstTenantPage = platformIdentityQueryService.tenants(actor, 1, 1);
+        var secondTenantPage = platformIdentityQueryService.tenants(actor, 2, 1);
+        var userPage = platformIdentityQueryService.users(actor, 1, 20);
+
+        assertThat(firstTenantPage.total()).isEqualTo(2);
+        assertThat(firstTenantPage.items()).singleElement()
+                .satisfies(tenant -> {
+                    assertThat(tenant.code()).isEqualTo("directory-alpha");
+                    assertThat(tenant.status()).isEqualTo(IdentityStatus.ACTIVE);
+                });
+        assertThat(secondTenantPage.items()).singleElement()
+                .extracting(tenant -> tenant.code())
+                .isEqualTo("directory-beta");
+        assertThat(userPage.total()).isEqualTo(2);
+        assertThat(userPage.items())
+                .extracting(user -> user.username())
+                .containsExactly(
+                        "alpha-owner@example.com",
+                        "beta-owner@example.com");
+    }
+
+    @Test
+    void tenantProvisioningRejectsChangedIdempotencyAndReleasesExpiredReservations() {
+        PlatformProvisioningActor actor =
+                new PlatformProvisioningActor("platform-operator", null, "req-expiry-1");
+        CreateTenantProvisioningCommand original = new CreateTenantProvisioningCommand(
+                "reserved-code",
+                "Reserved Tenant",
+                "reserved-owner@example.com",
+                "Reserved Owner",
+                "EMAIL",
+                "reserved-owner@example.com",
+                "idem-reserved",
+                "ORDER-2026-002");
+        TenantProvisioningRequest first = provisioningService
+                .create(original, actor, provisioningPolicy(Duration.ofMinutes(15)))
+                .request();
+
+        assertIdentityError(
+                () -> provisioningService.create(
+                        new CreateTenantProvisioningCommand(
+                                "reserved-code",
+                                "Changed Tenant",
+                                "reserved-owner@example.com",
+                                "Reserved Owner",
+                                "EMAIL",
+                                "reserved-owner@example.com",
+                                "idem-reserved",
+                                "ORDER-2026-002"),
+                        actor,
+                        provisioningPolicy(Duration.ofMinutes(15))),
+                IdentityErrorCode.TENANT_PROVISIONING_IDEMPOTENCY_CONFLICT);
+        assertIdentityError(
+                () -> provisioningService.create(
+                        new CreateTenantProvisioningCommand(
+                                "reserved-code",
+                                "Reserved Tenant",
+                                "reserved-owner@example.com",
+                                "Reserved Owner",
+                                "EMAIL",
+                                "reserved-owner@example.com",
+                                "idem-reserved",
+                                "ORDER-2026-CHANGED"),
+                        actor,
+                        provisioningPolicy(Duration.ofMinutes(15))),
+                IdentityErrorCode.TENANT_PROVISIONING_IDEMPOTENCY_CONFLICT);
+        assertIdentityError(
+                () -> provisioningService.create(
+                        new CreateTenantProvisioningCommand(
+                                "reserved-code",
+                                "Reserved Tenant",
+                                "other-owner@example.com",
+                                "Other Owner",
+                                "EMAIL",
+                                "other-owner@example.com",
+                                "idem-other",
+                                "ORDER-2026-003"),
+                        actor,
+                        provisioningPolicy(Duration.ofMinutes(15))),
+                IdentityErrorCode.TENANT_PROVISIONING_CONFLICT);
+
+        Instant now = Instant.now();
+        jdbcTemplate.update(
+                "UPDATE ainer_identity_tenant_provisioning_request "
+                        + "SET requested_at = ?, expires_at = ? WHERE id = ?",
+                databaseTimestamp(now.minus(Duration.ofHours(1))),
+                databaseTimestamp(now.minus(Duration.ofMinutes(1))),
+                first.id());
+
+        TenantProvisioningRequest expired = provisioningService.find(
+                first.id(),
+                new PlatformProvisioningActor(
+                        "platform-operator", null, "req-expiry-read"));
+        TenantProvisioningResult replacement = provisioningService.create(
+                new CreateTenantProvisioningCommand(
+                        "reserved-code",
+                        "Replacement Tenant",
+                        "replacement-owner@example.com",
+                        "Replacement Owner",
+                        "EMAIL",
+                        "replacement-owner@example.com",
+                        "idem-replacement",
+                        "ORDER-2026-004"),
+                new PlatformProvisioningActor(
+                        "platform-operator", null, "req-expiry-replacement"),
+                provisioningPolicy(Duration.ofDays(1)));
+
+        assertThat(expired.status()).isEqualTo("EXPIRED");
+        assertThat(expired.completedAt()).isNotNull();
+        assertThat(replacement.created()).isTrue();
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT phase, actor_type, actor_id "
+                        + "FROM ainer_identity_platform_operation_audit "
+                        + "WHERE operation_id = ? ORDER BY occurred_at, phase",
+                first.id()))
+                .extracting(
+                        row -> row.get("phase"),
+                        row -> row.get("actor_type"),
+                        row -> row.get("actor_id"))
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(
+                                "REQUESTED", "SERVICE", "platform-operator"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "EXPIRED", "SYSTEM", "system:expiry"));
+    }
+
+    @Test
+    void tenantProvisioningReusesOnlyActiveExistingUser() {
+        ProvisionedIdentity existing = provision(
+                "existing-home",
+                "Existing Home",
+                "existing-owner@example.com",
+                "Authoritative Display");
+
+        TenantProvisioningRequest request = provisioningService.create(
+                new CreateTenantProvisioningCommand(
+                        "existing-next",
+                        "Existing Next",
+                        "EXISTING-OWNER@EXAMPLE.COM",
+                        "Caller Supplied Display",
+                        "EMAIL",
+                        "existing-owner@example.com",
+                        "idem-existing",
+                        "ORDER-2026-005"),
+                new PlatformProvisioningActor(
+                        "platform-operator", null, "req-existing"),
+                provisioningPolicy(Duration.ofDays(7))).request();
+
+        assertThat(request.ownerUserExists()).isTrue();
+        assertThat(request.ownerSubjectId()).isEqualTo(existing.subjectId());
+        assertThat(request.ownerDisplayName()).isEqualTo("Authoritative Display");
+        TenantProvisioningCancellationResult cancelledExistingUser =
+                provisioningService.cancel(
+                        request.id(),
+                        "ORDER-CANCEL-EXISTING",
+                        new PlatformProvisioningActor(
+                                "platform-operator",
+                                null,
+                                "req-cancel-existing"));
+        assertThat(cancelledExistingUser.cancelled()).isTrue();
+        assertThat(cancelledExistingUser.request().status()).isEqualTo("CANCELLED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_activation_grant "
+                        + "WHERE provisioning_request_id = ?",
+                Integer.class,
+                request.id())).isZero();
+
+        jdbcTemplate.update(
+                "UPDATE ainer_identity_user SET status = 'LOCKED' WHERE id = ?",
+                existing.subjectId());
+        assertIdentityError(
+                () -> provisioningService.create(
+                        new CreateTenantProvisioningCommand(
+                                "locked-next",
+                                "Locked Next",
+                                "existing-owner@example.com",
+                                "Ignored Display",
+                                "EMAIL",
+                                "existing-owner@example.com",
+                                "idem-locked",
+                                "ORDER-2026-006"),
+                        new PlatformProvisioningActor(
+                                "platform-operator", null, "req-locked"),
+                        provisioningPolicy(Duration.ofDays(7))),
+                IdentityErrorCode.TENANT_PROVISIONING_USER_CONFLICT);
+    }
+
+    @Test
+    void newUserActivationConsumesSecretOnceAndCreatesTheReservedIdentityAtomically() {
+        TenantProvisioningResult result = createProvisioning(
+                "activation-new",
+                "Activation New",
+                "activation-new@example.com",
+                "Activation Owner",
+                "idem-activation-new",
+                "req-activation-new",
+                new TenantProvisioningPolicy(
+                        Duration.ofDays(7), Duration.ofHours(24), 5));
+        TenantProvisioningNotificationOutboxEntry delivery =
+                claimProvisioningNotification("relay:new-user");
+        TenantProvisioningNotification notification =
+                provisioningNotificationProtector.unprotect(
+                        delivery.protectedNotification());
+
+        assertThat(notification.provisioningRequestId()).isEqualTo(result.request().id());
+        assertThat(notification.activationGrantId()).isNotNull();
+        assertThat(notification.activationSecret()).hasSize(43);
+        assertThat(notification.deliveryChannel()).isEqualTo("EMAIL");
+        assertThat(notification.recipientReference())
+                .isEqualTo("activation-new@example.com");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT secret_hash <> ? AND char_length(secret_hash) = 64 "
+                        + "FROM ainer_identity_activation_grant WHERE id = ?",
+                Boolean.class,
+                notification.activationSecret(),
+                notification.activationGrantId())).isTrue();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT position(convert_to(?, 'UTF8') in protected_payload) = 0 "
+                        + "FROM ainer_identity_notification_outbox WHERE id = ?",
+                Boolean.class,
+                notification.activationSecret(),
+                delivery.id())).isTrue();
+        provisioningNotificationOutboxService.markPublished(
+                delivery.id(), "relay:new-user", Instant.now());
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT publication_status, payload_key_version, "
+                        + "payload_destroyed_at IS NOT NULL AS payload_destroyed "
+                        + "FROM ainer_identity_notification_outbox WHERE id = ?",
+                delivery.id()))
+                .containsEntry("publication_status", "PUBLISHED")
+                .containsEntry("payload_key_version", "destroyed")
+                .containsEntry("payload_destroyed", true);
+
+        TenantProvisioningCompletion completion = provisioningService.activateNewUser(
+                notification.activationGrantId(),
+                notification.activationSecret(),
+                "activation-password-2026",
+                "req-activate-new");
+
+        assertThat(completion.activated()).isTrue();
+        assertThat(completion.request().status()).isEqualTo("ACTIVATED");
+        assertThat(completion.identity().tenantId()).isEqualTo(result.request().tenantId());
+        assertThat(completion.identity().subjectId())
+                .isEqualTo(result.request().ownerSubjectId());
+        IdentityAccount account = service
+                .findAccountByUsername("activation-new@example.com")
+                .orElseThrow();
+        assertThat(passwordEncoder.matches(
+                "activation-password-2026", account.passwordHash())).isTrue();
+        assertThat(account.roles()).containsExactly("OWNER");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT is_default FROM ainer_identity_membership "
+                        + "WHERE tenant_id = ? AND user_id = ?",
+                Boolean.class,
+                completion.identity().tenantId(),
+                completion.identity().subjectId())).isTrue();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM ainer_identity_activation_grant WHERE id = ?",
+                String.class,
+                notification.activationGrantId())).isEqualTo("CONSUMED");
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT phase, actor_type FROM ainer_identity_platform_operation_audit "
+                        + "WHERE operation_id = ? ORDER BY occurred_at, phase",
+                result.request().id()))
+                .extracting(row -> row.get("phase"), row -> row.get("actor_type"))
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("REQUESTED", "SERVICE"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "ACTIVATED", "ACTIVATION_GRANT"));
+        assertIdentityError(
+                () -> provisioningService.activateNewUser(
+                        notification.activationGrantId(),
+                        notification.activationSecret(),
+                        "another-password-2026",
+                        "req-activate-replay"),
+                IdentityErrorCode.TENANT_ACTIVATION_CREDENTIAL_INVALID);
+    }
+
+    @Test
+    void activationFailuresPersistAttemptsThenLockWithoutCreatingCoreIdentity() {
+        TenantProvisioningResult result = createProvisioning(
+                "activation-lock",
+                "Activation Lock",
+                "activation-lock@example.com",
+                "Activation Lock Owner",
+                "idem-activation-lock",
+                "req-activation-lock",
+                new TenantProvisioningPolicy(
+                        Duration.ofDays(1), Duration.ofHours(1), 2));
+        TenantProvisioningNotification notification =
+                provisioningNotificationProtector.unprotect(
+                        claimProvisioningNotification("relay:lock")
+                                .protectedNotification());
+        String wrongSecret = (notification.activationSecret().startsWith("A") ? "B" : "A")
+                + notification.activationSecret().substring(1);
+
+        TenantProvisioningCompletion firstFailure =
+                provisioningService.activateNewUser(
+                        notification.activationGrantId(),
+                        wrongSecret,
+                        "activation-password-2026",
+                        "req-activation-wrong-1");
+        TenantProvisioningCompletion secondFailure =
+                provisioningService.activateNewUser(
+                        notification.activationGrantId(),
+                        wrongSecret,
+                        "activation-password-2026",
+                        "req-activation-wrong-2");
+
+        assertThat(firstFailure.activated()).isFalse();
+        assertThat(firstFailure.request().status()).isEqualTo("REQUESTED");
+        assertThat(secondFailure.activated()).isFalse();
+        assertThat(secondFailure.request().status()).isEqualTo("CANCELLED");
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT status, attempt_count FROM ainer_identity_activation_grant "
+                        + "WHERE id = ?",
+                notification.activationGrantId()))
+                .containsEntry("status", "LOCKED")
+                .containsEntry("attempt_count", 2);
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT publication_status, payload_key_version, "
+                        + "payload_destroyed_at IS NOT NULL AS payload_destroyed "
+                        + "FROM ainer_identity_notification_outbox "
+                        + "WHERE provisioning_request_id = ?",
+                result.request().id()))
+                .containsEntry("publication_status", "CANCELLED")
+                .containsEntry("payload_key_version", "destroyed")
+                .containsEntry("payload_destroyed", true);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_tenant", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_user", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_membership", Integer.class)).isZero();
+        assertIdentityError(
+                () -> provisioningService.activateNewUser(
+                        notification.activationGrantId(),
+                        notification.activationSecret(),
+                        "activation-password-2026",
+                        "req-activation-after-lock"),
+                IdentityErrorCode.TENANT_ACTIVATION_CREDENTIAL_INVALID);
+    }
+
+    @Test
+    void existingUserMustAcceptAsTheReservedSubjectAndKeepsTheOriginalDefaultTenant() {
+        ProvisionedIdentity existing = provision(
+                "accept-home",
+                "Accept Home",
+                "accept-owner@example.com",
+                "Accept Owner");
+        TenantProvisioningResult result = createProvisioning(
+                "accept-next",
+                "Accept Next",
+                "accept-owner@example.com",
+                "Ignored Caller Display",
+                "idem-accept-next",
+                "req-accept-next",
+                new TenantProvisioningPolicy(
+                        Duration.ofDays(7), Duration.ofHours(24), 5));
+        TenantProvisioningNotification notification =
+                provisioningNotificationProtector.unprotect(
+                        claimProvisioningNotification("relay:existing-user")
+                                .protectedNotification());
+
+        assertThat(notification.deliveryChannel()).isEqualTo("IDENTITY_SUBJECT");
+        assertThat(notification.recipientReference())
+                .isEqualTo(existing.subjectId().toString());
+        assertThat(notification.activationGrantId()).isNull();
+        assertThat(notification.activationSecret()).isNull();
+        assertIdentityError(
+                () -> provisioningService.acceptExistingUser(
+                        result.request().id(),
+                        UUID.randomUUID(),
+                        "req-accept-wrong-user"),
+                IdentityErrorCode.TENANT_PROVISIONING_ACCEPTANCE_FORBIDDEN);
+
+        TenantProvisioningCompletion completion =
+                provisioningService.acceptExistingUser(
+                        result.request().id(),
+                        existing.subjectId(),
+                        "req-accept-existing");
+
+        assertThat(completion.activated()).isTrue();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_user WHERE id = ?",
+                Integer.class,
+                existing.subjectId())).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT is_default FROM ainer_identity_membership "
+                        + "WHERE tenant_id = ? AND user_id = ?",
+                Boolean.class,
+                result.request().tenantId(),
+                existing.subjectId())).isFalse();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT tenant_id FROM ainer_identity_membership "
+                        + "WHERE user_id = ? AND is_default = true",
+                UUID.class,
+                existing.subjectId())).isEqualTo(existing.tenantId());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT actor_type FROM ainer_identity_platform_operation_audit "
+                        + "WHERE operation_id = ? AND phase = 'ACTIVATED'",
+                String.class,
+                result.request().id())).isEqualTo("USER");
+    }
+
+    @Test
+    void activationRollsBackTenantUserAndMembershipWhenPersistenceFails() {
+        TenantProvisioningResult result = createProvisioning(
+                "activation-rollback",
+                "Activation Rollback",
+                "activation-rollback@example.com",
+                "Activation Rollback Owner",
+                "idem-activation-rollback",
+                "req-activation-rollback",
+                new TenantProvisioningPolicy(
+                        Duration.ofDays(1), Duration.ofHours(1), 5));
+        TenantProvisioningNotification notification =
+                provisioningNotificationProtector.unprotect(
+                        claimProvisioningNotification("relay:rollback")
+                                .protectedNotification());
+        identityRepository.failNextMembership();
+
+        assertThatThrownBy(() -> provisioningService.activateNewUser(
+                notification.activationGrantId(),
+                notification.activationSecret(),
+                "activation-password-2026",
+                "req-activate-rollback"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("simulated membership persistence failure");
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_tenant WHERE id = ?",
+                Integer.class,
+                result.request().tenantId())).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_user WHERE id = ?",
+                Integer.class,
+                result.request().ownerSubjectId())).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_membership WHERE tenant_id = ?",
+                Integer.class,
+                result.request().tenantId())).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM ainer_identity_activation_grant WHERE id = ?",
+                String.class,
+                notification.activationGrantId())).isEqualTo("ACTIVE");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM ainer_identity_tenant_provisioning_request WHERE id = ?",
+                String.class,
+                result.request().id())).isEqualTo("REQUESTED");
+    }
+
+    @Test
+    void notificationRelayRetriesAProviderFailureAndPublishesProtectedPayload() {
+        createProvisioning(
+                "notification-retry",
+                "Notification Retry",
+                "notification-retry@example.com",
+                "Notification Retry Owner",
+                "idem-notification-retry",
+                "req-notification-retry",
+                new TenantProvisioningPolicy(
+                        Duration.ofDays(1), Duration.ofHours(1), 5));
+        Instant firstAttemptAt = Instant.now().plusSeconds(1);
+        AtomicInteger attempts = new AtomicInteger();
+        TenantProvisioningNotificationPublisher publisher = delivery -> {
+            if (attempts.incrementAndGet() == 1) {
+                throw new TenantProvisioningNotificationPublicationException(
+                        "AINER.IDENTITY.EMAIL_TEMPORARILY_UNAVAILABLE",
+                        "simulated provider failure");
+            }
+        };
+        TenantProvisioningNotificationRelay firstRelay =
+                new TenantProvisioningNotificationRelay(
+                        provisioningNotificationOutboxService,
+                        provisioningNotificationProtector,
+                        publisher,
+                        Clock.fixed(firstAttemptAt, ZoneOffset.UTC));
+
+        assertThat(firstRelay.relay(
+                "relay:retry",
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(1),
+                5,
+                10))
+                .extracting("claimed", "published", "failed")
+                .containsExactly(1, 0, 1);
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT publication_status, attempt_count, last_error_code "
+                        + "FROM ainer_identity_notification_outbox"))
+                .containsEntry("publication_status", "FAILED")
+                .containsEntry("attempt_count", 1)
+                .containsEntry(
+                        "last_error_code",
+                        "AINER.IDENTITY.EMAIL_TEMPORARILY_UNAVAILABLE");
+
+        TenantProvisioningNotificationRelay retryRelay =
+                new TenantProvisioningNotificationRelay(
+                        provisioningNotificationOutboxService,
+                        provisioningNotificationProtector,
+                        publisher,
+                        Clock.fixed(firstAttemptAt.plusSeconds(2), ZoneOffset.UTC));
+        assertThat(retryRelay.relay(
+                "relay:retry",
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(1),
+                5,
+                10))
+                .extracting("claimed", "published", "failed")
+                .containsExactly(1, 1, 0);
+        assertThat(attempts).hasValue(2);
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT publication_status, attempt_count, published_at "
+                        + "FROM ainer_identity_notification_outbox"))
+                .containsEntry("publication_status", "PUBLISHED")
+                .containsEntry("attempt_count", 2);
+        assertThat(provisioningNotificationOutboxService.status(5))
+                .extracting("pending", "failed", "exhausted", "published")
+                .containsExactly(0L, 0L, 0L, 1L);
+    }
+
+    @Test
+    void notificationReceiptRecordsOneTerminalFactOnlyAfterPublication() {
+        createProvisioning(
+                "notification-receipt",
+                "Notification Receipt",
+                "notification-receipt@example.com",
+                "Notification Receipt Owner",
+                "idem-notification-receipt",
+                "req-notification-receipt",
+                new TenantProvisioningPolicy(
+                        Duration.ofDays(1), Duration.ofHours(1), 5));
+        TenantProvisioningNotificationOutboxEntry delivery =
+                claimProvisioningNotification("relay:receipt");
+        Instant publishedAt = Instant.now().minusSeconds(2);
+        provisioningNotificationOutboxService.markPublished(
+                delivery.id(), "relay:receipt", publishedAt);
+        NotificationGatewayActor actor = new NotificationGatewayActor(
+                "notification-gateway", null, "req-receipt-db-1");
+        Instant occurredAt = Instant.now().minusSeconds(1);
+        TenantProvisioningNotificationReceiptCommand command =
+                new TenantProvisioningNotificationReceiptCommand(
+                        "gateway-event-db-1",
+                        delivery.id(),
+                        TenantProvisioningNotificationDeliveryStatus.DELIVERED,
+                        occurredAt,
+                        null);
+
+        var created = provisioningNotificationReceiptService.record(command, actor);
+        var replayed = provisioningNotificationReceiptService.record(command, actor);
+        var duplicateEvent = provisioningNotificationReceiptService.record(
+                new TenantProvisioningNotificationReceiptCommand(
+                        "gateway-event-db-duplicate",
+                        delivery.id(),
+                        TenantProvisioningNotificationDeliveryStatus.DELIVERED,
+                        occurredAt,
+                        null),
+                actor);
+
+        assertThat(created.created()).isTrue();
+        assertThat(replayed.created()).isFalse();
+        assertThat(duplicateEvent.created()).isFalse();
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT uuid_extract_version(id)::integer AS id_version, "
+                        + "gateway_client_id, gateway_event_id, delivery_status, "
+                        + "failure_code, request_id "
+                        + "FROM ainer_identity_notification_delivery_receipt "
+                        + "WHERE notification_id = ?",
+                delivery.id()))
+                .containsEntry("id_version", 7)
+                .containsEntry("gateway_client_id", "notification-gateway")
+                .containsEntry("gateway_event_id", "gateway-event-db-1")
+                .containsEntry("delivery_status", "DELIVERED")
+                .containsEntry("failure_code", null)
+                .containsEntry("request_id", "req-receipt-db-1");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) "
+                        + "FROM ainer_identity_notification_delivery_receipt "
+                        + "WHERE notification_id = ?",
+                Integer.class,
+                delivery.id())).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                        + "WHERE table_name = "
+                        + "'ainer_identity_notification_delivery_receipt' "
+                        + "AND (column_name LIKE '%secret%' "
+                        + "OR column_name LIKE '%token%' "
+                        + "OR column_name LIKE '%address%' "
+                        + "OR column_name LIKE '%payload%' "
+                        + "OR column_name LIKE '%body%')",
+                Integer.class)).isZero();
+
+        assertIdentityError(
+                () -> provisioningNotificationReceiptService.record(
+                        new TenantProvisioningNotificationReceiptCommand(
+                                "gateway-event-db-1",
+                                delivery.id(),
+                                TenantProvisioningNotificationDeliveryStatus.FAILED,
+                                occurredAt,
+                                "BOUNCED"),
+                        actor),
+                IdentityErrorCode
+                        .NOTIFICATION_RECEIPT_IDEMPOTENCY_CONFLICT);
+
+        createProvisioning(
+                "notification-receipt-pending",
+                "Notification Receipt Pending",
+                "notification-receipt-pending@example.com",
+                "Notification Receipt Pending Owner",
+                "idem-notification-receipt-pending",
+                "req-notification-receipt-pending",
+                new TenantProvisioningPolicy(
+                        Duration.ofDays(1), Duration.ofHours(1), 5));
+        UUID pendingNotificationId = jdbcTemplate.queryForObject(
+                "SELECT id FROM ainer_identity_notification_outbox "
+                        + "WHERE publication_status = 'PENDING'",
+                UUID.class);
+        assertIdentityError(
+                () -> provisioningNotificationReceiptService.record(
+                        new TenantProvisioningNotificationReceiptCommand(
+                                "gateway-event-db-pending",
+                                pendingNotificationId,
+                                TenantProvisioningNotificationDeliveryStatus.DELIVERED,
+                                Instant.now(),
+                                null),
+                        actor),
+                IdentityErrorCode.NOTIFICATION_RECEIPT_STATE_CONFLICT);
+    }
+
+    @Test
+    void concurrentTenantProvisioningAllowsOnlyOneOpenCodeReservation()
+            throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<Object> first = executor.submit(() -> concurrentProvisioning(
+                    "concurrent-owner-a@example.com",
+                    "Concurrent Owner A",
+                    "idem-concurrent-a",
+                    "req-concurrent-a",
+                    ready,
+                    start));
+            Future<Object> second = executor.submit(() -> concurrentProvisioning(
+                    "concurrent-owner-b@example.com",
+                    "Concurrent Owner B",
+                    "idem-concurrent-b",
+                    "req-concurrent-b",
+                    ready,
+                    start));
+            ready.await();
+            start.countDown();
+            List<Object> outcomes = List.of(first.get(), second.get());
+
+            assertThat(outcomes)
+                    .filteredOn(TenantProvisioningResult.class::isInstance)
+                    .hasSize(1);
+            assertThat(outcomes)
+                    .filteredOn(
+                            IdentityErrorCode.TENANT_PROVISIONING_CONFLICT::equals)
+                    .hasSize(1);
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) "
+                            + "FROM ainer_identity_tenant_provisioning_request "
+                            + "WHERE tenant_code = 'concurrent-code' "
+                            + "AND status = 'REQUESTED'",
+                    Integer.class)).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private Object concurrentProvisioning(
+            String ownerUsername,
+            String ownerDisplayName,
+            String idempotencyKey,
+            String requestId,
+            CountDownLatch ready,
+            CountDownLatch start) throws InterruptedException {
+        ready.countDown();
+        start.await();
+        try {
+            return provisioningService.create(
+                    new CreateTenantProvisioningCommand(
+                            "concurrent-code",
+                            "Concurrent Tenant",
+                            ownerUsername,
+                            ownerDisplayName,
+                            "EMAIL",
+                            ownerUsername,
+                            idempotencyKey,
+                            "ORDER-CONCURRENT"),
+                    new PlatformProvisioningActor(
+                            "platform-operator", null, requestId),
+                    provisioningPolicy(Duration.ofDays(7)));
+        } catch (BusinessException exception) {
+            return exception.errorCode();
+        }
     }
 
     @Test
@@ -626,6 +1590,47 @@ class IdentityModuleIntegrationTest {
         return instant.atOffset(ZoneOffset.UTC);
     }
 
+    private static TenantProvisioningPolicy provisioningPolicy(Duration requestTtl) {
+        Duration activationTtl = requestTtl.compareTo(Duration.ofHours(24)) < 0
+                ? requestTtl
+                : Duration.ofHours(24);
+        return new TenantProvisioningPolicy(requestTtl, activationTtl, 5);
+    }
+
+    private TenantProvisioningResult createProvisioning(
+            String tenantCode,
+            String tenantName,
+            String ownerUsername,
+            String ownerDisplayName,
+            String idempotencyKey,
+            String requestId,
+            TenantProvisioningPolicy policy) {
+        return provisioningService.create(
+                new CreateTenantProvisioningCommand(
+                        tenantCode,
+                        tenantName,
+                        ownerUsername,
+                        ownerDisplayName,
+                        "EMAIL",
+                        ownerUsername,
+                        idempotencyKey,
+                        "ORDER-" + tenantCode.toUpperCase()),
+                new PlatformProvisioningActor(
+                        "platform-operator", null, requestId),
+                policy);
+    }
+
+    private TenantProvisioningNotificationOutboxEntry claimProvisioningNotification(
+            String leaseOwner) {
+        return provisioningNotificationOutboxService.claimBatch(
+                        leaseOwner,
+                        Instant.now().plusSeconds(1),
+                        Duration.ofMinutes(1),
+                        5,
+                        1)
+                .getFirst();
+    }
+
     private ProvisionedIdentity provision(
             String tenantCode,
             String tenantName,
@@ -668,6 +1673,7 @@ class IdentityModuleIntegrationTest {
     }
 
     @TestConfiguration(proxyBeanMethods = false)
+    @Profile("identity-module-integration-test")
     static class FailureProbeConfiguration {
 
         @Bean
@@ -676,12 +1682,22 @@ class IdentityModuleIntegrationTest {
                 MybatisIdentityRepository delegate) {
             return new ControllableIdentityRepository(delegate);
         }
+
+        @Bean
+        TenantProvisioningNotificationPayloadProtector
+                tenantProvisioningNotificationPayloadProtector() {
+            return new AesGcmTenantProvisioningNotificationPayloadProtector(
+                    "test-v1",
+                    Map.of("test-v1", new byte[32]),
+                    new SecureRandom());
+        }
     }
 
     static final class ControllableIdentityRepository implements IdentityRepository {
 
         private final IdentityRepository delegate;
         private boolean failNextAccessEvent;
+        private boolean failNextMembership;
 
         ControllableIdentityRepository(IdentityRepository delegate) {
             this.delegate = delegate;
@@ -691,8 +1707,13 @@ class IdentityModuleIntegrationTest {
             failNextAccessEvent = true;
         }
 
+        void failNextMembership() {
+            failNextMembership = true;
+        }
+
         void reset() {
             failNextAccessEvent = false;
+            failNextMembership = false;
         }
 
         @Override
@@ -707,6 +1728,11 @@ class IdentityModuleIntegrationTest {
 
         @Override
         public void insertMembership(TenantMembership membership) {
+            if (failNextMembership) {
+                failNextMembership = false;
+                throw new IllegalStateException(
+                        "simulated membership persistence failure");
+            }
             delegate.insertMembership(membership);
         }
 
@@ -832,8 +1858,16 @@ class IdentityModuleIntegrationTest {
         }
 
         @Override
-        public void acquireTenantBootstrapLock(String tenantCode, String normalizedUsername) {
-            delegate.acquireTenantBootstrapLock(tenantCode, normalizedUsername);
+        public void acquireIdentityLock(String lockKey) {
+            delegate.acquireIdentityLock(lockKey);
+        }
+
+        @Override
+        public boolean openProvisioningReservationExists(
+                String tenantCode,
+                String normalizedUsername) {
+            return delegate.openProvisioningReservationExists(
+                    tenantCode, normalizedUsername);
         }
 
         @Override

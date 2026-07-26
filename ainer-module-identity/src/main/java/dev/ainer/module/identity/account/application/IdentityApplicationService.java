@@ -37,7 +37,11 @@ public class IdentityApplicationService {
     public ProvisionedIdentity provisionTenantOwner(ProvisionTenantOwnerCommand command) {
         try {
             Objects.requireNonNull(command, "command");
-            return provisionValidated(command, normalize(command.tenantCode()), normalize(command.username()));
+            String tenantCode = normalize(command.tenantCode());
+            String username = normalize(command.username());
+            acquireProvisioningLocks(tenantCode, username);
+            requireNoOpenProvisioningReservation(tenantCode, username);
+            return provisionValidated(command, tenantCode, username);
         } catch (DataIntegrityViolationException exception) {
             throw new BusinessException(IdentityErrorCode.ALREADY_EXISTS);
         } catch (IllegalArgumentException | NullPointerException exception) {
@@ -56,7 +60,7 @@ public class IdentityApplicationService {
             validateRawPassword(command.rawPassword());
             String tenantCode = normalize(command.tenantCode());
             String username = normalize(command.username());
-            repository.acquireTenantBootstrapLock(tenantCode, username);
+            acquireProvisioningLocks(tenantCode, username);
 
             Optional<IdentityDirectoryEntry> existing =
                     repository.findActiveDefaultOwner(tenantCode, username);
@@ -67,7 +71,9 @@ public class IdentityApplicationService {
                         false);
             }
             if (repository.tenantExistsByCode(tenantCode)
-                    || repository.userExistsByUsername(username)) {
+                    || repository.userExistsByUsername(username)
+                    || repository.openProvisioningReservationExists(
+                            tenantCode, username)) {
                 throw new BusinessException(IdentityErrorCode.TENANT_BOOTSTRAP_STATE_CONFLICT);
             }
             return new TenantOwnerBootstrapResult(
@@ -119,6 +125,19 @@ public class IdentityApplicationService {
     private void validateRawPassword(String password) {
         if (password == null || password.length() < 12 || password.length() > 128) {
             throw new IllegalArgumentException("password length is invalid");
+        }
+    }
+
+    private void acquireProvisioningLocks(String tenantCode, String username) {
+        repository.acquireIdentityLock("identity:tenant-code:" + tenantCode);
+        repository.acquireIdentityLock("identity:username:" + username);
+    }
+
+    private void requireNoOpenProvisioningReservation(
+            String tenantCode,
+            String username) {
+        if (repository.openProvisioningReservationExists(tenantCode, username)) {
+            throw new BusinessException(IdentityErrorCode.ALREADY_EXISTS);
         }
     }
 }

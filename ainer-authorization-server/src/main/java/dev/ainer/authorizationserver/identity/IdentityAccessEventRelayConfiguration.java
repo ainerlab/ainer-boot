@@ -5,6 +5,7 @@ import dev.ainer.module.identity.account.application.IdentityAccessEventPublishe
 import dev.ainer.module.identity.account.application.IdentityAccessEventRelay;
 import dev.ainer.security.client.ClientCredentialsServiceTokenProvider;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -24,7 +25,7 @@ import java.util.Set;
         havingValue = "true")
 public class IdentityAccessEventRelayConfiguration {
 
-    @Bean
+    @Bean("identityAccessEventServiceTokenProvider")
     ClientCredentialsServiceTokenProvider identityAccessEventServiceTokenProvider(
             IdentityAccessEventRelayProperties properties) {
         return new ClientCredentialsServiceTokenProvider(
@@ -38,7 +39,8 @@ public class IdentityAccessEventRelayConfiguration {
     @Bean
     IdentityAccessEventPublisher identityAccessEventPublisher(
             IdentityAccessEventRelayProperties properties,
-            ClientCredentialsServiceTokenProvider tokenProvider) {
+            @Qualifier("identityAccessEventServiceTokenProvider")
+                    ClientCredentialsServiceTokenProvider tokenProvider) {
         return new HttpIdentityAccessEventPublisher(
                 requireUri(
                         properties.getWorkspaceBaseUrl(),

@@ -1,6 +1,6 @@
 # Ainer 平台架构设计
 
-> 版本：M4 v1.1 · 2026-07-23
+> 版本：M4 v1.2 · 2026-07-26
 > 状态：当前权威设计；代码优先，文档不得描述尚未验证为“已完成”的能力
 
 ## 1. 产品定位
@@ -104,7 +104,12 @@ ainer-core <- ainer-starter-persistence <- business module
 - 用户、租户、默认成员关系、delegating password hash 和可信 JWT tenant/subject 投影。
 - ACTIVE tenant/user/membership 的 Directory 安全投影，不暴露密码哈希与 OAuth 协议数据。
 - 账号禁用、非 OWNER membership 撤销，以及和状态变化同事务的 access-event outbox。
-- 跨运行时 Directory adapter、outbox relay、Workspace 消费者与强实时 JWT 撤销仍是后续能力。
+- 跨运行时 Directory adapter、outbox relay、Workspace 幂等消费者，以及高风险路径选择性在线
+  Token 校验与 revocation epoch。
+- USER tenant 成员管理、首租户严格 bootstrap，以及 tenantless SERVICE 平台预配、激活、显式取消
+  与 tenant/user 安全分页；
+  申请只建立不可授权预留，激活使用只存摘要的短时 grant、加密通知 outbox 或已有用户本人接受，
+  成功后才原子创建核心 Identity。
 
 ## 5. 模块化单体
 
@@ -208,6 +213,11 @@ M2 的明确限制：
 - Memory：作用域、保留期限、脱敏和删除权。
 - Evaluation：离线数据集、在线采样、回归阈值。
 - Guardrails：输入输出策略、Prompt Injection 与数据泄露防护。
+
+Run / Artifact 与 Knowledge 的数据模型不在本总纲中展开，分别见
+[`ai-runtime-data-model.md`](ai-runtime-data-model.md) 和
+[`knowledge-data-model.md`](knowledge-data-model.md)。两者当前是 Proposed，并明确排除通用 Step、
+万能 Feedback、无版本知识段和无真实消费者的物理表。
 
 ### 9.3 边界
 

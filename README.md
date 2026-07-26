@@ -1,6 +1,6 @@
 # Ainer Boot
 
-> 正式品牌：Ainer · M4.7 tenant member control plane · 2026-07-26 · JDK 25 + Spring Boot 4.1.0
+> 正式品牌：Ainer · M4.8A tenant activation core · 2026-07-26 · JDK 25 + Spring Boot 4.1.0
 
 Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 AI 时代的企业应用平台底座。它从模块化单体开始，通过明确的契约、适配器和独立发行物演进为服务化系统；它不继承 yudao、BladeX、Dante 或 Snowy 的代码与框架范式。
 
@@ -17,11 +17,11 @@ Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 
 | `ainer-starter-persistence` | ✅ | MyBatis、Flyway、PostgreSQL 与 UUID 的公共装配 |
 | `ainer-security` | ✅ | 与框架无关的可信参与者与 authority 契约 |
 | `ainer-starter-security` | ✅ | Resource Server、人员/服务 JWT 投影、选择性 RFC 7662 在线校验、tenantless 指标授权与统一 401/403/503 |
-| `ainer-module-identity` | ✅ | 用户/租户、租户成员管理、安全 Directory、禁用/撤销、revocation epoch、可租约 outbox 与双人重放端口 |
+| `ainer-module-identity` | ✅ | 用户/租户、成员管理、平台预配/激活/取消与安全分页、安全 Directory、禁用/撤销、revocation epoch 与可靠 outbox |
 | `ainer-module-workspace` | ✅ | 可信租户资源、成员治理、幂等撤销、OWNER 恢复、授权审计热/归档与 SIEM 契约 |
 | `ainer-module-ai-runtime` | ✅ | OpenAI-compatible 网关、SSE、策略、预算与用量/费用审计 |
 | `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、可选 Directory client、撤销 consumer/SLO、OWNER 恢复与审计运营端点 |
-| `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、Identity 租户成员 API、受限 introspection/RFC 7009 与受审计 JDBC 协议仓库 |
+| `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、Identity 成员/平台预配/用户激活 API、受限 introspection/RFC 7009 与受审计 JDBC 协议仓库 |
 
 当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
 
@@ -129,19 +129,12 @@ ainer-boot/
 
 ## 文档入口
 
-从 [Ainer 文档中心](docs/README.md) 按角色和任务进入。长期参与开发前至少阅读：
+从 **[Ainer 文档总览：从这里开始](docs/00-overview.md)** 进入。它提供项目心智模型、按任务阅读
+路线、完整文档地图和维护规则，不需要先猜应该打开哪个文件。
 
-1. [当前项目状态与已知缺口](docs/project-status.md)
-2. [本地开发手册](docs/development.md)
-3. [架构总览](docs/architecture.md)
-4. [HTTP API 契约](docs/api.md)
-5. [工程约定](docs/conventions.md)
-6. [测试与质量门禁](docs/testing.md)
-7. [数据库与 Migration 手册](docs/database.md)
-8. [配置与秘密管理](docs/configuration.md)
-9. [ADR 索引与模板](docs/decisions/README.md)
-
-运行和发布分别见 [运行与故障处理手册](docs/operations.md) 与 [版本和发布规范](docs/releasing.md)。参与规则见 [CONTRIBUTING.md](CONTRIBUTING.md)，阶段变化见 [CHANGELOG.md](CHANGELOG.md)。
+开始开发前还应确认
+[当前项目状态与已知缺口](docs/project-status.md)；
+参与规则见 [CONTRIBUTING.md](CONTRIBUTING.md)，阶段变化见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 下一里程碑
 
@@ -171,6 +164,22 @@ M4.8 的已接受设计见
 推进。该顺序避免把 `is_default` 当作跨设备租户切换状态，也避免在目标管理员无法取得目标 tenant
 Token 时提前实现不可本人确认的 OWNER 转移。租户角色与未来 Community / Pro / Enterprise
 entitlement 保持独立。
+
+M4.8A 已形成“预配、激活与控制面”代码基线：平台申请仍只预留标识，同时为新用户创建短时、限次、
+只存 SHA-256 摘要的一次性 grant，并把唯一明文连同联系目标写入 AES-256-GCM 保护的 notification
+outbox；已有 ACTIVE 用户不产生认证材料，只生成按 Identity subject 路由的接受通知。新用户凭
+grant 设置首个长期密码，已有用户则必须以本人 USER Token 和 `identity.provisioning.accept`
+接受；两条路径都在单一事务中创建 ACTIVE tenant 与唯一 OWNER membership，失败不留下核心孤儿
+记录。平台响应和数据库可查询列均不暴露激活明文。Authorization Server 已提供默认关闭的
+OAuth2 Client Credentials + HTTPS 通知网关 relay，以稳定 notification ID 做下游幂等键，并在
+网关持久接收或请求取消后销毁可解密 payload；具体邮件/短信/站内信供应商和模板仍属于外部通知域。
+平台还形成了默认关闭的终态回执接收基线：外部网关使用另一组 tenantless SERVICE credential、
+精确白名单和 `identity.provisioning-notifications.receipts.write` scope，把供应商结果归一化为
+`DELIVERED` 或 `FAILED`；Identity 只保存 UUIDv7 notification 关联、受限事件/失败码和时间，不接收
+正文、联系地址或供应商原始 body。`DELIVERED` 仍只表示供应商确认交付，不表示自然人已阅读。
+平台现在还提供 tenant/user 的受限安全分页，以及对未完成申请的显式幂等取消；取消会在同一事务
+收口 request、一次性 grant、未发布通知 payload 和阶段审计。外部通知网关联调、最终送达证据、
+生产边缘限速/告警和 0-skipped 发布门禁仍未完成，因此当前还不能宣称可达的生产开户已经闭环。
 
 生产并行工作仍需部署真实 Prometheus、dashboard/告警，并完成 Authorization Server 多实例容量、
 故障切换和平台旧凭据退役证据；随后继续 IAM 职责分离、外部不可变审计副本、多节点 SLO、

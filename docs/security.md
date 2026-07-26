@@ -1,6 +1,6 @@
 # Ainer Identity 与 OAuth 2.1 使用基线
 
-> 适用版本：M4.7 tenant member control plane · 2026-07-26
+> 适用版本：M4.8A tenant activation core · 2026-07-26
 
 ## 1. 已落地边界
 
@@ -209,6 +209,96 @@ operator、`.all` 跨 tenant scope 或既有 bootstrap client。后几类仍需�
 控制面，不能把本切片描述成“所有 OAuth Client 已纳管”。完整决策见
 [ADR-0013](decisions/0013-audited-oauth-service-client-lifecycle.md)。
 
+### 5.5 平台 Identity 预配 Operator
+
+M4.8A 第一实现切片使用另一组独立 credential，不能复用 tenant 服务 client-control operator。
+受控初始化窗口可以创建一个无 tenant、仅 Client Credentials、Token TTL 一分钟的 operator：
+
+```bash
+export AINER_AUTHORIZATION_BOOTSTRAP_PLATFORM_IDENTITY_OPERATOR_ENABLED=true
+export AINER_AUTHORIZATION_BOOTSTRAP_PLATFORM_IDENTITY_OPERATOR_CLIENT_ID=ainer-platform-identity
+export AINER_AUTHORIZATION_BOOTSTRAP_PLATFORM_IDENTITY_OPERATOR_CLIENT_SECRET='at-least-24-characters-secret'
+
+export AINER_IDENTITY_PLATFORM_CONTROL_ENABLED=true
+export AINER_IDENTITY_PLATFORM_CONTROL_OPERATOR_CLIENT_IDS=ainer-platform-identity
+export AINER_IDENTITY_PLATFORM_CONTROL_REQUEST_TTL=7d
+export AINER_IDENTITY_PLATFORM_CONTROL_ACTIVATION_TTL=24h
+export AINER_IDENTITY_PLATFORM_CONTROL_ACTIVATION_MAX_ATTEMPTS=5
+export AINER_IDENTITY_NOTIFICATION_ACTIVE_KEY_VERSION=2026-07
+export AINER_IDENTITY_NOTIFICATION_PROTECTION_KEYS='2026-07:<32-byte-base64url-key>'
+
+export AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RELAY_ENABLED=true
+export AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RELAY_CLIENT_ID=ainer-provisioning-notification-relay
+export AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RELAY_CLIENT_SECRET='<at-least-24-characters-secret>'
+
+export AINER_IDENTITY_PROVISIONING_NOTIFICATION_RELAY_ENABLED=true
+export AINER_IDENTITY_PROVISIONING_NOTIFICATION_GATEWAY_URI='https://notify.example/internal/identity/tenant-provisioning-notifications'
+export AINER_IDENTITY_PROVISIONING_NOTIFICATION_TOKEN_URI='https://auth.example/oauth2/token'
+export AINER_IDENTITY_PROVISIONING_NOTIFICATION_CLIENT_ID=ainer-provisioning-notification-relay
+export AINER_IDENTITY_PROVISIONING_NOTIFICATION_CLIENT_SECRET='<secret-manager-reference>'
+
+export AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RECEIPT_ENABLED=true
+export AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RECEIPT_CLIENT_ID=ainer-provisioning-notification-gateway
+export AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RECEIPT_CLIENT_SECRET='<different-at-least-24-character-secret>'
+
+export AINER_IDENTITY_PROVISIONING_NOTIFICATION_RECEIPTS_ENABLED=true
+export AINER_IDENTITY_PROVISIONING_NOTIFICATION_RECEIPT_GATEWAY_CLIENT_IDS=ainer-provisioning-notification-gateway
+```
+
+operator 固定只有 `platform.tenants.read|write` 与 `platform.users.read|write`。POST 预配和显式
+取消必须同时有两个 write scope，GET 申请状态必须同时有两个 read scope；tenant/user 列表分别只
+要求对应的 read scope。所有端点此外还要满足
+`actor_type=SERVICE`、无 `tenant_id`、正确 issuer/audience 和精确 client ID 白名单。只有 scope
+但不在白名单、tenant-bound SERVICE 与 USER 全部返回 403。初始化完成后立即移除 bootstrap 开关
+和明文 operator secret；保留控制面开关、白名单、TTL 与由 secret manager 注入的通知保护 key ring。
+
+申请事务使用 operator + `Idempotency-Key` 建立稳定请求摘要，预留 tenant code、tenant ID 与
+OWNER subject/username，但不创建 ACTIVE tenant/user/membership。新用户得到 256-bit 随机激活
+secret：grant 只保存 SHA-256 摘要、TTL 与失败次数，联系目标和唯一明文只进入 AES-256-GCM
+保护的 outbox payload。key version 作为非秘密元数据保存，nonce 每条随机生成；平台 HTTP 投影、
+审计和日志都不得返回 secret、密文或联系地址。已有 ACTIVE 用户不生成认证材料，通知只按可信
+Identity subject 路由。
+
+通知 relay 使用另一组独立无 tenant client，只能持有
+`identity.provisioning-notifications.publish`。Authorization Server 以 Client Credentials 获取
+一分钟 Token，通过生产强制 HTTPS 的完整网关 URI 发送版本化 envelope，并把 UUIDv7
+notification ID 作为 `Idempotency-Key`。网关必须先持久化、去重再返回 2xx；Identity 随后将
+outbox 的 key version 标记为 `destroyed` 并覆盖密文。网关还必须校验 issuer/audience、SERVICE、
+无 tenant、最小 scope 与精确 relay subject，不能只检查任意 Bearer。取消未投递通知时也执行
+同样销毁。该机制
+降低活动数据库暴露窗口，但不能抹除此前 WAL/备份，也不能替代通知域自身的加密、保留和访问审计。
+
+relay 不记录 provider 响应正文、联系人、secret 或异常消息，只保存受限稳定错误码。401/403、
+其他 4xx、5xx/网络/Token 失败都会按受控延迟重试直至 exhausted；生产必须对 failed、exhausted
+和 oldest-ready-age 指标告警。`PUBLISHED` 仅表示网关已持久接收，不是最终触达或邮箱验证证明。
+
+终态回执使用第三组独立无 tenant gateway client，只允许
+`identity.provisioning-notifications.receipts.write`，并同时检查精确 client ID 白名单。网关把
+供应商方言归一化为 `DELIVERED|FAILED` 后调用 Identity；Identity 只保存 notification、gateway
+event/client、受限失败码与时间。相同事实回放幂等，矛盾终态失败关闭；只有已经 `PUBLISHED` 的
+outbox 可登记。回调抢先于 relay 状态提交时返回 409，网关必须稍后以同一事件重试。`DELIVERED`
+表示供应商确认交付，不表示自然人阅读或邮箱所有权验证。
+
+新用户消费 grant 的公开端点以 256-bit secret、短 TTL 和 per-grant 失败锁定为主防线；生产入口
+仍应叠加共享边缘限速、异常枚举告警和 `no-store` 日志策略。已有用户接受端点要求
+`actor_type=USER`、显式 `identity.provisioning.accept` 以及 JWT `sub` 与预留 subject 完全一致；
+SERVICE、其他用户和仅持有平台 scope 的主体均不能代办。两条成功路径都以一个数据库事务创建
+ACTIVE tenant 与唯一 OWNER；失败或过期只收口不可授权流程记录。
+
+平台取消是显式 `/cancellations` 资源，不开放任意状态 PATCH。它只允许 tenantless 白名单 SERVICE
+使用成对 write scope 调用，并在一个事务中锁定 request、失效新用户的一次性 grant、销毁仍未发布
+的通知 payload 和写入 `CANCELLED` 阶段审计。新用户 request 缺失预期 ACTIVE grant 时失败关闭；
+重复取消不重复审计，已经激活的身份不能通过该入口撤销。tenant/user 分页仅返回核心身份的受限
+字段和状态，不包含密码哈希、OAuth 协议记录、membership、通知目标或 provisioning secret。
+
+当前仓库已装配 HTTPS gateway publisher、scheduler 与 provider-neutral 最小终态回执接收端，但
+不实现真实外部通知网关、邮件/短信/站内信供应商、模板和供应商回执映射，也未实现 tenant/user
+禁用、恢复等后续账号生命周期操作。
+完成外部联调和发布门禁前，这一实现仍不能作为可达的生产开户链路；不得让运营系统直接写
+Identity 核心表或把首租户 bootstrap 当作日常开户入口。完整边界见
+[ADR-0019](decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md) 与
+[ADR-0021](decisions/0021-provisioning-notification-delivery-receipts.md)。
+
 ## 6. 浏览器与人员身份
 
 协议装配支持 Authorization Code、PKCE、Refresh Token、Client Credentials 与 OIDC；实际可用授权类型仍由 registered client 白名单决定。禁止配置 password grant。
@@ -277,7 +367,7 @@ Identity 表。对管理 API 的 step-up/在线校验策略仍需在 browser/OID
 
 Workspace 事件端点要求 `actor_type=SERVICE`、`identity.access-events.publish` 和精确可信 publisher `sub`。消费事务先插入 event receipt，再将同 tenant/subject、创建时间不晚于事件时间的 PENDING/ACTIVE membership 置为 `REVOKED`。重复 event ID 幂等成功，旧事件不影响后来创建的 membership，跨 tenant 不受影响。安全禁用可以让 OWNER 变为 REVOKED 并暂时留下无 ACTIVE OWNER 的 Workspace；这优先于继续放行已禁用账号，恢复/所有权处置必须使用后续专用流程。
 
-当前仍未提供公网注册、找回密码、恢复通知、租户切换和图形化 client 控制台；Passkey
+当前仍未提供公网注册、找回密码、恢复通知、预配激活、租户切换和图形化 client 控制台；Passkey
 协议/条件门禁、恢复、受控 enrollment、step-up、租户成员管理与 tenant-bound Client
 Credentials 内部生命周期 API 已落地，PKCE public client 仅存在于自动化测试。
 Directory 与事件 adapter 均默认关闭且不共享数据库；完整投递决策见
@@ -319,5 +409,7 @@ M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存�
 必须覆盖配置失败关闭、UV-required options、无凭证 bootstrap、已登记账号条件拦截、生命周期/
 审计同事务、软撤销、replacement、最后凭证保护、恢复/enrollment tenant-subject 绑定、登录
 429 和 step-up 的 200/401/403。租户成员管理还要以真实 PostgreSQL + HTTP 覆盖 USER/SERVICE、
-scope、跨 tenant、实时资源角色与审计。真实 PostgreSQL 和协议 smoke 证据维护在
+scope、跨 tenant、实时资源角色与审计。平台预配还要覆盖 tenantless SERVICE、成对 scope、
+operator 白名单、幂等摘要、共享锁、并发预留、过期、核心表零污染、同事务审计和秘密不落库。
+真实 PostgreSQL 和协议 smoke 证据维护在
 [`project-status.md`](project-status.md)。

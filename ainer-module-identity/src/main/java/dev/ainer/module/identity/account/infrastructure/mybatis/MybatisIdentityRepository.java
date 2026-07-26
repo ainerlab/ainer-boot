@@ -198,8 +198,16 @@ public class MybatisIdentityRepository implements IdentityRepository, IdentityTo
     }
 
     @Override
-    public void acquireTenantBootstrapLock(String tenantCode, String normalizedUsername) {
-        mapper.acquireTenantBootstrapLock(tenantCode + '\u001f' + normalizedUsername);
+    public void acquireIdentityLock(String lockKey) {
+        mapper.acquireIdentityLock(lockKey);
+    }
+
+    @Override
+    public boolean openProvisioningReservationExists(
+            String tenantCode,
+            String normalizedUsername) {
+        return mapper.countOpenProvisioningReservation(
+                tenantCode, normalizedUsername) > 0;
     }
 
     @Override

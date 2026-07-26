@@ -3,7 +3,7 @@
 Ainer Boot 的 AI/人协作规则。新会话先读本文件，再按顺序阅读：
 
 1. `README.md`
-2. `docs/README.md`
+2. `docs/00-overview.md`
 3. `docs/project-status.md`
 4. `docs/architecture.md`
 5. `docs/conventions.md`
@@ -12,7 +12,7 @@ Ainer Boot 的 AI/人协作规则。新会话先读本文件，再按顺序阅�
 8. `docs/decisions/0004-ainer-brand-and-naming-baseline.md`
 9. 与任务直接相关的开发手册、专题文档和 ADR
 
-数据库任务必须读 `docs/database.md` 与 `docs/testing.md`；安全任务必须读 `docs/security.md` 和 ADR-0005 至 ADR-0011；AI 任务必须读 `docs/ai-gateway.md` 与 ADR-0003。
+数据库任务必须读 `docs/database-design-standard.md`、`docs/database.md` 与 `docs/testing.md`；安全任务必须读 `docs/security.md` 和 ADR-0005 至 ADR-0011；AI 任务必须读 `docs/ai-gateway.md` 与 ADR-0003；涉及 Run/Artifact 或 Knowledge 时还必须读 `docs/design/` 中对应数据模型提案。
 
 ## 工程定位
 
@@ -82,7 +82,10 @@ ainer-core <- ainer-spring <- starter <- application/module
 
 ### 6. 数据与 AI
 
-- PostgreSQL 是首选业务数据库；集成测试使用真实 PostgreSQL Testcontainers，不用 H2 模拟 PostgreSQL。
+- PostgreSQL 18 是唯一业务数据库基线；不为 MySQL、H2、旧 PostgreSQL 或旧项目保留方言兼容层。
+  集成测试使用真实 PostgreSQL Testcontainers。
+- 新 Ainer 持久化 ID 默认 UUIDv7，`tenant_id` 全链路使用 UUID。业务代码不得用
+  `UUID.randomUUID()` 创建持久化身份；完整规则见 ADR-0020 与数据库设计规范。
 - SQL 参数必须绑定，禁止拼接用户 ID、URL、组织 ID 等权限条件。
 - AI 调用必须经过模型网关并记录租户、模型、Token/费用、耗时、结果状态和策略决策。
 - AI 审计默认不保存 prompt 和输出正文；新增正文存储必须先完成数据分类、保留期、加密、访问审计和删除机制设计。
@@ -126,9 +129,10 @@ mvn test
 
 ## 文档纪律
 
-- `docs/README.md` 是文档导航和维护协议；新增文档必须接入该索引，不建立孤岛文档。
+- `docs/00-overview.md` 是唯一权威文档入口与维护协议；`docs/README.md` 只是目录门面。新增文档
+  必须接入总览，不建立孤岛文档。
 - 长期规范、时间敏感状态、研究记录和 ADR 必须分开；不得把计划能力写成已经实现。
-- HTTP、行为、配置、数据库、运行或里程碑变化时，按 `docs/README.md` 的映射在同一变更更新文档。
+- HTTP、行为、配置、数据库、运行或里程碑变化时，按 `docs/00-overview.md` 的映射在同一变更更新文档。
 - 已接受 ADR 不改写结论。设计改变时新增 ADR，并把旧 ADR 标记为被取代。
 - 动态测试数量、当前缺口和下一里程碑只维护在 `docs/project-status.md`，发布变化维护在 `CHANGELOG.md`。
 - 文档示例禁止使用真实密码、Token、私钥、API key、客户数据、prompt 或供应商正文。

@@ -103,6 +103,12 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
         AinerSecurityFailureWriter failureWriter = new AinerSecurityFailureWriter(objectMapper);
         http.securityMatcher("/internal/**")
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(
+                                "/internal/identity/"
+                                        + "tenant-provisioning-notification-receipts")
+                        .access(new TenantlessServiceScopeAuthorizationManager(
+                                AinerSecurityScopes
+                                        .IDENTITY_PROVISIONING_NOTIFICATION_RECEIPTS_WRITE))
                         .requestMatchers("/internal/identity/directory/**")
                         .hasAnyAuthority(
                                 "SCOPE_identity.directory.read",
@@ -118,6 +124,12 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                         .requestMatchers("/internal/oauth-service-clients/**")
                         .hasAuthority("SCOPE_" + AinerAuthorizationServerConfiguration
                                 .CLIENT_CONTROL_MANAGE_SCOPE)
+                        .requestMatchers("/internal/platform/identity/**")
+                        .hasAnyAuthority(
+                                "SCOPE_" + AinerSecurityScopes.PLATFORM_TENANTS_READ,
+                                "SCOPE_" + AinerSecurityScopes.PLATFORM_TENANTS_WRITE,
+                                "SCOPE_" + AinerSecurityScopes.PLATFORM_USERS_READ,
+                                "SCOPE_" + AinerSecurityScopes.PLATFORM_USERS_WRITE)
                         .requestMatchers("/internal/passkey-recovery/**")
                         .hasAnyAuthority(
                                 "SCOPE_passkey.recovery.request",
@@ -146,6 +158,46 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
 
     @Bean
     @Order(3)
+    SecurityFilterChain tenantProvisioningActivationSecurityFilterChain(
+            HttpSecurity http,
+            JwtDecoder jwtDecoder,
+            ObjectMapper objectMapper) throws Exception {
+        AinerSecurityFailureWriter failureWriter = new AinerSecurityFailureWriter(objectMapper);
+        http.securityMatcher(
+                        "/api/identity/tenant-activations/**",
+                        "/api/me/tenant-provisioning-requests/**")
+                .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers("/api/identity/tenant-activations/**")
+                        .permitAll()
+                        .anyRequest()
+                        .authenticated())
+                .csrf(csrf -> csrf.disable())
+                .requestCache(cache -> cache.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(
+                        SessionCreationPolicy.STATELESS))
+                .oauth2ResourceServer(resourceServer -> resourceServer
+                        .jwt(jwt -> jwt.decoder(jwtDecoder))
+                        .authenticationEntryPoint((request, response, exception) ->
+                                failureWriter.write(
+                                        request,
+                                        response,
+                                        StandardErrorCode.UNAUTHENTICATED)))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, exception) ->
+                                failureWriter.write(
+                                        request,
+                                        response,
+                                        StandardErrorCode.UNAUTHENTICATED))
+                        .accessDeniedHandler((request, response, exception) ->
+                                failureWriter.write(
+                                        request,
+                                        response,
+                                        StandardErrorCode.FORBIDDEN)));
+        return http.build();
+    }
+
+    @Bean
+    @Order(4)
     SecurityFilterChain tenantMemberApiSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder jwtDecoder,
@@ -171,7 +223,7 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
     }
 
     @Bean
-    @Order(4)
+    @Order(5)
     SecurityFilterChain authorizationServerMetricsSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder jwtDecoder,
@@ -199,7 +251,7 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
     }
 
     @Bean
-    @Order(5)
+    @Order(6)
     SecurityFilterChain authorizationServerDefaultSecurityFilterChain(
             HttpSecurity http,
             ObjectProvider<AinerPasskeyWebSecurity> passkeyProvider,

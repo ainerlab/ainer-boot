@@ -68,7 +68,11 @@ public interface IdentityRepository {
 
     boolean userExistsByUsername(String normalizedUsername);
 
-    void acquireTenantBootstrapLock(String tenantCode, String normalizedUsername);
+    void acquireIdentityLock(String lockKey);
+
+    boolean openProvisioningReservationExists(
+            String tenantCode,
+            String normalizedUsername);
 
     void insertAccessEvent(IdentityAccessEvent event);
 }

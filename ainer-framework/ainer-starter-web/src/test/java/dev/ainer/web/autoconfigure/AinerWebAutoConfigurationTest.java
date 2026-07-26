@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
@@ -49,6 +50,20 @@ class AinerWebAutoConfigurationTest {
     }
 
     @Test
+    void mapsMissingRequiredHeaderToInvalidRequest() {
+        contextRunner.run(context -> {
+            MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                    .addFilter(context.getBean(RequestIdFilter.class))
+                    .build();
+
+            mockMvc.perform(get("/probe/required-header"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value(StandardErrorCode.INVALID_REQUEST.code()))
+                    .andExpect(jsonPath("$.requestId").isNotEmpty());
+        });
+    }
+
+    @Test
     void registersModuleErrorCodeContributors() {
         contextRunner
                 .withBean(ErrorCodeContributor.class, () -> () -> List.of(TestErrorCode.PROBE))
@@ -72,6 +87,10 @@ class AinerWebAutoConfigurationTest {
         @GetMapping("/probe/business")
         void businessFailure() {
             throw new BusinessException(StandardErrorCode.BUSINESS_RULE_VIOLATION, "订单状态不允许取消");
+        }
+
+        @GetMapping("/probe/required-header")
+        void requiredHeader(@RequestHeader("Idempotency-Key") String idempotencyKey) {
         }
     }
 

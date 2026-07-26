@@ -116,7 +116,9 @@ bootstrap 的首环境用途误用成日常业务控制面。拒绝。
     - `platform.tenants.write`
     - `platform.users.read`
     - `platform.users.write`
-    写 scope 不隐式包含读 scope，具体端点显式声明所需 capability。
+    - `identity.provisioning.accept`（仅已有用户本人接受）
+    写 scope 不隐式包含读 scope，平台 scope 不替代人员接受 scope，具体端点显式声明所需
+    capability。
 13. 调用方还必须同时满足：`actor_type=SERVICE`、无 `tenant_id`、正确 issuer/audience、精确
     operator client ID 白名单。tenant-bound SERVICE、USER、仅持有 scope 但不在 operator
     白名单的 client 全部拒绝。
@@ -271,6 +273,50 @@ M4.8A 额外证明幂等键与 tenant code 并发预留冲突、激活明文仅�
 失败/过期供应不污染核心 Identity 表，以及 ACTIVE tenant 从首次写入起就不孤儿；
 M4.8B 额外证明并行 tenant 会话互不影响、伪造选择拒绝、选择后撤销失效；M4.8C 额外证明并发接受
 只能成功一次、始终最多一个 ACTIVE OWNER、双方旧 Token 进入 revocation epoch。
+
+## 实现进度
+
+2026-07-26 已完成 M4.8A 的“预配 + 激活 + 控制面”代码基线；外部联调与发布证据尚未完成，
+因此仍不等同于生产可用的完整 M4.8A：
+
+- 新增默认关闭的 POST/GET provisioning request 控制面，落实 tenantless SERVICE、tenant/user
+  成对 scope 与精确 operator client ID 白名单；
+- 新增独立的一分钟 platform identity operator bootstrap；既有同 ID client 策略不完全匹配时
+  启动失败，不覆盖 secret；
+- 新增 operator 级幂等记录、SHA-256 规范化请求摘要、开放 tenant code/新 username 部分唯一
+  预留、共享 advisory lock、惰性 `EXPIRED` 状态和阶段审计；
+- 申请只预生成 PostgreSQL UUIDv7 tenant/subject，不写核心 tenant/user/membership；新用户生成
+  256-bit、短 TTL、限次的一次性 grant，数据库只存 SHA-256 摘要，联系目标与唯一明文使用带 key
+  version 的 AES-256-GCM outbox 密文；已有 ACTIVE 用户不生成认证材料；
+- 新用户凭 grant 设置首个长期密码；已有用户必须用本人 USER Token 和
+  `identity.provisioning.accept` 接受。成功时 ACTIVE tenant、user（若需要）、唯一 OWNER、
+  grant/request 状态与阶段审计同事务提交；错误次数耗尽、过期和回放失败关闭；
+- PostgreSQL 集成用例已加入幂等/并发/过期之外的明文不落库、错误计数锁定、一次性消费、已有
+  用户 subject 绑定、原默认 tenant 保留、通知重试和核心写入失败回滚；AES-GCM tamper、未知 key
+  与 key rotation 另有不依赖数据库的单元门禁；
+- 本轮在本机 PostgreSQL 18.4 随机 schema 中实际执行 8 份 Flyway migration，并跑通
+  “申请→解密通知→失败计数→成功激活→回放拒绝” smoke。Docker 未运行时 Testcontainers 会跳过，
+  因而发布候选仍必须补跑随机端口 HTTP 与完整 PostgreSQL 套件并保证 0 skipped；
+- 配置测试覆盖默认关闭语义所需的 operator/TTL 失败关闭，bootstrap 测试覆盖创建、弱 secret 与
+  不兼容既有 client 拒绝；新增 key ring/version 与激活策略同样启动失败关闭。完整 Reactor 结果维护在
+  [`project-status.md`](../project-status.md)。
+- 新增默认关闭的 notification relay：独立无 tenant client 只持有
+  `identity.provisioning-notifications.publish`，以 OAuth2 Client Credentials 和 HTTPS 向配置的
+  通知网关发送版本化 envelope；UUIDv7 notification ID 同时作为 `Idempotency-Key`。2xx 后标记
+  `PUBLISHED` 并销毁本地可解密 payload，取消时同样销毁；该状态只表示网关持久接收。
+- 新增默认关闭的 provider-neutral 终态回执接收基线：另一组 tenantless gateway client 只持有
+  `identity.provisioning-notifications.receipts.write` 并命中精确白名单；Identity 仅为已
+  `PUBLISHED` notification 保存唯一 `DELIVERED|FAILED` 最小事实。详细边界见 Proposed
+  [ADR-0021](0021-provisioning-notification-delivery-receipts.md)。
+- 平台控制面已增加 `GET /internal/platform/identity/tenants|users`：分别要求对应 read scope，
+  使用 `page/size/total`、单页最多 100，只返回 tenant/user 核心安全列。未激活 request 通过显式
+  `POST .../{id}/cancellations` 幂等关闭；成对 write scope、tenantless SERVICE 与 operator
+  白名单继续生效，request、预期 grant、未发布 payload 销毁和 `CANCELLED` 审计在同一事务完成。
+
+尚未完成：真实外部通知网关与邮件/短信供应商联调、供应商回执映射和最终送达证据、生产共享边缘限速/告警、升级库与
+随机端口 HTTP 的 0-skipped 证据。激活新建身份没有需要撤销的旧 Token，
+因此本切片不制造 access event；后续禁用/恢复仍复用既有撤销链。当前状态只能称为 M4.8A 激活
+与控制面代码基线，不能宣称可达的生产“平台开户”已经闭环。
 
 ## 本 ADR 不包含
 

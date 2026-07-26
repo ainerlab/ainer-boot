@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.identity.account.infrastructure.mybatis.TenantProvisioningNotificationReceiptMapper">
+
+    <resultMap id="tenantProvisioningNotificationReceiptRow"
+               type="dev.ainer.module.identity.account.infrastructure.mybatis.TenantProvisioningNotificationReceiptRow">
+        <id property="id" column="id"/>
+        <result property="notificationId" column="notification_id"/>
+        <result property="gatewayClientId" column="gateway_client_id"/>
+        <result property="gatewayEventId" column="gateway_event_id"/>
+        <result property="deliveryStatus" column="delivery_status"/>
+        <result property="failureCode" column="failure_code"/>
+        <result property="occurredAt" column="occurred_at"/>
+        <result property="receivedAt" column="received_at"/>
+        <result property="requestId" column="request_id"/>
+    </resultMap>
+
+    <resultMap id="tenantProvisioningNotificationPublicationRow"
+               type="dev.ainer.module.identity.account.infrastructure.mybatis.TenantProvisioningNotificationPublicationRow">
+        <id property="notificationId" column="notification_id"/>
+        <result property="publicationStatus" column="publication_status"/>
+        <result property="publishedAt" column="published_at"/>
+    </resultMap>
+
+    <select id="acquireReceiptLock" resultType="int">
+        WITH lock_acquired AS MATERIALIZED (
+            SELECT pg_advisory_xact_lock(hashtextextended(#{lockKey}, 0))
+        )
+        SELECT 1
+        FROM lock_acquired
+    </select>
+
+    <select id="selectByGatewayEvent"
+            resultMap="tenantProvisioningNotificationReceiptRow">
+        SELECT *
+        FROM ainer_identity_notification_delivery_receipt
+        WHERE gateway_client_id = #{gatewayClientId}
+          AND gateway_event_id = #{gatewayEventId}
+        FOR UPDATE
+    </select>
+
+    <select id="selectByNotification"
+            resultMap="tenantProvisioningNotificationReceiptRow">
+        SELECT *
+        FROM ainer_identity_notification_delivery_receipt
+        WHERE notification_id = #{notificationId}
+        FOR UPDATE
+    </select>
+
+    <select id="selectPublicationForUpdate"
+            resultMap="tenantProvisioningNotificationPublicationRow">
+        SELECT id AS notification_id, publication_status, published_at
+        FROM ainer_identity_notification_outbox
+        WHERE id = #{notificationId}
+        FOR UPDATE
+    </select>
+
+    <select id="selectUuidV7" resultType="java.util.UUID">
+        SELECT uuidv7()
+    </select>
+
+    <insert id="insertReceipt">
+        INSERT INTO ainer_identity_notification_delivery_receipt (
+            id, notification_id, gateway_client_id, gateway_event_id,
+            delivery_status, failure_code, occurred_at, received_at, request_id
+        ) VALUES (
+            #{id}, #{notificationId}, #{gatewayClientId}, #{gatewayEventId},
+            #{deliveryStatus}, #{failureCode}, #{occurredAt}, #{receivedAt},
+            #{requestId}
+        )
+    </insert>
+</mapper>

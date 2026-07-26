@@ -161,12 +161,42 @@ AI 默认关闭。启用时以下设置共同构成安全门禁：
 | `AINER_AUTHORIZATION_BOOTSTRAP_CLIENT_CONTROL_OPERATOR_ENABLED` | `false` | 只在建立无 tenant 控制面 operator 的初始化窗口启用 |
 | `AINER_AUTHORIZATION_BOOTSTRAP_CLIENT_CONTROL_OPERATOR_CLIENT_ID` | 空 | bootstrap 开启时必填，必须加入下方 operator 白名单 |
 | `AINER_AUTHORIZATION_BOOTSTRAP_CLIENT_CONTROL_OPERATOR_CLIENT_SECRET` | 空 | 24..128 字符，secret 注入 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_PLATFORM_IDENTITY_OPERATOR_ENABLED` | `false` | 只在建立无 tenant 平台 Identity operator 的初始化窗口启用 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_PLATFORM_IDENTITY_OPERATOR_CLIENT_ID` | 空 | bootstrap 开启时必填，必须加入平台 Identity operator 白名单 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_PLATFORM_IDENTITY_OPERATOR_CLIENT_SECRET` | 空 | 24..128 字符，secret 注入 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RELAY_ENABLED` | `false` | 只在建立无 tenant 预配通知 relay client 的初始化窗口启用 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RELAY_CLIENT_ID` | 空 | bootstrap 开启时必填，必须与平台 operator 分离 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RELAY_CLIENT_SECRET` | 空 | 24..128 字符，secret 注入 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RECEIPT_ENABLED` | `false` | 只在建立无 tenant 回执 gateway client 的初始化窗口启用 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RECEIPT_CLIENT_ID` | 空 | bootstrap 开启时必填，必须与 outbound relay 分离 |
+| `AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RECEIPT_CLIENT_SECRET` | 空 | 24..128 字符，secret 注入 |
 | `AINER_AUTHORIZATION_CLIENT_CONTROL_ENABLED` | `false` | 启用受审计 tenant 服务 client 内部控制面 |
 | `AINER_AUTHORIZATION_CLIENT_CONTROL_OPERATOR_CLIENT_IDS` | 空 | 启用时必填；无 tenant operator client ID 精确白名单，可逗号分隔 |
 | `AINER_AUTHORIZATION_CLIENT_CONTROL_ALLOWED_SCOPES` | `ai.invoke` | tenant 服务 client 可授 scope 白名单；禁止平台、控制面和 `.all` scope |
 | `AINER_AUTHORIZATION_CLIENT_CONTROL_ACCESS_TOKEN_TTL` | `5m` | managed client access token TTL，范围 30 秒至 15 分钟 |
 | `AINER_AUTHORIZATION_CLIENT_CONTROL_CLIENT_SECRET_TTL` | `90d` | managed client secret 有效期，范围 1 至 365 天 |
 | `AINER_AUTHORIZATION_CLIENT_CONTROL_SECRET_BYTES` | `32` | 服务端随机 secret 字节数，范围 32..64 |
+| `AINER_IDENTITY_PLATFORM_CONTROL_ENABLED` | `false` | 启用平台 Identity 预配/查询与用户激活端点 |
+| `AINER_IDENTITY_PLATFORM_CONTROL_OPERATOR_CLIENT_IDS` | 空 | 启用时必填；tenantless operator client ID 精确白名单，可逗号分隔 |
+| `AINER_IDENTITY_PLATFORM_CONTROL_REQUEST_TTL` | `7d` | `REQUESTED` 预留有效期，范围 15 分钟至 30 天 |
+| `AINER_IDENTITY_PLATFORM_CONTROL_ACTIVATION_TTL` | `24h` | 新用户 grant 有效期，不能超过 request TTL |
+| `AINER_IDENTITY_PLATFORM_CONTROL_ACTIVATION_MAX_ATTEMPTS` | `5` | 错误 secret 上限，范围 1..20 |
+| `AINER_IDENTITY_NOTIFICATION_ACTIVE_KEY_VERSION` | 空 | 启用时必填；AES-GCM 当前写 key 版本 |
+| `AINER_IDENTITY_NOTIFICATION_PROTECTION_KEYS` | 空 | 启用时必填；逗号分隔的版本化 32-byte base64url key ring |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_RELAY_ENABLED` | `false` | 启用 outbox 到通知网关的定时 relay |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_GATEWAY_URI` | 空 | 通知网关完整 POST URI，生产必须 HTTPS |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_TOKEN_URI` | 空 | relay Client Credentials Token endpoint，生产必须 HTTPS |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_CLIENT_ID` | 空 | 独立无 tenant relay client |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_CLIENT_SECRET` | 空 | 24..256 字符，secret 注入 |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_SCOPE` | `identity.provisioning-notifications.publish` | 唯一通知发布 scope |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_ALLOW_INSECURE_HTTP` | `false` | 仅本地合约测试可显式开启 |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_FIXED_DELAY` | `5s` | relay 调度间隔，必须为正 |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_LEASE_DURATION` | `30s` | 领取租约，必须为正 |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_RETRY_DELAY` | `30s` | 失败重试延迟，必须为正 |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_MAX_ATTEMPTS` | `10` | 自动投递上限，至少 1 |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_BATCH_SIZE` | `50` | 每批 `1..500` |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_RECEIPTS_ENABLED` | `false` | 装配 provider-neutral 终态回执 API |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_RECEIPT_GATEWAY_CLIENT_IDS` | 空 | 启用时必填；tenantless gateway client ID 精确白名单 |
 
 首个平台 tenant/OWNER 引导也运行在 Authorization Server，默认关闭：
 
@@ -193,6 +223,61 @@ metrics bootstrap 固定创建无 tenant、只有 `platform.metrics.read` scope�
 `oauth.clients.manage` 的专用 client。两者 access token TTL 都是 1 分钟且没有 introspection
 标记。metrics、introspection、operator 必须使用不同 ID/secret。所有 bootstrap 都只创建不存在
 的 client，不会覆盖、轮换或停用已有记录。
+
+platform identity operator bootstrap 固定创建无 tenant、只有
+`platform.tenants.read|write` 与 `platform.users.read|write` 四个 scope、仅支持 Client
+Credentials、access token TTL 一分钟且没有 introspection 标记。若相同 client ID 已存在但
+scope、grant、认证方式、tenant、Token 格式或 TTL 不完全符合策略，启动失败而不是覆盖。它必须与
+metrics、introspection、client-control、Passkey recovery 和事件重放凭据分离。
+
+provisioning notification relay bootstrap 固定创建无 tenant、只有
+`identity.provisioning-notifications.publish`、仅支持 Client Credentials、Token TTL 一分钟且
+没有 introspection 标记。既有同 ID client 的 scope、grant、认证方式、tenant、Token 格式或 TTL
+不完全匹配时同样拒绝启动。
+
+provisioning notification receipt bootstrap 固定创建无 tenant、只有
+`identity.provisioning-notifications.receipts.write`、仅支持 Client Credentials、Token TTL
+一分钟且没有 introspection 标记。它必须与 relay、platform operator、metrics、introspection
+使用不同 ID/secret；同 ID client 的策略不完全匹配时启动失败，不覆盖既有 secret。
+
+平台 Identity 控制面与激活配置：
+
+| 环境变量 | 默认值 | 生产说明 |
+|---|---|---|
+| `AINER_IDENTITY_PLATFORM_CONTROL_ENABLED` | `false` | 同时装配平台申请与用户激活端点 |
+| `AINER_IDENTITY_PLATFORM_CONTROL_OPERATOR_CLIENT_IDS` | 空 | tenantless 平台 operator 精确 ID 白名单 |
+| `AINER_IDENTITY_PLATFORM_CONTROL_REQUEST_TTL` | `7d` | 已有用户待接受请求 TTL，范围 `15m..30d` |
+| `AINER_IDENTITY_PLATFORM_CONTROL_ACTIVATION_TTL` | `24h` | 新用户 grant TTL，范围 `5m..request TTL` |
+| `AINER_IDENTITY_PLATFORM_CONTROL_ACTIVATION_MAX_ATTEMPTS` | `5` | secret 失败上限，范围 `1..20` |
+| `AINER_IDENTITY_NOTIFICATION_ACTIVE_KEY_VERSION` | 空 | 当前 AES-GCM 写入密钥版本 |
+| `AINER_IDENTITY_NOTIFICATION_PROTECTION_KEYS` | 空 | 逗号分隔的 `version:base64url` key ring；每把解码后必须恰好 32 bytes |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_RELAY_ENABLED` | `false` | 装配 HTTPS gateway publisher 与 scheduler |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_GATEWAY_URI` | 空 | 网关完整 POST URI；不允许 user-info、query 或 fragment |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_TOKEN_URI` | 空 | OAuth2 Token endpoint |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_CLIENT_ID` | 空 | relay 专用 client ID |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_CLIENT_SECRET` | 空 | relay secret，使用 secret manager 注入 |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_SCOPE` | `identity.provisioning-notifications.publish` | 不得增加平台或业务 scope |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_ALLOW_INSECURE_HTTP` | `false` | 只供 loopback 自动化测试 |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_FIXED_DELAY` | `5s` | scheduler 周期 |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_LEASE_DURATION` | `30s` | 多实例领取租约 |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_RETRY_DELAY` | `30s` | provider/鉴权/网络失败后的再次可领取延迟 |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_MAX_ATTEMPTS` | `10` | exhausted 判断与自动领取上限 |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_BATCH_SIZE` | `50` | 每周期上限 `1..500` |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_RECEIPTS_ENABLED` | `false` | 装配终态回执 Controller 与精确安全 matcher |
+| `AINER_IDENTITY_PROVISIONING_NOTIFICATION_RECEIPT_GATEWAY_CLIENT_IDS` | 空 | 启用时必填；可逗号分隔的 gateway client ID 白名单 |
+
+控制面启用时，operator 白名单、激活策略、活动密钥版本或 key ring 缺失/非法都会拒绝启动。
+POST 同时需要两个 write scope，GET 同时需要两个 read scope；写 scope 不隐式包含读 scope。
+key ring 用于保护联系目标与激活明文，必须由 secret manager 注入，不能写入仓库或普通配置中心；
+轮换时先加入新 key 并切换 active version，旧 key 至少保留到对应 outbox 全部被网关接收或安全
+取消。relay 启用时 URI、client、secret、scope 或重试边界缺失/非法会拒绝启动，生产 URI 默认
+强制 HTTPS。网关返回 2xx 后 outbox 标记 `PUBLISHED` 并销毁可解密 payload；因此网关必须先持久化
+并按 `Idempotency-Key` 去重。receipt 开关启用但 gateway 白名单为空或 ID 非法时同样拒绝启动；
+回调 client 只能使用专用 scope，不能复用 relay credential。当前代码已开放预配申请/查询、新用户
+grant 消费、已有用户本人接受、平台取消、tenant/user 列表、通知网关 transport 与 provider-neutral
+终态回执接收；真实外部邮件/短信/站内信供应商不在仓库中。
+需要接受已有用户请求的 browser/OIDC registered client 必须显式允许
+`identity.provisioning.accept`；平台 operator 和 relay client 都不得获得该人员 scope。
 
 Client 控制面配置在启动时失败关闭：operator 白名单或 allowed scope 为空会拒绝启动；输入含
 `oauth.clients.manage`、`token.introspect`、`platform.metrics.read` 或任意 `.all` scope 也会
