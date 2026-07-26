@@ -705,7 +705,12 @@ class AinerAuthorizationServerIntegrationTest {
             String actorType,
             String scope) {
         Instant now = Instant.now();
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        Map<String, Object> claims = new LinkedHashMap<>(Map.of(
+                "actor_type", actorType,
+                "sub", subjectId,
+                "tenant_id", tenantId,
+                "scope", scope));
+        JwtClaimsSet jwtClaims = JwtClaimsSet.builder()
                 .issuer("https://auth.ainer.test")
                 .subject(subjectId)
                 .audience(List.of("ainer-api"))
@@ -715,7 +720,24 @@ class AinerAuthorizationServerIntegrationTest {
                 .claim("tenant_id", tenantId)
                 .claim("scope", scope)
                 .build();
-        return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        String tokenValue = jwtEncoder.encode(JwtEncoderParameters.from(jwtClaims)).getTokenValue();
+        OAuth2AccessToken accessToken = new OAuth2AccessToken(
+                OAuth2AccessToken.TokenType.BEARER,
+                tokenValue,
+                now,
+                now.plus(Duration.ofMinutes(5)),
+                Set.copyOf(List.of(scope.split(" "))));
+        OAuth2Authorization authorization = OAuth2Authorization
+                .withRegisteredClient(registeredClientRepository.findByClientId(CLIENT_ID))
+                .principalName(subjectId)
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .authorizedScopes(accessToken.getScopes())
+                .token(accessToken, metadata -> metadata.put(
+                        OAuth2Authorization.Token.CLAIMS_METADATA_NAME,
+                        claims))
+                .build();
+        authorizationService.save(authorization);
+        return tokenValue;
     }
 
     private ProvisionedIdentity provision(
