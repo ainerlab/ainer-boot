@@ -30,6 +30,7 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
 import java.net.URI;
+import java.time.Clock;
 import java.util.List;
 
 @AutoConfiguration
@@ -97,13 +98,15 @@ public class AinerResourceServerAutoConfiguration {
     RecentStrongAuthenticationFilter ainerRecentStrongAuthenticationFilter(
             AinerResourceServerProperties properties,
             ObjectProvider<MeterRegistry> meterRegistry,
+            ObjectProvider<Clock> clock,
             ObjectMapper objectMapper) {
         AinerResourceServerProperties.StepUp stepUp = properties.getStepUp();
         stepUp.validate();
         return new RecentStrongAuthenticationFilter(
                 stepUp,
                 new AinerSecurityFailureWriter(objectMapper),
-                meterRegistry.getIfAvailable());
+                meterRegistry.getIfAvailable(),
+                clock.getIfAvailable(Clock::systemUTC));
     }
 
     @Bean

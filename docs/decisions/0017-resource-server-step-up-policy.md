@@ -65,8 +65,8 @@ step-up 替代。
 3. 满足则放行；任一不满足（缺 amr、缺 auth_time、auth_time 过期、非 JwtAuthenticationToken）
    失败关闭，写 `AINER.SECURITY.RECENT_STRONG_AUTHENTICATION_REQUIRED`（403），不泄露具体缺哪个。
    非 Bearer（未认证）请求不由此 filter 处理（已由前置认证入口返回 401）。
-4. 只作用于 `actor_type=USER` 的人员 Token；`SERVICE`（Client Credentials）无 `amr`/`auth_time`，
-   被 step-up 匹配的路径本就不应是机器调用（若配置如此，视为配置错误，启动校验告警）。
+4. 只作用于 `actor_type=USER` 的人员 Token；`SERVICE`（Client Credentials）不消费人员
+   `amr`/`auth_time`，继续由 endpoint 的 SERVICE/scope/tenant 授权决定。
 5. 新增嵌套配置 `ainer.security.resource-server.step-up`：`enabled`（默认关闭）、`max-auth-age`、
    `required-amr`、`always-protected-paths`、`mutating-protected-paths`、`mutating-methods`，
    镜像 `online-validation` 的属性结构与校验（启用时规则不得为空、max-auth-age 合法）。
@@ -128,9 +128,15 @@ Token 或 amr 写入日志/指标/错误正文。拒绝响应统一错误码，�
 - 默认关闭，错误码经 `ErrorCodeContributor` 自动注册；filter 与在线校验 filter 同锚定在
   `BearerTokenAuthenticationFilter` 之后。
 
+2026-07-26 追加验证：
+
+- 随机端口真实 HTTP 测试使用 stub `JwtDecoder` 覆盖强认证 USER 200、匿名 401、缺因子/过期/
+  未来 `auth_time` 403，以及 SERVICE 不被人员 step-up 误拒；
+- 固定 Clock 单元测试覆盖 `max-auth-age + clock-skew` 边界和 0..5 分钟 skew 配置校验；
+- 匿名请求由认证入口处理，避免 step-up 把本应 401 的请求改写为 403。
+
 尚未完成：
 
-- step-up filter 的端到端 HTTP 集成测试（stub JwtDecoder + 受保护业务路径 200/403）；
 - `max-auth-age` 按操作风险分级的生产配置与拒绝率监控；
 - 账号通知（Phase E）。
 

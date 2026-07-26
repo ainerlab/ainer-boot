@@ -228,6 +228,7 @@ public class AinerResourceServerProperties {
 
         private boolean enabled;
         private Duration maxAuthAge = Duration.ofMinutes(15);
+        private Duration clockSkew = Duration.ofSeconds(60);
         private List<String> requiredAmr = new ArrayList<>(List.of("mfa"));
         private List<String> alwaysProtectedPaths = new ArrayList<>();
         private List<String> mutatingProtectedPaths = new ArrayList<>();
@@ -251,6 +252,14 @@ public class AinerResourceServerProperties {
 
         public void setMaxAuthAge(Duration maxAuthAge) {
             this.maxAuthAge = maxAuthAge;
+        }
+
+        public Duration getClockSkew() {
+            return clockSkew;
+        }
+
+        public void setClockSkew(Duration clockSkew) {
+            this.clockSkew = clockSkew;
         }
 
         public List<String> getRequiredAmr() {
@@ -292,6 +301,10 @@ public class AinerResourceServerProperties {
             requirePositive(maxAuthAge, "max-auth-age");
             if (maxAuthAge.toHours() > 24) {
                 throw new IllegalStateException("Ainer step-up max-auth-age must be at most 24 hours");
+            }
+            if (clockSkew == null || clockSkew.isNegative() || clockSkew.compareTo(Duration.ofMinutes(5)) > 0) {
+                throw new IllegalStateException(
+                        "Ainer step-up clock-skew must be between zero and 5 minutes");
             }
             if (requiredAmr == null || requiredAmr.isEmpty() || requiredAmr.stream().anyMatch(String::isBlank)) {
                 throw new IllegalStateException("Ainer step-up required-amr must be a non-empty list");

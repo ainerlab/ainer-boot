@@ -1,6 +1,6 @@
 # Ainer 数据库与 Migration 手册
 
-> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-07-23 · 适用版本：`0.1.x`
+> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
 
 ## 1. 基线
 
@@ -13,7 +13,7 @@ UUID、时间、金额、约束和锁语义必须按 PostgreSQL 设计。SQL 参
 | 发行物 | 逻辑数据库 | 所属 migration | 当前数据 |
 |---|---|---|---|
 | `ainer-server` | 业务库 `ainer` | Workspace、AI runtime | workspace、成员、授权审计热/归档、OWNER 恢复审计、AI invocation |
-| `ainer-authorization-server` | 身份库 `ainer_auth` | Identity、OAuth authorization server | tenant、user、membership、access event/重放审计、client、authorization、consent、Passkey 协议/生命周期审计 |
+| `ainer-authorization-server` | 身份库 `ainer_auth` | Identity、OAuth authorization server | tenant、user、membership/成员变更审计、access event/重放审计、client、authorization、consent、Passkey 协议/生命周期/恢复审计 |
 
 数据库名只是本地示例。生产可以改名，但两个发行物不得通过共享表形成隐式模块调用。未来拆服务时，每个模块保留自己的数据所有权，跨边界通过契约或可靠事件同步。
 
@@ -64,11 +64,27 @@ M4.6 Passkey 切片新增：
 | `user_credentials` | Spring Security WebAuthn adapter | credential 公钥、计数器、transport、backup/attestation 协议材料 |
 | `ainer_passkey_credential` | Authorization Server | credential 与稳定 Identity subject 的 ACTIVE/REVOKED 生命周期 |
 | `ainer_passkey_credential_audit` | Authorization Server | REGISTERED/REVOKED、request ID 与发生时间 |
+| `ainer_passkey_recovery_code` / `_lockout` | Authorization Server | 恢复码 bcrypt hash 与按 subject 的失败锁定 |
+| `ainer_passkey_recovery_request` | Authorization Server | 管理员双人恢复申请 |
+| `ainer_passkey_security_operation_audit` | Authorization Server | 恢复申请与执行审计 |
+| `ainer_passkey_enrollment_grant` | Authorization Server | `require-invite` 首枚 Passkey 的短时授权 |
 
 `user_credentials` 不保存 authenticator 私钥或生物识别模板。Ainer 生命周期登记与官方协议记录在
 同一事务提交；认证更新时间不重复写生命周期审计。撤销不物理删除官方记录，读取只返回 ACTIVE
 credential。最后一个 ACTIVE credential 的自助撤销被拒绝；replacement 与旧 credential 通过
 同一 user entity 串行保护，避免并发删除把账号降级到零因子。
+
+M4.7 管理面新增：
+
+| 表 | 所有者 | 用途 |
+|---|---|---|
+| `ainer_identity_member_audit` | Identity | tenant 成员 ADDED/REACTIVATED/ROLE_CHANGED/REMOVED 的同事务安全审计 |
+
+成员管理 API 和 migration 只装配在 Identity 权威运行时 `ainer-authorization-server`，业务
+`ainer-server` 不创建 `ainer_identity_*` 表。Passkey 恢复码、锁定、恢复申请、安全操作审计与
+enrollment grant 都通过 `(tenant_id, subject_id)` 复合外键绑定
+`ainer_identity_membership(tenant_id, user_id)`；应用层还要求目标为 ACTIVE default membership，防止
+只凭全局 subject 对另一个 tenant 建立恢复或 enrollment 安全记录。
 
 ## 4. Migration 命名与不可变性
 

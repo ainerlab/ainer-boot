@@ -292,6 +292,7 @@ class AiGatewayModuleIntegrationTest {
                     .header("alg", "RS256")
                     .subject("subject:test")
                     .claim("tenant_id", token)
+                    .claim("actor_type", "USER")
                     .claim("scope", "ai.invoke")
                     .issuedAt(Instant.now().minusSeconds(5))
                     .expiresAt(Instant.now().plusSeconds(300))

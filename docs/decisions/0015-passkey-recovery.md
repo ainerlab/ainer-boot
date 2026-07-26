@@ -173,14 +173,16 @@ ADR-0014 已把 TOTP 排除在抗钓鱼主因子之外，作为受限恢复 fall
   phase)` 偏唯一审计为 `[REQUESTED, EXECUTED]`，重复批准被拒（`RECOVERY_REQUEST_CONFLICT`）；
 - 恢复吊销复用 `ainer_passkey_credential` 软撤销（`status='REVOKED'`、`version+1`、保留协议记录），
   普通自助删除的最后凭证保护不受影响；
+- 管理员恢复申请在写入前校验目标 subject 是路径 tenant 的 ACTIVE user + ACTIVE 默认 membership；
+  数据库对安全记录增加 `(tenant_id,subject_id)` 复合外键，跨 tenant 目标在服务和数据层均失败关闭；
 - Flyway 从空库执行八份 Authorization Server migration，含恢复码、锁定计数、恢复请求与安全
   操作审计四张新表与全部 CHECK/偏唯一约束。
 
 尚未完成：
 
-- 控制器层 SERVICE/tenant/scope 拒绝路径与限速边界（通用限速框架）的 HTTP 级自动化测试；
+- 管理员恢复控制器层 SERVICE/scope 拒绝路径的 HTTP 级自动化测试；
 - 账号所有者可达通知（含 Identity 联系字段与通知通道），仍为已知缺口；
-- 真实设备/浏览器兼容矩阵、step-up assurance policy 与多节点 session。
+- 真实设备/浏览器兼容矩阵、生产 step-up assurance 分级与多节点 session。
 
 ## 参考
 

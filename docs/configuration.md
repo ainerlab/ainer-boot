@@ -1,6 +1,6 @@
 # Ainer 配置与秘密管理
 
-> 文档类型：开发与运维规范 · 状态：生效 · 最近核对：2026-07-23 · 适用版本：`0.1.x`
+> 文档类型：开发与运维规范 · 状态：生效 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
 
 ## 1. 原则
 
@@ -46,6 +46,21 @@ M4.3 高风险请求在线 Token 校验默认关闭：
 | `AINER_SECURITY_ONLINE_VALIDATION_MUTATING_METHODS` | `POST,PUT,PATCH,DELETE` | 变更方法列表 |
 
 启用时 client、secret、URI、正超时和至少一条有效保护规则缺一不可，否则启动失败。inactive 返回 401；在线依赖异常返回 503 且不回退到本地 JWT 放行。默认规则是安全基线，收窄前必须按 ADR-0011 做安全评审。
+
+高风险人员操作的 step-up 默认关闭：
+
+| 环境变量 | 默认值 | 生产说明 |
+|---|---|---|
+| `AINER_SECURITY_STEP_UP_ENABLED` | `false` | 启用人员近期强认证门禁 |
+| `AINER_SECURITY_STEP_UP_MAX_AUTH_AGE` | `15m` | `auth_time` 最大年龄，必须大于 0 且不超过 24 小时 |
+| `AINER_SECURITY_STEP_UP_CLOCK_SKEW` | `60s` | 签发方/资源方时钟偏差容忍，范围 0..5 分钟 |
+| `AINER_SECURITY_STEP_UP_REQUIRED_AMR` | `mfa` | USER token 必须包含的全部 `amr` |
+| `AINER_SECURITY_STEP_UP_ALWAYS_PATHS` | 空 | 所有方法均要求 step-up 的路径列表 |
+| `AINER_SECURITY_STEP_UP_MUTATING_PATHS` | `/api/workspaces/*/ownership-transfers` | 默认保护 Workspace 所有权转移 |
+| `AINER_SECURITY_STEP_UP_MUTATING_METHODS` | `POST,PATCH,DELETE` | 与 mutating paths 共同匹配 |
+
+未认证请求继续由 Resource Server 返回 401；step-up 只消费 `actor_type=USER`，不把 SERVICE
+token 误判为缺 MFA。未来超过允许 skew 的 `auth_time`、过期、缺失或缺强因子均返回特定 403。
 
 跨运行时 Identity 能力默认关闭：
 
@@ -117,12 +132,21 @@ AI 默认关闭。启用时以下设置共同构成安全门禁：
 | `AINER_AUTHORIZATION_SIGNING_KEY_ID` | 空 | 必填，轮换时使用新 ID |
 | `AINER_AUTHORIZATION_PRIVATE_KEY_LOCATION` | 空 | 必填，只读 PEM 资源位置 |
 | `AINER_AUTHORIZATION_PUBLIC_KEY_LOCATION` | 空 | 必填，PEM 资源位置 |
+| `AINER_IDENTITY_ENABLED` | `true` | 控制 Identity module、tenant 成员 API 与 Identity migration 装配 |
 | `AINER_AUTHORIZATION_PASSKEY_ENABLED` | `false` | 启用 Spring Security WebAuthn/Passkey 与条件人员门禁 |
 | `AINER_AUTHORIZATION_PASSKEY_RP_ID` | 空 | 启用时必填，小写 DNS 名；测试可用 `localhost` |
 | `AINER_AUTHORIZATION_PASSKEY_RP_NAME` | `Ainer` | 浏览器展示的 relying party 名称，1..100 字符 |
 | `AINER_AUTHORIZATION_PASSKEY_ALLOWED_ORIGINS` | 空 | 启用时必填，精确 Origin 列表，host 必须在 RP ID 范围 |
 | `AINER_AUTHORIZATION_PASSKEY_ALLOW_INSECURE_HTTP` | `false` | 仅允许 `localhost` 自动化测试显式设为 `true` |
 | `AINER_AUTHORIZATION_PASSKEY_CEREMONY_TIMEOUT` | `5m` | WebAuthn ceremony timeout，必须大于 0 且不超过 10 分钟 |
+| `AINER_AUTHORIZATION_PASSKEY_RECOVERY_ENABLED` | `false` | 启用管理员双人 Passkey 恢复控制面 |
+| `AINER_AUTHORIZATION_PASSKEY_SELF_RECOVERY_ENABLED` | `false` | 启用人员恢复码签发/赎回；应与 Passkey 一起启用 |
+| `AINER_AUTHORIZATION_PASSKEY_RECOVERY_APPROVAL_TTL` | `15m` | 管理员恢复申请有效期 |
+| `AINER_AUTHORIZATION_PASSKEY_ENROLLMENT_MODE` | `optional` | `optional` 或 `require-invite`；后者要求首枚 Passkey 预授权 |
+| `AINER_AUTHORIZATION_LOGIN_RATE_LIMIT_ENABLED` | `false` | 启用 node-local 登录端点固定窗口限流 |
+| `AINER_AUTHORIZATION_LOGIN_RATE_LIMIT_WINDOW` | `1m` | 固定窗口，必须为正 |
+| `AINER_AUTHORIZATION_LOGIN_RATE_LIMIT_MAX_REQUESTS` | `20` | 每 IP/窗口最大请求数，必须大于 0 |
+| `AINER_AUTHORIZATION_LOGIN_RATE_LIMIT_PATHS` | `/login,/login/webauthn,/webauthn/authenticate/options` | 只匹配 POST，路径必须为绝对路径 |
 | `AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_ENABLED` | `false` | 只在受控初始化窗口启用 |
 | `AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_CLIENT_ID` | 空 | bootstrap 开启时必填 |
 | `AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_CLIENT_SECRET` | 空 | 至少 24 字符，secret 注入 |
@@ -143,6 +167,20 @@ AI 默认关闭。启用时以下设置共同构成安全门禁：
 | `AINER_AUTHORIZATION_CLIENT_CONTROL_ACCESS_TOKEN_TTL` | `5m` | managed client access token TTL，范围 30 秒至 15 分钟 |
 | `AINER_AUTHORIZATION_CLIENT_CONTROL_CLIENT_SECRET_TTL` | `90d` | managed client secret 有效期，范围 1 至 365 天 |
 | `AINER_AUTHORIZATION_CLIENT_CONTROL_SECRET_BYTES` | `32` | 服务端随机 secret 字节数，范围 32..64 |
+
+首个平台 tenant/OWNER 引导也运行在 Authorization Server，默认关闭：
+
+| 环境变量 | 默认值 | 生产说明 |
+|---|---|---|
+| `AINER_PLATFORM_TENANT_BOOTSTRAP_ENABLED` | `false` | 只在空环境受控初始化窗口启用 |
+| `AINER_PLATFORM_TENANT_BOOTSTRAP_TENANT_CODE` | 空 | 3..64 位小写字母/数字/连字符稳定代码 |
+| `AINER_PLATFORM_TENANT_BOOTSTRAP_TENANT_NAME` | 空 | 2..80 字符 |
+| `AINER_PLATFORM_TENANT_BOOTSTRAP_USERNAME` | 空 | Identity 全局唯一用户名 |
+| `AINER_PLATFORM_TENANT_BOOTSTRAP_PASSWORD` | 空 | secret 注入，12..128 字符 |
+| `AINER_PLATFORM_TENANT_BOOTSTRAP_DISPLAY_NAME` | 空 | 1..80 字符 |
+
+引导仅在租户、用户与 ACTIVE 默认 OWNER 关系完整匹配时幂等跳过；任何部分占用或状态漂移都
+启动失败，不覆盖已有密码。创建成功后立即从运行环境删除开关与明文密码。
 
 Bootstrap 是幂等初始化手段，不是长期管理 API。初始化完成后应关闭。新 tenant-bound 业务服务
 client 应使用受审计控制面；平台级 metrics/introspection、operator、`.all` 和既有 bootstrap
@@ -167,7 +205,9 @@ Passkey 开关默认关闭。启用时 RP ID、RP name 和 Origin 缺失或越�
 path、query、fragment 或 user-info。生产必须使用 HTTPS，`allow-insecure-http` 不能为普通
 HTTP 域名开后门。RP ID/Origin 是浏览器密码学信任边界，域名变更需要迁移和安全评审，不能当作
 普通 UI 配置临时切换。完整启用、降级和恢复限制见
-[ADR-0014](decisions/0014-passkey-first-human-authentication.md)。
+[ADR-0014](decisions/0014-passkey-first-human-authentication.md)。登录限流为单节点安全基线；多实例
+部署前必须改用共享权威限流或在可信入口统一节流。恢复与 enrollment 控制面要求独立最小权限
+SERVICE client，并再次校验目标 subject 属于路径 tenant 的 ACTIVE default Identity membership。
 
 Identity 内部 API 与 relay 配置：
 

@@ -1,6 +1,6 @@
 # Ainer Boot
 
-> 正式品牌：Ainer · M4.6 Passkey ceremony + 条件门禁加固 · 2026-07-25 · JDK 25 + Spring Boot 4.1.0
+> 正式品牌：Ainer · M4.7 tenant member control plane · 2026-07-26 · JDK 25 + Spring Boot 4.1.0
 
 Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 AI 时代的企业应用平台底座。它从模块化单体开始，通过明确的契约、适配器和独立发行物演进为服务化系统；它不继承 yudao、BladeX、Dante 或 Snowy 的代码与框架范式。
 
@@ -17,11 +17,11 @@ Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 
 | `ainer-starter-persistence` | ✅ | MyBatis、Flyway、PostgreSQL 与 UUID 的公共装配 |
 | `ainer-security` | ✅ | 与框架无关的可信参与者与 authority 契约 |
 | `ainer-starter-security` | ✅ | Resource Server、人员/服务 JWT 投影、选择性 RFC 7662 在线校验、tenantless 指标授权与统一 401/403/503 |
-| `ainer-module-identity` | ✅ | 用户/租户、安全 Directory、禁用/撤销、revocation epoch、可租约 outbox 与双人重放端口 |
+| `ainer-module-identity` | ✅ | 用户/租户、租户成员管理、安全 Directory、禁用/撤销、revocation epoch、可租约 outbox 与双人重放端口 |
 | `ainer-module-workspace` | ✅ | 可信租户资源、成员治理、幂等撤销、OWNER 恢复、授权审计热/归档与 SIEM 契约 |
 | `ainer-module-ai-runtime` | ✅ | OpenAI-compatible 网关、SSE、策略、预算与用量/费用审计 |
 | `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、可选 Directory client、撤销 consumer/SLO、OWNER 恢复与审计运营端点 |
-| `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、受限 introspection/RFC 7009、Identity 状态感知与受审计 JDBC 协议仓库 |
+| `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、Identity 租户成员 API、受限 introspection/RFC 7009 与受审计 JDBC 协议仓库 |
 
 当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
 
@@ -153,15 +153,19 @@ Authorization Code + PKCE 已建立真实 PostgreSQL 与浏览器 HTTP 会话门
 授权码单次交换和回调地址拒绝；该证据使用测试专用 public client，不代表生产 browser client
 控制面或登录体验已经交付。
 
-M4.6 已建立默认关闭的 Passkey 协议基础：启用时强制 WebAuthn user verification、精确 RP/
-Origin、已登记账号的条件授权门禁，以及凭证软撤销、replacement、最后凭证保护和操作审计。Phase A
-补齐了真实签名 ceremony 端到端门禁（webauthn4j 虚拟 authenticator 驱动 attestation/assertion
-闭环，`amr=pwd,mfa,pop` 在 HTTP 层验证）与凭证管理条件 MFA 门禁，并修复了此前被合成测试掩盖的
-授权记录反序列化、Passkey Token claims 与凭证管理门禁三个缺陷。这仍不是完整生产 MFA：主流真实
-设备兼容矩阵、受控首次登记、恢复码/管理员恢复、通知、step-up 策略和多节点会话仍未完成，详见
-[ADR-0014](docs/decisions/0014-passkey-first-human-authentication.md)。
+M4.6 已完成默认关闭的 Passkey 代码主线：真实签名 ceremony、条件 MFA、恢复码、管理员双人恢复、
+受控首次 enrollment、登录限速和 Resource Server step-up 均有自动化证据。本轮又修复恢复/enrollment
+跨租户目标绑定、限速 HTTP 契约以及 step-up 匿名/服务身份/未来时间语义。主流真实设备矩阵、恢复
+通知、共享限流和多节点会话仍未完成，详见 ADR-0014 至 ADR-0017。
+
+M4.7 首个管理面切片已经落地：Identity 所属的 `ainer-authorization-server` 提供租户成员列表、
+加入、角色变更和软移除 API，
+同时要求 USER actor、`tenant.members.read|write`、可信 tenant claim 与数据库 ACTIVE
+OWNER/ADMIN 关系；所有写入同事务审计，通用接口不能操作 OWNER。首个平台 tenant/OWNER 可用默认
+关闭的严格幂等 bootstrap 创建，部分占用或状态漂移会失败关闭，详见
+[ADR-0018](docs/decisions/0018-management-authorization-and-tenant-member-management.md)。
 
 下一步仍需部署真实 Prometheus、dashboard/告警，并完成 Authorization Server 多实例容量、故障
-切换和平台旧凭据退役证据；随后继续 IAM 职责分离、外部不可变审计副本、多节点 SLO、人员账号
-恢复治理、Passkey 完整 ceremony/恢复、tenant ownership transfer、browser/OIDC client
+切换和平台旧凭据退役证据；随后继续 IAM 职责分离、外部不可变审计副本、多节点 SLO、恢复通知与
+真实设备兼容矩阵、tenant ownership transfer、平台级 tenant/user 管理、browser/OIDC client
 控制面与签名密钥轮换。

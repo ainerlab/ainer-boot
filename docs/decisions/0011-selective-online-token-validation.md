@@ -90,7 +90,8 @@ Identity 查询只使用 tenant、subject、当前状态和撤销时间，不读
 - Identity 测试覆盖缺失/非 ACTIVE 身份，以及 `issuedAt` 在 epoch 之前、相等和之后的边界；
 - 本机 PostgreSQL 18.4 从空库执行五份 Authorization Server migration 并启动真实发行物，协议 smoke 得到普通 introspection 401、专用 `active=true`、revocation 200、撤销后 `active=false`；
 - 5,000 条合成 access event 下，epoch 查询使用现有 `idx_ainer_identity_access_event_subject` Index Only Scan，实测约 0.036 ms；未新增 Token 表或 migration；
-- 完整 `mvn clean test` 的 14 个 Reactor 模块成功：144 个测试，98 个实际通过，46 个因本机无 Docker 明确跳过，0 failure、0 error。
+- 当轮完整 `mvn clean test` 的 14 个 Reactor 模块成功；本机无 Docker 时数据库组按项目规则明确
+  跳过。当前不跳过的总测试数量只在 [`project-status.md`](../project-status.md) 维护。
 
 以上证据支持接受本决策与工程基线。生产发行仍必须在 Docker 可用的发布候选环境执行未跳过的 PostgreSQL 集成测试，并补齐高可用、容量、告警和凭据轮换证据；Accepted 不等于生产运营已完成。
 

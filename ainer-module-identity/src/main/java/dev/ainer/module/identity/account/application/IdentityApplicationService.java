@@ -35,27 +35,48 @@ public class IdentityApplicationService {
 
     @Transactional
     public ProvisionedIdentity provisionTenantOwner(ProvisionTenantOwnerCommand command) {
-        Objects.requireNonNull(command, "command");
         try {
-            validateRawPassword(command.rawPassword());
-            Instant now = clock.instant();
-            UUID tenantId = UUID.randomUUID();
-            UUID subjectId = UUID.randomUUID();
-            String username = normalize(command.username());
-            IdentityTenant tenant = new IdentityTenant(
-                    tenantId, normalize(command.tenantCode()), command.tenantName(), IdentityStatus.ACTIVE, now, now);
-            IdentityUser user = new IdentityUser(
-                    subjectId, username, passwordHashingPort.hash(command.rawPassword()), command.displayName(),
-                    IdentityStatus.ACTIVE, now, now);
-            TenantMembership membership = new TenantMembership(
-                    tenantId, subjectId, TenantRole.OWNER, true, IdentityStatus.ACTIVE, now, now);
-
-            repository.insertTenant(tenant);
-            repository.insertUser(user);
-            repository.insertMembership(membership);
-            return new ProvisionedIdentity(tenantId, subjectId, username);
+            Objects.requireNonNull(command, "command");
+            return provisionValidated(command, normalize(command.tenantCode()), normalize(command.username()));
         } catch (DataIntegrityViolationException exception) {
             throw new BusinessException(IdentityErrorCode.ALREADY_EXISTS);
+        } catch (IllegalArgumentException | NullPointerException exception) {
+            throw new BusinessException(IdentityErrorCode.INVALID_PROVISIONING_REQUEST);
+        }
+    }
+
+    /**
+     * 启动期幂等引导。相同租户代码和用户名已经构成 ACTIVE 默认 OWNER 时安全返回；任何部分占用或
+     * 状态漂移都失败，避免把“用户存在”误判为初始化成功。事务级 advisory lock 负责多实例并发串行化。
+     */
+    @Transactional
+    public TenantOwnerBootstrapResult ensureTenantOwner(ProvisionTenantOwnerCommand command) {
+        try {
+            Objects.requireNonNull(command, "command");
+            validateRawPassword(command.rawPassword());
+            String tenantCode = normalize(command.tenantCode());
+            String username = normalize(command.username());
+            repository.acquireTenantBootstrapLock(tenantCode, username);
+
+            Optional<IdentityDirectoryEntry> existing =
+                    repository.findActiveDefaultOwner(tenantCode, username);
+            if (existing.isPresent()) {
+                IdentityDirectoryEntry owner = existing.get();
+                return new TenantOwnerBootstrapResult(
+                        new ProvisionedIdentity(owner.tenantId(), owner.subjectId(), owner.username()),
+                        false);
+            }
+            if (repository.tenantExistsByCode(tenantCode)
+                    || repository.userExistsByUsername(username)) {
+                throw new BusinessException(IdentityErrorCode.TENANT_BOOTSTRAP_STATE_CONFLICT);
+            }
+            return new TenantOwnerBootstrapResult(
+                    provisionValidated(command, tenantCode, username),
+                    true);
+        } catch (BusinessException exception) {
+            throw exception;
+        } catch (DataIntegrityViolationException exception) {
+            throw new BusinessException(IdentityErrorCode.TENANT_BOOTSTRAP_STATE_CONFLICT);
         } catch (IllegalArgumentException | NullPointerException exception) {
             throw new BusinessException(IdentityErrorCode.INVALID_PROVISIONING_REQUEST);
         }
@@ -71,6 +92,28 @@ public class IdentityApplicationService {
 
     private String normalize(String value) {
         return Objects.requireNonNull(value, "value").trim().toLowerCase(Locale.ROOT);
+    }
+
+    private ProvisionedIdentity provisionValidated(
+            ProvisionTenantOwnerCommand command,
+            String tenantCode,
+            String username) {
+        validateRawPassword(command.rawPassword());
+        Instant now = clock.instant();
+        UUID tenantId = UUID.randomUUID();
+        UUID subjectId = UUID.randomUUID();
+        IdentityTenant tenant = new IdentityTenant(
+                tenantId, tenantCode, command.tenantName(), IdentityStatus.ACTIVE, now, now);
+        IdentityUser user = new IdentityUser(
+                subjectId, username, passwordHashingPort.hash(command.rawPassword()), command.displayName(),
+                IdentityStatus.ACTIVE, now, now);
+        TenantMembership membership = new TenantMembership(
+                tenantId, subjectId, TenantRole.OWNER, true, IdentityStatus.ACTIVE, now, now);
+
+        repository.insertTenant(tenant);
+        repository.insertUser(user);
+        repository.insertMembership(membership);
+        return new ProvisionedIdentity(tenantId, subjectId, username);
     }
 
     private void validateRawPassword(String password) {

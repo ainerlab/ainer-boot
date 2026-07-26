@@ -88,6 +88,24 @@
         WHERE u.username = #{username}
     </select>
 
+    <select id="selectAccountBySubjectId" resultMap="identityAccountRow">
+        SELECT u.id AS subject_id,
+               u.username,
+               u.password_hash,
+               u.status AS user_status,
+               m.tenant_id,
+               t.status AS tenant_status,
+               m.status AS membership_status,
+               m.role
+        FROM ainer_identity_user u
+        JOIN ainer_identity_membership m
+          ON m.user_id = u.id
+         AND m.is_default = true
+        JOIN ainer_identity_tenant t
+          ON t.id = m.tenant_id
+        WHERE u.id = #{subjectId}
+    </select>
+
     <select id="selectActiveDirectoryEntry" resultMap="identityDirectoryRow">
         SELECT m.tenant_id,
                u.id AS subject_id,
@@ -123,6 +141,23 @@
           )
         ORDER BY u.username, u.id
         LIMIT #{limit}
+    </select>
+
+    <select id="selectActiveDirectoryEntryForUpdate" resultMap="identityDirectoryRow">
+        SELECT m.tenant_id,
+               u.id AS subject_id,
+               u.username,
+               u.display_name,
+               m.role
+        FROM ainer_identity_membership m
+        JOIN ainer_identity_user u ON u.id = m.user_id
+        JOIN ainer_identity_tenant t ON t.id = m.tenant_id
+        WHERE m.tenant_id = #{tenantId}
+          AND m.user_id = #{subjectId}
+          AND m.status = 'ACTIVE'
+          AND u.status = 'ACTIVE'
+          AND t.status = 'ACTIVE'
+        FOR UPDATE OF m, u, t
     </select>
 
     <select id="selectTokenStatus" resultMap="identityTokenStatusRow">
@@ -183,4 +218,100 @@
           AND user_id = #{subjectId}
           AND status = #{expectedStatus}
     </update>
+
+    <select id="listMembersByTenant" resultMap="identityDirectoryRow">
+        SELECT m.tenant_id,
+               u.id AS subject_id,
+               u.username,
+               u.display_name,
+               m.role
+        FROM ainer_identity_membership m
+        JOIN ainer_identity_user u ON u.id = m.user_id
+        JOIN ainer_identity_tenant t ON t.id = m.tenant_id
+        WHERE m.tenant_id = #{tenantId}
+          AND m.status = 'ACTIVE'
+          AND u.status = 'ACTIVE'
+          AND t.status = 'ACTIVE'
+        ORDER BY u.username, u.id
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countMembersByTenant" resultType="int">
+        SELECT COUNT(*)
+        FROM ainer_identity_membership m
+        JOIN ainer_identity_user u ON u.id = m.user_id
+        JOIN ainer_identity_tenant t ON t.id = m.tenant_id
+        WHERE m.tenant_id = #{tenantId}
+          AND m.status = 'ACTIVE'
+          AND u.status = 'ACTIVE'
+          AND t.status = 'ACTIVE'
+    </select>
+
+    <update id="updateMembershipRole">
+        UPDATE ainer_identity_membership
+        SET role = #{newRole},
+            updated_at = #{updatedAt}
+        WHERE tenant_id = #{tenantId}
+          AND user_id = #{subjectId}
+          AND status = 'ACTIVE'
+    </update>
+
+    <update id="reactivateMembership">
+        UPDATE ainer_identity_membership
+        SET role = #{newRole},
+            status = 'ACTIVE',
+            updated_at = #{updatedAt}
+        WHERE tenant_id = #{tenantId}
+          AND user_id = #{subjectId}
+          AND status = #{expectedStatus}
+          AND role &lt;&gt; 'OWNER'
+    </update>
+
+    <select id="selectActiveDefaultOwner" resultMap="identityDirectoryRow">
+        SELECT m.tenant_id,
+               u.id AS subject_id,
+               u.username,
+               u.display_name,
+               m.role
+        FROM ainer_identity_tenant t
+        JOIN ainer_identity_membership m
+          ON m.tenant_id = t.id
+         AND m.is_default = true
+         AND m.role = 'OWNER'
+         AND m.status = 'ACTIVE'
+        JOIN ainer_identity_user u
+          ON u.id = m.user_id
+         AND u.status = 'ACTIVE'
+        WHERE t.code = #{tenantCode}
+          AND t.status = 'ACTIVE'
+          AND u.username = #{username}
+    </select>
+
+    <select id="countTenantByCode" resultType="int">
+        SELECT COUNT(*)
+        FROM ainer_identity_tenant
+        WHERE code = #{tenantCode}
+    </select>
+
+    <select id="countUserByUsername" resultType="int">
+        SELECT COUNT(*)
+        FROM ainer_identity_user
+        WHERE username = #{username}
+    </select>
+
+    <select id="acquireTenantBootstrapLock" resultType="int">
+        WITH lock_acquired AS MATERIALIZED (
+            SELECT pg_advisory_xact_lock(hashtextextended(#{lockKey}, 0))
+        )
+        SELECT 1
+        FROM lock_acquired
+    </select>
+
+    <insert id="insertMemberAudit">
+        INSERT INTO ainer_identity_member_audit
+            (id, tenant_id, actor_subject_id, target_subject_id, operation, role,
+             reason_code, request_id, occurred_at)
+        VALUES (#{id}, #{tenantId}, #{actorSubjectId}, #{targetSubjectId}, #{operation}, #{role},
+                #{reasonCode}, #{requestId}, #{occurredAt})
+    </insert>
 </mapper>

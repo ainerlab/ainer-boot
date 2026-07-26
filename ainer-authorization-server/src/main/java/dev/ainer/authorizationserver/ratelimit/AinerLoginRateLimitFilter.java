@@ -1,17 +1,21 @@
 package dev.ainer.authorizationserver.ratelimit;
 
 import dev.ainer.core.error.StandardErrorCode;
-import dev.ainer.web.request.RequestIds;
+import dev.ainer.security.autoconfigure.AinerSecurityFailureWriter;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -23,26 +27,40 @@ import java.util.Set;
  */
 public final class AinerLoginRateLimitFilter extends OncePerRequestFilter {
 
-    private static final HttpMethod POST = HttpMethod.POST;
-
     private final AinerRateLimiter rateLimiter;
-    private final Set<String> paths;
+    private final RequestMatcher protectedRequests;
+    private final AinerSecurityFailureWriter failureWriter;
+    private final Counter allowed;
+    private final Counter denied;
 
-    public AinerLoginRateLimitFilter(AinerRateLimiter rateLimiter, Set<String> paths) {
+    public AinerLoginRateLimitFilter(
+            AinerRateLimiter rateLimiter,
+            Set<String> paths,
+            AinerSecurityFailureWriter failureWriter,
+            MeterRegistry meterRegistry) {
         this.rateLimiter = rateLimiter;
-        this.paths = paths;
+        List<RequestMatcher> matchers = paths.stream()
+                .map(path -> PathPatternRequestMatcher.pathPattern(HttpMethod.POST, path))
+                .map(RequestMatcher.class::cast)
+                .toList();
+        this.protectedRequests = new OrRequestMatcher(matchers);
+        this.failureWriter = failureWriter;
+        this.allowed = counter(meterRegistry, "ainer.security.login.rate-limit.allowed");
+        this.denied = counter(meterRegistry, "ainer.security.login.rate-limit.denied");
     }
 
     @Override
     protected void doFilterInternal(
             HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        if (POST.matches(request.getMethod()) && paths.contains(request.getRequestURI())) {
+        if (protectedRequests.matches(request)) {
             AinerRateLimiter.AcquireResult result = rateLimiter.tryAcquire(clientIp(request));
             if (!result.allowed()) {
+                increment(denied);
                 writeRateLimited(request, response, result.retryAfterSeconds());
                 return;
             }
+            increment(allowed);
         }
         chain.doFilter(request, response);
     }
@@ -53,22 +71,21 @@ public final class AinerLoginRateLimitFilter extends OncePerRequestFilter {
     }
 
     private void writeRateLimited(
-            HttpServletRequest request, HttpServletResponse response, long retryAfterSeconds) {
-        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
+            HttpServletRequest request, HttpServletResponse response, long retryAfterSeconds)
+            throws IOException {
         response.setHeader("Retry-After", Long.toString(Math.max(1L, retryAfterSeconds)));
         response.setHeader("Cache-Control", "no-store");
         response.setHeader("Pragma", "no-cache");
-        StandardErrorCode error = StandardErrorCode.RATE_LIMITED;
-        String requestId = RequestIds.currentOrCreate(request);
-        String body = """
-                {"code":"%s","message":"%s","requestId":"%s"}""".formatted(
-                error.code(), error.defaultMessage(), requestId);
-        try {
-            response.getWriter().write(body);
-        } catch (IOException ignored) {
-            // 写入失败时已无法再做更多；保留 429 状态
+        failureWriter.write(request, response, StandardErrorCode.RATE_LIMITED);
+    }
+
+    private static Counter counter(MeterRegistry meterRegistry, String name) {
+        return meterRegistry == null ? null : Counter.builder(name).register(meterRegistry);
+    }
+
+    private static void increment(Counter counter) {
+        if (counter != null) {
+            counter.increment();
         }
     }
 }

@@ -33,11 +33,12 @@ final class SecurityContextAuthenticatedActorResolver implements AuthenticatedAc
 
         String subjectId = jwt.getClaimAsString(properties.getSubjectClaim());
         String tenantId = jwt.getClaimAsString(properties.getTenantClaim());
+        String actorType = jwt.getClaimAsString("actor_type");
         Set<String> authorities = authentication.getAuthorities().stream()
                 .map(authority -> authority.getAuthority())
                 .collect(Collectors.toUnmodifiableSet());
         try {
-            return new AuthenticatedActor(subjectId, tenantId, authorities);
+            return new AuthenticatedActor(subjectId, tenantId, actorType, authorities);
         } catch (IllegalArgumentException | NullPointerException exception) {
             throw new BusinessException(StandardErrorCode.FORBIDDEN);
         }

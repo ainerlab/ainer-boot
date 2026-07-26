@@ -1,6 +1,6 @@
 # Ainer 架构总览
 
-> 权威状态：M4.6 Passkey protocol foundation · 2026-07-23
+> 权威状态：M4.7 tenant member control plane · 2026-07-26
 
 ## 1. 系统定位
 
@@ -26,8 +26,8 @@ ainer-server                         JWT Resource Server、Actuator、平台/内
 ├── ainer-starter-security           JWT 验证、SecurityContext 投影、401/403
 └── ainer-starter-web
 
-ainer-authorization-server           独立 OAuth 2.1/OIDC 发行物、Passkey、Directory adapter、outbox relay
-├── ainer-module-identity             用户、租户、Directory、禁用/撤销、可租约 outbox 与双人重放
+ainer-authorization-server           独立 OAuth 2.1/OIDC 发行物、Identity 管理面、Passkey、Directory、relay
+├── ainer-module-identity             用户、租户、成员管理、禁用/撤销、可租约 outbox 与双人重放
 ├── Spring Security Authorization Server 7.1
 └── JDBC registered client / authorization / consent / WebAuthn credential
 
@@ -46,7 +46,10 @@ ainer-dependencies                   独立 BOM，统一依赖版本
 - `ainer-server` 只做装配，不承载业务领域逻辑。
 - `workspace` 与 AI runtime 各自拥有表、migration、端口和适配器；事务边界位于应用用例。
 - Workspace tenant/owner 来自 `AuthenticatedActor`；所有查询绑定 tenant，只有 ACTIVE 成员参与授权，所有权转移由锁与数据库唯一索引共同保护。
-- Identity Directory 只暴露 ACTIVE 安全投影；账号/成员状态变化与撤销 outbox 在同一事务，不允许 Workspace 共享查询 Identity 表。
+- Identity Directory 和 tenant 成员列表只暴露 ACTIVE 安全投影；账号/成员状态变化与撤销 outbox
+  在同一事务，不允许 Workspace 共享查询 Identity 表。Identity 的 USER-facing HTTP adapter 位于
+  `ainer-authorization-server`，`ainer-server` 不装配 Identity migration，Identity 应用/领域层
+  不依赖 Web。
 - 跨运行时调用使用服务 JWT 和最小 scope：Directory 是同步只读端口，撤销是至少一次 outbox + Workspace receipt；网络调用不进入 Identity 数据库事务。
 - 高风险安全运维使用短时双人审批：申请者和批准者是不同服务主体、分别持有最小 scope，批准事务锁定并重新验证目标状态。
 - Workspace 授权审计以同事务热/冷搬迁控制热表增长，在线查询和 SIEM 稳定游标读取两表并集；归档数据仍属于 Workspace 数据库。
@@ -99,6 +102,9 @@ infrastructure -> application/domain
 domain -> Java standard library only
 ```
 
+`api` 可以位于业务模块，也可以位于可执行发行物的 adapter 包；关键约束是 application/domain
+不能反向依赖 Web，传输 DTO 不成为应用命令或领域模型的兼容包袱。Identity 成员管理采用后者。
+
 不会要求每个简单 CRUD 都机械创建四层接口；复杂度必须由真实业务规则证明。
 
 ## 5. 单体与服务化
@@ -150,14 +156,17 @@ M3/M4 已形成以下边界：
 - 浏览器/移动端优先 Authorization Code + PKCE；机器调用使用 Client Credentials；实际 grant 由每个 registered client 白名单决定。设备可使用 Device Code，系统间委托可评估 Token Exchange。
 - M4.5 已用测试专用 public client 验证 PKCE S256、真实表单登录、授权码单次交换、错误 verifier
   与回调地址拒绝；生产 browser client 控制面、会话治理和登录 UI 仍是独立能力。
-- M4.6 使用 Spring Security 7.1 WebAuthn 建立默认关闭的 Passkey 协议基础：UV-required、
-  精确 RP/Origin、无凭证密码 bootstrap、已登记账号对 OAuth authorization/凭证管理的条件
-  WebAuthn 门禁，以及官方协议表外的 ACTIVE/REVOKED 生命周期、软撤销和审计。最后一个 ACTIVE
-  Passkey 不允许自助删除；完整 authenticator ceremony、恢复和多节点 session 尚未完成。
+- M4.6 使用 Spring Security 7.1 WebAuthn 建立默认关闭的 Passkey 主线：UV-required、真实签名
+  ceremony、条件 MFA、ACTIVE/REVOKED 生命周期、恢复码/管理员双人恢复、受控首次 enrollment、
+  登录限速和 Resource Server step-up。最后一个 ACTIVE Passkey 不允许普通自助删除；真实设备
+  矩阵、恢复通知、共享限流和多节点 session 尚未完成。
 - 短信、微信和企业身份源通过认证编排或标准扩展授权接入，不复活 password grant。
-- 业务模块从 `AuthenticatedActor` 获取 `sub`、`tenant_id` 和 authorities，不读取 JWT，也不接受客户端身份请求头。
+- 业务模块从 `AuthenticatedActor` 获取 `sub`、`tenant_id`、`actor_type` 和 authorities，不读取
+  JWT，也不接受客户端身份请求头；缺失/未知 actor type 失败关闭。
 - AI API 已强制 `ai.invoke` scope。
 - Workspace API 强制 `workspace.read` / `workspace.write` scope，并以数据库 ACTIVE OWNER/ADMIN/MEMBER 关系决定具体资源权限；tenant 与 owner 不能由客户端指定。
+- Identity tenant 成员 API 强制 USER actor、`tenant.members.read|write`、可信 tenant claim 与
+  数据库 ACTIVE OWNER/ADMIN 关系；写操作同事务审计且不能通过通用接口修改 OWNER。
 - 新邀请是 PENDING，只有同 tenant 的目标 JWT 主体本人接受后才激活；启用可选 Directory client 时，邀请创建前还必须通过远程 ACTIVE member 校验。Workspace 不跨模块读取 Identity 私有表。
 - 通用角色变更不能触碰 OWNER；所有权转移锁定 Workspace 并由 PostgreSQL 部分唯一索引保证最多一个 ACTIVE OWNER。
 - 跨租户和非 ACTIVE 成员访问按 404 隐藏资源；成员角色不足返回 403。关键允许/拒绝授权决策持久化到独立事务审计。PENDING/ACTIVE membership 接到可信 Identity 撤销事件后单调变为 REVOKED，不再参与授权；OWNER 也可因全局安全禁用而被撤销。

@@ -137,7 +137,8 @@ class AinerResourceServerIntegrationTest {
                         .header("alg", "RS256")
                         .subject("subject:user-1")
                         .issuedAt(Instant.now().minusSeconds(5))
-                        .expiresAt(Instant.now().plusSeconds(300));
+                        .expiresAt(Instant.now().plusSeconds(300))
+                        .claim("actor_type", "USER");
                 if (!"missing-scope".equals(token)) {
                     jwt.claim("scope", "ai.invoke");
                 }

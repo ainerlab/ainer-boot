@@ -11,6 +11,7 @@ import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.module.identity.account.application.IdentityAccessLifecycleService;
 import dev.ainer.module.identity.account.application.ProvisionTenantOwnerCommand;
 import dev.ainer.module.identity.account.application.ProvisionedIdentity;
+import dev.ainer.web.request.RequestIds;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -141,6 +142,7 @@ class AinerAuthorizationServerIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM ainer_identity_member_audit");
         jdbcTemplate.update("DELETE FROM ainer_passkey_security_operation_audit");
         jdbcTemplate.update("DELETE FROM ainer_passkey_enrollment_grant");
         jdbcTemplate.update("DELETE FROM ainer_passkey_recovery_lockout");
@@ -165,7 +167,7 @@ class AinerAuthorizationServerIntegrationTest {
 
     @Test
     void migratesIdentityAndOfficialJdbcProtocolStores() {
-        assertThat(flyway.info().applied()).hasSize(10);
+        assertThat(flyway.info().applied()).hasSize(13);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_name IN ('oauth2_registered_client','oauth2_authorization',"
@@ -174,8 +176,8 @@ class AinerAuthorizationServerIntegrationTest {
                         + "'ainer_passkey_credential','ainer_passkey_credential_audit',"
                         + "'ainer_passkey_recovery_code','ainer_passkey_recovery_lockout',"
                         + "'ainer_passkey_recovery_request','ainer_passkey_security_operation_audit',"
-                        + "'ainer_passkey_enrollment_grant')",
-                Integer.class)).isEqualTo(14);
+                        + "'ainer_passkey_enrollment_grant','ainer_identity_member_audit')",
+                Integer.class)).isEqualTo(15);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
     }
 
@@ -468,6 +470,101 @@ class AinerAuthorizationServerIntegrationTest {
                 .isEqualTo(403);
     }
 
+    @Test
+    void tenantMemberApiUsesUserScopeLiveRoleAndIdentityOwnedDatabase() throws Exception {
+        ProvisionedIdentity owner = provision(
+                "member-api", "Member API", "owner@member-api.dev", "Member API Owner");
+        ProvisionedIdentity target = provision(
+                "member-target", "Member Target", "target@member-api.dev", "Member Target");
+        ProvisionedIdentity outsider = provision(
+                "member-outsider", "Member Outsider", "outsider@member-api.dev", "Member Outsider");
+        String ownerToken = actorToken(
+                owner.subjectId().toString(),
+                owner.tenantId().toString(),
+                "USER",
+                "tenant.members.read tenant.members.write");
+
+        HttpResponse<String> unauthenticated = memberRequest(
+                "GET", memberPath(owner, ""), null, null);
+        assertThat(unauthenticated.statusCode()).isEqualTo(401);
+        assertThat(unauthenticated.body()).contains("AINER.COMMON.UNAUTHENTICATED");
+
+        HttpResponse<String> added = memberRequest(
+                "POST",
+                memberPath(owner, ""),
+                ownerToken,
+                """
+                        {
+                          "username": "TARGET@MEMBER-API.DEV",
+                          "role": "MEMBER",
+                          "reasonCode": "onboarding"
+                        }
+                        """);
+        assertThat(added.statusCode()).isEqualTo(200);
+        assertThat(added.headers().firstValue(RequestIds.HEADER)).isPresent();
+        assertThat(added.body())
+                .contains("\"code\":\"AINER.COMMON.OK\"")
+                .contains(target.subjectId().toString())
+                .contains("\"role\":\"MEMBER\"");
+
+        assertForbidden(memberRequest(
+                "GET",
+                memberPath(owner, ""),
+                actorToken(
+                        target.subjectId().toString(),
+                        owner.tenantId().toString(),
+                        "USER",
+                        "tenant.members.read tenant.members.write"),
+                null));
+        assertForbidden(memberRequest(
+                "GET",
+                memberPath(owner, ""),
+                actorToken(
+                        owner.subjectId().toString(),
+                        owner.tenantId().toString(),
+                        "SERVICE",
+                        "tenant.members.read tenant.members.write"),
+                null));
+        assertForbidden(memberRequest(
+                "GET",
+                memberPath(owner, ""),
+                actorToken(
+                        outsider.subjectId().toString(),
+                        outsider.tenantId().toString(),
+                        "USER",
+                        "tenant.members.read tenant.members.write"),
+                null));
+
+        HttpResponse<String> changed = memberRequest(
+                "PATCH",
+                memberPath(owner, "/" + target.subjectId()),
+                ownerToken,
+                """
+                        {"role":"ADMIN","reasonCode":"promotion"}
+                        """);
+        assertThat(changed.statusCode()).isEqualTo(200);
+        assertThat(changed.body()).contains("\"role\":\"ADMIN\"");
+
+        HttpResponse<String> listed = memberRequest(
+                "GET", memberPath(owner, "?page=1&size=20"), ownerToken, null);
+        assertThat(listed.statusCode()).isEqualTo(200);
+        assertThat(listed.body())
+                .contains("\"total\":2")
+                .contains("owner@member-api.dev")
+                .contains("target@member-api.dev");
+
+        HttpResponse<String> removed = memberRequest(
+                "DELETE",
+                memberPath(owner, "/" + target.subjectId() + "?reasonCode=offboarded"),
+                ownerToken,
+                null);
+        assertThat(removed.statusCode()).isEqualTo(200);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_member_audit WHERE tenant_id = ?",
+                Integer.class,
+                owner.tenantId())).isEqualTo(3);
+    }
+
     private RegisteredClient machineClient() {
         return machineClient(CLIENT_ID, TENANT_ID, "ai.invoke");
     }
@@ -595,18 +692,69 @@ class AinerAuthorizationServerIntegrationTest {
     }
 
     private String userToken(ProvisionedIdentity identity) {
+        return actorToken(
+                identity.subjectId().toString(),
+                identity.tenantId().toString(),
+                "USER",
+                "identity.directory.read");
+    }
+
+    private String actorToken(
+            String subjectId,
+            String tenantId,
+            String actorType,
+            String scope) {
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer("https://auth.ainer.test")
-                .subject(identity.subjectId().toString())
+                .subject(subjectId)
                 .audience(List.of("ainer-api"))
                 .issuedAt(now)
                 .expiresAt(now.plus(Duration.ofMinutes(5)))
-                .claim("actor_type", "USER")
-                .claim("tenant_id", identity.tenantId().toString())
-                .claim("scope", "identity.directory.read")
+                .claim("actor_type", actorType)
+                .claim("tenant_id", tenantId)
+                .claim("scope", scope)
                 .build();
         return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+    }
+
+    private ProvisionedIdentity provision(
+            String tenantCode,
+            String tenantName,
+            String username,
+            String displayName) {
+        return identityService.provisionTenantOwner(new ProvisionTenantOwnerCommand(
+                tenantCode, tenantName, username, "strong-password-2026", displayName));
+    }
+
+    private String memberPath(ProvisionedIdentity owner, String suffix) {
+        return "/api/tenants/" + owner.tenantId() + "/members" + suffix;
+    }
+
+    private HttpResponse<String> memberRequest(
+            String method,
+            String path,
+            String accessToken,
+            String body) throws Exception {
+        HttpRequest.Builder request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:%d%s".formatted(port, path)))
+                .method(
+                        method,
+                        body == null
+                                ? HttpRequest.BodyPublishers.noBody()
+                                : HttpRequest.BodyPublishers.ofString(body));
+        if (accessToken != null) {
+            request.header("Authorization", "Bearer " + accessToken);
+        }
+        if (body != null) {
+            request.header("Content-Type", "application/json");
+        }
+        return httpClient.send(request.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private static void assertForbidden(HttpResponse<String> response) {
+        assertThat(response.statusCode()).isEqualTo(403);
+        assertThat(response.body()).contains("AINER.COMMON.FORBIDDEN");
     }
 
     @TestConfiguration(proxyBeanMethods = false)

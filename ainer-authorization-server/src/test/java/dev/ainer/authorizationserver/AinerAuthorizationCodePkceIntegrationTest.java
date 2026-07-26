@@ -9,6 +9,7 @@ import dev.ainer.authorizationserver.passkey.AinerJdbcPasskeyCredentialRepositor
 import dev.ainer.authorizationserver.passkey.AinerPasskeyAdminRecoveryService;
 import dev.ainer.authorizationserver.passkey.AinerPasskeyEnrollmentGrantService;
 import dev.ainer.authorizationserver.passkey.AinerPasskeyRecoveryCodeService;
+import dev.ainer.authorizationserver.passkey.PasskeyErrorCode;
 import dev.ainer.authorizationserver.passkey.WebAuthnCeremony;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.module.identity.account.application.IdentityApplicationService;
@@ -535,6 +536,45 @@ class AinerAuthorizationCodePkceIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ainer_passkey_credential WHERE subject_id = ? AND status = 'ACTIVE'",
                 Integer.class, subjectId)).isEqualTo(2);
+    }
+
+    @Test
+    void tenantBoundPasskeyOperatorsCannotTargetAnotherHomeTenant() {
+        userCredentialRepository.save(credential());
+        ProvisionedIdentity otherTenant = identityService.provisionTenantOwner(new ProvisionTenantOwnerCommand(
+                "other-passkey-tenant",
+                "Other Passkey Tenant",
+                "other-passkey-owner@example.com",
+                PASSWORD,
+                "Other Passkey Owner"));
+
+        assertThatThrownBy(() -> adminRecoveryService.requestRecovery(
+                "service-other", otherTenant.tenantId(), identity.subjectId(),
+                "incident-cross-tenant", Duration.ofMinutes(15)))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception -> assertThat(exception.errorCode())
+                                .isEqualTo(PasskeyErrorCode.TENANT_SUBJECT_NOT_FOUND));
+        assertThatThrownBy(() -> enrollmentGrantService.grant(
+                "service-other", otherTenant.tenantId(), identity.subjectId(),
+                "invite-cross-tenant"))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception -> assertThat(exception.errorCode())
+                                .isEqualTo(PasskeyErrorCode.TENANT_SUBJECT_NOT_FOUND));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_passkey_recovery_request WHERE tenant_id = ?",
+                Integer.class,
+                otherTenant.tenantId())).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_passkey_enrollment_grant WHERE tenant_id = ?",
+                Integer.class,
+                otherTenant.tenantId())).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_passkey_credential WHERE subject_id = ? AND status = 'ACTIVE'",
+                Integer.class,
+                identity.subjectId())).isOne();
     }
 
     @Test

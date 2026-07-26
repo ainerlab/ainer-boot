@@ -158,12 +158,23 @@ class IdentitySecurityLifecycleTest {
         }
 
         @Override
+        public Optional<IdentityAccount> findAccountBySubjectId(UUID subjectId) {
+            return Optional.empty();
+        }
+
+        @Override
         public Optional<IdentityDirectoryEntry> findActiveDirectoryEntry(
                 UUID tenantId, UUID subjectId) {
             return directoryEntries.stream()
                     .filter(entry -> entry.tenantId().equals(tenantId))
                     .filter(entry -> entry.subjectId().equals(subjectId))
                     .findFirst();
+        }
+
+        @Override
+        public Optional<IdentityDirectoryEntry> findActiveDirectoryEntryForUpdate(
+                UUID tenantId, UUID subjectId) {
+            return findActiveDirectoryEntry(tenantId, subjectId);
         }
 
         @Override
@@ -224,6 +235,70 @@ class IdentitySecurityLifecycleTest {
                     current.tenantId(), current.userId(), current.role(), current.defaultTenant(),
                     newStatus, current.joinedAt(), updatedAt));
             return true;
+        }
+
+        @Override
+        public List<IdentityDirectoryEntry> listMembersByTenant(UUID tenantId, int offset, int limit) {
+            return directoryEntries.stream()
+                    .filter(entry -> entry.tenantId().equals(tenantId))
+                    .skip(offset)
+                    .limit(limit)
+                    .toList();
+        }
+
+        @Override
+        public int countMembersByTenant(UUID tenantId) {
+            return (int) directoryEntries.stream()
+                    .filter(entry -> entry.tenantId().equals(tenantId))
+                    .count();
+        }
+
+        @Override
+        public boolean updateMembershipRole(
+                UUID tenantId, UUID subjectId, String newRole, Instant updatedAt) {
+            return false;
+        }
+
+        @Override
+        public boolean reactivateMembership(
+                UUID tenantId,
+                UUID subjectId,
+                IdentityStatus expectedStatus,
+                String newRole,
+                Instant updatedAt) {
+            return false;
+        }
+
+        @Override
+        public void insertMemberAudit(
+                UUID tenantId,
+                UUID actorSubjectId,
+                UUID targetSubjectId,
+                String operation,
+                String role,
+                String reasonCode,
+                String requestId,
+                Instant occurredAt) {
+        }
+
+        @Override
+        public Optional<IdentityDirectoryEntry> findActiveDefaultOwner(
+                String tenantCode, String normalizedUsername) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean tenantExistsByCode(String tenantCode) {
+            return false;
+        }
+
+        @Override
+        public boolean userExistsByUsername(String normalizedUsername) {
+            return false;
+        }
+
+        @Override
+        public void acquireTenantBootstrapLock(String tenantCode, String normalizedUsername) {
         }
 
         @Override

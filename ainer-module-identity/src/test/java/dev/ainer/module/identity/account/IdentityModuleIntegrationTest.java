@@ -1,7 +1,9 @@
 package dev.ainer.module.identity.account;
 
 import dev.ainer.core.error.BusinessException;
+import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.module.identity.IdentityModuleConfiguration;
+import dev.ainer.module.identity.account.application.AddTenantMemberCommand;
 import dev.ainer.module.identity.account.application.IdentityAccessLifecycleService;
 import dev.ainer.module.identity.account.application.IdentityAccessEventDelivery;
 import dev.ainer.module.identity.account.application.IdentityAccessEventOutboxService;
@@ -15,8 +17,12 @@ import dev.ainer.module.identity.account.application.IdentityDirectoryService;
 import dev.ainer.module.identity.account.application.IdentityErrorCode;
 import dev.ainer.module.identity.account.application.IdentityRepository;
 import dev.ainer.module.identity.account.application.IdentityTokenStatusService;
+import dev.ainer.module.identity.account.application.MemberPage;
+import dev.ainer.module.identity.account.application.MemberSummary;
 import dev.ainer.module.identity.account.application.ProvisionTenantOwnerCommand;
 import dev.ainer.module.identity.account.application.ProvisionedIdentity;
+import dev.ainer.module.identity.account.application.TenantMemberManagementService;
+import dev.ainer.module.identity.account.application.TenantOwnerBootstrapResult;
 import dev.ainer.module.identity.account.domain.IdentityAccessEvent;
 import dev.ainer.module.identity.account.domain.IdentityStatus;
 import dev.ainer.module.identity.account.domain.IdentityTenant;
@@ -24,6 +30,8 @@ import dev.ainer.module.identity.account.domain.IdentityUser;
 import dev.ainer.module.identity.account.domain.TenantMembership;
 import dev.ainer.module.identity.account.domain.TenantRole;
 import dev.ainer.module.identity.account.infrastructure.mybatis.MybatisIdentityRepository;
+import dev.ainer.security.AinerSecurityScopes;
+import dev.ainer.security.actor.AuthenticatedActor;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,6 +58,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -98,6 +107,9 @@ class IdentityModuleIntegrationTest {
     private IdentityTokenStatusService tokenStatusService;
 
     @Autowired
+    private TenantMemberManagementService memberService;
+
+    @Autowired
     private ControllableIdentityRepository identityRepository;
 
     @Autowired
@@ -111,6 +123,7 @@ class IdentityModuleIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM ainer_identity_member_audit");
         jdbcTemplate.update("DELETE FROM ainer_identity_security_operation_audit");
         jdbcTemplate.update("DELETE FROM ainer_identity_access_event_replay_request");
         jdbcTemplate.update("DELETE FROM ainer_identity_access_event");
@@ -121,14 +134,15 @@ class IdentityModuleIntegrationTest {
 
     @Test
     void migrationCreatesIdentitySchema() {
-        assertThat(flyway.info().applied()).hasSize(4);
+        assertThat(flyway.info().applied()).hasSize(6);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_name IN ('ainer_identity_tenant','ainer_identity_user',"
                         + "'ainer_identity_membership','ainer_identity_access_event',"
                         + "'ainer_identity_access_event_replay_request',"
-                        + "'ainer_identity_security_operation_audit')",
-                Integer.class)).isEqualTo(6);
+                        + "'ainer_identity_security_operation_audit',"
+                        + "'ainer_identity_member_audit')",
+                Integer.class)).isEqualTo(7);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
     }
 
@@ -330,6 +344,195 @@ class IdentityModuleIntegrationTest {
     }
 
     @Test
+    void bootstrapIsIdempotentOnlyForTheExactActiveDefaultOwner() {
+        ProvisionTenantOwnerCommand command = new ProvisionTenantOwnerCommand(
+                "platform", "Ainer Platform", "PLATFORM@AINER.DEV",
+                "bootstrap-password-2026", "Platform Owner");
+
+        TenantOwnerBootstrapResult created = service.ensureTenantOwner(command);
+        String passwordHash = jdbcTemplate.queryForObject(
+                "SELECT password_hash FROM ainer_identity_user WHERE id = ?",
+                String.class,
+                created.identity().subjectId());
+        TenantOwnerBootstrapResult existing = service.ensureTenantOwner(new ProvisionTenantOwnerCommand(
+                "PLATFORM", "Ignored Name", "platform@ainer.dev",
+                "different-password-2026", "Ignored Display Name"));
+
+        assertThat(created.created()).isTrue();
+        assertThat(existing.created()).isFalse();
+        assertThat(existing.identity()).isEqualTo(created.identity());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT password_hash FROM ainer_identity_user WHERE id = ?",
+                String.class,
+                created.identity().subjectId())).isEqualTo(passwordHash);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_tenant", Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_user", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void bootstrapRejectsPartiallyOccupiedIdentityState() {
+        service.provisionTenantOwner(new ProvisionTenantOwnerCommand(
+                "occupied", "Occupied Tenant", "occupied@example.com",
+                "strong-password-2026", "Occupied Owner"));
+
+        assertIdentityError(
+                () -> service.ensureTenantOwner(new ProvisionTenantOwnerCommand(
+                        "occupied", "Other Tenant", "other@example.com",
+                        "other-password-2026", "Other Owner")),
+                IdentityErrorCode.TENANT_BOOTSTRAP_STATE_CONFLICT);
+        assertIdentityError(
+                () -> service.ensureTenantOwner(new ProvisionTenantOwnerCommand(
+                        "other-tenant", "Other Tenant", "occupied@example.com",
+                        "other-password-2026", "Other Owner")),
+                IdentityErrorCode.TENANT_BOOTSTRAP_STATE_CONFLICT);
+    }
+
+    @Test
+    void tenantManagersCanManageMembersWithAuditedLifecycle() {
+        ProvisionedIdentity owner = provision(
+                "managed", "Managed Tenant", "owner@managed.dev", "Managed Owner");
+        ProvisionedIdentity firstTarget = provision(
+                "first-home", "First Home", "first@managed.dev", "First Member");
+        ProvisionedIdentity secondTarget = provision(
+                "second-home", "Second Home", "second@managed.dev", "Second Member");
+        AuthenticatedActor ownerActor = managerActor(owner);
+
+        MemberSummary first = memberService.addMember(
+                ownerActor,
+                owner.tenantId(),
+                new AddTenantMemberCommand(
+                        "FIRST@MANAGED.DEV", null, TenantRole.MEMBER, "onboarding"),
+                "req-member-add-1");
+        MemberSummary second = memberService.addMember(
+                ownerActor,
+                owner.tenantId(),
+                new AddTenantMemberCommand(
+                        null, secondTarget.subjectId(), TenantRole.ADMIN, "admin-onboarding"),
+                "req-member-add-2");
+        MemberPage page = memberService.listMembers(ownerActor, owner.tenantId(), 1, 20);
+
+        assertThat(first)
+                .extracting(MemberSummary::subjectId, MemberSummary::username, MemberSummary::role)
+                .containsExactly(firstTarget.subjectId(), "first@managed.dev", TenantRole.MEMBER);
+        assertThat(second.role()).isEqualTo(TenantRole.ADMIN);
+        assertThat(page.total()).isEqualTo(3);
+        assertThat(page.members())
+                .extracting(MemberSummary::subjectId)
+                .containsExactlyInAnyOrder(
+                        owner.subjectId(), firstTarget.subjectId(), secondTarget.subjectId());
+
+        assertThat(memberService.changeMemberRole(
+                ownerActor,
+                owner.tenantId(),
+                firstTarget.subjectId(),
+                TenantRole.ADMIN,
+                "promoted",
+                "req-member-role").role()).isEqualTo(TenantRole.ADMIN);
+        memberService.removeMember(
+                ownerActor,
+                owner.tenantId(),
+                firstTarget.subjectId(),
+                "offboarded",
+                "req-member-remove");
+        assertThat(memberService.listMembers(ownerActor, owner.tenantId(), 1, 20).total()).isEqualTo(2);
+
+        assertThat(memberService.addMember(
+                ownerActor,
+                owner.tenantId(),
+                new AddTenantMemberCommand(
+                        null, firstTarget.subjectId(), TenantRole.MEMBER, "returned"),
+                "req-member-reactivate").role()).isEqualTo(TenantRole.MEMBER);
+
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT operation, role, reason_code, request_id "
+                        + "FROM ainer_identity_member_audit "
+                        + "WHERE tenant_id = ? ORDER BY occurred_at, request_id",
+                owner.tenantId()))
+                .extracting(
+                        row -> row.get("operation"),
+                        row -> row.get("reason_code"),
+                        row -> row.get("request_id"))
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple("ADDED", "onboarding", "req-member-add-1"),
+                        org.assertj.core.groups.Tuple.tuple("ADDED", "admin-onboarding", "req-member-add-2"),
+                        org.assertj.core.groups.Tuple.tuple("ROLE_CHANGED", "promoted", "req-member-role"),
+                        org.assertj.core.groups.Tuple.tuple("REMOVED", "offboarded", "req-member-remove"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "REACTIVATED", "returned", "req-member-reactivate"));
+    }
+
+    @Test
+    void memberManagementEnforcesActorTypeScopeTenantAndLiveManagerRole() {
+        ProvisionedIdentity owner = provision(
+                "secure", "Secure Tenant", "owner@secure.dev", "Secure Owner");
+        ProvisionedIdentity target = provision(
+                "target-home", "Target Home", "target@secure.dev", "Target Member");
+        ProvisionedIdentity outsider = provision(
+                "outsider", "Outsider Tenant", "owner@outsider.dev", "Outsider Owner");
+        AddTenantMemberCommand command = new AddTenantMemberCommand(
+                null, target.subjectId(), TenantRole.MEMBER, "onboarding");
+
+        assertStandardError(
+                () -> memberService.addMember(
+                        new AuthenticatedActor(
+                                owner.subjectId().toString(),
+                                owner.tenantId().toString(),
+                                AuthenticatedActor.USER,
+                                Set.of()),
+                        owner.tenantId(),
+                        command,
+                        "req-no-scope"),
+                StandardErrorCode.FORBIDDEN);
+        assertStandardError(
+                () -> memberService.addMember(
+                        new AuthenticatedActor(
+                                owner.subjectId().toString(),
+                                owner.tenantId().toString(),
+                                AuthenticatedActor.SERVICE,
+                                managerAuthorities()),
+                        owner.tenantId(),
+                        command,
+                        "req-service"),
+                StandardErrorCode.FORBIDDEN);
+        assertStandardError(
+                () -> memberService.listMembers(
+                        managerActor(outsider),
+                        owner.tenantId(),
+                        1,
+                        20),
+                StandardErrorCode.FORBIDDEN);
+
+        MemberSummary member = memberService.addMember(
+                managerActor(owner),
+                owner.tenantId(),
+                command,
+                "req-add-target");
+        AuthenticatedActor memberActor = new AuthenticatedActor(
+                member.subjectId().toString(),
+                owner.tenantId().toString(),
+                AuthenticatedActor.USER,
+                managerAuthorities());
+        assertStandardError(
+                () -> memberService.listMembers(memberActor, owner.tenantId(), 1, 20),
+                StandardErrorCode.FORBIDDEN);
+        assertIdentityError(
+                () -> memberService.changeMemberRole(
+                        managerActor(owner),
+                        owner.tenantId(),
+                        owner.subjectId(),
+                        TenantRole.ADMIN,
+                        "owner-change",
+                        "req-owner-change"),
+                IdentityErrorCode.CANNOT_MODIFY_OWNER);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_member_audit WHERE tenant_id = ?",
+                Integer.class,
+                owner.tenantId())).isEqualTo(1);
+    }
+
+    @Test
     void directoryReturnsOnlySafeActiveTenantProjection() {
         ProvisionedIdentity identity = service.provisionTenantOwner(new ProvisionTenantOwnerCommand(
                 "directory", "Directory Tenant", "Owner@Directory.COM",
@@ -423,6 +626,41 @@ class IdentityModuleIntegrationTest {
         return instant.atOffset(ZoneOffset.UTC);
     }
 
+    private ProvisionedIdentity provision(
+            String tenantCode,
+            String tenantName,
+            String username,
+            String displayName) {
+        return service.provisionTenantOwner(new ProvisionTenantOwnerCommand(
+                tenantCode, tenantName, username, "strong-password-2026", displayName));
+    }
+
+    private static AuthenticatedActor managerActor(ProvisionedIdentity identity) {
+        return new AuthenticatedActor(
+                identity.subjectId().toString(),
+                identity.tenantId().toString(),
+                AuthenticatedActor.USER,
+                managerAuthorities());
+    }
+
+    private static Set<String> managerAuthorities() {
+        return Set.of(
+                "SCOPE_" + AinerSecurityScopes.TENANT_MEMBERS_READ,
+                "SCOPE_" + AinerSecurityScopes.TENANT_MEMBERS_WRITE);
+    }
+
+    private static void assertIdentityError(Runnable invocation, IdentityErrorCode expected) {
+        assertThatThrownBy(invocation::run)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(expected));
+    }
+
+    private static void assertStandardError(Runnable invocation, StandardErrorCode expected) {
+        assertThatThrownBy(invocation::run)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(expected));
+    }
+
     @SpringBootConfiguration
     @EnableAutoConfiguration
     @Import({IdentityModuleConfiguration.class, FailureProbeConfiguration.class})
@@ -478,9 +716,20 @@ class IdentityModuleIntegrationTest {
         }
 
         @Override
+        public Optional<IdentityAccount> findAccountBySubjectId(UUID subjectId) {
+            return delegate.findAccountBySubjectId(subjectId);
+        }
+
+        @Override
         public Optional<IdentityDirectoryEntry> findActiveDirectoryEntry(
                 UUID tenantId, UUID subjectId) {
             return delegate.findActiveDirectoryEntry(tenantId, subjectId);
+        }
+
+        @Override
+        public Optional<IdentityDirectoryEntry> findActiveDirectoryEntryForUpdate(
+                UUID tenantId, UUID subjectId) {
+            return delegate.findActiveDirectoryEntryForUpdate(tenantId, subjectId);
         }
 
         @Override
@@ -522,6 +771,69 @@ class IdentityModuleIntegrationTest {
                 Instant updatedAt) {
             return delegate.updateMembershipStatus(
                     tenantId, subjectId, expectedStatus, newStatus, updatedAt);
+        }
+
+        @Override
+        public List<IdentityDirectoryEntry> listMembersByTenant(UUID tenantId, int offset, int limit) {
+            return delegate.listMembersByTenant(tenantId, offset, limit);
+        }
+
+        @Override
+        public int countMembersByTenant(UUID tenantId) {
+            return delegate.countMembersByTenant(tenantId);
+        }
+
+        @Override
+        public boolean updateMembershipRole(
+                UUID tenantId, UUID subjectId, String newRole, Instant updatedAt) {
+            return delegate.updateMembershipRole(tenantId, subjectId, newRole, updatedAt);
+        }
+
+        @Override
+        public boolean reactivateMembership(
+                UUID tenantId,
+                UUID subjectId,
+                IdentityStatus expectedStatus,
+                String newRole,
+                Instant updatedAt) {
+            return delegate.reactivateMembership(
+                    tenantId, subjectId, expectedStatus, newRole, updatedAt);
+        }
+
+        @Override
+        public void insertMemberAudit(
+                UUID tenantId,
+                UUID actorSubjectId,
+                UUID targetSubjectId,
+                String operation,
+                String role,
+                String reasonCode,
+                String requestId,
+                Instant occurredAt) {
+            delegate.insertMemberAudit(
+                    tenantId, actorSubjectId, targetSubjectId,
+                    operation, role, reasonCode, requestId, occurredAt);
+        }
+
+        @Override
+        public Optional<IdentityDirectoryEntry> findActiveDefaultOwner(
+                String tenantCode, String normalizedUsername) {
+            return delegate.findActiveDefaultOwner(tenantCode, normalizedUsername);
+        }
+
+        @Override
+        public boolean tenantExistsByCode(String tenantCode) {
+            return delegate.tenantExistsByCode(tenantCode);
+        }
+
+        @Override
+        public boolean userExistsByUsername(String normalizedUsername) {
+            return delegate.userExistsByUsername(normalizedUsername);
+        }
+
+        @Override
+        public void acquireTenantBootstrapLock(String tenantCode, String normalizedUsername) {
+            delegate.acquireTenantBootstrapLock(tenantCode, normalizedUsername);
         }
 
         @Override

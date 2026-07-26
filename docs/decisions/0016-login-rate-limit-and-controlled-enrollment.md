@@ -145,13 +145,15 @@ tenant、granted_by、incident_reference、时间与状态，不含密码、私�
 - 受控首次 enrollment 在真实 PostgreSQL 上验证：`require-invite` 模式下无授权的首枚 Passkey 登记
   被拒（`ENROLLMENT_GRANT_REQUIRED`），操作员建立授权后首登成功且授权同事务置 `CONSUMED`，
   已有 ACTIVE Passkey 的 replacement 登记不受影响；enrollment 授权建立/撤销写安全操作审计；
+- 真实 HTTP 限速测试在自定义 context path 下验证 POST 首次放行、超额 429、标准 Ainer 错误
+  envelope、`Retry-After`/`no-store`、GET 不受影响和 allow/deny Micrometer counter；
+- enrollment grant 与恢复控制面共用 tenant-subject guard，跨 tenant 或非 ACTIVE 目标不会生成授权；
 - Flyway 从空库执行十份 Authorization Server migration，含 enrollment 授权表与安全操作审计
   CHECK 扩展（`ENROLLMENT_GRANT`/`GRANTED`/`REVOKED`）。
 
 尚未完成：
 
-- 限速 filter 的端到端 HTTP 429 行为（路径匹配、`Retry-After` 头）与 enrollment 控制器层
-  SERVICE/tenant/scope 拒绝路径的 HTTP 级自动化测试；
+- enrollment 控制器层 SERVICE/scope 拒绝路径的 HTTP 级自动化测试；
 - 受信代理 `X-Forwarded-For` 解析、多节点共享存储限速、授权建立的双人审批。
 
 ## 参考

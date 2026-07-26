@@ -32,16 +32,19 @@ public final class AinerPasskeyAdminRecoveryService {
 
     private final JdbcTemplate jdbcTemplate;
     private final AinerJdbcPasskeyCredentialRepository credentialRepository;
+    private final AinerPasskeyTenantSubjectGuard tenantSubjectGuard;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
 
     public AinerPasskeyAdminRecoveryService(
             JdbcTemplate jdbcTemplate,
             AinerJdbcPasskeyCredentialRepository credentialRepository,
+            AinerPasskeyTenantSubjectGuard tenantSubjectGuard,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         this.jdbcTemplate = jdbcTemplate;
         this.credentialRepository = credentialRepository;
+        this.tenantSubjectGuard = tenantSubjectGuard;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -55,9 +58,10 @@ public final class AinerPasskeyAdminRecoveryService {
         Assert.notNull(tenantId, "tenantId cannot be null");
         Assert.notNull(subjectId, "subjectId cannot be null");
         return transactionTemplate.execute(status -> {
+            tenantSubjectGuard.requireActiveHomeTenantSubject(tenantId, subjectId);
             Instant now = clock.instant();
             expireOpenRequests(tenantId, subjectId, now);
-            requireSubjectHasActivePasskey(tenantId, subjectId);
+            requireSubjectHasActivePasskey(subjectId);
             UUID requestId = UUID.randomUUID();
             Instant expiresAt = now.plus(approvalTtl);
             jdbcTemplate.update(
@@ -106,7 +110,8 @@ public final class AinerPasskeyAdminRecoveryService {
             if (!now.isBefore(request.expiresAt())) {
                 throw new BusinessException(PasskeyErrorCode.RECOVERY_REQUEST_EXPIRED);
             }
-            requireSubjectHasActivePasskey(tenantId, request.subjectId());
+            tenantSubjectGuard.requireActiveHomeTenantSubject(tenantId, request.subjectId());
+            requireSubjectHasActivePasskey(request.subjectId());
             int revoked = credentialRepository.revokeAllActiveForSubject(request.subjectId());
             int changed = jdbcTemplate.update(
                     """
@@ -139,7 +144,7 @@ public final class AinerPasskeyAdminRecoveryService {
                 EXPIRED, tenantId, subjectId, Timestamp.from(now));
     }
 
-    private void requireSubjectHasActivePasskey(UUID tenantId, UUID subjectId) {
+    private void requireSubjectHasActivePasskey(UUID subjectId) {
         Integer activeCount = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)

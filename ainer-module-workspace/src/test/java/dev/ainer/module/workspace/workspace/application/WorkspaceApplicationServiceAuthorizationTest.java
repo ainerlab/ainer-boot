@@ -261,7 +261,7 @@ class WorkspaceApplicationServiceAuthorizationTest {
     }
 
     private static AuthenticatedActor actor(String subjectId, String tenantId, String... authorities) {
-        return new AuthenticatedActor(subjectId, tenantId, Set.of(authorities));
+        return new AuthenticatedActor(subjectId, tenantId, AuthenticatedActor.USER, Set.of(authorities));
     }
 
     private static final class InMemoryWorkspaceRepository implements WorkspaceRepository {

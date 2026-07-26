@@ -823,7 +823,7 @@ class WorkspaceModuleIntegrationTest {
     }
 
     private static AuthenticatedActor actor(String subjectId, String tenantId, String... authorities) {
-        return new AuthenticatedActor(subjectId, tenantId, Set.of(authorities));
+        return new AuthenticatedActor(subjectId, tenantId, AuthenticatedActor.USER, Set.of(authorities));
     }
 
     private String memberStatus(UUID tenantId, UUID workspaceId, UUID subjectId) {

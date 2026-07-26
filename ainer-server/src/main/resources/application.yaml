@@ -60,6 +60,13 @@ ainer:
         always-protected-paths: ${AINER_SECURITY_ONLINE_VALIDATION_ALWAYS_PATHS:/internal/**,/api/workspaces/*/authorization-audits}
         mutating-protected-paths: ${AINER_SECURITY_ONLINE_VALIDATION_MUTATING_PATHS:/api/workspaces/**,/api/ai/**}
         mutating-methods: ${AINER_SECURITY_ONLINE_VALIDATION_MUTATING_METHODS:POST,PUT,PATCH,DELETE}
+      step-up:
+        enabled: ${AINER_SECURITY_STEP_UP_ENABLED:false}
+        max-auth-age: ${AINER_SECURITY_STEP_UP_MAX_AUTH_AGE:15m}
+        clock-skew: ${AINER_SECURITY_STEP_UP_CLOCK_SKEW:60s}
+        required-amr: ${AINER_SECURITY_STEP_UP_REQUIRED_AMR:mfa}
+        mutating-protected-paths: ${AINER_SECURITY_STEP_UP_MUTATING_PATHS:/api/workspaces/*/ownership-transfers}
+        mutating-methods: ${AINER_SECURITY_STEP_UP_MUTATING_METHODS:POST,PATCH,DELETE}
   ai:
     enabled: ${AINER_AI_ENABLED:false}
     provider:

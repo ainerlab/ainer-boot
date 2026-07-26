@@ -45,15 +45,29 @@ public class MybatisIdentityRepository implements IdentityRepository, IdentityTo
 
     @Override
     public Optional<IdentityAccount> findAccountByUsername(String normalizedUsername) {
-        return Optional.ofNullable(mapper.selectAccountByUsername(normalizedUsername)).map(row -> {
-            boolean enabled = "ACTIVE".equals(row.getUserStatus())
-                    && "ACTIVE".equals(row.getTenantStatus())
-                    && "ACTIVE".equals(row.getMembershipStatus());
-            boolean accountNonLocked = !"LOCKED".equals(row.getUserStatus());
-            return new IdentityAccount(
-                    row.getSubjectId(), row.getUsername(), row.getPasswordHash(), enabled, accountNonLocked,
-                    row.getTenantId(), Set.of("ROLE_" + row.getRole()));
-        });
+        return Optional.ofNullable(mapper.selectAccountByUsername(normalizedUsername)).map(this::toAccount);
+    }
+
+    @Override
+    public Optional<IdentityAccount> findAccountBySubjectId(UUID subjectId) {
+        return Optional.ofNullable(mapper.selectAccountBySubjectId(subjectId)).map(this::toAccount);
+    }
+
+    private IdentityAccount toAccount(IdentityAccountRow row) {
+        boolean enabled = "ACTIVE".equals(row.getUserStatus())
+                && "ACTIVE".equals(row.getTenantStatus())
+                && "ACTIVE".equals(row.getMembershipStatus());
+        boolean accountNonLocked = !"LOCKED".equals(row.getUserStatus());
+        return new IdentityAccount(
+                row.getSubjectId(), row.getUsername(), row.getPasswordHash(), enabled, accountNonLocked,
+                row.getTenantId(), Set.of("ROLE_" + row.getRole()));
+    }
+
+    @Override
+    public Optional<IdentityDirectoryEntry> findActiveDirectoryEntryForUpdate(
+            UUID tenantId, UUID subjectId) {
+        return Optional.ofNullable(mapper.selectActiveDirectoryEntryForUpdate(tenantId, subjectId))
+                .map(this::toDirectoryEntry);
     }
 
     @Override
@@ -119,6 +133,73 @@ public class MybatisIdentityRepository implements IdentityRepository, IdentityTo
             Instant updatedAt) {
         return mapper.updateMembershipStatus(
                 tenantId, subjectId, expectedStatus.name(), newStatus.name(), updatedAt) == 1;
+    }
+
+    @Override
+    public List<IdentityDirectoryEntry> listMembersByTenant(UUID tenantId, int offset, int limit) {
+        return mapper.listMembersByTenant(tenantId, offset, limit).stream()
+                .map(this::toDirectoryEntry).toList();
+    }
+
+    @Override
+    public int countMembersByTenant(UUID tenantId) {
+        return mapper.countMembersByTenant(tenantId);
+    }
+
+    @Override
+    public boolean updateMembershipRole(
+            UUID tenantId, UUID subjectId, String newRole, Instant updatedAt) {
+        return mapper.updateMembershipRole(tenantId, subjectId, newRole, updatedAt) == 1;
+    }
+
+    @Override
+    public boolean reactivateMembership(
+            UUID tenantId,
+            UUID subjectId,
+            IdentityStatus expectedStatus,
+            String newRole,
+            Instant updatedAt) {
+        return mapper.reactivateMembership(
+                tenantId, subjectId, expectedStatus.name(), newRole, updatedAt) == 1;
+    }
+
+    @Override
+    public void insertMemberAudit(
+            UUID tenantId, UUID actorSubjectId, UUID targetSubjectId,
+            String operation, String role, String reasonCode, String requestId, Instant occurredAt) {
+        IdentityMemberAuditRow row = new IdentityMemberAuditRow();
+        row.setId(UUID.randomUUID());
+        row.setTenantId(tenantId);
+        row.setActorSubjectId(actorSubjectId);
+        row.setTargetSubjectId(targetSubjectId);
+        row.setOperation(operation);
+        row.setRole(role);
+        row.setReasonCode(reasonCode);
+        row.setRequestId(requestId);
+        row.setOccurredAt(occurredAt);
+        requireSingleRow(mapper.insertMemberAudit(row), "member audit");
+    }
+
+    @Override
+    public Optional<IdentityDirectoryEntry> findActiveDefaultOwner(
+            String tenantCode, String normalizedUsername) {
+        return Optional.ofNullable(mapper.selectActiveDefaultOwner(tenantCode, normalizedUsername))
+                .map(this::toDirectoryEntry);
+    }
+
+    @Override
+    public boolean tenantExistsByCode(String tenantCode) {
+        return mapper.countTenantByCode(tenantCode) > 0;
+    }
+
+    @Override
+    public boolean userExistsByUsername(String normalizedUsername) {
+        return mapper.countUserByUsername(normalizedUsername) > 0;
+    }
+
+    @Override
+    public void acquireTenantBootstrapLock(String tenantCode, String normalizedUsername) {
+        mapper.acquireTenantBootstrapLock(tenantCode + '\u001f' + normalizedUsername);
     }
 
     @Override

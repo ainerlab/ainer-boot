@@ -24,12 +24,17 @@ public final class AinerPasskeyEnrollmentGrantService {
     private static final String REVOKED = "REVOKED";
 
     private final JdbcTemplate jdbcTemplate;
+    private final AinerPasskeyTenantSubjectGuard tenantSubjectGuard;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
 
     public AinerPasskeyEnrollmentGrantService(
-            JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager, Clock clock) {
+            JdbcTemplate jdbcTemplate,
+            AinerPasskeyTenantSubjectGuard tenantSubjectGuard,
+            PlatformTransactionManager transactionManager,
+            Clock clock) {
         this.jdbcTemplate = jdbcTemplate;
+        this.tenantSubjectGuard = tenantSubjectGuard;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -41,6 +46,7 @@ public final class AinerPasskeyEnrollmentGrantService {
         Assert.notNull(tenantId, "tenantId cannot be null");
         Assert.notNull(subjectId, "subjectId cannot be null");
         return transactionTemplate.execute(status -> {
+            tenantSubjectGuard.requireActiveHomeTenantSubject(tenantId, subjectId);
             Instant now = clock.instant();
             int upserted = jdbcTemplate.update(
                     """

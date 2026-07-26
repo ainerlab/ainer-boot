@@ -12,7 +12,7 @@ server:
 
 ainer:
   identity:
-    enabled: true
+    enabled: ${AINER_IDENTITY_ENABLED:true}
     directory-api:
       enabled: ${AINER_IDENTITY_DIRECTORY_API_ENABLED:false}
     access-event-relay:
@@ -32,6 +32,14 @@ ainer:
       enabled: ${AINER_IDENTITY_ACCESS_EVENT_RECOVERY_ENABLED:false}
       approval-ttl: ${AINER_IDENTITY_ACCESS_EVENT_RECOVERY_APPROVAL_TTL:15m}
       max-attempts: ${AINER_IDENTITY_ACCESS_EVENT_MAX_ATTEMPTS:10}
+  platform:
+    tenant-bootstrap:
+      enabled: ${AINER_PLATFORM_TENANT_BOOTSTRAP_ENABLED:false}
+      tenant-code: ${AINER_PLATFORM_TENANT_BOOTSTRAP_TENANT_CODE:}
+      tenant-name: ${AINER_PLATFORM_TENANT_BOOTSTRAP_TENANT_NAME:}
+      username: ${AINER_PLATFORM_TENANT_BOOTSTRAP_USERNAME:}
+      password: ${AINER_PLATFORM_TENANT_BOOTSTRAP_PASSWORD:}
+      display-name: ${AINER_PLATFORM_TENANT_BOOTSTRAP_DISPLAY_NAME:}
   security:
     authorization-server:
       issuer: ${AINER_AUTHORIZATION_SERVER_ISSUER:}
@@ -47,6 +55,17 @@ ainer:
         allowed-origins: ${AINER_AUTHORIZATION_PASSKEY_ALLOWED_ORIGINS:}
         allow-insecure-http: ${AINER_AUTHORIZATION_PASSKEY_ALLOW_INSECURE_HTTP:false}
         ceremony-timeout: ${AINER_AUTHORIZATION_PASSKEY_CEREMONY_TIMEOUT:5m}
+        recovery:
+          enabled: ${AINER_AUTHORIZATION_PASSKEY_RECOVERY_ENABLED:false}
+          self-service-enabled: ${AINER_AUTHORIZATION_PASSKEY_SELF_RECOVERY_ENABLED:false}
+          approval-ttl: ${AINER_AUTHORIZATION_PASSKEY_RECOVERY_APPROVAL_TTL:15m}
+        enrollment:
+          mode: ${AINER_AUTHORIZATION_PASSKEY_ENROLLMENT_MODE:optional}
+      login-rate-limit:
+        enabled: ${AINER_AUTHORIZATION_LOGIN_RATE_LIMIT_ENABLED:false}
+        window: ${AINER_AUTHORIZATION_LOGIN_RATE_LIMIT_WINDOW:1m}
+        max-requests: ${AINER_AUTHORIZATION_LOGIN_RATE_LIMIT_MAX_REQUESTS:20}
+        paths: ${AINER_AUTHORIZATION_LOGIN_RATE_LIMIT_PATHS:/login,/login/webauthn,/webauthn/authenticate/options}
       machine-client-bootstrap:
         enabled: ${AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_ENABLED:false}
         client-id: ${AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_CLIENT_ID:}

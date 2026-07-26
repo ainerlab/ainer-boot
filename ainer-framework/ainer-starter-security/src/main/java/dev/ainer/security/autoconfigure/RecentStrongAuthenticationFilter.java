@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -18,6 +19,7 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -39,6 +41,8 @@ final class RecentStrongAuthenticationFilter extends OncePerRequestFilter {
     private final RequestMatcher protectedRequests;
     private final Set<String> requiredAmr;
     private final Duration maxAuthAge;
+    private final Duration clockSkew;
+    private final Clock clock;
     private final AinerSecurityFailureWriter failureWriter;
     private final Counter allowed;
     private final Counter denied;
@@ -46,10 +50,13 @@ final class RecentStrongAuthenticationFilter extends OncePerRequestFilter {
     RecentStrongAuthenticationFilter(
             AinerResourceServerProperties.StepUp properties,
             AinerSecurityFailureWriter failureWriter,
-            MeterRegistry meterRegistry) {
+            MeterRegistry meterRegistry,
+            Clock clock) {
         this.protectedRequests = protectedRequests(properties);
         this.requiredAmr = new HashSet<>(properties.getRequiredAmr());
         this.maxAuthAge = properties.getMaxAuthAge();
+        this.clockSkew = properties.getClockSkew();
+        this.clock = clock;
         this.failureWriter = failureWriter;
         this.allowed = counter(meterRegistry, METRIC_PREFIX + "allowed");
         this.denied = counter(meterRegistry, METRIC_PREFIX + "denied");
@@ -66,6 +73,12 @@ final class RecentStrongAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         if (authentication instanceof JwtAuthenticationToken token && meetsStepUp(token.getToken())) {
             increment(allowed);
             filterChain.doFilter(request, response);
@@ -79,6 +92,9 @@ final class RecentStrongAuthenticationFilter extends OncePerRequestFilter {
         if (jwt == null) {
             return false;
         }
+        if (!"USER".equals(jwt.getClaimAsString("actor_type"))) {
+            return false;
+        }
         List<String> amr = jwt.getClaimAsStringList("amr");
         if (amr == null || !new HashSet<>(amr).containsAll(requiredAmr)) {
             return false;
@@ -87,7 +103,11 @@ final class RecentStrongAuthenticationFilter extends OncePerRequestFilter {
         if (authTime == null) {
             return false;
         }
-        return !authTime.plus(maxAuthAge).isBefore(Instant.now());
+        Instant now = clock.instant();
+        if (authTime.isAfter(now.plus(clockSkew))) {
+            return false;
+        }
+        return !authTime.plus(maxAuthAge).plus(clockSkew).isBefore(now);
     }
 
     private static RequestMatcher protectedRequests(AinerResourceServerProperties.StepUp properties) {

@@ -1,6 +1,6 @@
 # Ainer 测试与质量门禁
 
-> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-07-23 · 适用版本：`0.1.x`
+> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
 
 ## 1. 目标
 
@@ -110,6 +110,13 @@ mvn clean test
   ACTIVE Passkey 时仅密码不得取得 authorization code；
 - Passkey 协议记录、ACTIVE 生命周期和 REGISTERED 审计同事务；计数器/last-used 更新不产生
   重复登记审计；replacement 后旧凭证软撤销，并发撤销不能移除最后一个 ACTIVE 凭证。
+- 恢复/enrollment 管理端必须把目标 `(tenant_id, subject_id)` 绑定到 ACTIVE default Identity membership，
+  跨 tenant 目标即使 subject 存在也必须拒绝；登录限流 HTTP 429 使用统一 envelope、`Retry-After`
+  与 no-store，并且只匹配配置的 POST 路径。
+- step-up 对匿名请求保留 Resource Server 401，对 SERVICE、缺/旧 `auth_time`、缺强因子和超出
+  clock skew 的未来时间返回稳定 403；边界时间使用可注入 `Clock`。
+- tenant 成员管理 HTTP/应用/真实 PostgreSQL 测试必须覆盖 USER scope + ACTIVE OWNER/ADMIN、
+  SERVICE/MEMBER/跨 tenant 拒绝、OWNER 不可由通用接口修改、重激活和同事务审计。
 
 ### 数据与事务
 
@@ -141,4 +148,4 @@ mvn clean test
 
 合并前：受影响模块测试、完整 `mvn clean test`、`git diff --check`。
 
-发布前还必须确认：数据库测试未因 Docker 缺失而跳过、两个可执行发行物均能启动、Flyway 从空库成功、升级 migration 在备份副本成功、关键鉴权与健康检查通过。M4.2 还要在可运行 Testcontainers 的环境执行双人审批、锁定重检、归档回滚和游标边界集成测试。M4.3 还要在真实 PostgreSQL 上执行 Authorization Server 协议 smoke，证明专用/普通 introspection client 隔离、active、RFC 7009 撤销和 Identity epoch，并用接近真实规模数据检查 epoch 查询计划；M4.5 还要执行真实浏览器 HTTP 会话的 PKCE S256 正反门禁，并检查 JDBC authorization 不落凭证。M4.6 当前还必须执行 Passkey options、条件门禁和 JDBC 生命周期门禁；在宣称生产 MFA 前，必须另补虚拟 authenticator 与主流真实设备的完整 registration/authentication、丢失/被盗/同步凭证、恢复通知和多节点 session 证据。生产可观测性切片还要用独立 metrics client 抓取两个真实 exporter，并验证多节点、Token endpoint/数据库故障和告警路由。手工 PostgreSQL 与 loopback 证据是补充，不取代发布候选环境中不跳过的自动门禁。当前验证快照见 [`project-status.md`](project-status.md)。
+发布前还必须确认：数据库测试未因 Docker 缺失而跳过、两个可执行发行物均能启动、Flyway 从空库成功、升级 migration 在备份副本成功、关键鉴权与健康检查通过。M4.2 还要在可运行 Testcontainers 的环境执行双人审批、锁定重检、归档回滚和游标边界集成测试。M4.3 还要在真实 PostgreSQL 上执行 Authorization Server 协议 smoke，证明专用/普通 introspection client 隔离、active、RFC 7009 撤销和 Identity epoch，并用接近真实规模数据检查 epoch 查询计划；M4.5 还要执行真实浏览器 HTTP 会话的 PKCE S256 正反门禁，并检查 JDBC authorization 不落凭证。M4.6 当前还必须执行 Passkey options、条件门禁、虚拟 authenticator 签名 ceremony、恢复/enrollment、登录限流和 step-up 门禁；在宣称生产 MFA 前，必须另补主流真实设备的 registration/authentication、丢失/被盗/同步凭证、恢复通知和多节点 session 证据。M4.7 还要执行 tenant 成员管理的真实 PostgreSQL + Bearer HTTP 正反门禁，并确认 API 与 migration 只存在于 Identity 权威运行时。生产可观测性切片还要用独立 metrics client 抓取两个真实 exporter，并验证多节点、Token endpoint/数据库故障和告警路由。手工 PostgreSQL 与 loopback 证据是补充，不取代发布候选环境中不跳过的自动门禁。当前验证快照见 [`project-status.md`](project-status.md)。

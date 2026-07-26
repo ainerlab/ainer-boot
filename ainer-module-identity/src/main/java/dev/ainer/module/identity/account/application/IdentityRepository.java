@@ -21,7 +21,11 @@ public interface IdentityRepository {
 
     Optional<IdentityAccount> findAccountByUsername(String normalizedUsername);
 
+    Optional<IdentityAccount> findAccountBySubjectId(UUID subjectId);
+
     Optional<IdentityDirectoryEntry> findActiveDirectoryEntry(UUID tenantId, UUID subjectId);
+
+    Optional<IdentityDirectoryEntry> findActiveDirectoryEntryForUpdate(UUID tenantId, UUID subjectId);
 
     List<IdentityDirectoryEntry> searchActiveDirectory(UUID tenantId, String likePattern, int limit);
 
@@ -40,6 +44,31 @@ public interface IdentityRepository {
             IdentityStatus expectedStatus,
             IdentityStatus newStatus,
             Instant updatedAt);
+
+    List<IdentityDirectoryEntry> listMembersByTenant(UUID tenantId, int offset, int limit);
+
+    int countMembersByTenant(UUID tenantId);
+
+    boolean updateMembershipRole(UUID tenantId, UUID subjectId, String newRole, Instant updatedAt);
+
+    boolean reactivateMembership(
+            UUID tenantId,
+            UUID subjectId,
+            IdentityStatus expectedStatus,
+            String newRole,
+            Instant updatedAt);
+
+    void insertMemberAudit(
+            UUID tenantId, UUID actorSubjectId, UUID targetSubjectId,
+            String operation, String role, String reasonCode, String requestId, Instant occurredAt);
+
+    Optional<IdentityDirectoryEntry> findActiveDefaultOwner(String tenantCode, String normalizedUsername);
+
+    boolean tenantExistsByCode(String tenantCode);
+
+    boolean userExistsByUsername(String normalizedUsername);
+
+    void acquireTenantBootstrapLock(String tenantCode, String normalizedUsername);
 
     void insertAccessEvent(IdentityAccessEvent event);
 }

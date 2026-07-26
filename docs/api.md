@@ -1,6 +1,6 @@
 # Ainer HTTP API 契约
 
-> 文档类型：接口基线 · 状态：生效 · 最近核对：2026-07-23 · 适用版本：`0.1.x`
+> 文档类型：接口基线 · 状态：生效 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
 
 本文记录当前手写 HTTP 契约和兼容规则。它是开发者索引，不替代未来由代码生成并在 CI 校验的 OpenAPI 文档。
 
@@ -24,7 +24,9 @@ HTTP status 是传输层权威语义。`code` 是稳定业务错误标识，客�
 
 ## 2. 身份上下文
 
-受保护 API 使用 Bearer JWT。Resource Server 验证签名、issuer、有效期和 audience，并从 `sub` 与 `tenant_id` 构建 `AuthenticatedActor`。OAuth scope 投影为 `SCOPE_<scope>`。
+受保护 API 使用 Bearer JWT。Resource Server 验证签名、issuer、有效期和 audience，并从 `sub`、
+`tenant_id` 与必需的 `actor_type` 构建 `AuthenticatedActor`。`actor_type` 只允许 `USER` 或
+`SERVICE`；缺失或未知值失败关闭。OAuth scope 投影为 `SCOPE_<scope>`。
 
 请求参数、请求体或外部请求头不能覆盖 tenant 与 subject。scope 只表示调用能力，Workspace 仍检查同 tenant 的 ACTIVE membership 和角色。
 
@@ -55,7 +57,25 @@ HTTP status 是传输层权威语义。`code` 是稳定业务错误标识，客�
 
 分页从 1 开始，`size` 范围为 1 到 100。跨 tenant、非成员和不可见资源拒绝应避免泄露资源是否存在。
 
-## 5. AI API
+## 5. Identity 租户成员 API
+
+以下接口位于 Identity 数据所属的 `ainer-authorization-server`，仅接受 `actor_type=USER`。
+路径 `tenantId` 必须等于 JWT
+`tenant_id`，调用者还必须是数据库中的 ACTIVE `OWNER`/`ADMIN`；scope 与资源角色缺一不可。
+
+| Method | Path | Scope | 资源角色/状态 | 说明 |
+|---|---|---|---|---|
+| GET | `/api/tenants/{tenantId}/members?page=1&size=20` | `tenant.members.read` | ACTIVE OWNER/ADMIN | 只返回 ACTIVE tenant/user/membership 的安全投影 |
+| POST | `/api/tenants/{tenantId}/members` | `tenant.members.write` | ACTIVE OWNER/ADMIN | 把已存在用户加入 tenant；`username`/`subjectId` 二选一，角色只允许 ADMIN/MEMBER |
+| PATCH | `/api/tenants/{tenantId}/members/{subjectId}` | `tenant.members.write` | ACTIVE OWNER/ADMIN | 在 ADMIN/MEMBER 间调整；通用接口不能修改 OWNER |
+| DELETE | `/api/tenants/{tenantId}/members/{subjectId}?reasonCode=...` | `tenant.members.write` | ACTIVE OWNER/ADMIN | 软移除非 OWNER 成员 |
+
+POST 请求还包含 `role` 与安全格式 `reasonCode`；PATCH 包含 `role`、`reasonCode`。已 DISABLED
+的非 OWNER membership 再次添加会显式重新激活，ACTIVE 重复关系、LOCKED/OWNER 状态冲突返回
+409。每次成功写操作与 `reasonCode`、request ID 一起进入同事务成员安全审计。分页从 1 开始，
+`size=1..100`。
+
+## 6. AI API
 
 AI runtime 默认关闭；启用后所有端点要求 `ai.invoke` scope。
 
@@ -67,7 +87,7 @@ AI runtime 默认关闭；启用后所有端点要求 `ai.invoke` scope。
 
 请求、SSE payload、错误和审计字段见 [`ai-gateway.md`](ai-gateway.md)。Ainer 的内部契约不是对 OpenAI API 的完整字段兼容承诺。
 
-## 6. Authorization Server 与内部 Identity API
+## 7. Authorization Server 与内部 Identity API
 
 `ainer-authorization-server` 暴露 Spring Authorization Server 的标准 OAuth 2.1/OIDC 端点，具体启用能力和密钥要求见 [`security.md`](security.md)。协议端点遵循标准响应，不套 Ainer JSON envelope。
 
@@ -90,9 +110,10 @@ Passkey 显式启用后还装配以下 Spring Security WebAuthn 端点；它们�
 | POST | `/webauthn/authenticate/options` | 可匿名或已有 session | 生成短时 authentication options；强制 UV |
 | POST | `/login/webauthn` | 对应 session options + CSRF | 验证 assertion 并建立/追加 WebAuthn 认证因子 |
 
-credential ID 是可关联安全元数据，不应出现在普通日志。当前没有 Ainer 自研 registration JSON、
-恢复 API 或管理员凭证删除 API；完整边界见
-[ADR-0014](decisions/0014-passkey-first-human-authentication.md)。
+credential ID 是可关联安全元数据，不应出现在普通日志。启用自助恢复后，
+`POST /passkey/recovery-codes` 由已登记且完成 WebAuthn 条件门禁的人员签发 8 枚明文只返回一次的
+恢复码；`POST /passkey/recovery-codes/redeem` 由密码会话中的本人提交一枚恢复码，成功后吊销该
+subject 全部 ACTIVE Passkey。完整边界见 ADR-0014/0015。
 
 Authorization Code + PKCE 当前由自动化测试专用 registered client 证明，生产没有默认 browser client，
 也没有 browser/OIDC client 创建 API。不得把测试 client、测试 issuer 或测试 RSA key 带入发行环境。
@@ -109,6 +130,10 @@ Authorization Code + PKCE 当前由自动化测试专用 registered client 证�
 | Authorization Server | GET | `/internal/identity/access-event-recovery/tenants/{tenantId}/exhausted?page=1&size=20` | `actor_type=SERVICE` + `identity.access-events.replay.read` 或 `.read.all` | 查询无有效 lease 的真正耗尽事件 |
 | Authorization Server | POST | `/internal/identity/access-event-recovery/tenants/{tenantId}/replay-requests` | `actor_type=SERVICE` + `identity.access-events.replay.request` 或 `.request.all` | 创建 15 分钟默认有效的重放申请 |
 | Authorization Server | POST | `/internal/identity/access-event-recovery/tenants/{tenantId}/replay-requests/{requestId}/approvals` | `actor_type=SERVICE` + `identity.access-events.replay.approve` 或 `.approve.all` | 由不同服务批准并重置原事件 |
+| Authorization Server | POST | `/internal/passkey-recovery/tenants/{tenantId}/recovery-requests` | `actor_type=SERVICE` + `passkey.recovery.request` 或 `.request.all` | 为属于该 ACTIVE tenant 的 ACTIVE subject 建立双人恢复申请 |
+| Authorization Server | POST | `/internal/passkey-recovery/tenants/{tenantId}/recovery-requests/{requestId}/approvals` | `actor_type=SERVICE` + `passkey.recovery.approve` 或 `.approve.all` | 不同服务批准并吊销目标全部 ACTIVE Passkey |
+| Authorization Server | GET/POST | `/internal/passkey-enrollment/tenants/{tenantId}/grants` | `actor_type=SERVICE` + `passkey.enrollment.manage` 或 `.manage.all` | 查询或授予目标 ACTIVE tenant subject 的首枚 Passkey enrollment |
+| Authorization Server | DELETE | `/internal/passkey-enrollment/tenants/{tenantId}/grants/{subjectId}` | 同上 | 撤销未消费的 enrollment grant |
 | Authorization Server | POST | `/internal/oauth-service-clients` | tenantless `actor_type=SERVICE` + `oauth.clients.manage` + operator ID 白名单 | 创建 tenant-bound Client Credentials client，secret 只返回一次 |
 | Authorization Server | GET | `/internal/oauth-service-clients/{clientId}` | 同上 | 查询安全生命周期投影，不返回 secret/hash |
 | Authorization Server | POST | `/internal/oauth-service-clients/{clientId}/rotations` | 同上 | 以新 client ID 创建并行 replacement |
@@ -196,7 +221,8 @@ DELETE 或重新激活。
 
 `eventType` 当前只有 `IDENTITY_USER_DISABLED`、`IDENTITY_MEMBERSHIP_REVOKED`。成功响应的 `data` 含 `eventId`、`duplicate`、`affectedMemberships`；重复 event ID 返回 200 且不重复修改。超过允许未来时钟偏差的事件返回 400。该端点不提供恢复语义，也不允许普通人员 Token 调用。
 
-账号禁用和 tenant membership 撤销仍是 Identity 应用用例，不在本阶段开放远程管理 HTTP API。
+账号禁用仍是 Identity 应用用例，尚未开放远程管理 HTTP API；tenant membership 的租户内管理
+已经通过第 5 节 USER API 开放，平台级跨租户管理仍未开放。
 
 重放申请请求体：
 
@@ -223,7 +249,7 @@ OWNER 恢复请求体：
 
 SIEM 导出参数 `afterOccurredAt` 与 `afterId` 必须同时提供或同时省略，`limit=1..1000`。结果按 `occurredAt,id` 升序，返回 `nextOccurredAt`、`nextId` 和 `hasMore`。消费者持久化这对游标并按 audit ID 去重；每次导出批次本身也写入安全操作审计。
 
-## 7. 兼容与变更
+## 8. 兼容与变更
 
 - 新增可选响应字段通常向后兼容，客户端必须容忍未知字段；
 - 删除、改名、改变字段类型、收紧枚举或改变 status/error code 都需要发布说明；

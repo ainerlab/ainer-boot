@@ -146,6 +146,32 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
 
     @Bean
     @Order(3)
+    SecurityFilterChain tenantMemberApiSecurityFilterChain(
+            HttpSecurity http,
+            JwtDecoder jwtDecoder,
+            ObjectMapper objectMapper) throws Exception {
+        AinerSecurityFailureWriter failureWriter = new AinerSecurityFailureWriter(objectMapper);
+        http.securityMatcher(
+                        "/api/tenants/*/members",
+                        "/api/tenants/*/members/**")
+                .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
+                .csrf(csrf -> csrf.disable())
+                .requestCache(cache -> cache.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .oauth2ResourceServer(resourceServer -> resourceServer
+                        .jwt(jwt -> jwt.decoder(jwtDecoder))
+                        .authenticationEntryPoint((request, response, exception) ->
+                                failureWriter.write(request, response, StandardErrorCode.UNAUTHENTICATED)))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, exception) ->
+                                failureWriter.write(request, response, StandardErrorCode.UNAUTHENTICATED))
+                        .accessDeniedHandler((request, response, exception) ->
+                                failureWriter.write(request, response, StandardErrorCode.FORBIDDEN)));
+        return http.build();
+    }
+
+    @Bean
+    @Order(4)
     SecurityFilterChain authorizationServerMetricsSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder jwtDecoder,
@@ -173,7 +199,7 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
     }
 
     @Bean
-    @Order(4)
+    @Order(5)
     SecurityFilterChain authorizationServerDefaultSecurityFilterChain(
             HttpSecurity http,
             ObjectProvider<AinerPasskeyWebSecurity> passkeyProvider,

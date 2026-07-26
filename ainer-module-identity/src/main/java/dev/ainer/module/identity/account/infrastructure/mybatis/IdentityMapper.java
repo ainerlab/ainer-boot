@@ -19,7 +19,13 @@ public interface IdentityMapper {
 
     IdentityAccountRow selectAccountByUsername(@Param("username") String username);
 
+    IdentityAccountRow selectAccountBySubjectId(@Param("subjectId") UUID subjectId);
+
     IdentityDirectoryRow selectActiveDirectoryEntry(
+            @Param("tenantId") UUID tenantId,
+            @Param("subjectId") UUID subjectId);
+
+    IdentityDirectoryRow selectActiveDirectoryEntryForUpdate(
             @Param("tenantId") UUID tenantId,
             @Param("subjectId") UUID subjectId);
 
@@ -52,6 +58,38 @@ public interface IdentityMapper {
             @Param("expectedStatus") String expectedStatus,
             @Param("newStatus") String newStatus,
             @Param("updatedAt") Instant updatedAt);
+
+    List<IdentityDirectoryRow> listMembersByTenant(
+            @Param("tenantId") UUID tenantId,
+            @Param("offset") int offset,
+            @Param("limit") int limit);
+
+    int countMembersByTenant(@Param("tenantId") UUID tenantId);
+
+    int updateMembershipRole(
+            @Param("tenantId") UUID tenantId,
+            @Param("subjectId") UUID subjectId,
+            @Param("newRole") String newRole,
+            @Param("updatedAt") Instant updatedAt);
+
+    int reactivateMembership(
+            @Param("tenantId") UUID tenantId,
+            @Param("subjectId") UUID subjectId,
+            @Param("expectedStatus") String expectedStatus,
+            @Param("newRole") String newRole,
+            @Param("updatedAt") Instant updatedAt);
+
+    int insertMemberAudit(IdentityMemberAuditRow audit);
+
+    IdentityDirectoryRow selectActiveDefaultOwner(
+            @Param("tenantCode") String tenantCode,
+            @Param("username") String username);
+
+    int countTenantByCode(@Param("tenantCode") String tenantCode);
+
+    int countUserByUsername(@Param("username") String username);
+
+    int acquireTenantBootstrapLock(@Param("lockKey") String lockKey);
 
     int insertAccessEvent(IdentityAccessEventRow event);
 }

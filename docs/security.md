@@ -1,6 +1,6 @@
 # Ainer Identity 与 OAuth 2.1 使用基线
 
-> 适用版本：M4.3 selective online token validation · 2026-07-23
+> 适用版本：M4.7 tenant member control plane · 2026-07-26
 
 ## 1. 已落地边界
 
@@ -9,7 +9,11 @@ Ainer 使用两个独立运行时：
 - `ainer-server`：OAuth 2.0 Resource Server，验证 Bearer JWT 的签名、issuer、有效期和 audience；
 - `ainer-authorization-server`：基于 Spring Security 7.1 Authorization Server 的 OAuth 2.1 / OIDC 签发服务。
 
-业务模块只依赖 `AuthenticatedActor`。`sub` 投影为主体，`tenant_id` 投影为当前租户，scope 按 Spring Security 规则成为 `SCOPE_*` authority。AI API 要求 `SCOPE_ai.invoke`；Workspace 读取和写入分别要求 `SCOPE_workspace.read`、`SCOPE_workspace.write`，并继续检查数据库资源角色。外部传入的 `X-Ainer-Tenant-Id`、`X-Ainer-Subject-Id` 不再参与身份解析。
+业务模块只依赖 `AuthenticatedActor`。`sub` 投影为主体，`tenant_id` 投影为当前租户，
+`actor_type` 是必需且只允许 `USER|SERVICE`，scope 按 Spring Security 规则成为 `SCOPE_*`
+authority。AI API 要求 `SCOPE_ai.invoke`；Workspace 读取和写入分别要求
+`SCOPE_workspace.read`、`SCOPE_workspace.write`，并继续检查数据库资源角色。外部传入的
+`X-Ainer-Tenant-Id`、`X-Ainer-Subject-Id` 不参与身份解析。
 
 Client Credentials access token 额外携带 `actor_type=SERVICE`，人员 access token 携带 `actor_type=USER`。内部 Directory 与撤销事件端点不仅检查 scope，还强制 `SERVICE`，防止人员 Token 因误授 scope 进入服务控制面。
 
@@ -249,22 +253,33 @@ M4.6 增加默认关闭的 Passkey/WebAuthn 协议基础。启用时：
   稳定 `sub`/`tenant_id`/`roles`（customizer 按 username 解析 WebAuthn principal）。
 
 真实签名 ceremony 已用 webauthn4j 虚拟 authenticator 在自动化测试中端到端跑通（attestation
-+ assertion 闭环、`amr=pwd,mfa,pop` 与凭证管理门禁均在 HTTP 层验证）。本切片仍未覆盖主流
-真实设备/浏览器兼容矩阵，也没有受控首次登记、恢复码、管理员恢复、恢复通知、登录限速、step-up
-有效期或多节点 session 证据。TOTP 只保留为后续受限恢复 fallback 的候选，不能作为抗钓鱼主因子。
-完整决策和威胁模型见 [ADR-0014](decisions/0014-passkey-first-human-authentication.md)。
++ assertion 闭环、`amr=pwd,mfa,pop` 与凭证管理门禁均在 HTTP 层验证）。恢复码、管理员双人恢复、
+`require-invite` 首次 enrollment、登录 POST 限速和 Resource Server step-up 也已落地并默认关闭。
+恢复与 enrollment 的目标 `(tenant,subject)` 必须对应 ACTIVE tenant/user/default membership；数据库
+复合外键再防止孤立或跨 tenant 安全记录。登录限流使用标准 Ainer 429 envelope、`Retry-After`、
+只匹配配置的 POST 路径，且明确是 node-local。step-up 只处理 USER token，校验必需 `amr`、
+`auth_time` 最大年龄、未来时间和可配时钟偏差；匿名仍返回 401。
+
+当前仍未覆盖主流真实设备/浏览器兼容矩阵、恢复通知和多节点 session/共享限流证据。TOTP 只保留为
+后续受限恢复 fallback 的候选，不能作为抗钓鱼主因子。完整决策和威胁模型见 ADR-0014 至 ADR-0017。
 
 人员账号由 `ainer-module-identity` 保存 delegating password hash、状态和唯一默认租户。Authorization Server 的 `UserDetailsService` 从该端口加载账号，签发时把稳定 UUID 写入 `sub`，把默认租户写入 `tenant_id`，并把成员角色写入 `roles`。
 
 Identity Directory 只返回 ACTIVE tenant、ACTIVE user、ACTIVE membership 的 tenant、subject、username、display name 和 role，不返回密码哈希、账号锁定细节或 OAuth 协议数据。默认关闭的 HTTP adapter 要求服务 JWT：`identity.directory.read` 只能查询 Token `tenant_id`，`identity.directory.read.all` 才能选择路径中的任意 tenant。人员 Token 即使误含 scope 也会被拒绝。`ainer-server` 可选 Directory client 使用 OAuth 2.0 Client Credentials，在启用时于创建 Workspace 邀请前验证目标是 ACTIVE Directory member；404 拒绝邀请，身份或传输故障按 503 关闭失败。
 
+租户成员 API 只接受 USER token，并同时要求 `tenant.members.read|write` capability、路径 tenant
+等于可信 claim，以及数据库中的 ACTIVE OWNER/ADMIN 调用者关系。写操作不能授予或修改 OWNER；
+新增、重新激活、角色变更和移除都与 actor/target/tenant/reason/request ID 审计同事务提交。
+该 API 位于 Identity 权威数据库所在的 Authorization Server；业务 Resource Server 不复制
+Identity 表。对管理 API 的 step-up/在线校验策略仍需在 browser/OIDC client 切片中单独接入。
+
 账号禁用会阻止后续人员 token 签发，非 OWNER tenant membership 可以被撤销。每次实际状态变化与 `ainer_identity_access_event` outbox 在同一事务提交；事件只保存 tenant、subject、类型、版本和时间。relay 通过短事务使用 `FOR UPDATE SKIP LOCKED` 领取并提交 lease，随后在事务外通过 HTTPS + Client Credentials 投递；成功或失败确认使用 event ID 与 lease owner 条件更新。
 
 Workspace 事件端点要求 `actor_type=SERVICE`、`identity.access-events.publish` 和精确可信 publisher `sub`。消费事务先插入 event receipt，再将同 tenant/subject、创建时间不晚于事件时间的 PENDING/ACTIVE membership 置为 `REVOKED`。重复 event ID 幂等成功，旧事件不影响后来创建的 membership，跨 tenant 不受影响。安全禁用可以让 OWNER 变为 REVOKED 并暂时留下无 ACTIVE OWNER 的 Workspace；这优先于继续放行已禁用账号，恢复/所有权处置必须使用后续专用流程。
 
-当前仍未提供公网注册、找回密码、完整 MFA/恢复、租户切换和图形化 client 控制台；只有
-Passkey 协议/条件门禁基础与 tenant-bound Client Credentials 内部生命周期 API 已落地，PKCE
-public client 仅存在于自动化测试。
+当前仍未提供公网注册、找回密码、恢复通知、租户切换和图形化 client 控制台；Passkey
+协议/条件门禁、恢复、受控 enrollment、step-up、租户成员管理与 tenant-bound Client
+Credentials 内部生命周期 API 已落地，PKCE public client 仅存在于自动化测试。
 Directory 与事件 adapter 均默认关闭且不共享数据库；完整投递决策见
 [ADR-0009](decisions/0009-cross-runtime-access-revocation-delivery.md)。
 
@@ -287,10 +302,22 @@ OWNER 恢复只在 Workspace 无 ACTIVE OWNER、至少有一个 REVOKED OWNER，
 ```bash
 mvn -pl ainer-framework/ainer-starter-security -am test
 mvn -pl ainer-authorization-server -am test
+mvn -pl ainer-module-identity -am test
 mvn -pl ainer-module-workspace -am test
 mvn test
 ```
 
 Resource Server 的 401/403、可信 claim、伪造身份头以及 Workspace 应用授权测试不依赖 Docker。Identity、JDBC 协议表、Client Credentials 签发与 Workspace tenant SQL 测试使用 PostgreSQL Testcontainers；没有 Docker 时会明确跳过，不会改用 H2。
 
-M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存、inactive 401、在线依赖失败 503、专用 client 与普通 client 隔离、RFC 7009 撤销，以及 Identity epoch 的等于/前后边界。指标边界还要验证无 Token 401，USER/tenant-bound/missing-scope 403，专用 tenantless SERVICE 200，以及业务 Resource Server 关闭时仍不匿名公开。tenant 服务 client 控制面另需验证一次性 secret、scope 白名单、operator/tenant 隔离、蓝绿轮换、退役后新 Token 401、历史 Token introspection inactive 和无 secret 审计。PKCE 门禁必须使用真实 HTTP 会话和 PostgreSQL，覆盖 S256 正反路径、登录 CSRF、授权码重放、redirect URI、人员 claims、无 refresh token 以及协议记录不落凭证。Passkey 基线还必须覆盖配置失败关闭、UV-required options、无凭证 bootstrap、已登记账号条件拦截、生命周期/审计同事务、软撤销、replacement 与最后凭证保护；完整 authenticator ceremony 和恢复路径仍是后续门禁。真实 PostgreSQL 和协议 smoke 证据维护在 [`project-status.md`](project-status.md)。
+M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存、inactive 401、在线依赖失败 503、
+专用 client 与普通 client 隔离、RFC 7009 撤销，以及 Identity epoch 的等于/前后边界。指标边界
+还要验证无 Token 401，USER/tenant-bound/missing-scope 403，专用 tenantless SERVICE 200，以及
+业务 Resource Server 关闭时仍不匿名公开。tenant 服务 client 控制面另需验证一次性 secret、scope
+白名单、operator/tenant 隔离、蓝绿轮换、退役后新 Token 401、历史 Token introspection inactive
+和无 secret 审计。PKCE 门禁必须使用真实 HTTP 会话和 PostgreSQL，覆盖 S256 正反路径、登录 CSRF、
+授权码重放、redirect URI、人员 claims、无 refresh token 以及协议记录不落凭证。Passkey 基线还
+必须覆盖配置失败关闭、UV-required options、无凭证 bootstrap、已登记账号条件拦截、生命周期/
+审计同事务、软撤销、replacement、最后凭证保护、恢复/enrollment tenant-subject 绑定、登录
+429 和 step-up 的 200/401/403。租户成员管理还要以真实 PostgreSQL + HTTP 覆盖 USER/SERVICE、
+scope、跨 tenant、实时资源角色与审计。真实 PostgreSQL 和协议 smoke 证据维护在
+[`project-status.md`](project-status.md)。

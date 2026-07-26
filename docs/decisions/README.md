@@ -1,6 +1,6 @@
 # Ainer 架构决策记录
 
-> 文档类型：决策索引 · 状态：生效 · 最近核对：2026-07-23
+> 文档类型：决策索引 · 状态：生效 · 最近核对：2026-07-26
 
 ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是实现日志，也不替代 API 或运行手册。
 
@@ -25,6 +25,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0015](0015-passkey-recovery.md) | Accepted | Passkey 恢复（恢复码 + 管理员双人恢复） |
 | [0016](0016-login-rate-limit-and-controlled-enrollment.md) | Accepted | 登录限速与受控首次 Passkey Enrollment |
 | [0017](0017-resource-server-step-up-policy.md) | Accepted | Resource Server Step-up 授权策略 |
+| [0018](0018-management-authorization-and-tenant-member-management.md) | Accepted | 管理授权模型与租户成员管理 |
 
 ## 何时需要 ADR
 

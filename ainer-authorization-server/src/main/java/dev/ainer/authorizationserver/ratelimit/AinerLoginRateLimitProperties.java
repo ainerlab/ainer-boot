@@ -12,7 +12,8 @@ public final class AinerLoginRateLimitProperties {
     private boolean enabled;
     private Duration window = Duration.ofMinutes(1);
     private int maxRequests = 20;
-    private Set<String> paths = new LinkedHashSet<>(Set.of("/login", "/login/webauthn"));
+    private Set<String> paths = new LinkedHashSet<>(
+            Set.of("/login", "/login/webauthn", "/webauthn/authenticate/options"));
 
     public boolean isEnabled() {
         return enabled;
@@ -44,5 +45,14 @@ public final class AinerLoginRateLimitProperties {
 
     public void setPaths(Set<String> paths) {
         this.paths = paths == null ? new LinkedHashSet<>() : new LinkedHashSet<>(paths);
+    }
+
+    void validate() {
+        if (paths == null
+                || paths.isEmpty()
+                || paths.stream().anyMatch(path -> path == null || path.isBlank() || !path.startsWith("/"))) {
+            throw new IllegalStateException(
+                    "Ainer login rate limit paths must be a non-empty set of absolute paths");
+        }
     }
 }

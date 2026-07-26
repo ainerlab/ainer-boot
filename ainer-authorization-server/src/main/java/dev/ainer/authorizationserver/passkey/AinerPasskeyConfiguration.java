@@ -93,6 +93,11 @@ public class AinerPasskeyConfiguration {
     }
 
     @Bean
+    AinerPasskeyTenantSubjectGuard ainerPasskeyTenantSubjectGuard(JdbcTemplate jdbcTemplate) {
+        return new AinerPasskeyTenantSubjectGuard(jdbcTemplate);
+    }
+
+    @Bean
     @ConditionalOnProperty(
             prefix = "ainer.security.authorization-server.passkey.recovery",
             name = "self-service-enabled",
@@ -115,17 +120,20 @@ public class AinerPasskeyConfiguration {
     AinerPasskeyAdminRecoveryService ainerPasskeyAdminRecoveryService(
             JdbcTemplate jdbcTemplate,
             AinerJdbcPasskeyCredentialRepository credentialRepository,
+            AinerPasskeyTenantSubjectGuard tenantSubjectGuard,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         return new AinerPasskeyAdminRecoveryService(
-                jdbcTemplate, credentialRepository, transactionManager, clock);
+                jdbcTemplate, credentialRepository, tenantSubjectGuard, transactionManager, clock);
     }
 
     @Bean
     AinerPasskeyEnrollmentGrantService ainerPasskeyEnrollmentGrantService(
             JdbcTemplate jdbcTemplate,
+            AinerPasskeyTenantSubjectGuard tenantSubjectGuard,
             PlatformTransactionManager transactionManager,
             Clock clock) {
-        return new AinerPasskeyEnrollmentGrantService(jdbcTemplate, transactionManager, clock);
+        return new AinerPasskeyEnrollmentGrantService(
+                jdbcTemplate, tenantSubjectGuard, transactionManager, clock);
     }
 }

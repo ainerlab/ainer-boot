@@ -4,6 +4,8 @@ package dev.ainer.security;
 public final class AinerSecurityScopes {
 
     public static final String PLATFORM_METRICS_READ = "platform.metrics.read";
+    public static final String TENANT_MEMBERS_READ = "tenant.members.read";
+    public static final String TENANT_MEMBERS_WRITE = "tenant.members.write";
 
     private AinerSecurityScopes() {
     }

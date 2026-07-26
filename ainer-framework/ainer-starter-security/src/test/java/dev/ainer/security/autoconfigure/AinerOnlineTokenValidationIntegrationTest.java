@@ -193,6 +193,7 @@ class AinerOnlineTokenValidationIntegrationTest {
             return token -> Jwt.withTokenValue(token)
                     .header("alg", "RS256")
                     .subject("subject:user-1")
+                    .claim("actor_type", "USER")
                     .claim("scope", "ai.invoke")
                     .claim("tenant_id", "tenant:trusted")
                     .issuedAt(Instant.now().minusSeconds(5))

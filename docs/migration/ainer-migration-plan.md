@@ -111,9 +111,13 @@ Ainer 采用 strangler + vertical slice：
 - Authorization Code + PKCE 已用测试专用 public client、真实 HTTP 登录会话和 PostgreSQL 完成
   S256 正反门禁；public client 不配置 Refresh Token，生产 browser/OIDC client 控制面、人员账号
   控制面仍未完成。
-- 已建立默认关闭的 Passkey 协议基础：UV-required、RP/Origin 失败关闭、无凭证密码
-  bootstrap、已登记账号条件门禁、软撤销/最后凭证保护与审计；完整 authenticator ceremony、
-  受控首次登记、恢复码/管理员恢复、通知和 step-up policy 仍未完成。
+- 已建立默认关闭的 Passkey 完整代码主线：UV-required、RP/Origin 失败关闭、无凭证密码
+  bootstrap、已登记账号条件门禁、真实虚拟 authenticator 签名 ceremony、软撤销/最后凭证保护、
+  恢复码与管理员双人恢复、受控首次 enrollment、登录限速和 Resource Server step-up；恢复通知、
+  真实设备矩阵、共享限流和多节点 session 仍未完成。
+- Identity 权威运行时已提供 tenant 成员列表、加入、角色变更与软移除 API，使用 USER capability
+  scope + 可信 tenant claim + ACTIVE OWNER/ADMIN 资源角色并同事务审计；首个平台 tenant/OWNER
+  使用默认关闭、严格幂等且带事务 advisory lock 的 Authorization Server bootstrap。
 - 旧 Token 在过渡期通过边界适配，不复制旧 Token 表到 Ainer。
 
 ### M4：低耦合业务切片
@@ -127,7 +131,8 @@ Ainer 采用 strangler + vertical slice：
 - 角色变更、移除和所有权转移已使用独立用例；数据库部分唯一索引与 Workspace 行锁保护单一 ACTIVE OWNER。
 - 关键允许/拒绝授权决策已进入独立事务审计；Identity Directory、禁用/撤销事务与 access-event outbox 已在 Identity 侧落地。
 - Workspace 审计已支持 `workspace.audit.read` + ACTIVE OWNER/ADMIN 的 tenant/resource 绑定分页查询。
-- 下一步是跨运行时 Directory adapter、outbox relay 与 Workspace 幂等撤销消费者；保留期、归档、SIEM 与告警仍未完成。
+- 跨运行时 Directory adapter、outbox relay、Workspace 幂等撤销消费者、热/冷归档和 SIEM 拉取
+  均已落地；生产外部不可变副本、告警路由与多节点容量证据仍未完成。
 
 优先选择：
 

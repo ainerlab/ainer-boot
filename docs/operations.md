@@ -139,15 +139,29 @@ Passkey 默认关闭，首次启用不能只切一个开关：
    反向代理必须保留正确外部 Origin，不能用内部容器域名代替；
 3. 在隔离环境用目标浏览器和真实/虚拟 authenticator 验证首次登记、Passkey 登录、第二凭证
    replacement、旧凭证撤销、最后凭证拒绝、session 超时与 CSRF；
-4. 高权限账号启用前，建立受控首次 enrollment、丢失设备停用和人工恢复值班流程；当前没有
-   恢复码或管理员恢复 API；
-5. 小范围启用，监控登录失败、登记/撤销审计、数据库错误和恢复工单，再扩大账号范围；
-6. 多实例前验证粘性会话或另行设计共享 session；当前 WebAuthn options 存于 HTTP session，
+4. 高权限账号启用前，选择并演练恢复路径：启用恢复码时确保明文只在签发响应出现一次；启用管理员
+   恢复时使用不同 SERVICE 主体分别持有 request/approve scope，并验证目标 tenant/subject 绑定；
+5. 若使用 `require-invite` enrollment，先为目标 ACTIVE tenant member 建立短时预授权；不得把
+   `optional` 误当作生产高权限账号的受控登记策略；
+6. 小范围启用，监控登录限流 allow/deny、登记/撤销/恢复审计、数据库错误和恢复工单，再扩大账号范围；
+7. 多实例前验证粘性会话或另行设计共享 session；当前 WebAuthn options 存于 HTTP session，
    不能假设任意节点无状态完成同一 ceremony。
 
 普通回滚可关闭功能并保留 `user_*`/`ainer_passkey_*` 表。对已登记账号关闭 Passkey 会把
 OAuth authorization 恢复为密码路径，属于安全降级，必须审批、通知并记录时间窗口；不得通过
 手工删除 lifecycle/credential 行解除门禁。
+
+### 2.7 首个平台 tenant/OWNER 引导
+
+引导运行在 Identity 权威数据所属的 Authorization Server，默认关闭：
+
+1. 在受控空环境通过 secret store 注入 tenant code/name、username、display name 与 12..128 字符
+   password，并只在初始化窗口启用 `AINER_PLATFORM_TENANT_BOOTSTRAP_ENABLED=true`；
+2. 启动 Authorization Server；确认日志只记录 tenant code 与 subject ID，不出现密码；
+3. 验证租户、用户、ACTIVE 默认 membership 与 OWNER 角色完整存在，再立即移除开关和明文密码；
+4. 重启验证严格幂等：完整匹配时不改密码；tenant code 或 username 部分占用、状态漂移时必须启动失败，
+   不得手工补记录后继续；
+5. 后续 tenant/user 平台管理等待专用 SERVICE 控制面，不反复开启首租户 bootstrap。
 
 ## 3. 健康检查
 

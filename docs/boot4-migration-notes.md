@@ -141,8 +141,9 @@ Spring Security 7.1 WebAuthn 已在 Authorization Server 中完成依赖与协�
 `/oauth2/authorize` 和凭证管理，不给 Client Credentials、internal API 或 metrics 增加人员因子
 要求。
 
-当前自动化真实执行 options、条件拒绝、PKCE bootstrap、`amr/auth_time` 和 JDBC 生命周期，但
-尚未完成虚拟 authenticator 的完整签名 ceremony 或真实设备矩阵。Ainer 没有用全局
+当前自动化已用虚拟 authenticator 真实执行 registration/authentication 签名 ceremony，并覆盖
+options、条件拒绝、PKCE bootstrap、`amr/auth_time`、恢复/enrollment 与 JDBC 生命周期；尚未完成
+主流真实设备/浏览器兼容矩阵、恢复通知、共享限流或多节点 session。Ainer 没有用全局
 `@EnableMultiFactorAuthentication` 改写服务安全链，而是在 browser chain 精确为 password 与
 WebAuthn authentication filter 开启 factor accumulation；升级 Spring Security 时需要继续用
 真实 HTTP 门禁验证该扩展点。
