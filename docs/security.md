@@ -231,6 +231,13 @@ M4.5 已用测试专用 public client 完成真实 HTTP 浏览器会话与 Postg
 这些证据不创建生产默认 browser client，也不提供注册/轮换 API、品牌登录页、同意页、租户选择、
 会话治理或完整 MFA。测试 issuer、测试 client 和测试 RSA key 不能用于发行环境。
 
+Ainer Admin 另提供只在 `dev` profile、显式开关下初始化的固定 public client
+`ainer-admin-dev`。它注册 `/ainer-admin/auth/callback` 与
+`/ainer-admin/auth/logged-out` 两个同源精确 URI，只允许 Authorization Code + PKCE S256，
+scopes 固定为 `openid profile tenant.members.read tenant.members.write`，不注册 Refresh Token。
+它用于官方参考管理应用联调，不是生产 browser client 控制面；完整边界见
+[ADR-0022](decisions/0022-ainer-admin-browser-integration-baseline.md)。
+
 M4.6 增加默认关闭的 Passkey/WebAuthn 协议基础。启用时：
 
 - RP ID 必须是小写 DNS 名或 `localhost`，Origin host 必须等于 RP ID 或位于其子域；生产只接受

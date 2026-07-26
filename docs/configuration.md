@@ -168,6 +168,19 @@ AI 默认关闭。启用时以下设置共同构成安全门禁：
 | `AINER_AUTHORIZATION_CLIENT_CONTROL_CLIENT_SECRET_TTL` | `90d` | managed client secret 有效期，范围 1 至 365 天 |
 | `AINER_AUTHORIZATION_CLIENT_CONTROL_SECRET_BYTES` | `32` | 服务端随机 secret 字节数，范围 32..64 |
 
+Ainer Admin 开发 browser client 只在 `dev` profile 中装配，并且默认关闭：
+
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `AINER_ADMIN_BROWSER_CLIENT_ENABLED` | `false` | 显式初始化固定 public client `ainer-admin-dev` |
+| `AINER_ADMIN_BROWSER_CLIENT_REDIRECT_URI` | 空 | 必须以 `/ainer-admin/auth/callback` 结尾 |
+| `AINER_ADMIN_BROWSER_CLIENT_POST_LOGOUT_REDIRECT_URI` | 空 | 必须以 `/ainer-admin/auth/logged-out` 结尾且与登录回调同源 |
+
+两个 URI 生产形态必须为 HTTPS；HTTP 只允许 `localhost`、`127.0.0.1` 或 `::1`。client 固定使用
+Authorization Code、PKCE S256 和 `openid profile tenant.members.read tenant.members.write`，
+不注册 client secret 或 Refresh Token。相同 `client_id` 已存在但策略不完全匹配时启动失败，
+不会覆盖或静默接受漂移。该入口是开发初始化，不是生产 browser client 控制面。
+
 首个平台 tenant/OWNER 引导也运行在 Authorization Server，默认关闭：
 
 | 环境变量 | 默认值 | 生产说明 |

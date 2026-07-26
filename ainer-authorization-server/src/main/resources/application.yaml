@@ -11,6 +11,11 @@ server:
   shutdown: graceful
 
 ainer:
+  admin:
+    browser-client:
+      enabled: ${AINER_ADMIN_BROWSER_CLIENT_ENABLED:false}
+      redirect-uri: ${AINER_ADMIN_BROWSER_CLIENT_REDIRECT_URI:}
+      post-logout-redirect-uri: ${AINER_ADMIN_BROWSER_CLIENT_POST_LOGOUT_REDIRECT_URI:}
   identity:
     enabled: ${AINER_IDENTITY_ENABLED:true}
     directory-api:
