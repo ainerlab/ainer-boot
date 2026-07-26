@@ -75,7 +75,19 @@ POST 请求还包含 `role` 与安全格式 `reasonCode`；PATCH 包含 `role`�
 409。每次成功写操作与 `reasonCode`、request ID 一起进入同事务成员安全审计。分页从 1 开始，
 `size=1..100`。
 
-## 6. AI API
+## 6. 当前 access token 自助撤销
+
+| Method | Path | Scope | Actor | 说明 |
+|---|---|---|---|---|
+| POST | `/api/me/access-token-revocations` | 无附加 scope | `USER` | 撤销当前请求携带的 access token |
+
+请求不接受 token 参数，也不能指定其他 authorization；成功响应的 `data` 为
+`{"revoked":true}`。Token 不存在、已过期或已撤销统一返回 401
+`AINER.COMMON.UNAUTHENTICATED`，`SERVICE` actor 返回 403。实现更新 Spring Authorization
+Server 官方 JDBC authorization，不建立 Ainer 自定义 Token 表，也不撤销当前 authorization
+可能关联的其他 token。
+
+## 7. AI API
 
 AI runtime 默认关闭；启用后所有端点要求 `ai.invoke` scope。
 
@@ -87,7 +99,7 @@ AI runtime 默认关闭；启用后所有端点要求 `ai.invoke` scope。
 
 请求、SSE payload、错误和审计字段见 [`ai-gateway.md`](ai-gateway.md)。Ainer 的内部契约不是对 OpenAI API 的完整字段兼容承诺。
 
-## 7. Authorization Server 与内部 Identity API
+## 8. Authorization Server 与内部 Identity API
 
 `ainer-authorization-server` 暴露 Spring Authorization Server 的标准 OAuth 2.1/OIDC 端点，具体启用能力和密钥要求见 [`security.md`](security.md)。协议端点遵循标准响应，不套 Ainer JSON envelope。
 

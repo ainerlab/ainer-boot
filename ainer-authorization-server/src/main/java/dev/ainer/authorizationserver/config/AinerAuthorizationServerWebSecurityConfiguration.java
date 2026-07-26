@@ -146,12 +146,13 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
 
     @Bean
     @Order(3)
-    SecurityFilterChain tenantMemberApiSecurityFilterChain(
+    SecurityFilterChain ainerAdminApiSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder jwtDecoder,
             ObjectMapper objectMapper) throws Exception {
         AinerSecurityFailureWriter failureWriter = new AinerSecurityFailureWriter(objectMapper);
         http.securityMatcher(
+                        "/api/me/access-token-revocations",
                         "/api/tenants/*/members",
                         "/api/tenants/*/members/**")
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())

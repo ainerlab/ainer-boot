@@ -285,6 +285,11 @@ Identity Directory 只返回 ACTIVE tenant、ACTIVE user、ACTIVE membership 的
 该 API 位于 Identity 权威数据库所在的 Authorization Server；业务 Resource Server 不复制
 Identity 表。对管理 API 的 step-up/在线校验策略仍需在 browser/OIDC client 切片中单独接入。
 
+`POST /api/me/access-token-revocations` 为 USER bearer 提供当前 access token 的窄自助撤销。
+端点不接收任意 token 参数，不要求 public browser client 伪造 client authentication，也不扩大
+RFC 7009 的 client 授权边界。撤销直接失效 Spring Authorization Server 官方 JDBC
+authorization 中的当前 access token；不存在、过期或已撤销统一按 401 处理。
+
 账号禁用会阻止后续人员 token 签发，非 OWNER tenant membership 可以被撤销。每次实际状态变化与 `ainer_identity_access_event` outbox 在同一事务提交；事件只保存 tenant、subject、类型、版本和时间。relay 通过短事务使用 `FOR UPDATE SKIP LOCKED` 领取并提交 lease，随后在事务外通过 HTTPS + Client Credentials 投递；成功或失败确认使用 event ID 与 lease owner 条件更新。
 
 Workspace 事件端点要求 `actor_type=SERVICE`、`identity.access-events.publish` 和精确可信 publisher `sub`。消费事务先插入 event receipt，再将同 tenant/subject、创建时间不晚于事件时间的 PENDING/ACTIVE membership 置为 `REVOKED`。重复 event ID 幂等成功，旧事件不影响后来创建的 membership，跨 tenant 不受影响。安全禁用可以让 OWNER 变为 REVOKED 并暂时留下无 ACTIVE OWNER 的 Workspace；这优先于继续放行已禁用账号，恢复/所有权处置必须使用后续专用流程。
