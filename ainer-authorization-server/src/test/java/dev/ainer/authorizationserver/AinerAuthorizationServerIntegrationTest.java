@@ -705,21 +705,25 @@ class AinerAuthorizationServerIntegrationTest {
             String actorType,
             String scope) {
         Instant now = Instant.now();
-        Map<String, Object> claims = new LinkedHashMap<>(Map.of(
-                "actor_type", actorType,
-                "sub", subjectId,
-                "tenant_id", tenantId,
-                "scope", scope));
-        JwtClaimsSet jwtClaims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
                 .issuer("https://auth.ainer.test")
                 .subject(subjectId)
                 .audience(List.of("ainer-api"))
                 .issuedAt(now)
                 .expiresAt(now.plus(Duration.ofMinutes(5)))
                 .claim("actor_type", actorType)
-                .claim("tenant_id", tenantId)
-                .claim("scope", scope)
-                .build();
+                .claim("scope", scope);
+        if (tenantId != null) {
+            claims.claim("tenant_id", tenantId);
+        }
+        JwtClaimsSet jwtClaims = claims.build();
+        Map<String, Object> authorizationClaims = new LinkedHashMap<>();
+        authorizationClaims.put("actor_type", actorType);
+        authorizationClaims.put("sub", subjectId);
+        authorizationClaims.put("scope", scope);
+        if (tenantId != null) {
+            authorizationClaims.put("tenant_id", tenantId);
+        }
         String tokenValue = jwtEncoder.encode(JwtEncoderParameters.from(jwtClaims)).getTokenValue();
         OAuth2AccessToken accessToken = new OAuth2AccessToken(
                 OAuth2AccessToken.TokenType.BEARER,
@@ -734,7 +738,7 @@ class AinerAuthorizationServerIntegrationTest {
                 .authorizedScopes(accessToken.getScopes())
                 .token(accessToken, metadata -> metadata.put(
                         OAuth2Authorization.Token.CLAIMS_METADATA_NAME,
-                        claims))
+                        authorizationClaims))
                 .build();
         authorizationService.save(authorization);
         return tokenValue;
