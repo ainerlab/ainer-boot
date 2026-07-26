@@ -6,11 +6,16 @@
 
 ## 1. 当前阶段
 
-Foundation M4.7 与 Ainer Admin 后端融合基线已经落地：M4.6 Passkey 代码主线（真实签名
-ceremony、恢复、受控 enrollment、登录限速与 Resource Server step-up）完成安全收口；Identity
-权威运行时提供 tenant 成员治理；固定开发 browser client、开发身份、Token 自助撤销、成员 API
-active gate、OpenAPI/SDK 与完整浏览器链路测试已经形成。当前工程是可编译、可运行、可用真实
-PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到生产或商业发行就绪。
+Foundation 已完成 M4.8A 与 Ainer Admin 后端融合：M4.7 tenant 成员管理与首租户严格 bootstrap
+已落地，平台
+预配申请又具备幂等摘要、并发预留、短时一次性 grant、加密 notification outbox、已有用户本人
+接受、原子创建 ACTIVE tenant/OWNER、显式取消、tenant/user 安全分页，以及默认关闭的
+OAuth2/HTTPS 通知网关 relay 和 provider-neutral `DELIVERED|FAILED` 终态回执接收基线。
+固定 Ainer Admin 开发 browser client、开发身份、Token 自助撤销、成员 API active gate、
+OpenAPI/SDK 与完整浏览器链路测试也已纳入同一分支。
+`REQUESTED` 仍不是可授权身份事实；真实外部通知网关/供应商联调、供应商回执映射、最终送达证据、
+生产限速/告警尚未完成，0-skipped 仍需在正式发布候选环境重复执行。当前工程是可编译、可运行、
+可用真实 PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到生产或商业发行就绪。
 
 ## 2. 已完成
 
@@ -73,35 +78,51 @@ PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到生产或�
   active gate、`ainer-admin-v1.yaml` 与 TypeScript SDK 生成入口；
 - 同一 `ainer-admin-dev` browser session 的 PKCE → default tenant → 成员列表/添加/双向改角色/
   软移除 → revoke → OIDC logout 真实 PostgreSQL 端到端门禁；
-- ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0019 与 ADR-0022 已接受，ADR-0012 至 ADR-0014 处于 Proposed；
+- 默认关闭的平台 Identity 预配申请控制面：tenantless SERVICE、tenant/user 成对 read/write
+  scope、精确 operator 白名单、独立一分钟 operator bootstrap、operator 级幂等、规范化摘要、
+  tenant code/新 username 并发预留、惰性过期、同事务平台审计和安全状态查询；
+- 平台预配与首租户 bootstrap 共享 tenant code/username advisory lock；申请只预生成
+  PostgreSQL UUIDv7 tenant/subject，不提前写核心 tenant/user/membership；
+- 新用户短时限次 activation grant（256-bit secret、数据库只存 SHA-256 摘要）、带 key version
+  的 AES-256-GCM notification outbox、失败重试与 key rotation 读取；平台投影/审计不返回 secret、
+  联系地址、密文或请求摘要；
+- 新用户消费 grant 时本人设置首个长期密码；已有 ACTIVE 用户必须用本人 USER Token 与
+  `identity.provisioning.accept` 接受。成功事务原子创建 ACTIVE tenant、user（若需要）与 OWNER；
+  失败计数锁定、过期、回放和核心写入失败均不产生孤儿 ACTIVE tenant；
+- 平台 tenant/user 核心事实安全分页分别受对应 read scope 保护，单页最多 100，不返回密码、
+  OAuth、membership、通知或 activation 数据；未激活申请通过显式 cancellation 子资源幂等关闭，
+  request、预期 grant、未发布 payload 销毁与阶段审计同事务；
+- 默认关闭的预配通知终态回执 API：独立 tenantless gateway client、专用
+  `identity.provisioning-notifications.receipts.write` scope、精确白名单、只允许已
+  `PUBLISHED` notification、gateway event/notification 双重幂等、UUIDv7 回执和最小安全字段；
+- ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0020 与 ADR-0022 已接受，ADR-0012 至 ADR-0014
+  及 ADR-0021 处于 Proposed；
   架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
 
 ## 3. 最近验证证据
 
 2026-07-26 在 macOS Colima、Testcontainers 2.0.5 与 `postgres:18.3-alpine` 环境执行完整
-`mvn test`：14 个 Reactor 模块成功，222 个测试全部实际执行通过，0 failure、0 error、
-0 skipped。
+`mvn test`：14 个 Reactor 模块成功，67 个测试套件、271 个测试全部实际执行通过，
+0 failure、0 error、0 skipped。
 
 本轮 Ainer Admin 证据使用固定 `ainer-admin-dev` public client、同一 HTTP cookie session 与
-`postgres:18.3-alpine` 从空库执行 Authorization Server 13 份 migration。端到端覆盖
+`postgres:18.3-alpine` 从空库执行 Authorization Server 16 份 migration。端到端覆盖
 Authorization Code + PKCE S256、无 Refresh Token、default tenant/OWNER claims、成员 GET、添加
 已有用户、MEMBER → ADMIN → MEMBER、软移除与 `[ADDED, ROLE_CHANGED, ROLE_CHANGED, REMOVED]`
 审计；自助撤销后旧 access token 被 active gate 返回 401，ID token 仍可完成
 `/connect/logout` 并精确返回 `/ainer-admin/auth/logged-out`。全量回归还把旧成员 API 集成测试
 从“只签名 JWT”改为持久化真实 active authorization，避免测试绕过新的在线活性边界。
-
-同日对 `dev@a22e121` 做了只读三方兼容审计：两条线共享 `981b0b4` 基点；M4.8A 修改 140 个
-路径，Admin 基线修改 34 个路径，重叠 13 个。把成员 active authorization 夹具从通用
-`actorToken` 中隔离后，主 Authorization Server 集成测试已可自动合并，并保留 M4.8A 的
-tenantless SERVICE Token 语义。Security 配置也通过保持原成员安全链 bean 名消除了顺序附近的
-文本冲突。最终 `git merge-tree` 只剩 7 个 README、Changelog、ADR 索引和状态文档冲突；代码、POM、
-`application.yaml`、Admin 新类/OpenAPI 与 M4.8A migration 均可文本自动合并，且没有 migration
-版本碰撞。自动合并会保留 M4.8A activation chain 的较高顺序，并把原成员安全链扩展为 Ainer
-Admin member/revoke + active gate，不需要建立第二条重叠 matcher。
-文档解冲突必须保留 `a22e121` 的 `docs/README.md` 目录门面，并把本轮新增的
-`ainer-admin-integration.md` 接入其唯一权威入口 `docs/00-overview.md`，不能恢复旧的双导航。
-因本阶段明确禁止合并，尚未形成 `a22e121 + Ainer Admin` 的组合编译/全量测试证据；
-集成时必须解冲突后重新计算测试数并执行零跳过 `mvn test`。
+本次已把 `dev@a22e121` 的 M4.8A 合入 Ainer Admin 分支。Java、POM、`application.yaml`、Admin
+OpenAPI 与 M4.8A migration 自动合并且没有 migration 版本碰撞；7 个冲突全部位于 README、
+Changelog、ADR 索引和状态文档，并已保留双方内容。安全链顺序保持为协议端点、内部控制面、
+M4.8A 激活、Admin 成员/revoke active gate、指标和默认登录；M4.8A tenantless SERVICE Token
+夹具与 Admin active authorization 夹具彼此隔离。融合回归还修正了 M4.8A 新用户激活测试把
+`IdentityAccount.roles()` 误写为领域角色 `OWNER` 的断言，使其与既有 Spring authority
+`ROLE_OWNER` 契约一致；对外 Token `roles` claim 仍为 `OWNER`。
+`docs/README.md` 继续只是目录门面，`docs/00-overview.md` 是唯一权威入口并已纳入
+`ainer-admin-integration.md`。严格 OpenAPI 校验和 TypeScript SDK 生成成功；
+`ainer-admin-v1.yaml` SHA-256 保持
+`1269a0e325f645ab9371a7783635e0a7cdfe1bfad4cd11b56bc6ade5f2468056`。
 
 本轮 M4.7 新增 Identity 管理面证据：Identity 模块从空库执行 6 份 migration，真实 PostgreSQL
 覆盖成员列表、按 username/subjectId 加入、角色变更、软移除、DISABLED 重激活、OWNER 保护与每次
@@ -109,6 +130,50 @@ Admin member/revoke + active gate，不需要建立第二条重叠 matcher。
 随机端口 HTTP 使用实际 RSA Bearer JWT 覆盖匿名 401、缺 scope/SERVICE/MEMBER/跨 tenant 403，以及
 加入、列表、改角色、移除和 3 条审计落库；同时证明成员 API 只使用 Identity 权威数据库。
 bootstrap 用例证明首次创建、重复执行不覆盖密码、部分 tenant/username 占用失败关闭。
+
+此前 M4.8A 预配申请证据：Identity 模块从空库执行 7 份 migration，真实 PostgreSQL 覆盖规范化
+请求、相同摘要幂等重放、同幂等键下 tenant name/change reference 变化冲突、tenant code 双线程并发
+预留只成功一次、过期释放、ACTIVE 用户复用、LOCKED 用户拒绝、与 bootstrap 共享冲突门禁、核心
+tenant/user/membership 零污染和 request/phase audit。Authorization Server 从空库执行 14 份
+migration，随机端口 HTTP 使用实际 RSA Bearer JWT 覆盖匿名 401、缺 header 400、缺成对 scope、
+tenant-bound SERVICE、USER、白名单外 operator 的 403，以及 POST/GET、安全投影、no-store、
+幂等冲突和审计落库。配置与 bootstrap 单元测试覆盖空 operator、TTL 边界、弱 secret 和策略不匹配
+既有 client 的启动失败。
+
+本轮激活核心增量证据：本机 PostgreSQL 18.4 随机 schema 经 Flyway 实际执行 Identity 全部 8 份
+migration，跑通申请、AES-GCM 通知解密、错误 secret 次数持久化、成功原子激活和回放拒绝，结束后
+schema 已清理；同一批 migration 还在单事务临时 schema 中完整执行并回滚。新增不依赖 Docker 的
+4 个测试覆盖 AES-GCM round-trip、tamper、未知 key、旧 key rotation 读取与 provider 失败延迟重试；
+配置测试覆盖 activation TTL/次数/key ring 失败关闭。完整 Identity PostgreSQL 用例又加入锁定、
+过期、已有用户 subject 绑定、默认 tenant 保留、核心写入失败回滚和密文不含 secret 断言。
+
+本轮通知 transport 增量已实现独立 tenantless relay client bootstrap、OAuth2 Client Credentials、
+HTTPS gateway publisher、稳定 `Idempotency-Key`、调度领取、失败分类和 pending/failed/exhausted/
+cancelled/oldest-ready 指标。HTTP 合约测试证明 Bearer、版本化 envelope、新用户激活材料和已有用户
+无 secret 投影；配置测试证明普通 HTTP、带 query 的 URI 和非法重试边界失败关闭。网关 2xx 后或
+请求取消时，Identity 会销毁 `protected_payload` 的可解密内容；`PUBLISHED` 只证明网关持久接收，
+不代表邮件、短信或站内信最终送达。
+
+本轮平台控制增量增加成对 write scope 的显式 cancellation，以及各自 read scope 的 tenant/user
+安全分页。非 Docker 单元测试覆盖 tenantless SERVICE、operator 白名单、scope 拆分、分页边界和
+取消指标；PostgreSQL 18.4 隔离 schema 重放全部 8 份 Identity migration，并实测 request/grant/
+outbox 同时 `CANCELLED`、payload 销毁和取消审计。Testcontainers 用例还覆盖重复取消不重复审计、
+新用户 grant 缺失时整笔回滚、已有用户无 grant、稳定排序/total 和 HTTP 响应不含凭据数据。
+
+本轮终态回执增量增加独立 gateway client bootstrap、tenantless SERVICE + 专用 scope + 精确白名单
+安全链、`DELIVERED|FAILED` 最小模型、单 notification 终态与 gateway event 幂等、抢先回执状态
+冲突以及首次终态 Counter。10 个不依赖 Docker 的新增测试覆盖参数/未来时间、回放/冲突、Controller
+安全投影、配置失败关闭和 bootstrap 策略。本机 PostgreSQL 18.4 隔离 schema 从空库重放全部 9 份
+Identity migration，验证回执 UUIDv7、合法终态写入、重复 notification 唯一冲突和 `FAILED`
+空失败码拒绝；该 smoke 实际发现并修正了 SQL 三值逻辑下 NULL 逃逸 check 的问题，schema 已清理。
+随机端口 OAuth2/Bearer 与真实事务 Testcontainers 用例已写入并通过 test compilation，但当前无
+Docker，尚未实际执行，不能计入 0-skipped 发布证据。
+
+当前机器未运行 Docker。本轮干净执行 `mvn clean test` 时 14 个 Reactor 模块全部成功，
+Surefire 共发现 61 个测试套件、256 个测试；其中 172 个实际执行并通过，0 failure、0 error，
+84 个 Testcontainers 测试因 `disabledWithoutDocker=true` 跳过。因此上述本机 PostgreSQL smoke
+是真实增量证据，但不是新的完整 0-skipped 发布快照。上方 221-test 结果仍是最近一次完整不跳过
+基线，合并/发布前必须在 Colima/Testcontainers 可用环境重跑全量并更新数字。
 
 本轮安全收口还验证：Passkey 恢复/enrollment 对目标 ACTIVE default membership 的跨 tenant guard 与
 数据库复合外键；登录限流在 context path 下对 WebAuthn options 返回统一 429、
@@ -202,9 +267,13 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 - Authorization Code + PKCE 与 Passkey 条件门禁、虚拟 authenticator 签名 ceremony、恢复、
   受控 enrollment 和 Resource Server step-up 已有自动化证据，但生产 browser/OIDC client 控制面、
   品牌登录 UI、恢复通知、真实设备矩阵、共享限流、多节点会话和签名密钥轮换未完成；
-- tenant ownership transfer、平台级 tenant/user 控制面和成员管理 UI 尚未完成；
-- tenant 成员 API 位于 Authorization Server，已对 Ainer Admin access token 强制 active gate；
-  step-up 仍未接入该端点，不能把业务 Server 的默认 step-up 规则误认为覆盖它；
+- 平台级 tenant/user 控制面已有默认关闭的预配申请/查询、一次性激活核心、加密 notification
+  outbox、OAuth2/HTTPS 通知网关 relay、已有用户本人接受、安全分页、显式取消与 provider-neutral
+  终态回执接收；真实外部通知网关/供应商、供应商回执映射和最终送达证据、禁用/恢复、tenant
+  ownership transfer 和成员管理 UI 尚未完成；
+- tenant 成员 API 位于 Authorization Server，但其 step-up/在线校验接入要随生产 browser/OIDC
+  client 策略单独完成；Ainer Admin access token 已强制 active gate，但不能把业务 Server 的默认
+  step-up 规则误认为覆盖该端点；
 - Ainer Admin 同源代理已有契约但尚未在选定生产 ingress 上完成 HTTPS、Cookie、重定向和缓存
   验收；`ainer-admin-dev` 与开发身份不能替代生产 browser client 生命周期和正式开户。
 
@@ -212,10 +281,16 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 - 限流仍是单进程基线，未形成集群级一致性；
 - provider 凭据托管、指标、trace、输出策略、评测、RAG 与 Agent runtime 尚未完成；
+- Run / Artifact 与 Knowledge 当前只有经 xq 现状复审后的 Proposed 数据模型，没有 Accepted ADR、
+  migration 或运行代码；通用 Step、Feedback 和资源级 ACL 不得描述为已完成；
 - 供应商兼容面仅覆盖当前 OpenAI-compatible 最小协议。
 
 ### 工程与运营
 
+- PostgreSQL Native-First 目标已由 ADR-0020 和数据库规范 1.2 确立，但当前持久化实现仍大量使用
+  UUIDv4，Workspace/AI `tenant_id` 仍为 `varchar(128)`；M4.8A 新增 request/grant/outbox/audit
+  /receipt 及预留 tenant/subject 已率先使用 PostgreSQL `uuidv7()`，但统一 `RETURNING`、全域
+  tenant UUID 化和 1.0 clean baseline 尚未实施；
 - 没有正式 CI、制品签名、SBOM、发布仓库和自动部署；
 - 没有具名模块维护者矩阵、`CODEOWNERS` 和正式审查责任分配；
 - 没有生产备份恢复、容量测试、正式错误预算/告警路由和灾难恢复演练；
@@ -226,11 +301,14 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 M4.8 已形成并接受
 [ADR-0019](decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)，
-按依赖顺序拆为三个切片：先完成 tenantless SERVICE 的 tenant/user 幂等供应、一次性激活和通知
-outbox；再完成 Authorization Server 人员多租户上下文选择，使 `is_default` 只承担首次登录落点；
-最后完成当前 OWNER 发起、目标 ACTIVE ADMIN 强认证接受的 Identity OWNER 专用转移。不能先做
-OWNER 转移，因为现有人员 Token 仍只从默认 membership 取得 tenant，上下文选择是目标本人接受
-转移的协议前提。
+按依赖顺序拆为三个切片。M4.8A 已完成 tenantless SERVICE 预配、激活核心与真实 HTTPS gateway
+transport、provider-neutral 终态回执接收，以及平台显式取消与 tenant/user 安全分页；下一步联调
+真实外部通知网关/供应商和回执映射，并在 Docker 可用环境跑完随机端口 HTTP、并发、过期、回滚和
+0-skipped PostgreSQL 门禁。完成这些
+M4.8A 发布证据后再进入 Authorization Server 人员
+多租户上下文选择，使 `is_default` 只承担首次登录落点；最后完成当前 OWNER 发起、目标 ACTIVE ADMIN
+强认证接受的 Identity OWNER 专用转移。不能先做 OWNER 转移，因为现有人员 Token 仍只从默认
+membership 取得 tenant，上下文选择是目标本人接受转移的协议前提。
 
 M4.8 与商业 entitlement 保持正交：Identity `OWNER/ADMIN/MEMBER` 只表达授权角色，Community /
 Pro / Enterprise、license、订阅和配额留给后续独立 entitlement 边界。生产并行工作仍包括真实

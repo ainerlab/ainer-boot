@@ -275,6 +275,49 @@ public class AinerAuthorizationServerConfiguration {
                 properties, registeredClientRepository, passwordEncoder);
     }
 
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "ainer.security.authorization-server.platform-identity-operator-bootstrap",
+            name = "enabled",
+            havingValue = "true")
+    AinerPlatformIdentityOperatorBootstrapRunner ainerPlatformIdentityOperatorBootstrapRunner(
+            AinerAuthorizationServerProperties properties,
+            RegisteredClientRepository registeredClientRepository,
+            PasswordEncoder passwordEncoder) {
+        return new AinerPlatformIdentityOperatorBootstrapRunner(
+                properties, registeredClientRepository, passwordEncoder);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "ainer.security.authorization-server."
+                    + "provisioning-notification-relay-client-bootstrap",
+            name = "enabled",
+            havingValue = "true")
+    AinerProvisioningNotificationRelayClientBootstrapRunner
+            ainerProvisioningNotificationRelayClientBootstrapRunner(
+                    AinerAuthorizationServerProperties properties,
+                    RegisteredClientRepository registeredClientRepository,
+                    PasswordEncoder passwordEncoder) {
+        return new AinerProvisioningNotificationRelayClientBootstrapRunner(
+                properties, registeredClientRepository, passwordEncoder);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "ainer.security.authorization-server."
+                    + "provisioning-notification-receipt-client-bootstrap",
+            name = "enabled",
+            havingValue = "true")
+    AinerProvisioningNotificationReceiptClientBootstrapRunner
+            ainerProvisioningNotificationReceiptClientBootstrapRunner(
+                    AinerAuthorizationServerProperties properties,
+                    RegisteredClientRepository registeredClientRepository,
+                    PasswordEncoder passwordEncoder) {
+        return new AinerProvisioningNotificationReceiptClientBootstrapRunner(
+                properties, registeredClientRepository, passwordEncoder);
+    }
+
     private List<String> roleNames(AinerUserDetails user) {
         return user.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)

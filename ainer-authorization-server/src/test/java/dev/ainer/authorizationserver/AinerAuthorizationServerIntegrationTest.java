@@ -81,6 +81,19 @@ import static org.assertj.core.api.Assertions.assertThat;
                         + "ainer-client-operator-test",
                 "ainer.security.authorization-server.client-control.allowed-scopes="
                         + "ai.invoke,identity.directory.read",
+                "ainer.identity.platform-control.enabled=true",
+                "ainer.identity.platform-control.operator-client-ids="
+                        + "ainer-platform-identity-operator-test,"
+                        + "ainer-platform-identity-limited-test",
+                "ainer.identity.platform-control.request-ttl=7d",
+                "ainer.identity.platform-control.activation-ttl=24h",
+                "ainer.identity.platform-control.activation-max-attempts=5",
+                "ainer.identity.platform-control.notification-protection-active-key-version=test-v1",
+                "ainer.identity.platform-control.notification-protection-keys="
+                        + "test-v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                "ainer.identity.provisioning-notification-receipts.enabled=true",
+                "ainer.identity.provisioning-notification-receipts.gateway-client-ids="
+                        + "ainer-notification-gateway-test",
                 "spring.main.banner-mode=off"
         })
 @Import(AinerAuthorizationServerIntegrationTest.TestKeyConfiguration.class)
@@ -90,6 +103,17 @@ class AinerAuthorizationServerIntegrationTest {
     private static final String CLIENT_SECRET = "machine-secret-2026";
     private static final String TENANT_ID = "tenant:machine-test";
     private static final String CLIENT_OPERATOR_ID = "ainer-client-operator-test";
+    private static final String PLATFORM_IDENTITY_OPERATOR_ID =
+            "ainer-platform-identity-operator-test";
+    private static final String PLATFORM_IDENTITY_LIMITED_ID =
+            "ainer-platform-identity-limited-test";
+    private static final String NOTIFICATION_GATEWAY_ID =
+            "ainer-notification-gateway-test";
+    private static final String NOTIFICATION_RECEIPT_SCOPE =
+            "identity.provisioning-notifications.receipts.write";
+    private static final String PLATFORM_IDENTITY_SCOPES =
+            "platform.tenants.read platform.tenants.write "
+                    + "platform.users.read platform.users.write";
 
     @Container
     private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(
@@ -142,6 +166,12 @@ class AinerAuthorizationServerIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM ainer_identity_platform_operation_audit");
+        jdbcTemplate.update(
+                "DELETE FROM ainer_identity_notification_delivery_receipt");
+        jdbcTemplate.update("DELETE FROM ainer_identity_notification_outbox");
+        jdbcTemplate.update("DELETE FROM ainer_identity_activation_grant");
+        jdbcTemplate.update("DELETE FROM ainer_identity_tenant_provisioning_request");
         jdbcTemplate.update("DELETE FROM ainer_identity_member_audit");
         jdbcTemplate.update("DELETE FROM ainer_passkey_security_operation_audit");
         jdbcTemplate.update("DELETE FROM ainer_passkey_enrollment_grant");
@@ -163,11 +193,26 @@ class AinerAuthorizationServerIntegrationTest {
         registeredClientRepository.save(machineClient());
         registeredClientRepository.save(machineClient(
                 CLIENT_OPERATOR_ID, null, "oauth.clients.manage"));
+        registeredClientRepository.save(machineClient(
+                PLATFORM_IDENTITY_OPERATOR_ID,
+                null,
+                "platform.tenants.read",
+                "platform.tenants.write",
+                "platform.users.read",
+                "platform.users.write"));
+        registeredClientRepository.save(machineClient(
+                PLATFORM_IDENTITY_LIMITED_ID,
+                null,
+                "platform.tenants.write"));
+        registeredClientRepository.save(machineClient(
+                NOTIFICATION_GATEWAY_ID,
+                null,
+                NOTIFICATION_RECEIPT_SCOPE));
     }
 
     @Test
     void migratesIdentityAndOfficialJdbcProtocolStores() {
-        assertThat(flyway.info().applied()).hasSize(13);
+        assertThat(flyway.info().applied()).hasSize(16);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_name IN ('oauth2_registered_client','oauth2_authorization',"
@@ -176,9 +221,384 @@ class AinerAuthorizationServerIntegrationTest {
                         + "'ainer_passkey_credential','ainer_passkey_credential_audit',"
                         + "'ainer_passkey_recovery_code','ainer_passkey_recovery_lockout',"
                         + "'ainer_passkey_recovery_request','ainer_passkey_security_operation_audit',"
-                        + "'ainer_passkey_enrollment_grant','ainer_identity_member_audit')",
-                Integer.class)).isEqualTo(15);
+                        + "'ainer_passkey_enrollment_grant','ainer_identity_member_audit',"
+                        + "'ainer_identity_tenant_provisioning_request',"
+                        + "'ainer_identity_platform_operation_audit',"
+                        + "'ainer_identity_activation_grant',"
+                        + "'ainer_identity_notification_outbox',"
+                        + "'ainer_identity_notification_delivery_receipt')",
+                Integer.class)).isEqualTo(20);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
+    }
+
+    @Test
+    void platformIdentityProvisioningIsTenantlessScopedIdempotentAndAudited() throws Exception {
+        String operatorToken =
+                accessToken(PLATFORM_IDENTITY_OPERATOR_ID, PLATFORM_IDENTITY_SCOPES);
+        Map<String, String> body = Map.of(
+                "tenantCode", "HTTP-NEXT",
+                "tenantName", "HTTP Next",
+                "ownerUsername", "OWNER@HTTP-NEXT.DEV",
+                "ownerDisplayName", "HTTP Owner",
+                "deliveryChannel", "EMAIL",
+                "deliveryAddress", "owner@http-next.dev",
+                "changeReference", "ORDER-HTTP-001");
+
+        HttpResponse<String> created = platformProvisioningPost(
+                operatorToken, "idem-http-next", body);
+        HttpResponse<String> replayed = platformProvisioningPost(
+                operatorToken, "idem-http-next", body);
+
+        assertThat(created.statusCode()).isEqualTo(200);
+        assertThat(replayed.statusCode()).isEqualTo(200);
+        assertThat(created.headers().firstValue("cache-control"))
+                .hasValueSatisfying(value -> assertThat(value).contains("no-store"));
+        JsonNode createdData = objectMapper.readTree(created.body()).path("data");
+        JsonNode replayedData = objectMapper.readTree(replayed.body()).path("data");
+        String provisioningRequestId = createdData.path("id").stringValue();
+        assertThat(createdData.path("created").booleanValue()).isTrue();
+        assertThat(replayedData.path("created").booleanValue()).isFalse();
+        assertThat(replayedData.path("id").stringValue()).isEqualTo(provisioningRequestId);
+        assertThat(createdData.path("tenantCode").stringValue()).isEqualTo("http-next");
+        assertThat(createdData.path("ownerUsername").stringValue())
+                .isEqualTo("owner@http-next.dev");
+        assertThat(createdData.path("status").stringValue()).isEqualTo("REQUESTED");
+        assertThat(created.body())
+                .doesNotContain("requestFingerprint")
+                .doesNotContain("idempotencyKey")
+                .doesNotContain("activationToken")
+                .doesNotContain("secret");
+
+        HttpResponse<String> found = internalGet(
+                "/internal/platform/identity/tenant-provisioning-requests/"
+                        + provisioningRequestId,
+                operatorToken);
+        assertThat(found.statusCode()).isEqualTo(200);
+        assertThat(objectMapper.readTree(found.body()).path("data").path("id").stringValue())
+                .isEqualTo(provisioningRequestId);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_tenant", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_user", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_platform_operation_audit "
+                        + "WHERE operation_id = ?::uuid AND phase = 'REQUESTED'",
+                Integer.class,
+                provisioningRequestId)).isEqualTo(1);
+
+        HttpResponse<String> changedIdempotency = platformProvisioningPost(
+                operatorToken,
+                "idem-http-next",
+                Map.of(
+                        "tenantCode", "HTTP-NEXT",
+                        "tenantName", "Changed Name",
+                        "ownerUsername", "OWNER@HTTP-NEXT.DEV",
+                        "ownerDisplayName", "HTTP Owner",
+                        "deliveryChannel", "EMAIL",
+                        "deliveryAddress", "owner@http-next.dev",
+                        "changeReference", "ORDER-HTTP-001"));
+        assertThat(changedIdempotency.statusCode()).isEqualTo(409);
+        assertThat(changedIdempotency.headers().firstValue("cache-control"))
+                .hasValueSatisfying(value -> assertThat(value).contains("no-store"));
+        assertThat(objectMapper.readTree(changedIdempotency.body()).path("code").stringValue())
+                .isEqualTo("AINER.IDENTITY.TENANT_PROVISIONING_IDEMPOTENCY_CONFLICT");
+    }
+
+    @Test
+    void platformIdentityCancellationIsExplicitIdempotentAndDestroysPayload()
+            throws Exception {
+        String operatorToken =
+                accessToken(PLATFORM_IDENTITY_OPERATOR_ID, PLATFORM_IDENTITY_SCOPES);
+        HttpResponse<String> created = platformProvisioningPost(
+                operatorToken,
+                "idem-http-cancel",
+                Map.of(
+                        "tenantCode", "http-cancel",
+                        "tenantName", "HTTP Cancel",
+                        "ownerUsername", "owner@http-cancel.dev",
+                        "ownerDisplayName", "HTTP Cancel Owner",
+                        "deliveryChannel", "EMAIL",
+                        "deliveryAddress", "owner@http-cancel.dev",
+                        "changeReference", "ORDER-HTTP-CREATE"));
+        String provisioningRequestId = objectMapper
+                .readTree(created.body())
+                .path("data")
+                .path("id")
+                .stringValue();
+        String cancellationPath =
+                "/internal/platform/identity/tenant-provisioning-requests/"
+                        + provisioningRequestId
+                        + "/cancellations";
+
+        HttpResponse<String> cancelled = internalPost(
+                cancellationPath,
+                operatorToken,
+                Map.of("changeReference", "ORDER-HTTP-CANCEL"));
+        HttpResponse<String> replayed = internalPost(
+                cancellationPath,
+                operatorToken,
+                Map.of("changeReference", "ORDER-HTTP-CANCEL-REPLAY"));
+
+        assertThat(cancelled.statusCode()).isEqualTo(200);
+        assertThat(replayed.statusCode()).isEqualTo(200);
+        assertThat(objectMapper.readTree(cancelled.body())
+                .path("data")
+                .path("status")
+                .stringValue()).isEqualTo("CANCELLED");
+        assertThat(objectMapper.readTree(replayed.body())
+                .path("data")
+                .path("status")
+                .stringValue()).isEqualTo("CANCELLED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM ainer_identity_activation_grant "
+                        + "WHERE provisioning_request_id = ?::uuid",
+                String.class,
+                provisioningRequestId)).isEqualTo("CANCELLED");
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT publication_status, payload_key_version, "
+                        + "octet_length(protected_payload) AS payload_length, "
+                        + "payload_destroyed_at IS NOT NULL AS payload_destroyed "
+                        + "FROM ainer_identity_notification_outbox "
+                        + "WHERE provisioning_request_id = ?::uuid",
+                provisioningRequestId))
+                .containsEntry("publication_status", "CANCELLED")
+                .containsEntry("payload_key_version", "destroyed")
+                .containsEntry("payload_length", 32)
+                .containsEntry("payload_destroyed", true);
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT actor_type, actor_id, change_reference "
+                        + "FROM ainer_identity_platform_operation_audit "
+                        + "WHERE operation_id = ?::uuid AND phase = 'CANCELLED'",
+                provisioningRequestId))
+                .containsEntry("actor_type", "SERVICE")
+                .containsEntry("actor_id", PLATFORM_IDENTITY_OPERATOR_ID)
+                .containsEntry("change_reference", "ORDER-HTTP-CANCEL");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_platform_operation_audit "
+                        + "WHERE operation_id = ?::uuid AND phase = 'CANCELLED'",
+                Integer.class,
+                provisioningRequestId)).isEqualTo(1);
+    }
+
+    @Test
+    void platformIdentityListsAreBoundedScopedAndExcludeCredentialData()
+            throws Exception {
+        identityService.provisionTenantOwner(new ProvisionTenantOwnerCommand(
+                "list-alpha",
+                "List Alpha",
+                "alpha-owner@example.com",
+                "strong-password-2026",
+                "Alpha Owner"));
+        identityService.provisionTenantOwner(new ProvisionTenantOwnerCommand(
+                "list-beta",
+                "List Beta",
+                "beta-owner@example.com",
+                "strong-password-2026",
+                "Beta Owner"));
+        String operatorToken =
+                accessToken(PLATFORM_IDENTITY_OPERATOR_ID, PLATFORM_IDENTITY_SCOPES);
+
+        HttpResponse<String> tenants = internalGet(
+                "/internal/platform/identity/tenants?page=1&size=1",
+                operatorToken);
+        HttpResponse<String> users = internalGet(
+                "/internal/platform/identity/users?page=1&size=20",
+                operatorToken);
+
+        assertThat(tenants.statusCode()).isEqualTo(200);
+        JsonNode tenantPage = objectMapper.readTree(tenants.body()).path("data");
+        assertThat(tenantPage.path("page").intValue()).isEqualTo(1);
+        assertThat(tenantPage.path("size").intValue()).isEqualTo(1);
+        assertThat(tenantPage.path("total").longValue()).isEqualTo(2);
+        assertThat(tenantPage.path("items").size()).isEqualTo(1);
+        assertThat(tenantPage.path("items").get(0).path("code").stringValue())
+                .isEqualTo("list-alpha");
+
+        assertThat(users.statusCode()).isEqualTo(200);
+        JsonNode userPage = objectMapper.readTree(users.body()).path("data");
+        assertThat(userPage.path("total").longValue()).isEqualTo(2);
+        assertThat(userPage.path("items").size()).isEqualTo(2);
+        assertThat(users.body())
+                .doesNotContain("password")
+                .doesNotContain("clientSecret")
+                .doesNotContain("activationSecret")
+                .doesNotContain("deliveryAddress");
+
+        assertThat(internalGet(
+                "/internal/platform/identity/users",
+                accessToken(
+                        PLATFORM_IDENTITY_LIMITED_ID,
+                        "platform.tenants.write"))
+                .statusCode()).isEqualTo(403);
+        assertThat(internalGet(
+                "/internal/platform/identity/tenants?size=101",
+                operatorToken)
+                .statusCode()).isEqualTo(400);
+    }
+
+    @Test
+    void notificationGatewayReceiptIsTenantlessScopedIdempotentAndSafe()
+            throws Exception {
+        String operatorToken =
+                accessToken(PLATFORM_IDENTITY_OPERATOR_ID, PLATFORM_IDENTITY_SCOPES);
+        HttpResponse<String> provisioning = platformProvisioningPost(
+                operatorToken,
+                "idem-http-receipt",
+                Map.of(
+                        "tenantCode", "http-receipt",
+                        "tenantName", "HTTP Receipt",
+                        "ownerUsername", "receipt-owner@example.com",
+                        "ownerDisplayName", "Receipt Owner",
+                        "deliveryChannel", "EMAIL",
+                        "deliveryAddress", "receipt-owner@example.com",
+                        "changeReference", "ORDER-HTTP-RECEIPT"));
+        assertThat(provisioning.statusCode()).isEqualTo(200);
+        String provisioningRequestId = objectMapper.readTree(provisioning.body())
+                .path("data")
+                .path("id")
+                .stringValue();
+        UUID notificationId = jdbcTemplate.queryForObject(
+                "SELECT id FROM ainer_identity_notification_outbox "
+                        + "WHERE provisioning_request_id = ?::uuid",
+                UUID.class,
+                provisioningRequestId);
+        jdbcTemplate.update(
+                "UPDATE ainer_identity_notification_outbox "
+                        + "SET publication_status = 'PUBLISHED', "
+                        + "published_at = CURRENT_TIMESTAMP, "
+                        + "payload_key_version = 'destroyed', "
+                        + "protected_payload = decode(repeat('00', 32), 'hex'), "
+                        + "payload_destroyed_at = CURRENT_TIMESTAMP "
+                        + "WHERE id = ?",
+                notificationId);
+
+        Instant occurredAt = Instant.now().minusSeconds(1);
+        Map<String, String> receipt = Map.of(
+                "eventId", "gateway-http-event-1",
+                "notificationId", notificationId.toString(),
+                "status", "DELIVERED",
+                "occurredAt", occurredAt.toString());
+        String path =
+                "/internal/identity/tenant-provisioning-notification-receipts";
+
+        assertThat(internalPost(path, null, receipt).statusCode()).isEqualTo(401);
+        assertThat(internalPost(
+                path,
+                actorToken(
+                        NOTIFICATION_GATEWAY_ID,
+                        null,
+                        "SERVICE",
+                        "platform.users.read"),
+                receipt).statusCode()).isEqualTo(403);
+        assertThat(internalPost(
+                path,
+                actorToken(
+                        NOTIFICATION_GATEWAY_ID,
+                        UUID.randomUUID().toString(),
+                        "SERVICE",
+                        NOTIFICATION_RECEIPT_SCOPE),
+                receipt).statusCode()).isEqualTo(403);
+        assertThat(internalPost(
+                path,
+                actorToken(
+                        "unknown-notification-gateway",
+                        null,
+                        "SERVICE",
+                        NOTIFICATION_RECEIPT_SCOPE),
+                receipt).statusCode()).isEqualTo(403);
+
+        String gatewayToken =
+                accessToken(NOTIFICATION_GATEWAY_ID, NOTIFICATION_RECEIPT_SCOPE);
+        HttpResponse<String> created =
+                internalPost(path, gatewayToken, receipt);
+        HttpResponse<String> replayed =
+                internalPost(path, gatewayToken, receipt);
+
+        assertThat(created.statusCode()).isEqualTo(200);
+        assertThat(created.headers().firstValue("cache-control"))
+                .hasValueSatisfying(value -> assertThat(value).contains("no-store"));
+        JsonNode createdBody = objectMapper.readTree(created.body());
+        assertThat(createdBody.path("data").path("created").booleanValue()).isTrue();
+        assertThat(createdBody.path("data").path("status").stringValue())
+                .isEqualTo("DELIVERED");
+        assertThat(replayed.statusCode()).isEqualTo(200);
+        assertThat(objectMapper.readTree(replayed.body())
+                .path("data")
+                .path("created")
+                .booleanValue()).isFalse();
+        assertThat(created.body().toLowerCase())
+                .doesNotContain(
+                        "receipt-owner@example.com",
+                        "secret",
+                        "payload",
+                        "token");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) "
+                        + "FROM ainer_identity_notification_delivery_receipt "
+                        + "WHERE notification_id = ?",
+                Integer.class,
+                notificationId)).isEqualTo(1);
+    }
+
+    @Test
+    void platformIdentityProvisioningRejectsAnonymousWrongActorTenantScopeAndOperator()
+            throws Exception {
+        Map<String, String> body = Map.of(
+                "tenantCode", "secure-provisioning",
+                "tenantName", "Secure Provisioning",
+                "ownerUsername", "secure-owner@example.com",
+                "ownerDisplayName", "Secure Owner",
+                "deliveryChannel", "EMAIL",
+                "deliveryAddress", "secure-owner@example.com",
+                "changeReference", "ORDER-HTTP-SECURE");
+
+        assertThat(platformProvisioningPost(null, "idem-anonymous", body).statusCode())
+                .isEqualTo(401);
+        assertThat(platformProvisioningPost(
+                accessToken(PLATFORM_IDENTITY_OPERATOR_ID, PLATFORM_IDENTITY_SCOPES),
+                null,
+                body).statusCode()).isEqualTo(400);
+        assertThat(platformProvisioningPost(
+                accessToken(PLATFORM_IDENTITY_LIMITED_ID, "platform.tenants.write"),
+                "idem-limited",
+                body).statusCode()).isEqualTo(403);
+        assertThat(platformProvisioningPost(
+                actorToken(
+                        PLATFORM_IDENTITY_OPERATOR_ID,
+                        UUID.randomUUID().toString(),
+                        "SERVICE",
+                        PLATFORM_IDENTITY_SCOPES),
+                "idem-tenant-bound",
+                body).statusCode()).isEqualTo(403);
+        assertThat(platformProvisioningPost(
+                actorToken(
+                        PLATFORM_IDENTITY_OPERATOR_ID,
+                        UUID.randomUUID().toString(),
+                        "USER",
+                        PLATFORM_IDENTITY_SCOPES),
+                "idem-user",
+                body).statusCode()).isEqualTo(403);
+
+        String unknownOperatorId = "unknown-platform-operator";
+        registeredClientRepository.save(machineClient(
+                unknownOperatorId,
+                null,
+                "platform.tenants.read",
+                "platform.tenants.write",
+                "platform.users.read",
+                "platform.users.write"));
+        assertThat(platformProvisioningPost(
+                accessToken(unknownOperatorId, PLATFORM_IDENTITY_SCOPES),
+                "idem-unknown",
+                body).statusCode()).isEqualTo(403);
+        assertThat(internalGet(
+                "/internal/platform/identity/tenant-provisioning-requests/"
+                        + UUID.randomUUID(),
+                accessToken(PLATFORM_IDENTITY_LIMITED_ID, "platform.tenants.write"))
+                .statusCode()).isEqualTo(403);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_tenant_provisioning_request",
+                Integer.class)).isZero();
     }
 
     @Test
@@ -663,13 +1083,16 @@ class AinerAuthorizationServerIntegrationTest {
 
     private HttpResponse<String> internalPost(String path, String accessToken, Object body)
             throws Exception {
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest.Builder request = HttpRequest.newBuilder()
                 .uri(URI.create("http://127.0.0.1:%d%s".formatted(port, path)))
-                .header("Authorization", "Bearer " + accessToken)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
-                .build();
-        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                .POST(HttpRequest.BodyPublishers.ofString(
+                        objectMapper.writeValueAsString(body)));
+        if (accessToken != null) {
+            request.header("Authorization", "Bearer " + accessToken);
+        }
+        return httpClient.send(
+                request.build(), HttpResponse.BodyHandlers.ofString());
     }
 
     private HttpResponse<String> internalGet(String path, String accessToken) throws Exception {
@@ -679,6 +1102,27 @@ class AinerAuthorizationServerIntegrationTest {
                 .GET()
                 .build();
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> platformProvisioningPost(
+            String accessToken,
+            String idempotencyKey,
+            Object body) throws Exception {
+        HttpRequest.Builder request = HttpRequest.newBuilder()
+                .uri(URI.create(
+                        "http://127.0.0.1:%d/internal/platform/identity/"
+                                .formatted(port)
+                                + "tenant-provisioning-requests"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(
+                        objectMapper.writeValueAsString(body)));
+        if (idempotencyKey != null) {
+            request.header("Idempotency-Key", idempotencyKey);
+        }
+        if (accessToken != null) {
+            request.header("Authorization", "Bearer " + accessToken);
+        }
+        return httpClient.send(request.build(), HttpResponse.BodyHandlers.ofString());
     }
 
     private HttpResponse<String> metrics(String accessToken) throws Exception {
@@ -705,17 +1149,20 @@ class AinerAuthorizationServerIntegrationTest {
             String actorType,
             String scope) {
         Instant now = Instant.now();
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
                 .issuer("https://auth.ainer.test")
                 .subject(subjectId)
                 .audience(List.of("ainer-api"))
                 .issuedAt(now)
                 .expiresAt(now.plus(Duration.ofMinutes(5)))
                 .claim("actor_type", actorType)
-                .claim("tenant_id", tenantId)
-                .claim("scope", scope)
-                .build();
-        return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+                .claim("scope", scope);
+        if (tenantId != null) {
+            claims.claim("tenant_id", tenantId);
+        }
+        return jwtEncoder.encode(
+                        JwtEncoderParameters.from(claims.build()))
+                .getTokenValue();
     }
 
     private String activeActorToken(

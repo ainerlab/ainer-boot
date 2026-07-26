@@ -46,6 +46,32 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - 增加 `ainer-admin-v1.yaml`、固定 Maven TypeScript SDK 生成入口，以及同一 browser session 的
   PKCE → 成员治理 → revoke → OIDC logout PostgreSQL 端到端门禁。
 - 增加 `/ainer-admin/` 同源反代、登录回调、SDK 装配、退出顺序与开发初始化的长期集成手册。
+- 增加默认关闭的 M4.8A 平台 tenant 预配与激活核心：独立 tenantless SERVICE operator、
+  tenant/user 成对 capability、operator ID 白名单、`Idempotency-Key` 请求摘要、tenant code/
+  新 username 并发预留、惰性过期和同事务平台操作审计；新用户使用短时限次、只存摘要的一次性
+  grant 与 AES-256-GCM 保护的 notification outbox，已有 ACTIVE 用户必须以本人 USER Token
+  接受。成功消费在单一事务中创建 ACTIVE tenant/user（若需要）和唯一 OWNER membership。
+- 增加默认关闭的预配通知 relay：以独立 tenantless Client Credentials client、最小
+  `identity.provisioning-notifications.publish` scope 和 HTTPS 向可配置通知网关投递；稳定
+  UUIDv7 notification ID 同时作为 `Idempotency-Key`，并暴露 pending/failed/exhausted/cancelled
+  指标。网关持久接收或请求取消后，Identity 主动销毁 outbox 中可解密 payload。
+- 增加默认关闭的预配通知终态回执 API：外部网关使用独立 tenantless Client Credentials client、
+  精确 client ID 白名单和 `identity.provisioning-notifications.receipts.write` scope 回传
+  `DELIVERED|FAILED`；Identity 使用 PostgreSQL UUIDv7、gateway event 与 notification 双重唯一键
+  保存最小终态事实，重复回放不重复写入或计数。
+- 增加平台 tenant/user 安全分页与未完成预配显式取消：列表分别使用最小 read scope、最大单页
+  100 且不返回凭据数据；取消使用成对 write scope，并把 request、预期 grant、未发布 payload
+  销毁和唯一 `CANCELLED` 审计放入同一事务，重复调用保持幂等。
+- 建立面向 PostgreSQL 18 的数据库设计规范 1.2，统一 Ainer 自有表的命名、类型、结构模板、
+  完整性、tenant 隔离、索引、AI 数据、在线演进与设计评审门禁；以最小“单一写入所有者”规则
+  约束跨模块写入，并为不可变 Domain Snapshot 划定 JSONB 边界。
+- 增加 Proposed 的 AI Runtime 与 Knowledge 数据模型提案：基于 Ainer 当前 Invocation 和 xq
+  现有模型复审 Run、Artifact、revision、chunk、索引代际与业务事实边界；不将候选表写成已交付。
+- 增加 `docs/00-overview.md` 作为人和 AI agent 的统一文档入口，按任务组织阅读路径和完整文档地图；
+  `docs/README.md` 收敛为代码托管平台自动展示的极简门面。
+- 接受 ADR-0020，将数据基线调整为 PostgreSQL 18 Native-First：新 Ainer 持久化 ID 默认
+  UUIDv7、`tenant_id` 全链路统一 UUID，现有 UUIDv4/字符串 tenant 和早期 migration 只作为
+  1.0 前待清理实现债；PostgreSQL 19 Beta 被规划为前向测试目标而非生产承诺。
 - 建立架构决策、HTTP API、开发、测试、数据库、配置、运行和发布文档体系。
 
 ### Security
@@ -68,10 +94,23 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   匿名请求保留标准 401，未来 `auth_time` 不能超过受控 clock skew。
 - Ainer Admin browser client 无 secret、只允许 PKCE S256；成员 API 与当前 Token 撤销均要求
   官方 authorization 仍 active，同源登录、Token 交换和 logout 复用同一 browser session。
+- 平台 Identity 预配只接受无 tenant 的 SERVICE、精确 operator client ID，并同时要求 tenant 与
+  user 对应的 read/write scope；独立一分钟 operator bootstrap 不覆盖策略不匹配的既有 client。
+  平台响应不含密码、激活 secret 或请求摘要；grant 只保存高熵 secret 摘要，联系目标与唯一明文
+  只存在于带密钥版本的 AES-GCM outbox 密文。已有用户接受只允许目标 USER subject 并要求
+  `identity.provisioning.accept`。
+- 预配通知 relay client 与平台 operator 分离且无 tenant，只能持有通知发布 scope；生产默认强制
+  HTTPS。网关 2xx 只表示已持久、幂等接收，不伪装成最终邮件/短信送达，错误正文不会进入日志或
+  outbox。
+- 预配通知回执 client 还必须与 relay、operator、metrics、introspection 分离，只能持有回执写
+  scope 并命中精确白名单；回调不接收正文、联系地址、供应商原始 body、Token 或 secret。
 - AI 审计默认不保存 prompt、模型输出、API key 或供应商错误正文。
 
 ### Fixed
 
+- 修复已认证请求缺少必填 HTTP header 时落入 500 的通用 Web 错误映射；现在
+  `MissingRequestHeaderException` 返回统一 400 `AINER.COMMON.INVALID_REQUEST`，平台预配缺少
+  `Idempotency-Key` 已有真实 HTTP 回归门禁。
 - 修复 Identity access-event 新记录遗漏 `available_at`，确保状态变化与可领取 outbox 事实可在同一事务写入真实 PostgreSQL。
 - 修复 OAuth2 授权记录无法反序列化 Passkey 用户的 `WebAuthnAuthentication` 主体：显式注册
   `WebauthnJacksonModule` 并把其协议主体类型加入多态白名单，否则任何 Passkey 用户走授权码
@@ -90,6 +129,8 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   配置的 POST PathPattern，返回统一 envelope、`Retry-After`/no-store 并记录 allow/deny 指标。
 - 修复 step-up 把匿名请求提前改写为 403、未区分 SERVICE、直接使用系统时钟且接受任意未来
   `auth_time`；现由认证链保留 401，并使用可注入 `Clock` 与有界 clock skew。
+- 修复预配通知 `FAILED` 回执数据库 check 在 SQL 三值逻辑下允许空 `failure_code` 的问题；现以
+  显式 `IS NOT NULL` 约束，并由 PostgreSQL 18.4 smoke 验证拒绝。
 
 ### Known limitations
 
@@ -100,7 +141,10 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   主线已有虚拟 authenticator 签名 ceremony、
   受控 enrollment、恢复与 step-up，但尚缺恢复通知、主流真实设备矩阵、共享限流与多节点会话；
   生产 browser/OIDC client 控制面和登录体验也尚未完成。
-- tenant ownership transfer、平台级 tenant/user 管理和成员管理 UI 尚未完成。
+- M4.8A 已完成预配申请、一次性激活核心、加密 notification outbox、OAuth2/HTTPS 网关 relay
+  与已有用户本人接受，并已增加 tenant/user 安全分页、未完成申请显式取消和 provider-neutral
+  终态回执接收基线；仓库不包含真实外部通知网关、邮件/短信供应商或真实最终送达证明，
+  tenant/user 禁用恢复等后续生命周期、tenant ownership transfer 和成员管理 UI 不在本切片。
 - 审计归档仍位于同一 PostgreSQL 数据库，没有 WORM/法律保留、外部不可变副本、生产 SIEM 消费者和告警路由。
 - 正式 CI、制品发布、备份恢复、经真实流量验证的 SLO 与商业授权交付尚未建立。
 

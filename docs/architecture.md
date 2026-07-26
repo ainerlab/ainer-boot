@@ -1,6 +1,6 @@
 # Ainer 架构总览
 
-> 权威状态：M4.7 + Ainer Admin backend integration baseline · 2026-07-26
+> 权威状态：M4.8A + Ainer Admin integration · 2026-07-26
 
 ## 1. 系统定位
 
@@ -27,7 +27,7 @@ ainer-server                         JWT Resource Server、Actuator、平台/内
 └── ainer-starter-web
 
 ainer-authorization-server           独立 OAuth 2.1/OIDC 发行物、Identity 管理面、Passkey、Directory、relay
-├── ainer-module-identity             用户、租户、成员管理、禁用/撤销、可租约 outbox 与双人重放
+├── ainer-module-identity             用户、租户、成员管理、平台预配/激活、禁用/撤销与可靠 outbox
 ├── Spring Security Authorization Server 7.1
 └── JDBC registered client / authorization / consent / WebAuthn credential
 
@@ -181,6 +181,21 @@ M3/M4 已形成以下边界：
 - Workspace API 强制 `workspace.read` / `workspace.write` scope，并以数据库 ACTIVE OWNER/ADMIN/MEMBER 关系决定具体资源权限；tenant 与 owner 不能由客户端指定。
 - Identity tenant 成员 API 强制 USER actor、`tenant.members.read|write`、可信 tenant claim 与
   数据库 ACTIVE OWNER/ADMIN 关系；写操作同事务审计且不能通过通用接口修改 OWNER。
+- Identity 平台预配 API 强制 tenantless SERVICE、tenant/user 成对 capability 与精确 operator
+  client ID 白名单。申请事务只预留 tenant/subject，使用与首租户 bootstrap 共享的 tenant
+  code/username advisory lock，并创建只存摘要的一次性 grant 或已有用户接受通知；联系目标与激活
+  明文只进入 AES-GCM 保护的 outbox。新用户消费 grant 或已有用户本人以 USER Token 接受时，才在
+  单一事务创建核心 tenant/user（若需要）/OWNER。`REQUESTED` 始终不是可授权身份事实。
+- 平台 tenant/user 查询是独立的只读安全投影，分别要求对应 read capability，采用
+  `page/size/total` 且单页最多 100，不暴露密码、OAuth、membership 或通知数据。未完成预配通过
+  显式 `/cancellations` 子资源关闭；request、预期 grant、未发布通知 payload 与阶段审计同事务，
+  不提供通用状态 PATCH。
+- provisioning notification 通过独立应用端口和默认关闭的 OAuth2/HTTPS gateway adapter 交付；
+  Identity 不拥有邮件/短信 SDK、模板或供应商账号。notification ID 是下游幂等键，网关确认后
+  销毁本地可解密 payload；`PUBLISHED` 只表示网关持久接收，不代表最终触达。
+- 外部通知网关负责把供应商回执归一化为 `DELIVERED|FAILED`，再使用另一组 tenantless SERVICE
+  credential 回调 Identity。Identity 只保存一条与 UUIDv7 notification 关联的最小终态事实，
+  不保存供应商原始 body、联系地址或自由文本错误；该接收端代码基线不等同于真实供应商联调证据。
 - 新邀请是 PENDING，只有同 tenant 的目标 JWT 主体本人接受后才激活；启用可选 Directory client 时，邀请创建前还必须通过远程 ACTIVE member 校验。Workspace 不跨模块读取 Identity 私有表。
 - 通用角色变更不能触碰 OWNER；所有权转移锁定 Workspace 并由 PostgreSQL 部分唯一索引保证最多一个 ACTIVE OWNER。
 - 跨租户和非 ACTIVE 成员访问按 404 隐藏资源；成员角色不足返回 403。关键允许/拒绝授权决策持久化到独立事务审计。PENDING/ACTIVE membership 接到可信 Identity 撤销事件后单调变为 REVOKED，不再参与授权；OWNER 也可因全局安全禁用而被撤销。
@@ -212,6 +227,10 @@ AI HTTP / application port
 ```
 
 业务模块不能直接散落调用模型厂商 SDK。所有调用必须经过模型网关，确保模型切换、费用控制、审计和数据策略可执行。
+
+后续 Run / Artifact 与 Knowledge 只按真实纵向切片增量实现，候选语义见
+[`design/ai-runtime-data-model.md`](design/ai-runtime-data-model.md) 和
+[`design/knowledge-data-model.md`](design/knowledge-data-model.md)；两份提案不能作为一次性建表依据。
 
 当前边界说明：
 

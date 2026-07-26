@@ -118,9 +118,15 @@ Ainer 采用 strangler + vertical slice：
 - Identity 权威运行时已提供 tenant 成员列表、加入、角色变更与软移除 API，使用 USER capability
   scope + 可信 tenant claim + ACTIVE OWNER/ADMIN 资源角色并同事务审计；首个平台 tenant/OWNER
   使用默认关闭、严格幂等且带事务 advisory lock 的 Authorization Server bootstrap。
-- 下一阶段按 [ADR-0019](../decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)
-  依次推进平台 tenant/user 幂等供应与一次性激活、Authorization Server 租户上下文选择、Identity
-  OWNER 双方确认转移；`is_default` 只保留为首次登录落点，不作为并行会话的租户切换机制。
+- 已按 [ADR-0019](../decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)
+  落地 M4.8A 预配与激活核心：tenantless SERVICE、成对 capability、operator 白名单、幂等/并发
+  预留、短时限次 grant、AES-GCM notification outbox、已有用户本人接受与原子创建 ACTIVE
+  tenant/OWNER；随后补齐独立 OAuth2 client、HTTPS notification gateway publisher、调度、
+  幂等与积压指标、tenant/user 安全分页、未完成申请显式取消，以及 provider-neutral 的
+  `DELIVERED|FAILED` 终态回执接收基线。真实外部通知网关/供应商联调、最终送达证据、生产告警和
+  0-skipped 发布门禁仍是 M4.8A 后续收口。
+- 后续再依次推进 Authorization Server 租户上下文选择与 Identity OWNER 双方确认转移；
+  `is_default` 只保留为首次登录落点，不作为并行会话的租户切换机制。
 - 旧 Token 在过渡期通过边界适配，不复制旧 Token 表到 Ainer。
 
 ### M4：低耦合业务切片

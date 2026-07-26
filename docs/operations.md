@@ -161,7 +161,59 @@ OAuth authorization 恢复为密码路径，属于安全降级，必须审批、
 3. 验证租户、用户、ACTIVE 默认 membership 与 OWNER 角色完整存在，再立即移除开关和明文密码；
 4. 重启验证严格幂等：完整匹配时不改密码；tenant code 或 username 部分占用、状态漂移时必须启动失败，
    不得手工补记录后继续；
-5. 后续 tenant/user 平台管理等待专用 SERVICE 控制面，不反复开启首租户 bootstrap。
+5. 后续 tenant/user 使用 2.8 节专用 SERVICE 控制面，不反复开启首租户 bootstrap。
+
+### 2.8 M4.8A 平台 Identity 预配、激活、取消与通知回执
+
+平台预配/激活、operator bootstrap 都默认关闭。当前切片的安全上线顺序：
+
+1. 发布 migration 和应用，保持 `AINER_IDENTITY_PLATFORM_CONTROL_ENABLED=false`；确认现有
+   bootstrap、登录、Token、tenant 成员管理和 Flyway smoke 不变；
+2. 在受控窗口启用 platform identity operator bootstrap，使用独立 client ID 和 secret store
+   注入的 24..128 字符 secret；同一 ID 配入
+   `AINER_IDENTITY_PLATFORM_CONTROL_OPERATOR_CLIENT_IDS`；
+3. 启动后核对 operator 无 tenant、只有四个 `platform.tenants/users.read/write` scope、
+   Client Credentials 和一分钟 Token；然后移除 bootstrap 开关与明文 secret；
+4. 由 secret manager 注入 active key version 与至少一把 32-byte AES key；先在测试环境验证旧 key
+   仍可解密存量 outbox，再切换写入版本，禁止在日志、命令历史或仓库保存 key；
+5. 在另一个受控窗口启用 provisioning notification relay client bootstrap，建立无 tenant、只有
+   `identity.provisioning-notifications.publish` 且 Token TTL 一分钟的独立 client；不得复用
+   platform operator，建立后移除 bootstrap 开关和明文 secret；
+6. 配置通知网关完整 HTTPS POST URI、Token URI、relay client/secret、lease/retry/max-attempts 与
+   batch size，再显式启用 notification relay。网关必须按 notification UUIDv7
+   `Idempotency-Key` 去重，并在返回 2xx 前持久化完整 envelope；
+7. 在第三个受控窗口建立无 tenant、只有
+   `identity.provisioning-notifications.receipts.write` 的回执 gateway client，把精确 ID 写入
+   receipt 白名单后再启用 endpoint；不得复用 outbound relay、platform operator 或其他平台凭据；
+8. 启用平台控制面，先用测试 tenant 验证首次申请、相同键重放、不同 payload 冲突、缺 scope、
+   tenant-bound SERVICE、USER 和白名单外 client 拒绝；
+9. 核对 request/grant/outbox/audit 各一条、Identity 核心 tenant/user/membership 仍为零变化；
+   grant 只有摘要，outbox 只有密文，平台响应和日志不含联系地址、密码、激活 secret 或密文；
+10. 使用受控网关验证 Token 失败、401/403、其他 4xx 与 5xx 后延迟重试；2xx 后检查 outbox 为
+   `PUBLISHED`、`published_at` 已写入、payload 已标记 `destroyed` 且相同 notification ID 重放
+   仍由网关返回成功。`PUBLISHED` 只代表网关持久接收，不代表最终触达；
+11. 让网关分别回传受控 `DELIVERED` 和 `FAILED` 终态，验证匿名、错误 scope、tenant-bound
+    SERVICE、白名单外 client 被拒；相同事实重放 `created=false`，矛盾终态 409，回执抢先于
+    `PUBLISHED` 时也为 409 并由网关稍后以同一 event ID 重试。数据库与日志不得出现正文、联系
+    地址、供应商原始 body 或自由文本错误；
+12. 新用户消费 secret 后检查 grant/request、
+   ACTIVE tenant/user/默认 OWNER 与 audit 同事务完成，并验证回放拒绝；已有 ACTIVE 用户必须以
+   本人 USER Token 接受，新增 membership 不覆盖原默认 tenant；
+13. 用测试申请验证显式 `/cancellations`：首次调用把 request/grant/outbox 收口为
+    `CANCELLED`、payload 标记 `destroyed`、审计保存取消 change reference；重复调用不新增审计。
+    再以独立 tenant/user read scope 验证分页、最大 `size=100` 和响应不含密码/OAuth/通知数据；
+14. 观察 requested/idempotent/cancelled、receipt delivered/failed Counter、HTTP 4xx/5xx、
+    数据库唯一冲突，以及 provisioning notification 的 pending/failed/exhausted/cancelled/
+    oldest-ready 指标。仓库只有 provider-neutral 回执接收端，不包含真实外部通知网关或邮件/
+    短信/站内信供应商；完成真实供应商联调和告警前不得接入商业开户，或把 `REQUESTED`/
+    `PUBLISHED`/本地合成 `DELIVERED` 当作真实客户可达证据。
+
+回滚先关闭通知回执 endpoint，再关闭通知 relay，最后关闭平台控制面和新申请；保留
+request/grant/outbox/receipt/audit 及已经激活的核心事实，不回删 tenant/user/membership。开放预留会在 GET、消费或后续冲突检查时惰性转为
+`EXPIRED`；secret 错误耗尽会收口为 `LOCKED/CANCELLED`。未激活申请使用显式 cancellation API，
+不要手工删除、解密或改状态；该 API 不能回滚已经激活的核心身份，也不能召回已经被通知网关持久
+接收的消息。当前仍没有后台过期清扫 SLA，紧急处置应记录 request ID、operator ID、change
+reference、key version 与时间线。
 
 ### 2.8 Ainer Admin 同源入口
 
@@ -200,6 +252,8 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 - 检查 issuer 是否为 HTTPS；
 - 检查 RSA key ID、PEM 路径、文件权限和公私钥是否匹配；
 - 检查身份库与 OAuth 表 migration；
+- 平台 Identity 控制面启用时，检查 operator 白名单非空、ID 格式和 15 分钟至 30 天 request TTL；
+  operator bootstrap 还必须与既有同 ID client 的 scope/grant/tenant/Token 策略完全一致；
 - Passkey 开启时检查 RP ID、Origin、HTTPS、timeout 与代理外部域名；不要临时扩大 Origin；
 - 不把私钥内容粘贴到日志或工单。
 
@@ -289,9 +343,18 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 | `ainer.security.online.validation.inactive` | Counter | 在线判定 inactive 并返回 401 的数量 |
 | `ainer.security.online.validation.failed` | Counter | introspection 依赖失败并返回 503 的数量 |
 | `ainer.security.online.validation.duration` | Timer | 每次高风险 introspection 调用耗时，不包含后续业务处理 |
+| `ainer.identity.tenant.provisioning.requested` | Counter | 新建平台 Identity 预配申请总数 |
+| `ainer.identity.tenant.provisioning.idempotent` | Counter | 命中同 operator/幂等键/摘要并返回原申请的总数 |
+| `ainer.identity.tenant.provisioning.cancelled` | Counter | 显式取消首次完成 `REQUESTED -> CANCELLED` 的总数；幂等重放不增加 |
+| `ainer.identity.tenant.provisioning.notification.delivered` | Counter | 首次登记 `DELIVERED` 回执的总数；幂等重放不增加 |
+| `ainer.identity.tenant.provisioning.notification.failed` | Counter | 首次登记 `FAILED` 回执的总数；幂等重放不增加 |
 
 初始建议目标是：滚动 30 天内 99% 的首次成功 Workspace 撤销消费在可配置的 60 秒内完成。Timer 只包含已成功样本，因此必须同时使用 `exhausted == 0`、最老可领取年龄不超过 60 秒和 relay cycle 无持续失败作为完整性守门。这是尚未用真实流量验证的初始 SLO，不是正式错误预算。
 
 初始告警条件至少包括：`exhausted > 0` 立即告警、最老可领取年龄持续超过 60 秒、`ownerless > 0` 立即告警、archive failure 增长，以及 DENIED 窗口值明显超过环境基线。DENIED 阈值必须根据正常流量建基线，不能在未观测环境中伪造通用数字。
 
 在线校验初始告警至少包括 `.failed` 持续增长、`.inactive` 异常突增和 `.duration` 接近读取超时；阈值必须由压测和真实流量建立。当前代码已经安全暴露 Prometheus 文本 exporter，但尚未部署生产 Prometheus、统一 dashboard、告警路由、trace 和结构化日志 schema。exporter、指标、归档代码和 SIEM 拉取 API 存在，不等于生产监控或外部不可变审计链路已经完成。
+
+平台预配初始观察至少包括：requested 突增、idempotent 比例异常、409/422 增长、开放
+`REQUESTED` 数量与最老 `expires_at`。后两项当前没有现成 Gauge，需先用受限只读查询或后续专用
+指标补齐，不能把 Counter 存在误报为完整告警闭环。

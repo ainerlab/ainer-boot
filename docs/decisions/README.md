@@ -27,6 +27,8 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0017](0017-resource-server-step-up-policy.md) | Accepted | Resource Server Step-up 授权策略 |
 | [0018](0018-management-authorization-and-tenant-member-management.md) | Accepted | 管理授权模型与租户成员管理 |
 | [0019](0019-identity-provisioning-tenant-context-and-ownership-governance.md) | Accepted | Identity 供应、租户上下文与所有权治理 |
+| [0020](0020-postgresql-native-greenfield-baseline.md) | Accepted | PostgreSQL Native-First Greenfield 数据基线 |
+| [0021](0021-provisioning-notification-delivery-receipts.md) | Proposed | 供应通知最终投递回执边界 |
 | [0022](0022-ainer-admin-browser-integration-baseline.md) | Accepted | Ainer Admin 浏览器集成基线 |
 
 ## 何时需要 ADR

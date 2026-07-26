@@ -117,6 +117,35 @@ mvn clean test
   clock skew 的未来时间返回稳定 403；边界时间使用可注入 `Clock`。
 - tenant 成员管理 HTTP/应用/真实 PostgreSQL 测试必须覆盖 USER scope + ACTIVE OWNER/ADMIN、
   SERVICE/MEMBER/跨 tenant 拒绝、OWNER 不可由通用接口修改、重激活和同事务审计。
+- 平台 Identity 预配必须覆盖 tenantless SERVICE、tenant/user 成对 read/write scope、精确
+  operator 白名单、缺失 `Idempotency-Key`、相同摘要重放与不同摘要冲突、tenant code 并发预留、
+  已有 ACTIVE/非 ACTIVE 用户、惰性过期、与首租户 bootstrap 的共享锁，以及核心
+  tenant/user/membership 零污染。
+- 预配 HTTP 成功与错误响应必须 `no-store`，不得返回 request fingerprint、幂等键、密码、激活
+  Token 或 secret；request 与 phase audit 必须同事务，数据库 schema 也不得出现认证明文列。
+- 新用户激活必须覆盖：outbox 密文可由正确 key version 解密、数据库只存 secret 摘要、错误 secret
+  尝试跨事务持久化、达到上限锁定、过期、成功单次消费、重放 401、用户本人设置的密码哈希，以及
+  tenant/user/默认 OWNER/状态/审计任一步失败时整体回滚。
+- 已有用户接受必须覆盖：通知不含激活材料、匿名 401、缺 scope/SERVICE/错误 subject 403、目标
+  ACTIVE USER 成功、不会复制 user、不会覆盖原默认 tenant，新 OWNER membership 为非默认。
+- notification relay 必须覆盖租约领取、provider 失败延迟重试、正确 key rotation 读取、
+  tamper/未知 key 拒绝、成功确认后 `PUBLISHED`、payload 销毁和最大尝试后不再自动领取；HTTP
+  合约还必须覆盖独立 Client Credentials Bearer、稳定 `Idempotency-Key`、版本化 envelope、
+  已有用户无 secret 投影、HTTPS/URI 失败关闭和下游鉴权拒绝。测试 publisher 不得把明文打印到
+  日志。
+- notification receipt 必须覆盖独立 tenantless SERVICE credential、专用 write scope、精确 gateway
+  client 白名单、默认关闭与空白名单失败关闭；HTTP 负向矩阵包含匿名、错误 scope、tenant-bound
+  SERVICE 和未知 gateway client。只有 `PUBLISHED` notification 可登记，`DELIVERED` 不得有
+  failure code，`FAILED` 必须有受限稳定码，未来时间只允许五分钟 clock skew。
+- receipt 幂等测试必须覆盖相同 gateway event 重放、同 notification 的不同 event 但相同终态、
+  相同事件不同内容和矛盾终态；前两者返回原事实且不重复计数，后两者返回 409。数据库 schema
+  必须证明不存在正文、联系地址、secret、Token 或供应商原始 body 列。
+- 平台显式取消必须覆盖成对 write scope、精确 operator、`REQUESTED -> CANCELLED`、重复调用
+  幂等、新用户 grant 同步取消、已有用户无 grant、预期 grant 缺失时整笔回滚、通知 payload
+  销毁，以及取消 `changeReference` 只进入唯一阶段审计。
+- 平台 tenant/user 分页必须覆盖各自独立 read scope、tenantless SERVICE、白名单、`page >= 1`、
+  `size <= 100`、稳定排序和正确 total；HTTP 响应不得出现 password hash、OAuth secret、激活
+  材料或通知目标，尚未激活的 reservation 不得混入核心列表。
 
 ### 数据与事务
 
@@ -148,4 +177,4 @@ mvn clean test
 
 合并前：受影响模块测试、完整 `mvn clean test`、`git diff --check`。
 
-发布前还必须确认：数据库测试未因 Docker 缺失而跳过、两个可执行发行物均能启动、Flyway 从空库成功、升级 migration 在备份副本成功、关键鉴权与健康检查通过。M4.2 还要在可运行 Testcontainers 的环境执行双人审批、锁定重检、归档回滚和游标边界集成测试。M4.3 还要在真实 PostgreSQL 上执行 Authorization Server 协议 smoke，证明专用/普通 introspection client 隔离、active、RFC 7009 撤销和 Identity epoch，并用接近真实规模数据检查 epoch 查询计划；M4.5 还要执行真实浏览器 HTTP 会话的 PKCE S256 正反门禁，并检查 JDBC authorization 不落凭证。M4.6 当前还必须执行 Passkey options、条件门禁、虚拟 authenticator 签名 ceremony、恢复/enrollment、登录限流和 step-up 门禁；在宣称生产 MFA 前，必须另补主流真实设备的 registration/authentication、丢失/被盗/同步凭证、恢复通知和多节点 session 证据。M4.7 还要执行 tenant 成员管理的真实 PostgreSQL + Bearer HTTP 正反门禁，并确认 API 与 migration 只存在于 Identity 权威运行时。生产可观测性切片还要用独立 metrics client 抓取两个真实 exporter，并验证多节点、Token endpoint/数据库故障和告警路由。手工 PostgreSQL 与 loopback 证据是补充，不取代发布候选环境中不跳过的自动门禁。当前验证快照见 [`project-status.md`](project-status.md)。
+发布前还必须确认：数据库测试未因 Docker 缺失而跳过、两个可执行发行物均能启动、Flyway 从空库成功、升级 migration 在备份副本成功、关键鉴权与健康检查通过。M4.2 还要在可运行 Testcontainers 的环境执行双人审批、锁定重检、归档回滚和游标边界集成测试。M4.3 还要在真实 PostgreSQL 上执行 Authorization Server 协议 smoke，证明专用/普通 introspection client 隔离、active、RFC 7009 撤销和 Identity epoch，并用接近真实规模数据检查 epoch 查询计划；M4.5 还要执行真实浏览器 HTTP 会话的 PKCE S256 正反门禁，并检查 JDBC authorization 不落凭证。M4.6 当前还必须执行 Passkey options、条件门禁、虚拟 authenticator 签名 ceremony、恢复/enrollment、登录限流和 step-up 门禁；在宣称生产 MFA 前，必须另补主流真实设备的 registration/authentication、丢失/被盗/同步凭证、恢复通知和多节点 session 证据。M4.7 还要执行 tenant 成员管理的真实 PostgreSQL + Bearer HTTP 正反门禁，并确认 API 与 migration 只存在于 Identity 权威运行时。M4.8A 必须执行平台预配与激活的真实 PostgreSQL 并发、Bearer HTTP 正反门禁、默认关闭/错误配置、operator bootstrap、通知重试、终态回执幂等/冲突、过期/回放和无孤儿 ACTIVE tenant 测试；本机临时 schema smoke 只能补充 DDL/事务证据，不能替代发布候选环境中 0 skipped 的完整 Testcontainers 门禁。真实送达声明还必须使用真实外部网关与供应商沙箱或正式通道，覆盖 credential、供应商事件映射、重放和失败演练；本地 stub、数据库回执或合成 `DELIVERED` 都不能替代。生产可观测性切片还要用独立 metrics client 抓取两个真实 exporter，并验证多节点、Token endpoint/数据库故障和告警路由。当前验证快照见 [`project-status.md`](project-status.md)。

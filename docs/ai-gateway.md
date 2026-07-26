@@ -15,6 +15,11 @@
 
 M3 已接入 Resource Server 和可信认证上下文；当前仍不包含完整 DLP、输出 guardrail、Agent/Tool/RAG、集群级限流或自动价格同步。
 
+Run / Artifact 与 Knowledge 的后续候选边界分别记录在
+[`design/ai-runtime-data-model.md`](design/ai-runtime-data-model.md) 和
+[`design/knowledge-data-model.md`](design/knowledge-data-model.md)。它们仍是 Proposed 设计，不是
+当前 Model Gateway 已交付能力。
+
 ## 2. 启用配置
 
 AI runtime 默认关闭。生产环境至少提供：

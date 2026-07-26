@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.identity.account.infrastructure.mybatis.PlatformIdentityQueryMapper">
+
+    <resultMap id="platformIdentityTenantRow"
+               type="dev.ainer.module.identity.account.infrastructure.mybatis.PlatformIdentityTenantRow">
+        <id property="id" column="id"/>
+        <result property="code" column="code"/>
+        <result property="name" column="name"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="platformIdentityUserRow"
+               type="dev.ainer.module.identity.account.infrastructure.mybatis.PlatformIdentityUserRow">
+        <id property="subjectId" column="subject_id"/>
+        <result property="username" column="username"/>
+        <result property="displayName" column="display_name"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="selectTenants" resultMap="platformIdentityTenantRow">
+        SELECT id, code, name, status, created_at, updated_at
+        FROM ainer_identity_tenant
+        ORDER BY code, id
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countTenants" resultType="long">
+        SELECT COUNT(*)
+        FROM ainer_identity_tenant
+    </select>
+
+    <select id="selectUsers" resultMap="platformIdentityUserRow">
+        SELECT id AS subject_id, username, display_name, status, created_at, updated_at
+        FROM ainer_identity_user
+        ORDER BY username, id
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countUsers" resultType="long">
+        SELECT COUNT(*)
+        FROM ainer_identity_user
+    </select>
+</mapper>

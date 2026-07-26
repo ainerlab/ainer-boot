@@ -299,12 +299,22 @@
         WHERE username = #{username}
     </select>
 
-    <select id="acquireTenantBootstrapLock" resultType="int">
+    <select id="acquireIdentityLock" resultType="int">
         WITH lock_acquired AS MATERIALIZED (
             SELECT pg_advisory_xact_lock(hashtextextended(#{lockKey}, 0))
         )
         SELECT 1
         FROM lock_acquired
+    </select>
+
+    <select id="countOpenProvisioningReservation" resultType="int">
+        SELECT COUNT(*)
+        FROM ainer_identity_tenant_provisioning_request
+        WHERE status = 'REQUESTED'
+          AND (
+              tenant_code = #{tenantCode}
+              OR (owner_username = #{username} AND owner_user_exists = false)
+          )
     </select>
 
     <insert id="insertMemberAudit">

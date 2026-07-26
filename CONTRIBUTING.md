@@ -7,7 +7,7 @@
 请先阅读：
 
 1. [`AGENTS.md`](AGENTS.md)
-2. [`docs/README.md`](docs/README.md)
+2. [`docs/00-overview.md`](docs/00-overview.md)
 3. [`docs/project-status.md`](docs/project-status.md)
 4. [`docs/development.md`](docs/development.md)
 5. [`docs/conventions.md`](docs/conventions.md)

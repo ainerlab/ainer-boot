@@ -94,7 +94,11 @@ public enum WorkspaceErrorCode implements ErrorCode {
 
 ## 8. 数据库
 
+- 表、字段、类型、约束、索引、tenant 完整性和 AI 数据设计必须遵守
+  [`database-design-standard.md`](database-design-standard.md)；本节只保留工程层速查。
 - PostgreSQL 是真实测试目标。
+- PostgreSQL 18 是唯一数据方言；新 Ainer 持久化 ID 默认 UUIDv7，`tenant_id` 全链路使用 UUID。
+  不为当前 UUIDv4/字符串 tenant 实现保留兼容模式。
 - migration 使用 `VyyyyMMddHHmm__description.sql`，一个文件做一件事；已发布 migration 不修改。
 - SQL 使用参数绑定。权限条件不得通过字符串拼接进入 SQL。
 - `CREATE INDEX CONCURRENTLY` 与事务 migration 分开执行。

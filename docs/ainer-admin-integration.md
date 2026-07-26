@@ -160,7 +160,7 @@ import {
 
 const configuration = new Configuration({
   basePath: window.location.origin,
-  accessToken: async () => accessTokenStore.require(),
+  accessToken: async () => `Bearer ${accessTokenStore.require()}`,
   credentials: 'same-origin',
 })
 
@@ -265,4 +265,3 @@ mvn -pl ainer-authorization-server -am \
 - 当前无 tenant selector；用户只能管理 Token default tenant；
 - 当前没有成员审计查询 UI，但服务端写操作审计仍会持续落库；
 - 同源代理配置尚需在目标 ingress/proxy 产品上进行真实 HTTPS、Cookie、重定向和缓存验收。
-

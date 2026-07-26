@@ -19,6 +19,14 @@ public class AinerAuthorizationServerProperties {
     private final MetricsClientBootstrap metricsClientBootstrap = new MetricsClientBootstrap();
     private final ClientControlOperatorBootstrap clientControlOperatorBootstrap =
             new ClientControlOperatorBootstrap();
+    private final PlatformIdentityOperatorBootstrap platformIdentityOperatorBootstrap =
+            new PlatformIdentityOperatorBootstrap();
+    private final ProvisioningNotificationRelayClientBootstrap
+            provisioningNotificationRelayClientBootstrap =
+                    new ProvisioningNotificationRelayClientBootstrap();
+    private final ProvisioningNotificationReceiptClientBootstrap
+            provisioningNotificationReceiptClientBootstrap =
+                    new ProvisioningNotificationReceiptClientBootstrap();
 
     public String getIssuer() {
         return issuer;
@@ -58,6 +66,20 @@ public class AinerAuthorizationServerProperties {
 
     public ClientControlOperatorBootstrap getClientControlOperatorBootstrap() {
         return clientControlOperatorBootstrap;
+    }
+
+    public PlatformIdentityOperatorBootstrap getPlatformIdentityOperatorBootstrap() {
+        return platformIdentityOperatorBootstrap;
+    }
+
+    public ProvisioningNotificationRelayClientBootstrap
+            getProvisioningNotificationRelayClientBootstrap() {
+        return provisioningNotificationRelayClientBootstrap;
+    }
+
+    public ProvisioningNotificationReceiptClientBootstrap
+            getProvisioningNotificationReceiptClientBootstrap() {
+        return provisioningNotificationReceiptClientBootstrap;
     }
 
     public static final class SigningKey {
@@ -263,6 +285,99 @@ public class AinerAuthorizationServerProperties {
     }
 
     public static final class ClientControlOperatorBootstrap {
+
+        private boolean enabled;
+        private String clientId;
+        private String clientSecret;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getClientId() {
+            return clientId;
+        }
+
+        public void setClientId(String clientId) {
+            this.clientId = clientId;
+        }
+
+        public String getClientSecret() {
+            return clientSecret;
+        }
+
+        public void setClientSecret(String clientSecret) {
+            this.clientSecret = clientSecret;
+        }
+    }
+
+    public static final class PlatformIdentityOperatorBootstrap {
+
+        private boolean enabled;
+        private String clientId;
+        private String clientSecret;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getClientId() {
+            return clientId;
+        }
+
+        public void setClientId(String clientId) {
+            this.clientId = clientId;
+        }
+
+        public String getClientSecret() {
+            return clientSecret;
+        }
+
+        public void setClientSecret(String clientSecret) {
+            this.clientSecret = clientSecret;
+        }
+    }
+
+    public static final class ProvisioningNotificationRelayClientBootstrap {
+
+        private boolean enabled;
+        private String clientId;
+        private String clientSecret;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getClientId() {
+            return clientId;
+        }
+
+        public void setClientId(String clientId) {
+            this.clientId = clientId;
+        }
+
+        public String getClientSecret() {
+            return clientSecret;
+        }
+
+        public void setClientSecret(String clientSecret) {
+            this.clientSecret = clientSecret;
+        }
+    }
+
+    public static final class ProvisioningNotificationReceiptClientBootstrap {
 
         private boolean enabled;
         private String clientId;

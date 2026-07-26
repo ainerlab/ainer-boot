@@ -15,6 +15,7 @@ import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.ErrorResponseException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -41,7 +42,11 @@ public class GlobalExceptionHandler {
         return response(StandardErrorCode.INVALID_REQUEST, message, request);
     }
 
-    @ExceptionHandler({ConstraintViolationException.class, MissingServletRequestParameterException.class})
+    @ExceptionHandler({
+            ConstraintViolationException.class,
+            MissingRequestHeaderException.class,
+            MissingServletRequestParameterException.class
+    })
     public ResponseEntity<ApiResponse<Void>> handleInvalidRequest(Exception exception, HttpServletRequest request) {
         return response(StandardErrorCode.INVALID_REQUEST, exception.getMessage(), request);
     }

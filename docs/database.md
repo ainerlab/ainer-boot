@@ -2,9 +2,18 @@
 
 > 文档类型：长期规范 · 状态：生效 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
 
+本文负责数据库归属、当前表、Flyway 执行、安全演进和运行验证。新表/字段设计、命名、类型、
+约束、索引、tenant 完整性和评审门禁以
+[`database-design-standard.md`](database-design-standard.md) 为权威规范；发生冲突时不得默默选取，
+应修复文档或通过 ADR 明确偏离。
+
 ## 1. 基线
 
-Ainer 以 PostgreSQL 18.x 为业务数据库，使用 Flyway 管理 schema，使用 MyBatis 实现业务持久化。禁止用 H2 的兼容模式替代 PostgreSQL 行为验证。
+Ainer 以 PostgreSQL 18.x 为唯一业务数据库基线，使用 Flyway 管理 schema，使用 MyBatis 实现
+业务持久化。项目不提供 MySQL、H2 或旧 PostgreSQL 方言兼容；禁止用 H2 compatibility mode
+替代 PostgreSQL 行为验证。新 Ainer 持久化 ID 与 tenant 类型遵守
+[ADR-0020](decisions/0020-postgresql-native-greenfield-baseline.md)：ID 默认 UUIDv7，
+`tenant_id` 全链路统一 UUID。
 
 UUID、时间、金额、约束和锁语义必须按 PostgreSQL 设计。SQL 参数必须绑定，不得拼接 tenant、subject、URL 或用户输入。
 
@@ -86,6 +95,60 @@ enrollment grant 都通过 `(tenant_id, subject_id)` 复合外键绑定
 `ainer_identity_membership(tenant_id, user_id)`；应用层还要求目标为 ACTIVE default membership，防止
 只凭全局 subject 对另一个 tenant 建立恢复或 enrollment 安全记录。
 
+M4.8A 预配、激活与控制面新增：
+
+| 表 | 所有者 | 用途 |
+|---|---|---|
+| `ainer_identity_tenant_provisioning_request` | Identity | tenant/OWNER 标识预留、operator 级幂等、状态与 TTL；不是可授权核心身份 |
+| `ainer_identity_activation_grant` | Identity | 新用户高熵 secret 的 SHA-256 摘要、短 TTL、失败次数与单次消费状态 |
+| `ainer_identity_notification_outbox` | Identity | 带 key version 的 AES-GCM 密文、租约、重试和网关发布状态；不保存可查询联系地址/正文，发布或取消后销毁 payload |
+| `ainer_identity_notification_delivery_receipt` | Identity | 外部网关归一化的唯一 `DELIVERED|FAILED` 终态；不保存正文、联系地址或供应商原始 body |
+| `ainer_identity_platform_operation_audit` | Identity | `REQUESTED/ACTIVATED/CANCELLED/EXPIRED` 的同事务审计与 SERVICE/USER/SYSTEM/grant actor 类型 |
+
+预配 request 以 `(requested_by_service_id, idempotency_key)` 唯一约束保存稳定幂等结果，并只对
+`REQUESTED` 状态建立 tenant code 部分唯一索引；不存在核心用户时，open request 还对规范化
+username 建立部分唯一索引。过期记录保留历史，不复用其预生成 UUID；新请求使用新幂等键和新 ID。
+`owner_user_exists=true` 允许同一 ACTIVE 用户成为多个待接受 tenant 的候选 OWNER；接受事务仍会
+锁定并重新检查实时用户状态与目标 subject。request、grant、notification 和平台 audit 的独立 ID
+均使用 PostgreSQL 18 `uuidv7()` 并有版本 check；预留给新 tenant/subject 的 ID 也由同一数据库
+生成器取得。
+
+平台预配与首租户 bootstrap 使用相同的
+`identity:tenant-code:<code>` / `identity:username:<username>` PostgreSQL transaction advisory
+lock 命名空间，避免两个入口并发绕过彼此。申请事务只写 request、grant（仅新用户）、加密 outbox
+与 audit，不写 `ainer_identity_tenant`、`ainer_identity_user` 或
+`ainer_identity_membership`。grant 只有 `secret_hash`，outbox 只有 `protected_payload BYTEA`
+与 key version；联系地址、正文和激活明文没有可查询列。
+
+通知网关返回 2xx 后，outbox 在 lease owner 条件下进入 `PUBLISHED`，记录 `published_at`，把
+`payload_key_version` 改为 `destroyed`、覆盖 `protected_payload` 并记录
+`payload_destroyed_at`；请求在投递前取消时使用同一销毁规则。数据库状态因此只证明通知网关已
+持久接收，不证明最终邮件/短信送达。覆盖不能清除已经进入 WAL 或备份的数据，密钥轮换、备份访问
+和通知域保留策略仍是必要控制。
+
+终态回执表以 `(gateway_client_id,gateway_event_id)` 和 `notification_id` 两个唯一约束同时限制
+上游事件重放与单 notification 终态；回执自身 ID、notification ID 都有 UUIDv7 check。
+`DELIVERED` 必须没有 `failure_code`，`FAILED` 必须具有受限大写稳定码，供应商发生时间不能超过
+Ainer 接收时间五分钟以上。外键只能证明 notification 存在；“仅 `PUBLISHED` 可登记”需要锁定
+outbox 后由应用事务验证，因为跨表 check constraint 不能可靠表达该规则。
+
+新用户成功消费 grant 时，tenant、user、默认 ACTIVE OWNER membership、grant `CONSUMED`、
+request `ACTIVATED` 与阶段审计在同一事务提交；已有用户本人接受时不创建 user，新增 OWNER
+membership 的 `is_default=false`，不覆盖原登录落点。错误次数达到上限会把 grant 置 `LOCKED`、
+request 置 `CANCELLED` 并取消未投递 outbox；到期会置 `EXPIRED`。任何核心写入失败都会回滚，
+因此失败或过期请求不能产生孤儿 ACTIVE tenant。
+
+平台显式取消锁定 provisioning request，只允许 `REQUESTED -> CANCELLED`。新用户申请必须恰好把
+一条 ACTIVE grant 迁移为 `CANCELLED`；已有用户申请必须没有 grant，实际影响行数与该不变量不符
+时整笔事务失败关闭。PENDING/FAILED notification 同事务转为 `CANCELLED` 并执行 payload 销毁，
+随后写入唯一 `(operation_id, phase='CANCELLED')` 审计；重复取消不新增审计。已 `PUBLISHED`
+notification 不能召回，但其可解密 payload 已在发布确认时销毁，关联 grant 仍会被取消。
+
+平台 tenant/user 分页直接读取核心表的安全列，分别按唯一业务键 `code,id` 和 `username,id`
+排序，使用受限 `LIMIT/OFFSET`（`page >= 1`、`size <= 100`）并返回总数。查询不得选择
+`password_hash`，也不连接 OAuth、notification 或 activation 表；provisioning reservation 在
+真正激活进入核心表前不会出现在列表中。
+
 ## 4. Migration 命名与不可变性
 
 文件位于所属模块：
@@ -161,6 +224,13 @@ mvn -pl ainer-module-identity -am test
 mvn -pl ainer-module-ai-runtime -am test
 mvn -pl ainer-authorization-server -am test
 ```
+
+2026-07-26 的 PostgreSQL 18.4 隔离 schema smoke 从空库重放 Identity 全部 9 份 migration，并
+验证回执 ID 为 UUIDv7、合法终态可写、重复 notification 被唯一约束拒绝。该 smoke 还揭示 SQL
+三值逻辑会让仅写 `failure_code ~ pattern` 的 check 在 NULL 时得到 UNKNOWN 并放行，因此最终
+migration 对 `FAILED` 显式增加 `failure_code IS NOT NULL`；修正后 NULL 失败码被数据库拒绝。
+隔离 schema 已删除。此证据补充 DDL 真实性，但不替代发布候选环境的完整 Testcontainers/HTTP
+门禁。
 
 发布前还必须在备份恢复出的接近真实规模数据库上验证升级耗时、锁等待和回滚方案。当前项目尚未建立生产备份恢复自动化，不能把空库测试等同于生产升级演练。
 

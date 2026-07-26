@@ -89,7 +89,11 @@ public interface IdentityMapper {
 
     int countUserByUsername(@Param("username") String username);
 
-    int acquireTenantBootstrapLock(@Param("lockKey") String lockKey);
+    int acquireIdentityLock(@Param("lockKey") String lockKey);
+
+    int countOpenProvisioningReservation(
+            @Param("tenantCode") String tenantCode,
+            @Param("username") String username);
 
     int insertAccessEvent(IdentityAccessEventRow event);
 }

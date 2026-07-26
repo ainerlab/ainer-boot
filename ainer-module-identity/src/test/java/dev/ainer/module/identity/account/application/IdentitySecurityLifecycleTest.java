@@ -298,7 +298,14 @@ class IdentitySecurityLifecycleTest {
         }
 
         @Override
-        public void acquireTenantBootstrapLock(String tenantCode, String normalizedUsername) {
+        public void acquireIdentityLock(String lockKey) {
+        }
+
+        @Override
+        public boolean openProvisioningReservationExists(
+                String tenantCode,
+                String normalizedUsername) {
+            return false;
         }
 
         @Override
