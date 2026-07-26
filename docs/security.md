@@ -238,6 +238,11 @@ scopes 固定为 `openid profile tenant.members.read tenant.members.write`，不
 它用于官方参考管理应用联调，不是生产 browser client 控制面；完整边界见
 [ADR-0022](decisions/0022-ainer-admin-browser-integration-baseline.md)。
 
+同一 `dev` profile 还可以显式启用 Admin fixture。它通过 Identity 的严格幂等 bootstrap 创建
+`ainer-admin-dev` 的 default OWNER，以及以独立 `ainer-admin-member-home` 为 default tenant 的
+第二用户。第二用户初始不属于 Admin 主 tenant，因此可以验证“添加已有用户”；fixture 不提供默认
+用户名或密码，配置缺失、用户名相同、部分占用或状态漂移均启动失败。
+
 M4.6 增加默认关闭的 Passkey/WebAuthn 协议基础。启用时：
 
 - RP ID 必须是小写 DNS 名或 `localhost`，Origin host 必须等于 RP ID 或位于其子域；生产只接受

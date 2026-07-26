@@ -181,6 +181,23 @@ Authorization Code、PKCE S256 和 `openid profile tenant.members.read tenant.me
 不注册 client secret 或 Refresh Token。相同 `client_id` 已存在但策略不完全匹配时启动失败，
 不会覆盖或静默接受漂移。该入口是开发初始化，不是生产 browser client 控制面。
 
+Ainer Admin 开发身份 fixture 同样只在 `dev` profile 中装配并默认关闭：
+
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `AINER_ADMIN_DEV_BOOTSTRAP_ENABLED` | `false` | 显式初始化 Admin 开发身份 |
+| `AINER_ADMIN_DEV_OWNER_USERNAME` | 空 | 主 tenant 的 default OWNER 用户名 |
+| `AINER_ADMIN_DEV_OWNER_PASSWORD` | 空 | 12..128 字符，只能通过 secret 注入 |
+| `AINER_ADMIN_DEV_OWNER_DISPLAY_NAME` | 空 | OWNER 展示名 |
+| `AINER_ADMIN_DEV_MEMBER_USERNAME` | 空 | 用于“添加已有用户”的第二用户名 |
+| `AINER_ADMIN_DEV_MEMBER_PASSWORD` | 空 | 12..128 字符，只能通过 secret 注入 |
+| `AINER_ADMIN_DEV_MEMBER_DISPLAY_NAME` | 空 | 第二用户展示名 |
+
+fixture 严格创建两个不同的 Identity 信任根：OWNER 属于 `ainer-admin-dev`，第二用户以
+`ainer-admin-member-home` 为 default OWNER，因此两人均可正常登录，但第二用户初始不是 Admin
+主 tenant 成员。初始化复用 Identity 的严格幂等 bootstrap；任何部分占用或状态漂移都会失败关闭，
+不会覆盖密码。完成后关闭开关并移除环境中的明文密码。该能力不得用于生产开户。
+
 首个平台 tenant/OWNER 引导也运行在 Authorization Server，默认关闭：
 
 | 环境变量 | 默认值 | 生产说明 |
