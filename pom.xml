@@ -36,6 +36,7 @@
         <maven.enforcer.plugin.version>3.6.2</maven.enforcer.plugin.version>
         <maven.surefire.plugin.version>3.5.3</maven.surefire.plugin.version>
         <flatten.maven.plugin.version>1.7.3</flatten.maven.plugin.version>
+        <openapi.generator.maven.plugin.version>7.24.0</openapi.generator.maven.plugin.version>
     </properties>
 
     <dependencyManagement>

@@ -2,7 +2,9 @@
 
 > 文档类型：接口基线 · 状态：生效 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
 
-本文记录当前手写 HTTP 契约和兼容规则。它是开发者索引，不替代未来由代码生成并在 CI 校验的 OpenAPI 文档。
+本文记录当前 HTTP 契约和兼容规则。Ainer Admin 的机器可读子集位于
+`ainer-authorization-server/src/main/openapi/ainer-admin-v1.yaml`，由固定 Maven profile
+校验并生成 TypeScript SDK；本文件继续解释跨 API 的语义与边界。
 
 ## 1. 通用响应
 
@@ -90,6 +92,23 @@ access token 仍为 active；未知、过期、显式撤销或 Identity 当前�
 `AINER.COMMON.UNAUTHENTICATED`，`SERVICE` actor 返回 403。实现更新 Spring Authorization
 Server 官方 JDBC authorization，不建立 Ainer 自定义 Token 表，也不撤销当前 authorization
 可能关联的其他 token。该端点也经过同一 active gate。
+
+### Ainer Admin TypeScript SDK
+
+从仓库根目录运行：
+
+```bash
+mvn -pl ainer-authorization-server -Painer-admin-sdk generate-resources
+```
+
+命令先严格校验 `ainer-admin-v1.yaml`，再用固定版本 OpenAPI Generator 的
+`typescript-fetch` 生成器输出到
+`ainer-authorization-server/target/generated-sources/ainer-admin-typescript/`。生成目录属于
+构建产物，不提交到 Ainer Boot；Ainer Studio 按已批准的前端目录与包管理策略消费该输出。
+SDK 只覆盖成员 JSON API 与当前 token 自助撤销，OAuth/OIDC 登录和 logout 继续使用标准协议客户端。
+OpenAPI 使用相对 `/` 表达同源入口；由于生成器会为该合法相对地址写入 `http://localhost`
+兜底值，Ainer Admin 必须在 SDK `Configuration` 中显式传入 `window.location.origin`，
+并通过 `accessToken` 回调读取内存中的当前 access token。
 
 ## 7. AI API
 

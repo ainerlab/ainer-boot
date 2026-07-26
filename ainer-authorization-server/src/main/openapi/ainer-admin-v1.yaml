@@ -1,0 +1,523 @@
+openapi: 3.0.4
+info:
+  title: Ainer Admin API
+  version: 1.0.0
+  description: |
+    Ainer Admin 最小管理链路的 JSON API。OAuth/OIDC 登录、Token 交换和
+    RP-Initiated Logout 使用标准协议端点，不由本契约生成自制协议客户端。
+servers:
+  - url: /
+    description: 与 Ainer Admin 同源的反向代理入口
+tags:
+  - name: TenantMembers
+    description: Token default tenant 内的固定角色成员治理
+  - name: CurrentSession
+    description: 当前 USER bearer 的窄自助撤销
+paths:
+  /api/tenants/{tenantId}/members:
+    parameters:
+      - $ref: '#/components/parameters/TenantId'
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      tags:
+        - TenantMembers
+      operationId: listTenantMembers
+      summary: 查询 default tenant 的 ACTIVE 成员
+      security:
+        - ainerAdminOAuth:
+            - tenant.members.read
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: 成员分页
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberPageApiResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/OnlineValidationUnavailable'
+    post:
+      tags:
+        - TenantMembers
+      operationId: addTenantMember
+      summary: 把已有 ACTIVE 用户加入 default tenant
+      description: username 与 subjectId 必须且只能提供一个；只能授予 ADMIN 或 MEMBER。
+      security:
+        - ainerAdminOAuth:
+            - tenant.members.write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTenantMemberRequest'
+      responses:
+        '200':
+          description: 新增或重新激活后的成员
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberApiResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/InvalidMemberRequest'
+        '503':
+          $ref: '#/components/responses/OnlineValidationUnavailable'
+  /api/tenants/{tenantId}/members/{subjectId}:
+    parameters:
+      - $ref: '#/components/parameters/TenantId'
+      - $ref: '#/components/parameters/SubjectId'
+      - $ref: '#/components/parameters/RequestId'
+    patch:
+      tags:
+        - TenantMembers
+      operationId: changeTenantMemberRole
+      summary: 在 ADMIN 与 MEMBER 之间调整成员角色
+      description: OWNER 不能通过通用成员接口修改。
+      security:
+        - ainerAdminOAuth:
+            - tenant.members.write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeTenantMemberRoleRequest'
+      responses:
+        '200':
+          description: 调整后的成员
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberApiResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/InvalidMemberRequest'
+        '503':
+          $ref: '#/components/responses/OnlineValidationUnavailable'
+    delete:
+      tags:
+        - TenantMembers
+      operationId: removeTenantMember
+      summary: 软移除非 OWNER 成员
+      security:
+        - ainerAdminOAuth:
+            - tenant.members.write
+      parameters:
+        - name: reasonCode
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/ReasonCode'
+      responses:
+        '200':
+          description: 成员已经软移除
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/InvalidMemberRequest'
+        '503':
+          $ref: '#/components/responses/OnlineValidationUnavailable'
+  /api/me/access-token-revocations:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    post:
+      tags:
+        - CurrentSession
+      operationId: revokeCurrentAccessToken
+      summary: 撤销当前 USER bearer access token
+      description: 不接受 token 请求参数，不能撤销其他 authorization。
+      security:
+        - ainerAdminOAuth: []
+      responses:
+        '200':
+          description: 当前 access token 已撤销
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenRevocationApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/OnlineValidationUnavailable'
+components:
+  securitySchemes:
+    ainerAdminOAuth:
+      type: oauth2
+      description: Authorization Code + PKCE S256；public client 不持有 client secret。
+      flows:
+        authorizationCode:
+          authorizationUrl: /oauth2/authorize
+          tokenUrl: /oauth2/token
+          scopes:
+            openid: 请求 OIDC ID Token
+            profile: 请求基础用户身份投影
+            tenant.members.read: 读取 default tenant 成员
+            tenant.members.write: 管理 default tenant 非 OWNER 成员
+  parameters:
+    TenantId:
+      name: tenantId
+      in: path
+      required: true
+      description: 必须等于 access token 的 tenant_id。
+      schema:
+        type: string
+        format: uuid
+    SubjectId:
+      name: subjectId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: 可选的安全请求关联 ID；非法值由服务端重新生成。
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: '^[A-Za-z0-9._:-]+$'
+  headers:
+    RequestId:
+      description: 服务端接受或生成的请求关联 ID。
+      schema:
+        type: string
+  responses:
+    InvalidRequest:
+      description: HTTP 参数或 JSON 绑定不合法
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorApiResponse'
+    Unauthenticated:
+      description: access token 缺失、无效、过期或 inactive
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorApiResponse'
+    Forbidden:
+      description: actor、scope、tenant 或资源角色不允许该操作
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorApiResponse'
+    NotFound:
+      description: 目标账号或成员关系不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorApiResponse'
+    Conflict:
+      description: 成员已存在、OWNER 保护或并发状态冲突
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorApiResponse'
+    InvalidMemberRequest:
+      description: 成员操作违反稳定输入规则
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorApiResponse'
+    OnlineValidationUnavailable:
+      description: authorization 或 Identity 在线状态查询暂不可用
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorApiResponse'
+    InternalError:
+      description: 服务端未预期失败
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorApiResponse'
+  schemas:
+    MemberRole:
+      type: string
+      enum:
+        - OWNER
+        - ADMIN
+        - MEMBER
+    AssignableMemberRole:
+      type: string
+      enum:
+        - ADMIN
+        - MEMBER
+    ReasonCode:
+      type: string
+      minLength: 1
+      maxLength: 128
+      pattern: '^[A-Za-z0-9._:@/-]+$'
+    AddTenantMemberRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - role
+        - reasonCode
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: 与 subjectId 必须且只能提供一个。
+        subjectId:
+          type: string
+          format: uuid
+          description: 与 username 必须且只能提供一个。
+        role:
+          $ref: '#/components/schemas/AssignableMemberRole'
+        reasonCode:
+          $ref: '#/components/schemas/ReasonCode'
+    ChangeTenantMemberRoleRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - role
+        - reasonCode
+      properties:
+        role:
+          $ref: '#/components/schemas/AssignableMemberRole'
+        reasonCode:
+          $ref: '#/components/schemas/ReasonCode'
+    Member:
+      type: object
+      additionalProperties: false
+      required:
+        - subjectId
+        - username
+        - displayName
+        - role
+      properties:
+        subjectId:
+          type: string
+          format: uuid
+        username:
+          type: string
+        displayName:
+          type: string
+        role:
+          $ref: '#/components/schemas/MemberRole'
+    MemberPage:
+      type: object
+      additionalProperties: false
+      required:
+        - members
+        - page
+        - size
+        - total
+      properties:
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/Member'
+        page:
+          type: integer
+          format: int32
+          minimum: 1
+        size:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          format: int32
+          minimum: 0
+    AccessTokenRevocation:
+      type: object
+      additionalProperties: false
+      required:
+        - revoked
+      properties:
+        revoked:
+          type: boolean
+          enum:
+            - true
+    MemberPageApiResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - data
+        - requestId
+        - timestamp
+      properties:
+        code:
+          type: string
+          example: AINER.COMMON.OK
+        message:
+          type: string
+          example: OK
+        data:
+          $ref: '#/components/schemas/MemberPage'
+        requestId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    MemberApiResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - data
+        - requestId
+        - timestamp
+      properties:
+        code:
+          type: string
+          example: AINER.COMMON.OK
+        message:
+          type: string
+          example: OK
+        data:
+          $ref: '#/components/schemas/Member'
+        requestId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    AccessTokenRevocationApiResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - data
+        - requestId
+        - timestamp
+      properties:
+        code:
+          type: string
+          example: AINER.COMMON.OK
+        message:
+          type: string
+          example: OK
+        data:
+          $ref: '#/components/schemas/AccessTokenRevocation'
+        requestId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    EmptyApiResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - data
+        - requestId
+        - timestamp
+      properties:
+        code:
+          type: string
+          example: AINER.COMMON.OK
+        message:
+          type: string
+          example: OK
+        data:
+          nullable: true
+        requestId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    ErrorApiResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - data
+        - requestId
+        - timestamp
+      properties:
+        code:
+          type: string
+          example: AINER.COMMON.UNAUTHENTICATED
+        message:
+          type: string
+        data:
+          nullable: true
+        requestId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

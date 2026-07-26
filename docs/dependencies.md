@@ -16,6 +16,7 @@
 | Micrometer Core | 1.17.0 | 在线校验、撤销传播与安全运营指标 API | Apache-2.0 | `io.micrometer:micrometer-core` |
 | Micrometer Prometheus Registry | 1.17.0 | 两个可执行发行物的 Prometheus 文本格式导出 | Apache-2.0 | `io.micrometer:micrometer-registry-prometheus` |
 | Flatten Maven Plugin | 1.7.3 | 解析 CI-friendly `${revision}` 发布 POM | Apache-2.0 | `org.codehaus.mojo:flatten-maven-plugin` |
+| OpenAPI Generator Maven Plugin | 7.24.0 | 严格校验 Ainer Admin 契约并生成 `typescript-fetch` SDK | Apache-2.0 | `org.openapitools:openapi-generator-maven-plugin` |
 
 ## 引入规则
 
@@ -61,3 +62,11 @@
 - 两个可执行发行物直接引入 Boot BOM 管理的 Micrometer Prometheus registry；可复用安全 starter 仍只依赖 Micrometer Core，不强迫所有消费方选择 Prometheus。
 - Prometheus Java client 由 registry 传递引入，不在 Ainer 代码中直接依赖其 API；商业发布前仍需由 SBOM 和许可证扫描复核完整传递依赖。
 - 指标访问复用 Spring Security JWT 与 OAuth2 Client Credentials，不引入监控厂商 SDK、自研静态 Token 或新的会话组件。
+
+## Ainer Admin 契约切片取舍
+
+- OpenAPI Generator 只在显式 `ainer-admin-sdk` Maven profile 中运行，不进入服务器运行时依赖。
+- 生成物写入模块 `target/`，Ainer Boot 不提交派生 TypeScript；唯一前端源码仍由 Ainer Studio
+  的 `templates/ainer-admin` 维护。
+- SDK 只生成 Ainer JSON API。Authorization Code + PKCE、OIDC discovery 和 RP-Initiated
+  Logout 继续交给标准前端协议库，避免生成并维护自制 OAuth 实现。
