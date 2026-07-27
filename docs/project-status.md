@@ -95,14 +95,24 @@ OpenAPI/SDK 与完整浏览器链路测试也已纳入同一分支。
 - 默认关闭的预配通知终态回执 API：独立 tenantless gateway client、专用
   `identity.provisioning-notifications.receipts.write` scope、精确白名单、只允许已
   `PUBLISHED` notification、gateway event/notification 双重幂等、UUIDv7 回执和最小安全字段；
-- `ainer-dev.xiaoqu99.com` 手工触发的可复现 dev 发布工具：独立 PostgreSQL、loopback
-  Authorization Server systemd、版本化 JAR、原子切换/校验回滚、Let's Encrypt 和精确同源
-  Nginx 配置；公网部署与真实浏览器验收尚未因工具存在而标记完成；
+- `ainer-dev.xiaoqu99.com` 手工触发的可复现 dev 发布与真实公网环境：独立 PostgreSQL 18.3、
+  loopback Authorization Server systemd、版本化 JAR/Studio/Admin、原子切换/校验回滚、
+  Let's Encrypt 和精确同源 Nginx 配置；真实 Chromium 已完成 PKCE、成员治理、revoke、
+  OIDC logout 和退出后重新登录门禁；
 - ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0020 与 ADR-0022 已接受，ADR-0012 至 ADR-0014
   及 ADR-0021 处于 Proposed；
   架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
 
 ## 3. 最近验证证据
+
+2026-07-27 在 `https://ainer-dev.xiaoqu99.com` 完成首次真实公网联合验收。Authorization Server
+release 为 `3f9420a4425f11e78feace776fe0b15853a0b884`，Ainer Studio/Admin release 为
+`d13fe026cd5422f85f03c443e09f825c05e114a1`；systemd 与独立 PostgreSQL 18.3 均在线，空库
+实际执行 16 份 migration，公开 discovery issuer 与规范 origin 一致。无网络拦截的 Chromium
+实际完成表单登录、Authorization Code + PKCE、成员读取/添加、MEMBER → ADMIN → MEMBER、软移除、
+当前 access token 撤销、RP-Initiated Logout 和退出后重新访问要求登录。公网延迟暴露的 Studio
+退出导航/路由守卫竞态已由 `d13fe02` 修复并复验通过；fixture 运行开关已关闭，密码不在 Java
+EnvironmentFile。
 
 2026-07-27 部署工具通过 `bash -n`、隔离路径/精确代理静态门禁和 `git diff --check`。Java
 `mvn test` 的 14 模块构建成功，但执行机当时没有 Docker，Authorization Server 的 30 个

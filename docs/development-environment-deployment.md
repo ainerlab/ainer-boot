@@ -1,6 +1,6 @@
 # Ainer 开发环境部署与跨 Session 交接
 
-> 文档类型：dev 运行手册与时间敏感交接 · 状态：部署工具已建立，公网验收待执行 · 最近核对：2026-07-27
+> 文档类型：dev 运行手册与时间敏感交接 · 状态：公网开发环境与真实浏览器验收已完成 · 最近核对：2026-07-27
 
 本文是 `ainer-dev.xiaoqu99.com` 联合开发环境的操作入口。Boot、Studio 或其他 session 接手前先读
 本页，再分别阅读 [`ainer-admin-integration.md`](ainer-admin-integration.md) 与
@@ -143,10 +143,30 @@ pnpm test:e2e:boot:remote
 
 ## 7. 当前交接状态
 
-截至本文最近核对：
+截至 2026-07-27 最近核对：
 
-- DNS `ainer-dev.xiaoqu99.com` 已解析到 `43.139.111.228`；
-- Boot/Studio 阶段 5 本地联合验收基线仍为 Boot `ea30ff43...` 与 Studio `e217154...`；
-- 部署、回滚、systemd、独立 PostgreSQL 和 Nginx 配置已进入仓库，服务器变更尚未执行；
-- 首次公网成功后必须在本节记录实际 Boot/Studio/Admin commit、证书、服务状态和真实浏览器证据，
-  不得由后续 session 根据“有脚本”推断“已部署”。
+- 规范 origin `https://ainer-dev.xiaoqu99.com` 已解析到 `43.139.111.228`；Let's Encrypt
+  证书只有 `DNS:ainer-dev.xiaoqu99.com`，有效期至 `2026-10-25 01:43:26 UTC`，certbot timer
+  负责续期；
+- `ainer-authorization-server-dev.service` 为 `active/running`，只监听
+  `127.0.0.1:19000`；独立 `ainer-auth-postgres-dev` 为 `running`，使用
+  `postgres:18.3-alpine` 与 `127.0.0.1:55432`，首次空库已成功执行 16 份 migration；
+- Boot current 为 `3f9420a4425f-20260727024015`，commit
+  `3f9420a4425f11e78feace776fe0b15853a0b884`，JAR SHA-256
+  `a8709bbee9e6916e5654ac3ee221c04747f1c8cba97457a4b1e0d8a3ca1c6165`；
+- Studio current 为 `d13fe026cd54-20260727025810`，Admin current 为
+  `d13fe026cd54-20260727025626`；二者都绑定
+  `d13fe026cd5422f85f03c443e09f825c05e114a1`；
+- Boot 仓库 `dev` 的部署控制面 HEAD 为 `4cd296356450d31130d29d88a38f3f00a6af6b3d`。
+  `0f27e73`、`4cd2963` 只修正公网/本机 SNI smoke，当前 JAR 无需因此重发；
+- fixture 第一次初始化成功后已关闭，密码已从 Java EnvironmentFile 移除；root-only
+  `/etc/ainer/authorization-server-dev-fixture.credentials` 仅供 dev 登录与联合验收，不得输出；
+- 真实 remote Chromium 已在上述 releases 上通过 PKCE、表单登录、成员列表/添加、双向角色调整、
+  软移除、当前 access token revoke、OIDC logout 和退出后重新访问要求登录；测试没有网络拦截、
+  HAR、fetch mock、伪造 Token 或 mock 降级；
+- 公网测试曾暴露 Studio 的退出竞态：发起 `/connect/logout` 后过早清空界面会话会触发路由守卫
+  抢先重新授权。Studio `d13fe02` 已修复并补充安全网络诊断与回归测试，复验通过。
+
+后续 Boot、Studio 或其他 session 不要重新运行首次 bootstrap，也不要复用小趣 PostgreSQL。先执行
+第 4 节只读检查并读取三个 `current/release.json`；变更后只发布所属 release，最后重跑第 6 节
+真实公网门禁。若 release 与本文不同，以服务器签名/清单和当次验收结果为准，并立即更新本节。

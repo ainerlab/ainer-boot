@@ -6,9 +6,10 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
-- 增加 `ainer-dev.xiaoqu99.com` 可复现 dev 部署工具：独立 PostgreSQL 18.3、loopback systemd
-  Authorization Server、版本化 JAR release、原子切换/校验回滚、Let's Encrypt 与精确同源
-  Nginx 路由；同时建立跨 Boot/Studio session 的开发环境交接手册。
+- `ainer-dev.xiaoqu99.com` 可复现 dev 环境已真实上线：独立 PostgreSQL 18.3、loopback
+  systemd Authorization Server、版本化 JAR/Studio/Admin release、原子切换/校验回滚、
+  Let's Encrypt 与精确同源 Nginx 路由全部启用；远程 Chromium 已跑通 PKCE、成员治理、
+  revoke、OIDC logout 和退出后重新登录，并建立跨 Boot/Studio session 的开发环境交接手册。
 - 建立 JDK 25、Spring Boot 4.1.0 与 Maven 多模块工程基线。
 - 增加 Core、Spring、Web、Persistence、Security Starter 与独立 BOM。
 - 增加 Workspace tenant 资源、成员生命周期、所有权转移和授权审计。
