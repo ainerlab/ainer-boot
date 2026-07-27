@@ -51,6 +51,8 @@ browser
   +-- /ainer-admin/** --------------------------> Ainer Admin static/SPA
   |
   +-- /.well-known/**, /oauth2/**, /login ------> ainer-authorization-server
+  +-- /ainer-login/tokens.css ------------------> ainer-authorization-server
+  +-- /ainer-login/login.css -------------------> ainer-authorization-server
   +-- /connect/logout, /api/me/** --------------> ainer-authorization-server
   +-- /api/tenants/*/members** -----------------> ainer-authorization-server
 ```
@@ -59,8 +61,8 @@ browser
 
 1. `/ainer-admin/**` 由前端静态服务处理，SPA fallback 只能限制在这个前缀内；
 2. `/.well-known/**`、`/oauth2/**`、`/connect/logout`、`/login`、`/login/**`、
-   `/default-ui.css` 和
-   `/error` 转发到 Authorization Server；
+   `/error`、精确 `/ainer-login/tokens.css` 与精确 `/ainer-login/login.css` 转发到
+   Authorization Server；`/default-ui.css` 只为回滚到 M6 前 release 保留；
 3. `/api/me/access-token-revocations` 和 `/api/tenants/*/members**` 转发到
    Authorization Server，不能被 SPA fallback 改写为 `index.html`；
 4. 启用 Passkey 时再把 `/webauthn/**` 与 `/login/webauthn` 转发到同一个
@@ -73,12 +75,32 @@ browser
    access log 不记录 authorization code、`code_verifier`、Bearer Token、ID token 或密码；
 8. 第一版不增加全局 CORS。出现跨域请求说明入口或 SDK `basePath` 配置发生漂移，应修复路由，
    而不是放宽 Origin。
+9. 禁止增加 `/ainer-login/**`、通用静态目录或 `/api/**` catch-all；登录资源与成员 API 都必须
+   维持可审计的精确代理边界。
 
 Authorization Server 把 OIDC ID token 的 `sid` 与登录 HTTP session 绑定。浏览器必须在同一个
 cookie session 中完成登录、授权、Token 交换和 `/connect/logout`；不能用一个脱离浏览器 cookie
 jar 的后端脚本交换 code，再期待原浏览器会话完成 RP-Initiated Logout。
 
 ## 3. 登录与回调
+
+公开 `GET /login` 由 Ainer Boot 服务端渲染，不属于 Ainer Admin React 路由。页面固定提交
+`POST /login` 的 `username`、`password` 与服务端生成的 CSRF 参数；Admin 不读取凭据。
+普通认证失败统一回到 `/login?error`，不区分未知账号与错误密码；明确的认证基础设施异常映射为
+一次性 `503` 页面；声明接受 HTML 的登录提交被限速时原位返回 `429` 与 `Retry-After`。这些
+HTML、错误和重定向均 `no-store`，且不改变后续 SavedRequest 恢复的 OAuth 授权请求。
+
+品牌登录页面源自 Ainer Studio commit
+`a73f40b77b33f4591fd5eadcc7c3fd4bb8f430b8` 的视觉合同 `1.0.0`：
+
+- `contract.json` SHA-256：
+  `e8e50c266957c7fe14af4b4e30508dd6fe52f43c12029261d8a44e5d51ce2786`；
+- `tokens.css` SHA-256：
+  `2a8eeed8d598ebc647163662a7de8f7bb0d0ce2e3a171e2392e638ba75c095d8`。
+
+Boot 固定复制这两份资源，不运行 Studio React/Ant Design 预览。合同 1.0.0 不显示 Passkey
+动作；Boot 仍保留 WebAuthn 协议端点、条件 MFA 过滤器与 factor query 上下文，但需要可见 Passkey
+交互的环境必须等待 Studio 新合同，不能由 Boot 自行设计入口。
 
 前端开始登录时生成高熵 `state`、`nonce` 和 `code_verifier`，只把它们短时放入
 `sessionStorage`。`code_challenge` 使用 SHA-256 与 base64url-no-padding 计算。授权请求固定包含：

@@ -1,6 +1,8 @@
 package dev.ainer.authorizationserver.config;
 
+import dev.ainer.authorizationserver.login.AinerLoginAuthenticationFailureHandler;
 import dev.ainer.authorizationserver.passkey.AinerPasskeyWebSecurity;
+import dev.ainer.authorizationserver.ratelimit.AinerLoginRateLimitFilter;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.security.AinerSecurityScopes;
 import dev.ainer.security.autoconfigure.AinerSecurityFailureWriter;
@@ -12,6 +14,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -27,6 +30,7 @@ import org.springframework.security.oauth2.server.resource.web.DefaultBearerToke
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import tools.jackson.databind.ObjectMapper;
 
@@ -265,11 +269,18 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
     SecurityFilterChain authorizationServerDefaultSecurityFilterChain(
             HttpSecurity http,
             ObjectProvider<AinerPasskeyWebSecurity> passkeyProvider,
-            ObjectProvider<dev.ainer.authorizationserver.ratelimit.AinerLoginRateLimitFilter> rateLimitFilterProvider)
+            ObjectProvider<AinerLoginRateLimitFilter> rateLimitFilterProvider,
+            AinerLoginAuthenticationFailureHandler loginFailureHandler)
             throws Exception {
         AinerPasskeyWebSecurity passkey = passkeyProvider.getIfAvailable();
         http.authorizeHttpRequests(authorize -> {
-                    authorize.requestMatchers("/actuator/health/**", "/actuator/info").permitAll();
+                    authorize.requestMatchers(HttpMethod.GET, "/login").permitAll();
+                    authorize.requestMatchers(
+                                    "/actuator/health/**",
+                                    "/actuator/info",
+                                    "/ainer-login/tokens.css",
+                                    "/ainer-login/login.css")
+                            .permitAll();
                     if (passkey != null) {
                         authorize.requestMatchers(
                                         "/webauthn/authenticate/options",
@@ -282,23 +293,27 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                     }
                     authorize.anyRequest().authenticated();
                 });
-        dev.ainer.authorizationserver.ratelimit.AinerLoginRateLimitFilter rateLimitFilter =
-                rateLimitFilterProvider.getIfAvailable();
+        AinerLoginRateLimitFilter rateLimitFilter = rateLimitFilterProvider.getIfAvailable();
         if (rateLimitFilter != null) {
-            http.addFilterAfter(
-                    rateLimitFilter,
-                    org.springframework.security.web.context.SecurityContextHolderFilter.class);
+            // 浏览器 HTML 限流响应需要复用服务端 CSRF Token，因此必须在 CSRF 校验之后执行。
+            http.addFilterAfter(rateLimitFilter, CsrfFilter.class);
         }
+        http.formLogin(formLogin -> {
+            formLogin.loginPage("/login")
+                    .loginProcessingUrl("/login")
+                    .failureHandler(loginFailureHandler)
+                    .permitAll();
+            if (passkey != null) {
+                passkey.configureFormLogin(formLogin);
+            }
+        });
         if (passkey != null) {
-            http.formLogin(passkey::configureFormLogin);
             http.webAuthn(passkey::configureBrowserChain);
             // WebAuthn 协议 filter 在授权 filter 之前短路，凭证管理端点必须显式补一道条件 MFA 门禁。
             // 锚定 CsrfFilter 之后：CSRF 已校验、会话认证已恢复，且仍在 WebAuthn 协议 filter 之前。
             http.addFilterAfter(
                     passkey.credentialManagementGateFilter(),
                     org.springframework.security.web.csrf.CsrfFilter.class);
-        } else {
-            http.formLogin(Customizer.withDefaults());
         }
         return http.build();
     }

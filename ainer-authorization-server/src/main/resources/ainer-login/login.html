@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>登录 Ainer</title>
+  <link rel="stylesheet" href="{{contextPath}}/ainer-login/tokens.css">
+  <link rel="stylesheet" href="{{contextPath}}/ainer-login/login.css">
+</head>
+<body class="ainer-login" data-state="{{stateKey}}">
+  <main class="ainer-login__shell">
+    <section class="ainer-login__brand-panel" aria-labelledby="ainer-brand-name">
+      <div class="ainer-login__brand-content">
+        <div id="ainer-brand-name" class="ainer-login__wordmark">Ainer</div>
+        <p class="ainer-login__meaning">AI-Native Extensible Runtime</p>
+        <p class="ainer-login__brand-copy">
+          面向智能应用的可信运行底座，让身份、权限与开放能力保持清晰边界。
+        </p>
+      </div>
+    </section>
+
+    <section class="ainer-login__form-panel" aria-labelledby="ainer-login-title">
+      <div class="ainer-login__mobile-brand" aria-hidden="true">
+        <span class="ainer-login__wordmark">Ainer</span>
+        <span class="ainer-login__meaning">AI-Native Extensible Runtime</span>
+      </div>
+      <div class="ainer-login__card">
+        <header class="ainer-login__header">
+          <h1 id="ainer-login-title">登录 Ainer</h1>
+          <p>使用你的账号继续。</p>
+        </header>
+
+        {{statusContent}}
+
+        <form method="post" action="{{formAction}}" class="ainer-login__form">
+          <div class="ainer-login__field">
+            <label for="username">用户名</label>
+            <input id="username" name="username" type="text"
+                   autocomplete="username" required autofocus>
+          </div>
+          <div class="ainer-login__field">
+            <label for="password">密码</label>
+            <input id="password" name="password" type="password"
+                   autocomplete="current-password" required>
+          </div>
+          <input type="hidden" name="{{csrfParameterName}}" value="{{csrfToken}}">
+          <button type="submit">登录</button>
+        </form>
+
+        <footer>身份验证由 Ainer Boot 提供</footer>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

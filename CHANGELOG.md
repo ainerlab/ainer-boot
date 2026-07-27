@@ -6,6 +6,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- 增加由 Ainer Boot 服务端承载的品牌 `/login`：固定消费 Ainer Studio 视觉合同 1.0.0，
+  保持 CSRF、SavedRequest、PKCE/OIDC 与条件 MFA 语义，统一凭据错误，提供 HTML 429 和明确
+  基础设施异常 503 状态，并只通过两个精确 CSS 路径交付资源。
 - `ainer-dev.xiaoqu99.com` 可复现 dev 环境已真实上线：独立 PostgreSQL 18.3、loopback
   systemd Authorization Server、版本化 JAR/Studio/Admin release、原子切换/校验回滚、
   Let's Encrypt 与精确同源 Nginx 路由全部启用；远程 Chromium 已跑通 PKCE、成员治理、

@@ -16,7 +16,9 @@ https://ainer-dev.xiaoqu99.com
 ├── /.well-known/**
 ├── /oauth2/**
 ├── /login、/login/**
-├── /default-ui.css
+├── /ainer-login/tokens.css
+├── /ainer-login/login.css
+├── /default-ui.css      仅供回滚到 M6 之前的 Boot release
 ├── /error
 ├── /connect/logout
 ├── /api/me/access-token-revocations
@@ -106,6 +108,11 @@ ssh ubuntu@dev.xiaoqu99.com \
 Nginx 已对 OAuth、logout 与成员 API location 关闭 access log，避免 query 中的授权码或
 `id_token_hint` 进入通用日志。
 
+品牌登录页静态资源只允许两个精确代理：
+`/ainer-login/tokens.css` 与 `/ainer-login/login.css`。不得增加
+`location ^~ /ainer-login/` 或通用静态目录代理。`/default-ui.css` 只保留给 M6 之前的
+Authorization Server 回滚版本，新页面不引用它。
+
 ## 5. 回滚
 
 先只读选择 release：
@@ -174,6 +181,15 @@ pnpm test:e2e:boot:remote
 - Spring Security 默认登录页依赖的精确 `/default-ui.css` 已转发到 Boot；根
   `/favicon.ico` 由 Nginx 返回空响应，避免页面样式缺失和无意义的控制台 404。没有因此增加
   宽泛静态目录或 `/api` 代理。
+
+M6 品牌登录候选尚未部署。候选代码将新增精确 `/ainer-login/tokens.css` 与
+`/ainer-login/login.css` 代理；发布后必须先确认 `GET /login` 的合同版本与资源均来自同一 Boot
+release，再通知 Studio 重跑第 6 节 remote E2E。当前线上仍是已验收的 Spring Security 默认登录页，
+不得把本地候选误写成已上线事实。
+
+Studio 登录视觉合同 1.0.0 明确不显示 Passkey 动作。M6 候选保留既有 WebAuthn 端点、条件 MFA
+过滤器和 `factor.type` / `factor.reason` 表单上下文，但在 Studio 发布包含 Passkey 交互的新合同前，
+不得在需要人员可见 Passkey 登录的环境启用该候选。开发环境当前 Passkey 默认关闭。
 
 后续 Boot、Studio 或其他 session 不要重新运行首次 bootstrap，也不要复用小趣 PostgreSQL。先执行
 第 4 节只读检查并读取三个 `current/release.json`；变更后只发布所属 release，最后重跑第 6 节

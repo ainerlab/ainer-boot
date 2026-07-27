@@ -13,6 +13,8 @@ Foundation 已完成 M4.8A 与 Ainer Admin 后端融合：M4.7 tenant 成员管�
 OAuth2/HTTPS 通知网关 relay 和 provider-neutral `DELIVERED|FAILED` 终态回执接收基线。
 固定 Ainer Admin 开发 browser client、开发身份、Token 自助撤销、成员 API active gate、
 OpenAPI/SDK 与完整浏览器链路测试也已纳入同一分支。
+M6 已在独立候选分支实现由 Authorization Server 承载的品牌 `/login`，固定消费 Studio
+视觉合同 1.0.0，并保持 CSRF、SavedRequest、PKCE/OIDC 与条件 MFA 协议边界；候选尚未部署。
 `REQUESTED` 仍不是可授权身份事实；真实外部通知网关/供应商联调、供应商回执映射、最终送达证据、
 生产限速/告警尚未完成，0-skipped 仍需在正式发布候选环境重复执行。当前工程是可编译、可运行、
 可用真实 PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到生产或商业发行就绪。
@@ -78,6 +80,9 @@ OpenAPI/SDK 与完整浏览器链路测试也已纳入同一分支。
   active gate、`ainer-admin-v1.yaml` 与 TypeScript SDK 生成入口；
 - 同一 `ainer-admin-dev` browser session 的 PKCE → default tenant → 成员列表/添加/双向改角色/
   软移除 → revoke → OIDC logout 真实 PostgreSQL 端到端门禁；
+- Ainer 品牌服务端登录页：Studio 合同与 Tokens 固定哈希、四种服务端状态、服务端 CSRF、
+  SavedRequest、统一凭据错误、HTML 429/`Retry-After`、明确认证基础设施异常 503、精确 CSS
+  代理，以及不改变 WebAuthn/MFA filter 的兼容基线；
 - 默认关闭的平台 Identity 预配申请控制面：tenantless SERVICE、tenant/user 成对 read/write
   scope、精确 operator 白名单、独立一分钟 operator bootstrap、operator 级幂等、规范化摘要、
   tenant code/新 username 并发预留、惰性过期、同事务平台审计和安全状态查询；
@@ -113,6 +118,18 @@ release 为 `3f9420a4425f11e78feace776fe0b15853a0b884`，Ainer Studio/Admin rele
 当前 access token 撤销、RP-Initiated Logout 和退出后重新访问要求登录。公网延迟暴露的 Studio
 退出导航/路由守卫竞态已由 `d13fe02` 修复并复验通过；fixture 运行开关已关闭，密码不在 Java
 EnvironmentFile。
+
+2026-07-27 的 M6 品牌登录候选在 macOS Colima、Testcontainers 2.0.5 与
+`postgres:18.3-alpine` 环境完成 `mvn clean test`：14 个 Reactor 模块成功，71 个测试套件、
+281 个测试全部实际执行通过，0 failure、0 error、0 skipped。真实 Chromium 直接访问候选
+Authorization Server 的 `/login` 与 `/login?error`，并以同一服务端模板/CSS 检查合同规定的
+429/503 视觉状态；normal、credential-error、rate-limited、service-unavailable 四种状态均完成
+1440×900 和 390×844 截图复核，桌面/移动共 8 组 axe-core 4.12.1 扫描均为 0 violation。
+服务端测试同时覆盖 CSRF、SavedRequest/PKCE、通用凭据错误、一次性 503、HTML 429、
+`Retry-After`、no-store 与既有 Passkey/WebAuthn ceremony。Studio 合同和 Tokens 的 SHA-256
+分别保持 `e8e50c266957c7fe14af4b4e30508dd6fe52f43c12029261d8a44e5d51ce2786` 与
+`2a8eeed8d598ebc647163662a7de8f7bb0d0ce2e3a171e2392e638ba75c095d8`。该候选尚未推送或部署，
+不能替代现有 dev 公网验收。
 
 2026-07-27 部署工具通过 `bash -n`、隔离路径/精确代理静态门禁和 `git diff --check`。Java
 `mvn test` 的 14 模块构建成功，但执行机当时没有 Docker，Authorization Server 的 30 个
@@ -285,7 +302,8 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
   导出、双人审批或 UI；
 - Authorization Code + PKCE 与 Passkey 条件门禁、虚拟 authenticator 签名 ceremony、恢复、
   受控 enrollment 和 Resource Server step-up 已有自动化证据，但生产 browser/OIDC client 控制面、
-  品牌登录 UI、恢复通知、真实设备矩阵、共享限流、多节点会话和签名密钥轮换未完成；
+  恢复通知、真实设备矩阵、共享限流、多节点会话和签名密钥轮换未完成；品牌登录合同 1.0.0
+  明确不提供可见 Passkey 动作，因此需要人员 Passkey 登录的部署仍需等待 Studio 新合同；
 - 平台级 tenant/user 控制面已有默认关闭的预配申请/查询、一次性激活核心、加密 notification
   outbox、OAuth2/HTTPS 通知网关 relay、已有用户本人接受、安全分页、显式取消与 provider-neutral
   终态回执接收；真实外部通知网关/供应商、供应商回执映射和最终送达证据、禁用/恢复、tenant

@@ -1,5 +1,6 @@
 package dev.ainer.authorizationserver.ratelimit;
 
+import dev.ainer.authorizationserver.login.AinerLoginPageRenderer;
 import dev.ainer.core.web.ApiResponse;
 import dev.ainer.security.autoconfigure.AinerSecurityFailureWriter;
 import dev.ainer.web.request.RequestIds;
@@ -118,6 +119,7 @@ class AinerLoginRateLimitFilterIntegrationTest {
                     new AinerRateLimiter(Duration.ofMinutes(1), 1, clock),
                     Set.of("/login"),
                     new AinerSecurityFailureWriter(objectMapper),
+                    new AinerLoginPageRenderer(),
                     meterRegistry);
         }
 

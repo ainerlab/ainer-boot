@@ -318,8 +318,19 @@ M4.5 已用测试专用 public client 完成真实 HTTP 浏览器会话与 Postg
 `CredentialsContainer`，认证成功后擦除 password hash；持久化 mixin 忽略 password 属性，集成
 测试直接检查授权记录不含密码或 password 字段。
 
-这些证据不创建生产默认 browser client，也不提供注册/轮换 API、品牌登录页、同意页、租户选择、
-会话治理或完整 MFA。测试 issuer、测试 client 和测试 RSA key 不能用于发行环境。
+这些证据不创建生产默认 browser client，也不提供注册/轮换 API、同意页、租户选择、会话治理或
+完整 MFA。测试 issuer、测试 client 和测试 RSA key 不能用于发行环境。
+
+M6 使用 Ainer Studio `a73f40b` 的视觉合同 1.0.0 提供纯服务端品牌登录页。它保持
+`GET/POST /login`、服务端 CSRF、Spring Security SavedRequest 与 MFA filter 语义；用户名不存在
+和密码错误统一显示同一消息。HTML 登录限速保留 429、`Retry-After` 与
+`AINER.COMMON.RATE_LIMITED` 的对应关系，JSON/WebAuthn 端点仍使用原错误合同；只有明确的
+`AuthenticationServiceException` 才产生一次性 503 视图，普通失败不能伪装为服务不可用。
+页面不回填用户名或密码，所有 HTML、失败重定向和错误响应都使用 `no-store`。
+
+视觉合同 1.0.0 明确禁止显示 Passkey 动作，因此本次实现只保证协议与条件 MFA 兼容，不声称提供
+人员可操作的 Passkey 登录 UI。需要启用人员 Passkey 的部署必须先取得 Studio 新版视觉/交互合同；
+不能在 Boot 中私自添加按钮或脚本。
 
 Ainer Admin 另提供只在 `dev` profile、显式开关下初始化的固定 public client
 `ainer-admin-dev`。它注册 `/ainer-admin/auth/callback` 与
@@ -358,8 +369,9 @@ M4.6 增加默认关闭的 Passkey/WebAuthn 协议基础。启用时：
 + assertion 闭环、`amr=pwd,mfa,pop` 与凭证管理门禁均在 HTTP 层验证）。恢复码、管理员双人恢复、
 `require-invite` 首次 enrollment、登录 POST 限速和 Resource Server step-up 也已落地并默认关闭。
 恢复与 enrollment 的目标 `(tenant,subject)` 必须对应 ACTIVE tenant/user/default membership；数据库
-复合外键再防止孤立或跨 tenant 安全记录。登录限流使用标准 Ainer 429 envelope、`Retry-After`、
-只匹配配置的 POST 路径，且明确是 node-local。step-up 只处理 USER token，校验必需 `amr`、
+复合外键再防止孤立或跨 tenant 安全记录。登录限流对 JSON/API 使用标准 Ainer 429 envelope，
+对明确接受 HTML 的 `POST /login` 使用同一品牌页面，并统一保留 `Retry-After`、`no-store`；
+它只匹配配置的 POST 路径，且明确是 node-local。step-up 只处理 USER token，校验必需 `amr`、
 `auth_time` 最大年龄、未来时间和可配时钟偏差；匿名仍返回 401。
 
 当前仍未覆盖主流真实设备/浏览器兼容矩阵、恢复通知和多节点 session/共享限流证据。TOTP 只保留为
