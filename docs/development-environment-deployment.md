@@ -158,8 +158,9 @@ pnpm test:e2e:boot:remote
 - Studio current 为 `d13fe026cd54-20260727025810`，Admin current 为
   `d13fe026cd54-20260727025626`；二者都绑定
   `d13fe026cd5422f85f03c443e09f825c05e114a1`；
-- Boot 仓库 `dev` 的部署控制面 HEAD 为 `4cd296356450d31130d29d88a38f3f00a6af6b3d`。
-  `0f27e73`、`4cd2963` 只修正公网/本机 SNI smoke，当前 JAR 无需因此重发；
+- 服务器当前 Nginx/origin 配置已安装至 Boot `ab32325` 基线；`0f27e73`、`4cd2963`
+  只修正公网/本机 SNI smoke，`ab32325` 补齐登录页样式与 favicon 精确路由，这些提交都不要求
+  重发当前 JAR；
 - fixture 第一次初始化成功后已关闭，密码已从 Java EnvironmentFile 移除；root-only
   `/etc/ainer/authorization-server-dev-fixture.credentials` 仅供 dev 登录与联合验收，不得输出；
 - 真实 remote Chromium 已在上述 releases 上通过 PKCE、表单登录、成员列表/添加、双向角色调整、
