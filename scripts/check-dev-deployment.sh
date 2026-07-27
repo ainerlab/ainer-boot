@@ -25,6 +25,8 @@ grep -Fq 'proxy_set_header X-Forwarded-For $remote_addr;' "$proxy"
 grep -Fq 'access_log off;' "$proxy"
 grep -Fq 'alias /opt/ainer-admin/current/' "$vhost"
 grep -Fq 'alias /opt/ainer-studio/current/' "$vhost"
+grep -Fq 'location = /default-ui.css' "$vhost"
+grep -Fq 'location = /favicon.ico' "$vhost"
 grep -Fq 'location = /api/me/access-token-revocations' "$vhost"
 grep -Fq 'location ~ ^/api/tenants/[^/]+/members' "$vhost"
 grep -Fq "curl --noproxy '*'" ops/dev/bootstrap-origin.sh

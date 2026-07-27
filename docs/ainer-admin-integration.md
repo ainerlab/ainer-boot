@@ -58,7 +58,8 @@ browser
 代理规则至少满足：
 
 1. `/ainer-admin/**` 由前端静态服务处理，SPA fallback 只能限制在这个前缀内；
-2. `/.well-known/**`、`/oauth2/**`、`/connect/logout`、`/login`、`/login/**` 和
+2. `/.well-known/**`、`/oauth2/**`、`/connect/logout`、`/login`、`/login/**`、
+   `/default-ui.css` 和
    `/error` 转发到 Authorization Server；
 3. `/api/me/access-token-revocations` 和 `/api/tenants/*/members**` 转发到
    Authorization Server，不能被 SPA fallback 改写为 `index.html`；

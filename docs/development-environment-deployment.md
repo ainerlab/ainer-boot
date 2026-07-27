@@ -16,6 +16,7 @@ https://ainer-dev.xiaoqu99.com
 ├── /.well-known/**
 ├── /oauth2/**
 ├── /login、/login/**
+├── /default-ui.css
 ├── /error
 ├── /connect/logout
 ├── /api/me/access-token-revocations
@@ -166,6 +167,9 @@ pnpm test:e2e:boot:remote
   HAR、fetch mock、伪造 Token 或 mock 降级；
 - 公网测试曾暴露 Studio 的退出竞态：发起 `/connect/logout` 后过早清空界面会话会触发路由守卫
   抢先重新授权。Studio `d13fe02` 已修复并补充安全网络诊断与回归测试，复验通过。
+- Spring Security 默认登录页依赖的精确 `/default-ui.css` 已转发到 Boot；根
+  `/favicon.ico` 由 Nginx 返回空响应，避免页面样式缺失和无意义的控制台 404。没有因此增加
+  宽泛静态目录或 `/api` 代理。
 
 后续 Boot、Studio 或其他 session 不要重新运行首次 bootstrap，也不要复用小趣 PostgreSQL。先执行
 第 4 节只读检查并读取三个 `current/release.json`；变更后只发布所属 release，最后重跑第 6 节
