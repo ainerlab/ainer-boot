@@ -142,8 +142,9 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 
 1. [`operations.md`](operations.md)
 2. [`configuration.md`](configuration.md)
-3. [`releasing.md`](releasing.md)
-4. [`project-status.md`](project-status.md) 的当前运行缺口
+3. [`public-origin-and-domain-strategy.md`](public-origin-and-domain-strategy.md)
+4. [`releasing.md`](releasing.md)
+5. [`project-status.md`](project-status.md) 的当前运行缺口
 
 ### 4.8 旧系统迁移或 Boot 4 兼容
 
@@ -193,6 +194,7 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 | 文档 | 作用 |
 |---|---|
 | [`operations.md`](operations.md) | 启停、健康检查、诊断、备份和故障处理 |
+| [`public-origin-and-domain-strategy.md`](public-origin-and-domain-strategy.md) | 临时开发 origin、未来独立品牌域名布局与安全迁移步骤 |
 | [`releasing.md`](releasing.md) | 版本、制品、兼容、发布和回滚门禁 |
 | [`boot4-migration-notes.md`](boot4-migration-notes.md) | Spring Boot 4/JDK 25 兼容验证 |
 | [`migration/ainer-migration-plan.md`](migration/ainer-migration-plan.md) | 旧项目到 Ainer 的迁移路线 |

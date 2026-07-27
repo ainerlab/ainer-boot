@@ -265,3 +265,15 @@ mvn -pl ainer-authorization-server -am \
 - 当前无 tenant selector；用户只能管理 Token default tenant；
 - 当前没有成员审计查询 UI，但服务端写操作审计仍会持续落库；
 - 同源代理配置尚需在目标 ingress/proxy 产品上进行真实 HTTPS、Cookie、重定向和缓存验收。
+
+## 9. 公开域名与品牌迁移
+
+Ainer Admin 与 Boot 在每个环境继续使用一个规范 HTTPS origin。过渡开发环境建议使用
+`https://ainer-dev.xiaoqu99.com`，但该主机名在完成 DNS、证书、代理和真实验收前只能描述为计划，
+不能写成已部署事实。
+
+未来取得独立 Ainer 品牌域名后，production 推荐使用 `app.<brand-domain>` 同时承载 Admin、
+Authorization Server 协议端点和 API；品牌官网使用 apex，Studio 可在不共享 Admin 登录会话时使用
+`studio.<brand-domain>`。域名切换不通过 CORS 或 OAuth 端点的笼统重定向解决，完整拓扑、`.com` /
+`.cn` 边界和迁移步骤见
+[`public-origin-and-domain-strategy.md`](public-origin-and-domain-strategy.md)。
