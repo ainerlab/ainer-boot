@@ -60,10 +60,10 @@ nginx -t
 systemctl reload nginx
 trap - ERR
 
-curl -fsS --retry 10 --retry-delay 1 \
+curl --noproxy '*' -fsS --retry 10 --retry-delay 1 \
   "https://$domain/.well-known/openid-configuration" >/dev/null
-curl -fsS --retry 10 --retry-delay 1 \
+curl --noproxy '*' -fsS --retry 10 --retry-delay 1 \
   "https://$domain/ainer-admin/" >/dev/null
-curl -fsS --retry 10 --retry-delay 1 \
+curl --noproxy '*' -fsS --retry 10 --retry-delay 1 \
   "https://$domain/ainer-studio/" >/dev/null
 echo "AINER_DEV_ORIGIN_BOOTSTRAPPED=https://$domain"

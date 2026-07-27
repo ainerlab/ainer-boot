@@ -65,7 +65,7 @@ bash scripts/deploy-authorization-server-dev.sh --skip-public-smoke
 # 2. Ainer Studio：先发布 Studio，再发布官方 Boot-mode Admin。
 cd /Users/xq/01-code/xq/ainer-studio
 pnpm deploy:dev
-pnpm deploy:admin:dev -- --skip-http-smoke
+pnpm deploy:admin:dev --skip-http-smoke
 
 # 3. Ainer Boot：签发 TLS，安装独立 vhost 和精确同源代理。
 cd /Users/xq/01-code/xq/ainer-boot

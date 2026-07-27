@@ -27,6 +27,8 @@ grep -Fq 'alias /opt/ainer-admin/current/' "$vhost"
 grep -Fq 'alias /opt/ainer-studio/current/' "$vhost"
 grep -Fq 'location = /api/me/access-token-revocations' "$vhost"
 grep -Fq 'location ~ ^/api/tenants/[^/]+/members' "$vhost"
+grep -Fq "curl --noproxy '*'" ops/dev/bootstrap-origin.sh
+grep -Fq "curl --noproxy '*'" scripts/bootstrap-ainer-dev-origin.sh
 
 if grep -Eq 'location[[:space:]]+(\^~[[:space:]]+)?/api/' "$vhost"; then
   echo '[ainer-dev-check] broad /api/ proxy is forbidden' >&2

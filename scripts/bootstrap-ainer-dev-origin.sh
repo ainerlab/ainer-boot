@@ -42,6 +42,6 @@ scp ops/dev/bootstrap-origin.sh "$deploy_host:$remote_bootstrap"
 ssh "$deploy_host" \
   "sudo bash '$remote_bootstrap' '$remote_http' '$remote_https' '$remote_proxy'"
 
-curl -fsS --retry 10 --retry-delay 1 \
+curl --noproxy '*' -fsS --retry 10 --retry-delay 1 \
   https://ainer-dev.xiaoqu99.com/ainer-admin/ >/dev/null
 echo "[ainer-origin-bootstrap] HTTPS origin smoke passed"

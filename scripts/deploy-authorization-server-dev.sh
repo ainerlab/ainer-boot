@@ -59,7 +59,7 @@ ssh "$deploy_host" "sudo bash '$remote_bootstrap' '$remote_unit'"
 ssh "$deploy_host" "sudo bash '$remote_deploy' '$remote_jar' '$commit' '5'"
 
 if [[ "$skip_public_smoke" == false ]]; then
-  discovery="$(curl -fsS --retry 10 --retry-delay 1 \
+  discovery="$(curl --noproxy '*' -fsS --retry 10 --retry-delay 1 \
     https://ainer-dev.xiaoqu99.com/.well-known/openid-configuration)"
   printf '%s' "$discovery" | node -e '
     let input = ""
