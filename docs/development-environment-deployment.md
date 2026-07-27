@@ -158,6 +158,9 @@ pnpm test:e2e:boot:remote
 - Studio current 为 `d13fe026cd54-20260727025810`，Admin current 为
   `d13fe026cd54-20260727025626`；二者都绑定
   `d13fe026cd5422f85f03c443e09f825c05e114a1`；
+- 两个仓库均已创建并推送 annotated tag `dev-env-20260727`：Boot 标签精确指向上述 Boot
+  runtime commit，Studio 标签精确指向上述 Studio/Admin runtime commit。需要回看首次公网验收
+  代码时使用标签，不要用后续纯文档 HEAD 替代运行制品；
 - 服务器当前 Nginx/origin 配置已安装至 Boot `ab32325` 基线；`0f27e73`、`4cd2963`
   只修正公网/本机 SNI smoke，`ab32325` 补齐登录页样式与 favicon 精确路由，这些提交都不要求
   重发当前 JAR；
