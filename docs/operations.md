@@ -224,8 +224,10 @@ CORS 掩盖代理路径错误。
 
 登录、Token 交换和 `/connect/logout` 必须复用同一浏览器 cookie session，否则 ID token 的
 `sid` 无法与登录 session 完成可靠注销。完整路由表、退出失败语义、开发 fixture 和 smoke
-见 [`ainer-admin-integration.md`](ainer-admin-integration.md)。当前只形成契约和自动化证据，
-尚未在选定的生产 ingress 上完成部署验收。
+见 [`ainer-admin-integration.md`](ainer-admin-integration.md)。过渡 dev 环境的可执行发布、独立
+PostgreSQL、systemd、TLS、Nginx、回滚和公网联合验收以
+[`development-environment-deployment.md`](development-environment-deployment.md) 为准。它不
+替代尚未完成的 production ingress、browser client 控制面和高可用验收。
 
 ## 3. 健康检查
 

@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-07-26 · 工程版本：`0.1.0-SNAPSHOT`
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-07-27 · 工程版本：`0.1.0-SNAPSHOT`
 
 本文只记录当前事实和验证证据，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -95,11 +95,20 @@ OpenAPI/SDK 与完整浏览器链路测试也已纳入同一分支。
 - 默认关闭的预配通知终态回执 API：独立 tenantless gateway client、专用
   `identity.provisioning-notifications.receipts.write` scope、精确白名单、只允许已
   `PUBLISHED` notification、gateway event/notification 双重幂等、UUIDv7 回执和最小安全字段；
+- `ainer-dev.xiaoqu99.com` 手工触发的可复现 dev 发布工具：独立 PostgreSQL、loopback
+  Authorization Server systemd、版本化 JAR、原子切换/校验回滚、Let's Encrypt 和精确同源
+  Nginx 配置；公网部署与真实浏览器验收尚未因工具存在而标记完成；
 - ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0020 与 ADR-0022 已接受，ADR-0012 至 ADR-0014
   及 ADR-0021 处于 Proposed；
   架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
 
 ## 3. 最近验证证据
+
+2026-07-27 部署工具通过 `bash -n`、隔离路径/精确代理静态门禁和 `git diff --check`。Java
+`mvn test` 的 14 模块构建成功，但执行机当时没有 Docker，Authorization Server 的 30 个
+Testcontainers 测试按既有 `disabledWithoutDocker` 策略跳过；该次运行不替代下述 0-skipped
+基线，也不能作为公网 dev 部署证据。首次上线仍必须用服务器真实 PostgreSQL migration 和远程
+Chromium 联合验收关闭门禁。
 
 2026-07-26 在 macOS Colima、Testcontainers 2.0.5 与 `postgres:18.3-alpine` 环境执行完整
 `mvn test`：14 个 Reactor 模块成功，67 个测试套件、271 个测试全部实际执行通过，
