@@ -28,6 +28,7 @@ grep -Fq 'alias /opt/ainer-studio/current/' "$vhost"
 grep -Fq 'location = /api/me/access-token-revocations' "$vhost"
 grep -Fq 'location ~ ^/api/tenants/[^/]+/members' "$vhost"
 grep -Fq "curl --noproxy '*'" ops/dev/bootstrap-origin.sh
+grep -Fq -- '--resolve "$domain:443:127.0.0.1"' ops/dev/bootstrap-origin.sh
 grep -Fq "curl --noproxy '*'" scripts/bootstrap-ainer-dev-origin.sh
 
 if grep -Eq 'location[[:space:]]+(\^~[[:space:]]+)?/api/' "$vhost"; then
