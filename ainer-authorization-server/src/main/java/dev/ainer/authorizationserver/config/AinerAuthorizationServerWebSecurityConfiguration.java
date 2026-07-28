@@ -229,7 +229,9 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                         "/api/me/access-token-revocations",
                         "/api/me/tenants",
                         "/api/tenants/*/members",
-                        "/api/tenants/*/members/**")
+                        "/api/tenants/*/members/**",
+                        "/api/tenants/*/ownership-transfers",
+                        "/api/tenants/*/ownership-transfers/**")
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
                 .csrf(csrf -> csrf.disable())
                 .requestCache(cache -> cache.disable())

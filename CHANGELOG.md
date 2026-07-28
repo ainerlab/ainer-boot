@@ -12,6 +12,12 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   用户被重定向到品牌选择页，选择结果绑定当前 AS 会话与 authorization request；
   JWT token customizer 在签发人员 access token 前实时重查 Identity membership 校验选定 tenant
   仍然 ACTIVE 并取得当前角色，principal 或客户端提交的 tenant 只作为候选。
+- 增加默认关闭的 M4.8C OWNER 专用转移：双自然人确认状态机（REQUESTED → EXECUTED / CANCELLED /
+  EXPIRED），当前 ACTIVE OWNER 发起、目标 ACTIVE ADMIN 接受后原子角色交换（OWNER↔ADMIN），
+  同事务写入操作审计与双方 `IDENTITY_MEMBERSHIP_ROLE_CHANGED` access event/outbox 使旧角色
+  Token 进入撤销链路；数据库部分唯一索引保证每 tenant 最多一个 ACTIVE OWNER 和一个未完成转移；
+  暴露 initiate/get/accept/cancel 四个端点，要求 `tenant.ownership.transfer` scope、可信
+  tenant claim 与实时角色门禁。
 - `ainer-dev.xiaoqu99.com` 可复现 dev 环境已真实上线：独立 PostgreSQL 18.3、loopback
   systemd Authorization Server、版本化 JAR/Studio/Admin release、原子切换/校验回滚、
   Let's Encrypt 与精确同源 Nginx 路由全部启用；远程 Chromium 已跑通 PKCE、成员治理、

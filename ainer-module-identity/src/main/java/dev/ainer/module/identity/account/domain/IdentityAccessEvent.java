@@ -38,4 +38,11 @@ public record IdentityAccessEvent(
                 UUID.randomUUID(), IdentityAccessEventType.IDENTITY_MEMBERSHIP_REVOKED,
                 tenantId, subjectId, CURRENT_PAYLOAD_VERSION, occurredAt);
     }
+
+    public static IdentityAccessEvent membershipRoleChanged(
+            UUID tenantId, UUID subjectId, Instant occurredAt) {
+        return new IdentityAccessEvent(
+                UUID.randomUUID(), IdentityAccessEventType.IDENTITY_MEMBERSHIP_ROLE_CHANGED,
+                tenantId, subjectId, CURRENT_PAYLOAD_VERSION, occurredAt);
+    }
 }

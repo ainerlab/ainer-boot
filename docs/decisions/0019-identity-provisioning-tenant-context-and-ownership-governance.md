@@ -304,7 +304,32 @@ M4.8B 额外证明并行 tenant 会话互不影响、伪造选择拒绝、选择
 
 尚未完成：M4.8B 候选尚未部署到 dev 公网联合验收；多浏览器会话并行、选择后撤销失效、
 真实多 tenant 品牌选择页、与 M6 品牌登录页的视觉统一、生产 browser/OIDC client 控制面接入
-均留待后续；M4.8C OWNER 专用转移尚未开始。
+均留待后续。
+
+2026-07-28 已完成 M4.8C 的"OWNER 专用转移"代码基线与真实 PostgreSQL 集成证据：
+
+- 新增 `ainer_identity_ownership_transfer` 表与状态机（REQUESTED/EXECUTED/CANCELLED/EXPIRED），
+  部分唯一索引 `ux_ainer_identity_ownership_transfer_outstanding` 保证每 tenant 同时最多一个
+  REQUESTED 转移；新增安全不变量唯一索引
+  `ux_ainer_identity_membership_active_owner` 保证每 tenant 最多一个 ACTIVE OWNER（升级前
+  执行重复检查，发现冲突阻止发布）。
+- 新增 `OwnershipTransferService`：`initiateTransfer`（OWNER 发起，目标必须同 tenant ACTIVE
+  ADMIN）、`acceptTransfer`（目标 ADMIN 接受，单一事务锁定双方 membership、再次校验角色、
+  先降原 OWNER 为 ADMIN 再升目标为 OWNER、写 `OWNERSHIP_TRANSFERRED` 审计与双方
+  `IDENTITY_MEMBERSHIP_ROLE_CHANGED` access event/outbox 使旧角色 Token 进入撤销链路）、
+  `cancelTransfer`、`getTransfer`。
+- 新增 `OwnershipTransferController`：`POST/GET
+  /api/tenants/{tenantId}/ownership-transfers[/{transferId}[/acceptances|/cancellations]]`，
+  要求 `tenant.ownership.transfer` scope、USER actor、可信 tenant claim 与实时角色门禁。
+- 新增 `IdentityAccessEventType.IDENTITY_MEMBERSHIP_ROLE_CHANGED` 与
+  `IdentityAccessEvent.membershipRoleChanged` 工厂。
+- 完整 `mvn test` 在 macOS Colima + Testcontainers 2.0.5 + `postgres:18.3-alpine` 环境执行：
+  14 个 Reactor 模块成功，281 个测试全部实际执行通过，0 failure、0 error、0 skipped。
+  PostgreSQL 集成测试覆盖角色原子交换 + 审计 + 双方 access event、非 OWNER 发起被拒、非 ADMIN
+  目标被拒、每 tenant 最多一个未完成转移、发起者取消后可再次发起。
+
+尚未完成：M4.8C 候选尚未部署到 dev 公网；真实 HTTP ownership-transfer 端到端、并发接受只能
+成功一次、step-up `amr`/`auth_time` 强认证门禁、OWNER 丢失恢复流程与正常转移分离均留待后续。
 
 2026-07-26 已完成 M4.8A 的“预配 + 激活 + 控制面”代码基线；外部联调与发布证据尚未完成，
 因此仍不等同于生产可用的完整 M4.8A：

@@ -84,6 +84,24 @@ public interface IdentityMapper {
 
     int insertMemberAudit(IdentityMemberAuditRow audit);
 
+    int insertOwnershipTransfer(OwnershipTransferRow transfer);
+
+    OwnershipTransferRow selectOwnershipTransferById(@Param("id") UUID id);
+
+    OwnershipTransferRow selectOwnershipTransferByIdForUpdate(@Param("id") UUID id);
+
+    int completeOwnershipTransfer(
+            @Param("id") UUID id,
+            @Param("tenantId") UUID tenantId,
+            @Param("executedBySubjectId") UUID executedBySubjectId,
+            @Param("executedAt") java.time.Instant executedAt,
+            @Param("updatedAt") java.time.Instant updatedAt);
+
+    int cancelOwnershipTransfer(
+            @Param("id") UUID id,
+            @Param("tenantId") UUID tenantId,
+            @Param("updatedAt") java.time.Instant updatedAt);
+
     IdentityDirectoryRow selectActiveDefaultOwner(
             @Param("tenantCode") String tenantCode,
             @Param("username") String username);

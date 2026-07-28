@@ -15,6 +15,7 @@ public final class AinerSecurityScopes {
             "identity.provisioning-notifications.receipts.write";
     public static final String TENANT_MEMBERS_READ = "tenant.members.read";
     public static final String TENANT_MEMBERS_WRITE = "tenant.members.write";
+    public static final String TENANT_OWNERSHIP_TRANSFER = "tenant.ownership.transfer";
 
     private AinerSecurityScopes() {
     }

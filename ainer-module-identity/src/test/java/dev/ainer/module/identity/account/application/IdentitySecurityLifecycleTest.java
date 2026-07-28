@@ -207,6 +207,32 @@ class IdentitySecurityLifecycleTest {
         }
 
         @Override
+        public void insertOwnershipTransfer(OwnershipTransfer transfer) {
+        }
+
+        @Override
+        public Optional<OwnershipTransfer> findOwnershipTransfer(UUID id) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<OwnershipTransfer> findOwnershipTransferForUpdate(UUID id) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean completeOwnershipTransfer(
+                UUID id, UUID tenantId, UUID executedBySubjectId,
+                Instant executedAt, Instant updatedAt) {
+            return false;
+        }
+
+        @Override
+        public boolean cancelOwnershipTransfer(UUID id, UUID tenantId, Instant updatedAt) {
+            return false;
+        }
+
+        @Override
         public boolean updateUserStatus(
                 UUID subjectId,
                 IdentityStatus expectedStatus,

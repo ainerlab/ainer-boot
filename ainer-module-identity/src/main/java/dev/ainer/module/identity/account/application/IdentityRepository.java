@@ -77,4 +77,16 @@ public interface IdentityRepository {
             String normalizedUsername);
 
     void insertAccessEvent(IdentityAccessEvent event);
+
+    void insertOwnershipTransfer(OwnershipTransfer transfer);
+
+    Optional<OwnershipTransfer> findOwnershipTransfer(UUID id);
+
+    Optional<OwnershipTransfer> findOwnershipTransferForUpdate(UUID id);
+
+    boolean completeOwnershipTransfer(
+            UUID id, UUID tenantId, UUID executedBySubjectId,
+            java.time.Instant executedAt, java.time.Instant updatedAt);
+
+    boolean cancelOwnershipTransfer(UUID id, UUID tenantId, java.time.Instant updatedAt);
 }

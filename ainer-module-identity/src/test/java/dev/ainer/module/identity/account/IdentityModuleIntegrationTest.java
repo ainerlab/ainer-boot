@@ -27,6 +27,7 @@ import dev.ainer.module.identity.account.application.ProvisionTenantOwnerCommand
 import dev.ainer.module.identity.account.application.ProvisionedIdentity;
 import dev.ainer.module.identity.account.application.TenantMemberManagementService;
 import dev.ainer.module.identity.account.application.TenantContextEntry;
+import dev.ainer.module.identity.account.application.OwnershipTransfer;
 import dev.ainer.module.identity.account.application.TenantProvisioningCancellationResult;
 import dev.ainer.module.identity.account.application.TenantProvisioningCompletion;
 import dev.ainer.module.identity.account.application.TenantProvisioningNotification;
@@ -46,6 +47,7 @@ import dev.ainer.module.identity.account.application.TenantProvisioningPolicy;
 import dev.ainer.module.identity.account.application.TenantProvisioningService;
 import dev.ainer.module.identity.account.domain.IdentityAccessEvent;
 import dev.ainer.module.identity.account.domain.IdentityStatus;
+import dev.ainer.module.identity.account.domain.OwnershipTransferStatus;
 import dev.ainer.module.identity.account.domain.IdentityTenant;
 import dev.ainer.module.identity.account.domain.IdentityUser;
 import dev.ainer.module.identity.account.domain.TenantMembership;
@@ -170,6 +172,7 @@ class IdentityModuleIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM ainer_identity_ownership_transfer");
         jdbcTemplate.update("DELETE FROM ainer_identity_platform_operation_audit");
         jdbcTemplate.update(
                 "DELETE FROM ainer_identity_notification_delivery_receipt");
@@ -187,7 +190,7 @@ class IdentityModuleIntegrationTest {
 
     @Test
     void migrationCreatesIdentitySchema() {
-        assertThat(flyway.info().applied()).hasSize(9);
+        assertThat(flyway.info().applied()).hasSize(11);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_name IN ('ainer_identity_tenant','ainer_identity_user',"
@@ -199,8 +202,9 @@ class IdentityModuleIntegrationTest {
                         + "'ainer_identity_platform_operation_audit',"
                         + "'ainer_identity_activation_grant',"
                         + "'ainer_identity_notification_outbox',"
-                        + "'ainer_identity_notification_delivery_receipt')",
-                Integer.class)).isEqualTo(12);
+                        + "'ainer_identity_notification_delivery_receipt',"
+                        + "'ainer_identity_ownership_transfer')",
+                Integer.class)).isEqualTo(13);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
     }
 
@@ -1728,6 +1732,112 @@ class IdentityModuleIntegrationTest {
                 .getFirst();
     }
 
+    @Test
+    void ownershipTransferSwapsOwnerAndAdminAtomicallyWithAuditAndRevocationEvents() {
+        ProvisionedIdentity owner = provision(
+                "owner-tx", "Owner TX", "owner@tx.dev", "TX Owner");
+        ProvisionedIdentity admin = provision(
+                "admin-home", "Admin Home", "admin@tx.dev", "TX Admin");
+        AuthenticatedActor ownerActor = transferActor(owner);
+        // 给 owner tenant 添加 admin 用户为 ADMIN
+        memberService.addMember(
+                ownerActor, owner.tenantId(),
+                new AddTenantMemberCommand("ADMIN@TX.DEV", null, TenantRole.ADMIN, "onboarding"),
+                "req-add-admin");
+
+        // 发起转移
+        OwnershipTransfer transfer = transferService.initiateTransfer(
+                ownerActor, owner.tenantId(), admin.subjectId(), "succession", "req-init-1");
+        assertThat(transfer.status()).isEqualTo(OwnershipTransferStatus.REQUESTED);
+
+        // admin（目标）接受转移
+        AuthenticatedActor adminActor = transferActorFor(admin, owner.tenantId());
+        OwnershipTransfer executed = transferService.acceptTransfer(
+                adminActor, owner.tenantId(), transfer.id(), "accepted", "req-accept-1");
+        assertThat(executed.status()).isEqualTo(OwnershipTransferStatus.EXECUTED);
+        assertThat(executed.executedBySubjectId()).isEqualTo(admin.subjectId());
+
+        // 角色：原 owner 降为 ADMIN，admin 升为 OWNER
+        IdentityDirectoryEntry demotedOwner = directoryService.findActiveMember(
+                owner.tenantId(), owner.subjectId()).orElseThrow();
+        assertThat(demotedOwner.role()).isEqualTo(TenantRole.ADMIN);
+        IdentityDirectoryEntry promotedAdmin = directoryService.findActiveMember(
+                owner.tenantId(), admin.subjectId()).orElseThrow();
+        assertThat(promotedAdmin.role()).isEqualTo(TenantRole.OWNER);
+
+        // 审计记录
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_member_audit "
+                        + "WHERE tenant_id = ? AND operation = 'OWNERSHIP_TRANSFERRED'",
+                Integer.class, owner.tenantId())).isEqualTo(1);
+
+        // 双方 access event（撤销链路）
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_access_event "
+                        + "WHERE tenant_id = ? AND event_type = 'IDENTITY_MEMBERSHIP_ROLE_CHANGED' "
+                        + "AND subject_id IN (?, ?)",
+                Integer.class, owner.tenantId(), owner.subjectId(), admin.subjectId())).isEqualTo(2);
+    }
+
+    @Test
+    void ownershipTransferEnforcesInitiatorOwnerAndTargetAdminAndAtMostOneOutstanding() {
+        ProvisionedIdentity owner = provision(
+                "ot-1", "OT One", "owner@ot1.dev", "OT Owner");
+        ProvisionedIdentity admin = provision(
+                "ot-2", "OT Two", "admin@ot2.dev", "OT Admin");
+        ProvisionedIdentity member = provision(
+                "ot-3", "OT Three", "member@ot3.dev", "OT Member");
+        AuthenticatedActor ownerActor = transferActor(owner);
+        memberService.addMember(ownerActor, owner.tenantId(),
+                new AddTenantMemberCommand("ADMIN@OT2.DEV", null, TenantRole.ADMIN, "add"),
+                "req-1");
+        memberService.addMember(ownerActor, owner.tenantId(),
+                new AddTenantMemberCommand("MEMBER@OT3.DEV", null, TenantRole.MEMBER, "add"),
+                "req-2");
+
+        // 非 OWNER 不能发起
+        AuthenticatedActor adminActor = transferActorFor(admin, owner.tenantId());
+        assertStandardError(
+                () -> transferService.initiateTransfer(
+                        adminActor, owner.tenantId(), member.subjectId(), "try", "req-no-owner"),
+                StandardErrorCode.FORBIDDEN);
+
+        // 目标必须是 ADMIN，不能是 MEMBER
+        assertIdentityError(
+                () -> transferService.initiateTransfer(
+                        ownerActor, owner.tenantId(), member.subjectId(), "try-member", "req-no-admin"),
+                IdentityErrorCode.OWNERSHIP_TRANSFER_TARGET_INELIGIBLE);
+
+        // 正常发起
+        OwnershipTransfer transfer = transferService.initiateTransfer(
+                ownerActor, owner.tenantId(), admin.subjectId(), "init", "req-ok-1");
+
+        // 同 tenant 同时只能一个未完成转移
+        assertIdentityError(
+                () -> transferService.initiateTransfer(
+                        ownerActor, owner.tenantId(), admin.subjectId(), "dup", "req-ok-2"),
+                IdentityErrorCode.OWNERSHIP_TRANSFER_OUTSTANDING_CONFLICT);
+
+        // 发起者（OWNER）不能接受自己的转移（角色不是 ADMIN）
+        assertStandardError(
+                () -> transferService.acceptTransfer(
+                        ownerActor, owner.tenantId(), transfer.id(), "hijack", "req-hijack"),
+                StandardErrorCode.FORBIDDEN);
+
+        // 发起者取消
+        OwnershipTransfer cancelled = transferService.cancelTransfer(
+                ownerActor, owner.tenantId(), transfer.id(), "cancelled", "req-cancel-1");
+        assertThat(cancelled.status()).isEqualTo(OwnershipTransferStatus.CANCELLED);
+
+        // 取消后可以再次发起
+        assertThat(transferService.initiateTransfer(
+                ownerActor, owner.tenantId(), admin.subjectId(), "retry", "req-ok-3").status())
+                .isEqualTo(OwnershipTransferStatus.REQUESTED);
+    }
+
+    @Autowired
+    private dev.ainer.module.identity.account.application.OwnershipTransferService transferService;
+
     private ProvisionedIdentity provision(
             String tenantCode,
             String tenantName,
@@ -1743,6 +1853,24 @@ class IdentityModuleIntegrationTest {
                 identity.tenantId().toString(),
                 AuthenticatedActor.USER,
                 managerAuthorities());
+    }
+
+    private static AuthenticatedActor transferActor(ProvisionedIdentity identity) {
+        java.util.Set<String> authorities = new java.util.HashSet<>(managerAuthorities());
+        authorities.add("SCOPE_" + AinerSecurityScopes.TENANT_OWNERSHIP_TRANSFER);
+        return new AuthenticatedActor(
+                identity.subjectId().toString(),
+                identity.tenantId().toString(),
+                AuthenticatedActor.USER,
+                authorities);
+    }
+
+    private static AuthenticatedActor transferActorFor(ProvisionedIdentity identity, UUID tenantId) {
+        return new AuthenticatedActor(
+                identity.subjectId().toString(),
+                tenantId.toString(),
+                AuthenticatedActor.USER,
+                java.util.Set.of("SCOPE_" + AinerSecurityScopes.TENANT_OWNERSHIP_TRANSFER));
     }
 
     private static Set<String> managerAuthorities() {
@@ -1874,6 +2002,33 @@ class IdentityModuleIntegrationTest {
         @Override
         public List<TenantContextEntry> findActiveMembershipsBySubject(UUID subjectId) {
             return delegate.findActiveMembershipsBySubject(subjectId);
+        }
+
+        @Override
+        public void insertOwnershipTransfer(OwnershipTransfer transfer) {
+            delegate.insertOwnershipTransfer(transfer);
+        }
+
+        @Override
+        public Optional<OwnershipTransfer> findOwnershipTransfer(UUID id) {
+            return delegate.findOwnershipTransfer(id);
+        }
+
+        @Override
+        public Optional<OwnershipTransfer> findOwnershipTransferForUpdate(UUID id) {
+            return delegate.findOwnershipTransferForUpdate(id);
+        }
+
+        @Override
+        public boolean completeOwnershipTransfer(
+                UUID id, UUID tenantId, UUID executedBySubjectId,
+                Instant executedAt, Instant updatedAt) {
+            return delegate.completeOwnershipTransfer(id, tenantId, executedBySubjectId, executedAt, updatedAt);
+        }
+
+        @Override
+        public boolean cancelOwnershipTransfer(UUID id, UUID tenantId, Instant updatedAt) {
+            return delegate.cancelOwnershipTransfer(id, tenantId, updatedAt);
         }
 
         @Override

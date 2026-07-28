@@ -5,6 +5,7 @@ import dev.ainer.module.identity.account.application.IdentityDirectoryEntry;
 import dev.ainer.module.identity.account.application.IdentityRepository;
 import dev.ainer.module.identity.account.application.IdentityTokenStatus;
 import dev.ainer.module.identity.account.application.IdentityTokenStatusRepository;
+import dev.ainer.module.identity.account.application.OwnershipTransfer;
 import dev.ainer.module.identity.account.application.TenantContextEntry;
 import dev.ainer.module.identity.account.domain.IdentityAccessEvent;
 import dev.ainer.module.identity.account.domain.IdentityStatus;
@@ -239,6 +240,63 @@ public class MybatisIdentityRepository implements IdentityRepository, IdentityTo
         row.setPublicationStatus("PENDING");
         row.setAttemptCount(0);
         requireSingleRow(mapper.insertAccessEvent(row), "access event");
+    }
+
+    @Override
+    public void insertOwnershipTransfer(OwnershipTransfer transfer) {
+        OwnershipTransferRow row = new OwnershipTransferRow();
+        row.setId(transfer.id());
+        row.setTenantId(transfer.tenantId());
+        row.setInitiatorSubjectId(transfer.initiatorSubjectId());
+        row.setTargetSubjectId(transfer.targetSubjectId());
+        row.setStatus(transfer.status().name());
+        row.setReasonCode(transfer.reasonCode());
+        row.setRequestId(transfer.requestId());
+        row.setExpiresAt(transfer.expiresAt());
+        row.setCreatedAt(transfer.createdAt());
+        row.setUpdatedAt(transfer.updatedAt());
+        requireSingleRow(mapper.insertOwnershipTransfer(row), "ownership transfer");
+    }
+
+    @Override
+    public Optional<OwnershipTransfer> findOwnershipTransfer(UUID id) {
+        return Optional.ofNullable(mapper.selectOwnershipTransferById(id))
+                .map(this::toOwnershipTransfer);
+    }
+
+    @Override
+    public Optional<OwnershipTransfer> findOwnershipTransferForUpdate(UUID id) {
+        return Optional.ofNullable(mapper.selectOwnershipTransferByIdForUpdate(id))
+                .map(this::toOwnershipTransfer);
+    }
+
+    @Override
+    public boolean completeOwnershipTransfer(
+            UUID id, UUID tenantId, UUID executedBySubjectId,
+            Instant executedAt, Instant updatedAt) {
+        return mapper.completeOwnershipTransfer(
+                id, tenantId, executedBySubjectId, executedAt, updatedAt) == 1;
+    }
+
+    @Override
+    public boolean cancelOwnershipTransfer(UUID id, UUID tenantId, Instant updatedAt) {
+        return mapper.cancelOwnershipTransfer(id, tenantId, updatedAt) == 1;
+    }
+
+    private OwnershipTransfer toOwnershipTransfer(OwnershipTransferRow row) {
+        return new OwnershipTransfer(
+                row.getId(),
+                row.getTenantId(),
+                row.getInitiatorSubjectId(),
+                row.getTargetSubjectId(),
+                dev.ainer.module.identity.account.domain.OwnershipTransferStatus.valueOf(row.getStatus()),
+                row.getReasonCode(),
+                row.getRequestId(),
+                row.getExpiresAt(),
+                row.getCreatedAt(),
+                row.getUpdatedAt(),
+                row.getExecutedAt(),
+                row.getExecutedBySubjectId());
     }
 
     private IdentityDirectoryEntry toDirectoryEntry(IdentityDirectoryRow row) {

@@ -53,6 +53,22 @@
         <result property="defaultTenant" column="is_default"/>
     </resultMap>
 
+    <resultMap id="ownershipTransferRow"
+               type="dev.ainer.module.identity.account.infrastructure.mybatis.OwnershipTransferRow">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="initiatorSubjectId" column="initiator_subject_id"/>
+        <result property="targetSubjectId" column="target_subject_id"/>
+        <result property="status" column="status"/>
+        <result property="reasonCode" column="reason_code"/>
+        <result property="requestId" column="request_id"/>
+        <result property="expiresAt" column="expires_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="executedAt" column="executed_at"/>
+        <result property="executedBySubjectId" column="executed_by_subject_id"/>
+    </resultMap>
+
     <insert id="insertTenant">
         INSERT INTO ainer_identity_tenant (id, code, name, status, created_at, updated_at)
         VALUES (#{id}, #{code}, #{name}, #{status}, #{createdAt}, #{updatedAt})
@@ -349,4 +365,49 @@
         VALUES (#{id}, #{tenantId}, #{actorSubjectId}, #{targetSubjectId}, #{operation}, #{role},
                 #{reasonCode}, #{requestId}, #{occurredAt})
     </insert>
+
+    <insert id="insertOwnershipTransfer">
+        INSERT INTO ainer_identity_ownership_transfer
+            (id, tenant_id, initiator_subject_id, target_subject_id, status,
+             reason_code, request_id, expires_at, created_at, updated_at)
+        VALUES (#{id}, #{tenantId}, #{initiatorSubjectId}, #{targetSubjectId}, #{status},
+                #{reasonCode}, #{requestId}, #{expiresAt}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <select id="selectOwnershipTransferById" resultMap="ownershipTransferRow">
+        SELECT id, tenant_id, initiator_subject_id, target_subject_id, status,
+               reason_code, request_id, expires_at, created_at, updated_at,
+               executed_at, executed_by_subject_id
+        FROM ainer_identity_ownership_transfer
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectOwnershipTransferByIdForUpdate" resultMap="ownershipTransferRow">
+        SELECT id, tenant_id, initiator_subject_id, target_subject_id, status,
+               reason_code, request_id, expires_at, created_at, updated_at,
+               executed_at, executed_by_subject_id
+        FROM ainer_identity_ownership_transfer
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
+    <update id="completeOwnershipTransfer">
+        UPDATE ainer_identity_ownership_transfer
+        SET status = 'EXECUTED',
+            executed_at = #{executedAt},
+            executed_by_subject_id = #{executedBySubjectId},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+          AND status = 'REQUESTED'
+    </update>
+
+    <update id="cancelOwnershipTransfer">
+        UPDATE ainer_identity_ownership_transfer
+        SET status = 'CANCELLED',
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+          AND status = 'REQUESTED'
+    </update>
 </mapper>
