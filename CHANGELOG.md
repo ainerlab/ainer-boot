@@ -6,6 +6,12 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- 增加默认关闭的 M4.8B 租户上下文选择：`GET /api/me/tenants` 返回当前 USER 的 ACTIVE
+  membership 安全投影（tenant ID、code、name、role、是否默认），LOCKED/DISABLED 不返回；
+  Authorization Code + PKCE 人员流程在认证后增加 tenant selection 步骤，多 ACTIVE membership
+  用户被重定向到品牌选择页，选择结果绑定当前 AS 会话与 authorization request；
+  JWT token customizer 在签发人员 access token 前实时重查 Identity membership 校验选定 tenant
+  仍然 ACTIVE 并取得当前角色，principal 或客户端提交的 tenant 只作为候选。
 - `ainer-dev.xiaoqu99.com` 可复现 dev 环境已真实上线：独立 PostgreSQL 18.3、loopback
   systemd Authorization Server、版本化 JAR/Studio/Admin release、原子切换/校验回滚、
   Let's Encrypt 与精确同源 Nginx 路由全部启用；远程 Chromium 已跑通 PKCE、成员治理、

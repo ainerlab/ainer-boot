@@ -276,6 +276,36 @@ M4.8B 额外证明并行 tenant 会话互不影响、伪造选择拒绝、选择
 
 ## 实现进度
 
+2026-07-28 已完成 M4.8B 的"租户上下文选择"代码基线与真实 PostgreSQL + HTTP 集成证据：
+
+- 新增 `GET /api/me/tenants`（`MyTenantContextController`），只返回当前 USER 的 ACTIVE
+  membership 安全投影（tenant ID、code、name、role、是否默认）；LOCKED/DISABLED tenant、
+  用户或 membership 不返回。SERVICE actor 被 controller 403 拒绝；安全链复用现有
+  `@Order(4)` JWT + active-gate 链。
+- 新增 `AinerTenantSelectionFilter`，锚定 `@Order(1)` authorization server 链中
+  `SecurityContextHolderFilter` 之后、Spring AS authorization endpoint filter 之前；对持有
+  多个 ACTIVE membership 的已认证人员，保存原始 `/oauth2/authorize?...` URL 并重定向到
+  `/select-tenant`。单 membership 或零 membership 直接放行，沿用默认落点。
+- 新增 `AinerTenantSelectionController`（GET + POST `/select-tenant`）：GET 从 session 缓存
+  的 membership 列表渲染服务端页面（CSRF + radio 选择）；POST 实时重查
+  `findActiveMembership(tenantId, subjectId)` 校验选择关系仍然 ACTIVE，然后以选定 tenant 的
+  角色更新 `SecurityContext` principal（`AinerUserDetails`）并重定向回原 authorization URL。
+  选择绑定当前 AS 会话（session attribute）与当前 authorization request（更新后的 principal
+  持久化进 `OAuth2Authorization`）。
+- 修改 `ainerJwtTokenCustomizer`：签发人员 access token 时不再直接信任 principal 的
+  `tenantId`/`authorities`，改为实时重查 `IdentityApplicationService.findActiveMembership`
+  校验关系仍然 ACTIVE 并取得当前角色；principal 或客户端提交的 tenant 只作为候选。
+- Identity 数据层新增 `selectActiveMembershipsBySubject` 查询（JOIN tenant + user +
+  membership，三者均 ACTIVE，默认租户排在首位）与对应 repository/service 方法。
+- 完整 `mvn test` 在 macOS Colima + Testcontainers 2.0.5 + `postgres:18.3-alpine` 环境执行：
+  14 个 Reactor 模块成功，274 个测试全部实际执行通过，0 failure、0 error、0 skipped。
+  随机端口 HTTP 集成测试覆盖单租户 `GET /api/me/tenants`、SERVICE 403、多租户选择非默认 tenant
+  后 token `tenant_id`/`roles` 来自实时 membership、选择默认 tenant 保持 OWNER 角色。
+
+尚未完成：M4.8B 候选尚未部署到 dev 公网联合验收；多浏览器会话并行、选择后撤销失效、
+真实多 tenant 品牌选择页、与 M6 品牌登录页的视觉统一、生产 browser/OIDC client 控制面接入
+均留待后续；M4.8C OWNER 专用转移尚未开始。
+
 2026-07-26 已完成 M4.8A 的“预配 + 激活 + 控制面”代码基线；外部联调与发布证据尚未完成，
 因此仍不等同于生产可用的完整 M4.8A：
 

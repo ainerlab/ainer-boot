@@ -26,6 +26,7 @@ import dev.ainer.module.identity.account.application.PlatformProvisioningActor;
 import dev.ainer.module.identity.account.application.ProvisionTenantOwnerCommand;
 import dev.ainer.module.identity.account.application.ProvisionedIdentity;
 import dev.ainer.module.identity.account.application.TenantMemberManagementService;
+import dev.ainer.module.identity.account.application.TenantContextEntry;
 import dev.ainer.module.identity.account.application.TenantProvisioningCancellationResult;
 import dev.ainer.module.identity.account.application.TenantProvisioningCompletion;
 import dev.ainer.module.identity.account.application.TenantProvisioningNotification;
@@ -1428,6 +1429,102 @@ class IdentityModuleIntegrationTest {
     }
 
     @Test
+    void findActiveMembershipsReturnsAllActiveWithContextForMultiTenantUser() {
+        ProvisionedIdentity ownerA = provision(
+                "alpha", "Alpha Tenant", "owner@alpha.dev", "Alpha Owner");
+        ProvisionedIdentity ownerB = provision(
+                "beta", "Beta Tenant", "owner@beta.dev", "Beta Owner");
+        AuthenticatedActor ownerBActor = managerActor(ownerB);
+
+        // ownerA 的用户被加入 Beta Tenant 作为 MEMBER
+        memberService.addMember(
+                ownerBActor,
+                ownerB.tenantId(),
+                new AddTenantMemberCommand(
+                        "OWNER@ALPHA.DEV", null, TenantRole.MEMBER, "cross-tenant"),
+                "req-cross-1");
+
+        List<TenantContextEntry> memberships = service.findActiveMemberships(ownerA.subjectId());
+
+        assertThat(memberships).hasSize(2);
+        // 默认租户排在首位
+        TenantContextEntry defaultEntry = memberships.get(0);
+        assertThat(defaultEntry.tenantId()).isEqualTo(ownerA.tenantId());
+        assertThat(defaultEntry.tenantCode()).isEqualTo("alpha");
+        assertThat(defaultEntry.role()).isEqualTo(TenantRole.OWNER);
+        assertThat(defaultEntry.defaultTenant()).isTrue();
+        // 第二个 membership
+        TenantContextEntry betaEntry = memberships.get(1);
+        assertThat(betaEntry.tenantId()).isEqualTo(ownerB.tenantId());
+        assertThat(betaEntry.tenantCode()).isEqualTo("beta");
+        assertThat(betaEntry.role()).isEqualTo(TenantRole.MEMBER);
+        assertThat(betaEntry.defaultTenant()).isFalse();
+    }
+
+    @Test
+    void findActiveMembershipValidatesRealtimeRelationship() {
+        ProvisionedIdentity owner = provision(
+                "gamma", "Gamma Tenant", "owner@gamma.dev", "Gamma Owner");
+        ProvisionedIdentity other = provision(
+                "delta", "Delta Tenant", "owner@delta.dev", "Delta Owner");
+        AuthenticatedActor ownerActor = managerActor(owner);
+
+        // other 用户加入 gamma tenant
+        memberService.addMember(
+                ownerActor,
+                owner.tenantId(),
+                new AddTenantMemberCommand(
+                        null, other.subjectId(), TenantRole.ADMIN, "joined"),
+                "req-join-1");
+
+        // 实时校验：存在的 ACTIVE membership
+        Optional<IdentityDirectoryEntry> active = service.findActiveMembership(
+                owner.tenantId(), other.subjectId());
+        assertThat(active).isPresent();
+        assertThat(active.get().role()).isEqualTo(TenantRole.ADMIN);
+
+        // 实时校验：非成员关系返回空
+        assertThat(service.findActiveMembership(
+                other.tenantId(), owner.subjectId())).isEmpty();
+
+        // 撤销后实时校验也返回空
+        memberService.removeMember(
+                ownerActor, owner.tenantId(), other.subjectId(), "revoked", "req-remove-1");
+        assertThat(service.findActiveMembership(
+                owner.tenantId(), other.subjectId())).isEmpty();
+        // 但该用户在原 tenant 仍有一个 membership
+        assertThat(service.findActiveMemberships(other.subjectId()))
+                .extracting(TenantContextEntry::tenantCode)
+                .containsExactly("delta");
+    }
+
+    @Test
+    void disabledMembershipNotListedInActiveMemberships() {
+        ProvisionedIdentity owner = provision(
+                "epsilon", "Epsilon Tenant", "owner@epsilon.dev", "Epsilon Owner");
+        ProvisionedIdentity member = provision(
+                "zeta", "Zeta Tenant", "zeta-user@zeta.dev", "Zeta Owner");
+        AuthenticatedActor ownerActor = managerActor(owner);
+
+        memberService.addMember(
+                ownerActor,
+                owner.tenantId(),
+                new AddTenantMemberCommand(
+                        null, member.subjectId(), TenantRole.MEMBER, "joined"),
+                "req-join-2");
+
+        // 加入后有两个 ACTIVE membership
+        assertThat(service.findActiveMemberships(member.subjectId())).hasSize(2);
+
+        // 撤销后只剩一个
+        memberService.removeMember(
+                ownerActor, owner.tenantId(), member.subjectId(), "offboarded", "req-remove-2");
+        List<TenantContextEntry> remaining = service.findActiveMemberships(member.subjectId());
+        assertThat(remaining).hasSize(1);
+        assertThat(remaining.get(0).tenantCode()).isEqualTo("zeta");
+    }
+
+    @Test
     void memberManagementEnforcesActorTypeScopeTenantAndLiveManagerRole() {
         ProvisionedIdentity owner = provision(
                 "secure", "Secure Tenant", "owner@secure.dev", "Secure Owner");
@@ -1772,6 +1869,11 @@ class IdentityModuleIntegrationTest {
         @Override
         public List<UUID> findActiveMembershipTenantIds(UUID subjectId) {
             return delegate.findActiveMembershipTenantIds(subjectId);
+        }
+
+        @Override
+        public List<TenantContextEntry> findActiveMembershipsBySubject(UUID subjectId) {
+            return delegate.findActiveMembershipsBySubject(subjectId);
         }
 
         @Override

@@ -202,6 +202,11 @@ class IdentitySecurityLifecycleTest {
         }
 
         @Override
+        public List<TenantContextEntry> findActiveMembershipsBySubject(UUID subjectId) {
+            return List.of();
+        }
+
+        @Override
         public boolean updateUserStatus(
                 UUID subjectId,
                 IdentityStatus expectedStatus,

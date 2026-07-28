@@ -1,18 +1,20 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-07-27 · 工程版本：`0.1.0-SNAPSHOT`
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-07-28 · 工程版本：`0.1.0-SNAPSHOT`
 
 本文只记录当前事实和验证证据，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
 ## 1. 当前阶段
 
-Foundation 已完成 M4.8A 与 Ainer Admin 后端融合：M4.7 tenant 成员管理与首租户严格 bootstrap
-已落地，平台
+Foundation 已完成 M4.8A 与 Ainer Admin 后端融合，并进入 M4.8B 租户上下文选择代码基线。
+M4.7 tenant 成员管理与首租户严格 bootstrap 已落地，平台
 预配申请又具备幂等摘要、并发预留、短时一次性 grant、加密 notification outbox、已有用户本人
 接受、原子创建 ACTIVE tenant/OWNER、显式取消、tenant/user 安全分页，以及默认关闭的
 OAuth2/HTTPS 通知网关 relay 和 provider-neutral `DELIVERED|FAILED` 终态回执接收基线。
 固定 Ainer Admin 开发 browser client、开发身份、Token 自助撤销、成员 API active gate、
 OpenAPI/SDK 与完整浏览器链路测试也已纳入同一分支。
+M4.8B 已在独立候选分支实现 `GET /api/me/tenants`、Authorization Code + PKCE 多租户选择流程
+与 JWT token customizer 实时重查 membership；候选尚未部署。
 `REQUESTED` 仍不是可授权身份事实；真实外部通知网关/供应商联调、供应商回执映射、最终送达证据、
 生产限速/告警尚未完成，0-skipped 仍需在正式发布候选环境重复执行。当前工程是可编译、可运行、
 可用真实 PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到生产或商业发行就绪。
@@ -102,8 +104,25 @@ OpenAPI/SDK 与完整浏览器链路测试也已纳入同一分支。
 - ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0020 与 ADR-0022 已接受，ADR-0012 至 ADR-0014
   及 ADR-0021 处于 Proposed；
   架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
+- M4.8B 租户上下文选择代码基线：`GET /api/me/tenants` 返回当前 USER 的 ACTIVE membership
+  安全投影（tenant ID/code/name/role/is_default），LOCKED/DISABLED tenant/user/membership
+  不返回；`AinerTenantSelectionFilter` 在 Authorization Code + PKCE 流程的 authorization
+  endpoint 拦截多 ACTIVE membership 人员并重定向到服务端渲染的 `/select-tenant` 选择页，
+  选择结果绑定当前 AS 会话（session attribute）与 authorization request（principal 更新后
+  持久化进 `OAuth2Authorization`）；token customizer 在签发人员 access token 前实时重查
+  `findActiveMembership(tenantId, subjectId)` 校验关系仍然 ACTIVE 并取得当前角色，principal
+  或客户端提交的 tenant 只作为候选；SERVICE token 被该端点 403 拒绝。
 
 ## 3. 最近验证证据
+
+2026-07-28 的 M4.8B 候选在 macOS Colima、Testcontainers 2.0.5 与 `postgres:18.3-alpine`
+环境完成完整 `mvn clean test`：14 个 Reactor 模块成功，74 个测试套件、274 个测试全部实际
+执行通过，0 failure、0 error、0 skipped。真实 PostgreSQL 从空库执行全部 migration，
+随机端口 HTTP 使用实际 RSA JWT 覆盖：单租户用户 `GET /api/me/tenants` 返回正确 OWNER
+membership、SERVICE token 403、多租户用户选择非默认 tenant 后 access token 的 `tenant_id`
+与 `roles` 来自选定 tenant 的实时 membership（而非登录时缓存的默认 principal）、选择默认
+tenant 保持 OWNER 角色不变。token customizer 重查在单租户用户既有 PKCE 流程上验证不破坏
+amr/auth_time/roles/sub 等既有 claim。
 
 2026-07-27 在 `https://ainer-dev.xiaoqu99.com` 完成首次真实公网联合验收。Authorization Server
 release 为 `3f9420a4425f11e78feace776fe0b15853a0b884`，Ainer Studio/Admin release 为
@@ -321,13 +340,11 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 M4.8 已形成并接受
 [ADR-0019](decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)，
 按依赖顺序拆为三个切片。M4.8A 已完成 tenantless SERVICE 预配、激活核心与真实 HTTPS gateway
-transport、provider-neutral 终态回执接收，以及平台显式取消与 tenant/user 安全分页；下一步联调
-真实外部通知网关/供应商和回执映射，并在 Docker 可用环境跑完随机端口 HTTP、并发、过期、回滚和
-0-skipped PostgreSQL 门禁。完成这些
-M4.8A 发布证据后再进入 Authorization Server 人员
-多租户上下文选择，使 `is_default` 只承担首次登录落点；最后完成当前 OWNER 发起、目标 ACTIVE ADMIN
-强认证接受的 Identity OWNER 专用转移。不能先做 OWNER 转移，因为现有人员 Token 仍只从默认
-membership 取得 tenant，上下文选择是目标本人接受转移的协议前提。
+transport、provider-neutral 终态回执接收，以及平台显式取消与 tenant/user 安全分页。M4.8B 已完成
+`GET /api/me/tenants`、Authorization Code + PKCE 多租户选择流程与 token customizer 实时重查的
+代码基线与真实 PostgreSQL + 真实 HTTP 集成证据；下一步把 M4.8B 部署到 dev 公网联合验收，
+补齐多浏览器会话并行、撤销失效和真实多 tenant UI 证据，再进入 M4.8C 当前 OWNER 发起、目标
+ACTIVE ADMIN 强认证接受的 Identity OWNER 专用转移。
 
 M4.8 与商业 entitlement 保持正交：Identity `OWNER/ADMIN/MEMBER` 只表达授权角色，Community /
 Pro / Enterprise、license、订阅和配额留给后续独立 entitlement 边界。生产并行工作仍包括真实

@@ -5,6 +5,7 @@ import dev.ainer.module.identity.account.application.IdentityDirectoryEntry;
 import dev.ainer.module.identity.account.application.IdentityRepository;
 import dev.ainer.module.identity.account.application.IdentityTokenStatus;
 import dev.ainer.module.identity.account.application.IdentityTokenStatusRepository;
+import dev.ainer.module.identity.account.application.TenantContextEntry;
 import dev.ainer.module.identity.account.domain.IdentityAccessEvent;
 import dev.ainer.module.identity.account.domain.IdentityStatus;
 import dev.ainer.module.identity.account.domain.IdentityTenant;
@@ -102,6 +103,22 @@ public class MybatisIdentityRepository implements IdentityRepository, IdentityTo
     @Override
     public List<UUID> findActiveMembershipTenantIds(UUID subjectId) {
         return mapper.selectActiveMembershipTenantIds(subjectId);
+    }
+
+    @Override
+    public List<TenantContextEntry> findActiveMembershipsBySubject(UUID subjectId) {
+        return mapper.selectActiveMembershipsBySubject(subjectId).stream()
+                .map(this::toTenantContextEntry)
+                .toList();
+    }
+
+    private TenantContextEntry toTenantContextEntry(IdentityMembershipSummaryRow row) {
+        return new TenantContextEntry(
+                row.getTenantId(),
+                row.getTenantCode(),
+                row.getTenantName(),
+                TenantRole.valueOf(row.getRole()),
+                row.isDefaultTenant());
     }
 
     @Override

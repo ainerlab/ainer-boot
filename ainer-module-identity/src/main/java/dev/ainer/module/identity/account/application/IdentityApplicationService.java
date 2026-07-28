@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -94,6 +95,30 @@ public class IdentityApplicationService {
             return Optional.empty();
         }
         return repository.findAccountByUsername(normalize(username));
+    }
+
+    /**
+     * 列出指定主体当前所有 ACTIVE membership 安全投影（tenant/user/membership 均 ACTIVE）。
+     *
+     * <p>用于租户上下文选择与 {@code GET /api/me/tenants}；默认租户排在首位。
+     */
+    @Transactional(readOnly = true)
+    public List<TenantContextEntry> findActiveMemberships(UUID subjectId) {
+        Objects.requireNonNull(subjectId, "subjectId");
+        return repository.findActiveMembershipsBySubject(subjectId);
+    }
+
+    /**
+     * 实时校验 (tenantId, subjectId) 是否构成 ACTIVE membership 并返回安全投影。
+     *
+     * <p>Token customizer 在签发人员 access token 前调用，确保 tenant claim 来自 Identity 实时
+     * 关系而非登录时缓存的 principal。
+     */
+    @Transactional(readOnly = true)
+    public Optional<IdentityDirectoryEntry> findActiveMembership(UUID tenantId, UUID subjectId) {
+        Objects.requireNonNull(tenantId, "tenantId");
+        Objects.requireNonNull(subjectId, "subjectId");
+        return repository.findActiveDirectoryEntry(tenantId, subjectId);
     }
 
     private String normalize(String value) {

@@ -44,6 +44,15 @@
         <result property="latestRevokedAt" column="latest_revoked_at"/>
     </resultMap>
 
+    <resultMap id="identityMembershipSummaryRow"
+               type="dev.ainer.module.identity.account.infrastructure.mybatis.IdentityMembershipSummaryRow">
+        <id property="tenantId" column="tenant_id"/>
+        <result property="tenantCode" column="tenant_code"/>
+        <result property="tenantName" column="tenant_name"/>
+        <result property="role" column="role"/>
+        <result property="defaultTenant" column="is_default"/>
+    </resultMap>
+
     <insert id="insertTenant">
         INSERT INTO ainer_identity_tenant (id, code, name, status, created_at, updated_at)
         VALUES (#{id}, #{code}, #{name}, #{status}, #{createdAt}, #{updatedAt})
@@ -192,6 +201,22 @@
         WHERE user_id = #{subjectId}
           AND status = 'ACTIVE'
         ORDER BY tenant_id
+    </select>
+
+    <select id="selectActiveMembershipsBySubject" resultMap="identityMembershipSummaryRow">
+        SELECT m.tenant_id,
+               t.code AS tenant_code,
+               t.name AS tenant_name,
+               m.role,
+               m.is_default
+        FROM ainer_identity_membership m
+        JOIN ainer_identity_tenant t ON t.id = m.tenant_id
+        JOIN ainer_identity_user u ON u.id = m.user_id
+        WHERE m.user_id = #{subjectId}
+          AND m.status = 'ACTIVE'
+          AND t.status = 'ACTIVE'
+          AND u.status = 'ACTIVE'
+        ORDER BY m.is_default DESC, t.name, m.tenant_id
     </select>
 
     <update id="updateUserStatus">

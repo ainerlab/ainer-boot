@@ -8,6 +8,7 @@ import com.nimbusds.jose.proc.SecurityContext;
 import dev.ainer.authorizationserver.identity.AinerUserDetails;
 import dev.ainer.authorizationserver.identity.AinerUserDetailsService;
 import dev.ainer.module.identity.account.application.IdentityApplicationService;
+import dev.ainer.module.identity.account.application.IdentityDirectoryEntry;
 import dev.ainer.module.identity.account.application.IdentityTokenStatusService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -17,7 +18,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -158,7 +158,8 @@ public class AinerAuthorizationServerConfiguration {
     @Bean
     OAuth2TokenCustomizer<JwtEncodingContext> ainerJwtTokenCustomizer(
             AinerAuthorizationServerProperties properties,
-            AinerUserDetailsService userDetailsService) {
+            AinerUserDetailsService userDetailsService,
+            IdentityApplicationService identityService) {
         return context -> {
             if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
                 String audience = properties.getAudience();
@@ -170,11 +171,19 @@ public class AinerAuthorizationServerConfiguration {
             Authentication authentication = context.getPrincipal();
             AinerUserDetails user = ainerUserDetails(authentication, userDetailsService);
             if (user != null) {
+                // M4.8B：tenant claim 来自 Identity 实时关系，不直接信任登录时缓存的 principal。
+                // principal 中的 tenantId 可能是默认落点，也可能是租户选择后更新过的值；customizer
+                // 再次读取 membership 校验该关系仍然 ACTIVE 并取得当前角色。
+                IdentityDirectoryEntry membership = identityService.findActiveMembership(
+                        user.tenantId(), user.subjectId()).orElseThrow(() ->
+                        new IllegalStateException(
+                                "Active membership not found for subject " + user.subjectId()
+                                        + " in tenant " + user.tenantId()));
                 context.getClaims()
                         .subject(user.subjectId().toString())
                         .claim("actor_type", "USER")
-                        .claim("tenant_id", user.tenantId().toString())
-                        .claim("roles", new ArrayList<>(roleNames(user)));
+                        .claim("tenant_id", membership.tenantId().toString())
+                        .claim("roles", new ArrayList<>(List.of(membership.role().name())));
                 List<FactorGrantedAuthority> factors = authentication.getAuthorities().stream()
                         .filter(FactorGrantedAuthority.class::isInstance)
                         .map(FactorGrantedAuthority.class::cast)
@@ -316,15 +325,6 @@ public class AinerAuthorizationServerConfiguration {
                     PasswordEncoder passwordEncoder) {
         return new AinerProvisioningNotificationReceiptClientBootstrapRunner(
                 properties, registeredClientRepository, passwordEncoder);
-    }
-
-    private List<String> roleNames(AinerUserDetails user) {
-        return user.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .filter(authority -> authority.startsWith("ROLE_"))
-                .map(authority -> authority.substring("ROLE_".length()))
-                .sorted()
-                .toList();
     }
 
     private List<String> authenticationMethods(

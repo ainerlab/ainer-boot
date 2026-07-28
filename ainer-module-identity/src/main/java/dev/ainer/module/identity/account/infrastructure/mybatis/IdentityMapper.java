@@ -42,6 +42,9 @@ public interface IdentityMapper {
 
     List<UUID> selectActiveMembershipTenantIds(@Param("subjectId") UUID subjectId);
 
+    List<IdentityMembershipSummaryRow> selectActiveMembershipsBySubject(
+            @Param("subjectId") UUID subjectId);
+
     int updateUserStatus(
             @Param("subjectId") UUID subjectId,
             @Param("expectedStatus") String expectedStatus,

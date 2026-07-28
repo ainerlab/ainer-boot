@@ -1,7 +1,9 @@
 package dev.ainer.authorizationserver.config;
 
 import dev.ainer.authorizationserver.passkey.AinerPasskeyWebSecurity;
+import dev.ainer.authorizationserver.tenantcontext.AinerTenantSelectionFilter;
 import dev.ainer.core.error.StandardErrorCode;
+import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.security.AinerSecurityScopes;
 import dev.ainer.security.autoconfigure.AinerSecurityFailureWriter;
 import dev.ainer.security.authorization.PrometheusEndpointRequestMatcher;
@@ -38,13 +40,24 @@ import java.util.Set;
 public class AinerAuthorizationServerWebSecurityConfiguration {
 
     @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+            prefix = "ainer.identity",
+            name = "enabled",
+            havingValue = "true",
+            matchIfMissing = true)
+    AinerTenantSelectionFilter ainerTenantSelectionFilter(IdentityApplicationService identityService) {
+        return new AinerTenantSelectionFilter(identityService);
+    }
+
+    @Bean
     @Order(1)
     SecurityFilterChain authorizationServerSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder jwtDecoder,
             RegisteredClientRepository registeredClientRepository,
             OAuth2AuthorizationService authorizationService,
-            ObjectProvider<AinerPasskeyWebSecurity> passkeyProvider) throws Exception {
+            ObjectProvider<AinerPasskeyWebSecurity> passkeyProvider,
+            ObjectProvider<AinerTenantSelectionFilter> tenantSelectionFilterProvider) throws Exception {
         AinerTokenIntrospectionAuthenticationProvider introspectionProvider =
                 new AinerTokenIntrospectionAuthenticationProvider(
                         registeredClientRepository, authorizationService);
@@ -92,6 +105,12 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                 });
         if (passkey != null) {
             http.webAuthn(passkey::configureProtocolChain);
+        }
+        AinerTenantSelectionFilter tenantSelectionFilter = tenantSelectionFilterProvider.getIfAvailable();
+        if (tenantSelectionFilter != null) {
+            http.addFilterAfter(
+                    tenantSelectionFilter,
+                    org.springframework.security.web.context.SecurityContextHolderFilter.class);
         }
         return http.build();
     }
@@ -208,6 +227,7 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
         AinerSecurityFailureWriter failureWriter = new AinerSecurityFailureWriter(objectMapper);
         http.securityMatcher(
                         "/api/me/access-token-revocations",
+                        "/api/me/tenants",
                         "/api/tenants/*/members",
                         "/api/tenants/*/members/**")
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())

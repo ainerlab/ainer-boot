@@ -33,6 +33,8 @@ public interface IdentityRepository {
 
     List<UUID> findActiveMembershipTenantIds(UUID subjectId);
 
+    List<TenantContextEntry> findActiveMembershipsBySubject(UUID subjectId);
+
     boolean updateUserStatus(
             UUID subjectId, IdentityStatus expectedStatus, IdentityStatus newStatus, Instant updatedAt);
 
