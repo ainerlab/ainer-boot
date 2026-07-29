@@ -1,0 +1,232 @@
+{
+  "$schema": "../visual-contract.schema.json",
+  "schemaVersion": 1,
+  "kind": "ainer:visual-contract",
+  "id": "ainer-login",
+  "name": "Ainer 品牌化登录",
+  "version": "1.0.0",
+  "status": "approved-for-implementation",
+  "summary": "由 Ainer Boot 承载的公开登录页视觉合同；Ainer Studio 提供框架无关规范与可访问预览。",
+  "owners": {
+    "visual": "Ainer Studio",
+    "runtime": "Ainer Boot Authorization Server",
+    "consumerSurface": "GET /login"
+  },
+  "brand": {
+    "productName": "Ainer",
+    "meaning": "AI-Native Extensible Runtime",
+    "wordmark": {
+      "type": "text",
+      "value": "Ainer",
+      "replaceable": true,
+      "approvedLogo": false,
+      "assetPath": null
+    },
+    "trademarkClaim": false,
+    "decoration": "CSS-only gradients and geometric rings; no image or font asset"
+  },
+  "resources": {
+    "contract": "packages/visual-contracts/ainer-login/contract.json",
+    "tokens": "packages/visual-contracts/ainer-login/tokens.css",
+    "implementationNotes": "docs/visual-contracts/ainer-login.md",
+    "logo": null
+  },
+  "layout": {
+    "desktopBreakpointPx": 768,
+    "desktopMinHeightPx": 640,
+    "formColumnWidthPx": 520,
+    "formMaxWidthPx": 440,
+    "desktopOuterPaddingPx": 48,
+    "desktopCardPaddingPx": 40,
+    "mobileOuterPaddingPx": 20,
+    "mobileCardPaddingPx": 24,
+    "minimumTouchTargetPx": 44,
+    "statusSlotMinHeightPx": 76
+  },
+  "tokens": {
+    "color": {
+      "brand": "#2458A6",
+      "brandStrong": "#173A69",
+      "brandPanel": "#102E56",
+      "page": "#F3F6FA",
+      "surface": "#FFFFFF",
+      "text": "#172033",
+      "textSecondary": "#566276",
+      "border": "#CAD2DE",
+      "focus": "#2458A6",
+      "danger": "#A8071A",
+      "dangerSurface": "#FFF1F0",
+      "warning": "#7A4300",
+      "warningSurface": "#FFF7E6",
+      "onBrand": "#FFFFFF"
+    },
+    "font": {
+      "family": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", \"Hiragino Sans GB\", \"Microsoft YaHei\", sans-serif",
+      "wordmarkSizePx": 28,
+      "titleSizePx": 28,
+      "bodySizePx": 14,
+      "captionSizePx": 12,
+      "titleWeight": 600,
+      "bodyLineHeight": 1.6
+    },
+    "spacePx": [
+      4,
+      8,
+      12,
+      16,
+      24,
+      32,
+      40,
+      48
+    ],
+    "radiusPx": {
+      "control": 8,
+      "surface": 16
+    },
+    "shadow": {
+      "surface": "0 20px 60px rgba(16, 46, 86, 0.12)"
+    }
+  },
+  "form": {
+    "method": "POST",
+    "action": "/login",
+    "encoding": "application/x-www-form-urlencoded",
+    "fields": [
+      {
+        "name": "username",
+        "label": "用户名",
+        "type": "text",
+        "autocomplete": "username",
+        "required": true
+      },
+      {
+        "name": "password",
+        "label": "密码",
+        "type": "password",
+        "autocomplete": "current-password",
+        "required": true
+      },
+      {
+        "name": "_csrf",
+        "type": "hidden",
+        "source": "Spring Security request attribute",
+        "required": true
+      }
+    ],
+    "submitLabel": "登录",
+    "secondaryActions": [],
+    "footer": "身份验证由 Ainer Boot 提供"
+  },
+  "viewModel": {
+    "stateKey": [
+      "normal",
+      "credential-error",
+      "rate-limited",
+      "service-unavailable"
+    ],
+    "csrf": "Server-provided parameter name and token value",
+    "retryAfterSeconds": "Optional for rate-limited only; never invent a countdown",
+    "usernameRepopulation": "Do not repopulate by default",
+    "passwordRepopulation": "Never repopulate"
+  },
+  "states": [
+    {
+      "key": "normal",
+      "label": "正常",
+      "severity": "none",
+      "title": null,
+      "message": null,
+      "signal": {
+        "current": true,
+        "source": "GET /login without error signal"
+      }
+    },
+    {
+      "key": "credential-error",
+      "label": "凭据错误",
+      "severity": "error",
+      "title": "登录失败",
+      "message": "用户名或密码错误，请重新输入。",
+      "signal": {
+        "current": true,
+        "source": "Spring Security authentication failure redirect to GET /login?error",
+        "privacy": "Do not distinguish an unknown username from a wrong password"
+      }
+    },
+    {
+      "key": "rate-limited",
+      "label": "限流",
+      "severity": "warning",
+      "title": "请稍后再试",
+      "message": "登录尝试过于频繁，请稍后再试。",
+      "signal": {
+        "current": true,
+        "source": "POST /login returns HTTP 429, code AINER.COMMON.RATE_LIMITED and Retry-After",
+        "transport": "Current Boot response is JSON; branded HTML mapping is required before this state is reachable in the login view"
+      }
+    },
+    {
+      "key": "service-unavailable",
+      "label": "服务异常",
+      "severity": "error",
+      "title": "登录服务暂时不可用",
+      "message": "请稍后重试。",
+      "signal": {
+        "current": false,
+        "source": "No stable Boot login-view signal exists yet",
+        "constraint": "Do not infer this state from the generic /login?error signal"
+      }
+    }
+  ],
+  "springSecurityMapping": {
+    "page": "GET /login",
+    "submission": "POST /login",
+    "credentialFailure": "GET /login?error",
+    "rateLimit": {
+      "status": 429,
+      "code": "AINER.COMMON.RATE_LIMITED",
+      "retryAfterHeader": "Retry-After"
+    },
+    "serviceFailure": null,
+    "csrf": "Render the server-provided _csrf hidden field; never synthesize a token",
+    "savedRequest": "Keep Spring Security request-cache behavior so the original OAuth authorization request resumes after login"
+  },
+  "accessibility": {
+    "documentLanguage": "zh-CN",
+    "singleLevelOneHeading": true,
+    "visibleLabels": true,
+    "errorContainerRole": "alert",
+    "focusVisible": true,
+    "minimumTextContrast": 4.5,
+    "minimumLargeTextContrast": 3,
+    "minimumTouchTargetPx": 44,
+    "keyboardOrder": [
+      "username",
+      "password",
+      "submit"
+    ],
+    "reducedMotion": "No interaction depends on motion"
+  },
+  "securityBoundary": {
+    "credentialsOwner": "Ainer Boot Authorization Server",
+    "studioResponsibility": "Visual contract, design tokens, preview and state matrix only",
+    "adminResponsibility": "Start Authorization Code + PKCE and handle the approved callbacks only",
+    "mustNotChange": [
+      "client_id=ainer-admin-dev",
+      "callback=/ainer-admin/auth/callback",
+      "logout callback=/ainer-admin/auth/logged-out",
+      "scopes=openid profile tenant.members.read tenant.members.write",
+      "same-origin proxy",
+      "access token stored in memory only",
+      "no refresh token",
+      "Boot mode fails closed and never falls back to mock"
+    ],
+    "forbiddenInStudioPreview": [
+      "credential submission",
+      "OAuth authorization request",
+      "PKCE transaction",
+      "token exchange",
+      "token storage"
+    ]
+  }
+}

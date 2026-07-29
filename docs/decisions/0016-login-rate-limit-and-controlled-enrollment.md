@@ -69,11 +69,12 @@ enrollment 的首登入口在 `AinerJdbcPasskeyCredentialRepository.register()`�
 1. 新增可复用限速器 `AinerRateLimiter`（固定窗口、`ConcurrentHashMap`、`Clock` 注入、per-key），
    提供 `tryAcquire(String key)` 与惰性清理；窗口大小与每窗口上限可配置。明确为 node-local，
    不宣称集群级一致。
-2. 新增 `AinerLoginRateLimitFilter`（`OncePerRequestFilter`），锚定在浏览器安全链靠前位置
-   （`SecurityContextHolderFilter` 之后、认证 filter 之前），按**客户端 IP** 对配置的路径节流：
+2. 新增 `AinerLoginRateLimitFilter`（`OncePerRequestFilter`），锚定在浏览器安全链的 CSRF
+   校验之后、认证 filter 之前，按**客户端 IP** 对配置的路径节流：
    默认覆盖 `/login`（POST）、`/login/webauthn`、`/webauthn/authenticate/options`。
-3. 超额返回 **429** `AINER.SECURITY.RATE_LIMITED`，响应带 `Retry-After`（向上取整到窗口剩余秒数），
-   不泄露具体上限或计数。IP 取值只用于限速键，不进入业务日志的常规字段。
+3. 超额返回 **429** `AINER.COMMON.RATE_LIMITED`，响应带 `Retry-After`（向上取整到窗口剩余秒数），
+   不泄露具体上限或计数。明确接受 HTML 的 `POST /login` 渲染同状态品牌登录页；JSON 与
+   WebAuthn 协议请求继续使用原错误合同。IP 取值只用于限速键，不进入业务日志的常规字段。
 4. 默认关闭；启用需显式配置 `window`、`max-requests` 与非空路径集合。限速只决定当前请求是否
    继续，不影响后续认证与授权决策。
 5. 限速器暴露基础指标：放行、拒绝计数（不含 IP 或用户名）。dashboard/告警仍是后续可观测切片。

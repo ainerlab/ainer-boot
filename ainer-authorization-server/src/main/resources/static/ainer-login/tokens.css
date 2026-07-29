@@ -1,0 +1,49 @@
+/*
+ * Ainer branded login v1.0.0
+ * Framework-neutral CSS custom properties. Scope them with `.ainer-login`.
+ * No logo asset is approved; consumers render the text wordmark from contract.json.
+ */
+.ainer-login {
+  --ainer-login-color-brand: #2458A6;
+  --ainer-login-color-brand-strong: #173A69;
+  --ainer-login-color-brand-panel: #102E56;
+  --ainer-login-color-page: #F3F6FA;
+  --ainer-login-color-surface: #FFFFFF;
+  --ainer-login-color-text: #172033;
+  --ainer-login-color-text-secondary: #566276;
+  --ainer-login-color-border: #CAD2DE;
+  --ainer-login-color-focus: #2458A6;
+  --ainer-login-color-danger: #A8071A;
+  --ainer-login-color-danger-surface: #FFF1F0;
+  --ainer-login-color-warning: #7A4300;
+  --ainer-login-color-warning-surface: #FFF7E6;
+  --ainer-login-color-on-brand: #FFFFFF;
+  --ainer-login-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --ainer-login-font-size-wordmark: 28px;
+  --ainer-login-font-size-title: 28px;
+  --ainer-login-font-size-body: 14px;
+  --ainer-login-font-size-caption: 12px;
+  --ainer-login-font-weight-title: 600;
+  --ainer-login-line-height-body: 1.6;
+  --ainer-login-space-1: 4px;
+  --ainer-login-space-2: 8px;
+  --ainer-login-space-3: 12px;
+  --ainer-login-space-4: 16px;
+  --ainer-login-space-6: 24px;
+  --ainer-login-space-8: 32px;
+  --ainer-login-space-10: 40px;
+  --ainer-login-space-12: 48px;
+  --ainer-login-radius-control: 8px;
+  --ainer-login-radius-surface: 16px;
+  --ainer-login-shadow-surface: 0 20px 60px rgba(16, 46, 86, 0.12);
+  --ainer-login-desktop-breakpoint: 768px;
+  --ainer-login-desktop-min-height: 640px;
+  --ainer-login-form-column-width: 520px;
+  --ainer-login-form-max-width: 440px;
+  --ainer-login-desktop-outer-padding: 48px;
+  --ainer-login-desktop-card-padding: 40px;
+  --ainer-login-mobile-outer-padding: 20px;
+  --ainer-login-mobile-card-padding: 24px;
+  --ainer-login-touch-target-min: 44px;
+  --ainer-login-status-slot-min-height: 76px;
+}

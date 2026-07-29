@@ -1,5 +1,7 @@
 package dev.ainer.authorizationserver.ratelimit;
 
+import dev.ainer.authorizationserver.login.AinerLoginPageRenderer;
+import dev.ainer.authorizationserver.login.AinerLoginPageState;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.security.autoconfigure.AinerSecurityFailureWriter;
 import io.micrometer.core.instrument.Counter;
@@ -9,6 +11,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
@@ -30,6 +35,7 @@ public final class AinerLoginRateLimitFilter extends OncePerRequestFilter {
     private final AinerRateLimiter rateLimiter;
     private final RequestMatcher protectedRequests;
     private final AinerSecurityFailureWriter failureWriter;
+    private final AinerLoginPageRenderer loginPageRenderer;
     private final Counter allowed;
     private final Counter denied;
 
@@ -37,6 +43,7 @@ public final class AinerLoginRateLimitFilter extends OncePerRequestFilter {
             AinerRateLimiter rateLimiter,
             Set<String> paths,
             AinerSecurityFailureWriter failureWriter,
+            AinerLoginPageRenderer loginPageRenderer,
             MeterRegistry meterRegistry) {
         this.rateLimiter = rateLimiter;
         List<RequestMatcher> matchers = paths.stream()
@@ -45,6 +52,7 @@ public final class AinerLoginRateLimitFilter extends OncePerRequestFilter {
                 .toList();
         this.protectedRequests = new OrRequestMatcher(matchers);
         this.failureWriter = failureWriter;
+        this.loginPageRenderer = loginPageRenderer;
         this.allowed = counter(meterRegistry, "ainer.security.login.rate-limit.allowed");
         this.denied = counter(meterRegistry, "ainer.security.login.rate-limit.denied");
     }
@@ -76,7 +84,32 @@ public final class AinerLoginRateLimitFilter extends OncePerRequestFilter {
         response.setHeader("Retry-After", Long.toString(Math.max(1L, retryAfterSeconds)));
         response.setHeader("Cache-Control", "no-store");
         response.setHeader("Pragma", "no-cache");
+        if (isHtmlLoginSubmission(request)) {
+            loginPageRenderer.render(
+                    request,
+                    response,
+                    AinerLoginPageState.RATE_LIMITED,
+                    HttpStatus.TOO_MANY_REQUESTS.value());
+            return;
+        }
         failureWriter.write(request, response, StandardErrorCode.RATE_LIMITED);
+    }
+
+    private static boolean isHtmlLoginSubmission(HttpServletRequest request) {
+        if (!"/login".equals(request.getServletPath())) {
+            return false;
+        }
+        String accept = request.getHeader(HttpHeaders.ACCEPT);
+        if (accept == null || accept.isBlank()) {
+            return false;
+        }
+        try {
+            return MediaType.parseMediaTypes(accept).stream()
+                    .anyMatch(mediaType -> mediaType.isCompatibleWith(MediaType.TEXT_HTML)
+                            && !(mediaType.isWildcardType() && mediaType.isWildcardSubtype()));
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 
     private static Counter counter(MeterRegistry meterRegistry, String name) {

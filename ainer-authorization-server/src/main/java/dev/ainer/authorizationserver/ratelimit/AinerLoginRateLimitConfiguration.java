@@ -1,5 +1,6 @@
 package dev.ainer.authorizationserver.ratelimit;
 
+import dev.ainer.authorizationserver.login.AinerLoginPageRenderer;
 import dev.ainer.security.autoconfigure.AinerSecurityFailureWriter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.ObjectProvider;
@@ -33,11 +34,13 @@ public class AinerLoginRateLimitConfiguration {
             AinerRateLimiter rateLimiter,
             AinerLoginRateLimitProperties properties,
             ObjectProvider<MeterRegistry> meterRegistry,
+            AinerLoginPageRenderer loginPageRenderer,
             ObjectMapper objectMapper) {
         return new AinerLoginRateLimitFilter(
                 rateLimiter,
                 properties.getPaths(),
                 new AinerSecurityFailureWriter(objectMapper),
+                loginPageRenderer,
                 meterRegistry.getIfAvailable());
     }
 }

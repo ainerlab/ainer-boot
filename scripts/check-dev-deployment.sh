@@ -25,6 +25,8 @@ grep -Fq 'proxy_set_header X-Forwarded-For $remote_addr;' "$proxy"
 grep -Fq 'access_log off;' "$proxy"
 grep -Fq 'alias /opt/ainer-admin/current/' "$vhost"
 grep -Fq 'alias /opt/ainer-studio/current/' "$vhost"
+grep -Fq 'location = /ainer-login/tokens.css' "$vhost"
+grep -Fq 'location = /ainer-login/login.css' "$vhost"
 grep -Fq 'location = /default-ui.css' "$vhost"
 grep -Fq 'location = /favicon.ico' "$vhost"
 grep -Fq 'location = /api/me/access-token-revocations' "$vhost"
@@ -35,6 +37,10 @@ grep -Fq "curl --noproxy '*'" scripts/bootstrap-ainer-dev-origin.sh
 
 if grep -Eq 'location[[:space:]]+(\^~[[:space:]]+)?/api/' "$vhost"; then
   echo '[ainer-dev-check] broad /api/ proxy is forbidden' >&2
+  exit 1
+fi
+if grep -Eq 'location[[:space:]]+\^~[[:space:]]+/ainer-login/' "$vhost"; then
+  echo '[ainer-dev-check] broad /ainer-login/ proxy is forbidden' >&2
   exit 1
 fi
 if grep -Eq '/opt/xiaoqu|xq-postgres|server_name[[:space:]]+dev\.xiaoqu99\.com;' \

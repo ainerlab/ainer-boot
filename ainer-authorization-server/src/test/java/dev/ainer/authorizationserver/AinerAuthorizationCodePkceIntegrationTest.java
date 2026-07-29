@@ -227,6 +227,91 @@ class AinerAuthorizationCodePkceIntegrationTest {
     }
 
     @Test
+    void brandedLoginKeepsCsrfGenericFailureAndPublicAssets() throws Exception {
+        BrowserSession browser = newBrowser();
+        HttpResponse<String> loginPage = sendGet(browser.client(), localUri("/login"));
+
+        assertThat(loginPage.statusCode()).isEqualTo(200);
+        assertThat(loginPage.headers().firstValue("Cache-Control").orElseThrow())
+                .contains("no-store");
+        assertThat(loginPage.body())
+                .contains("data-state=\"normal\"")
+                .contains("<h1 id=\"ainer-login-title\">登录 Ainer</h1>")
+                .contains("/ainer-login/tokens.css")
+                .contains("/ainer-login/login.css")
+                .doesNotContain("/default-ui.css")
+                .doesNotContain("/login/webauthn");
+        Matcher csrf = CSRF_INPUT.matcher(loginPage.body());
+        assertThat(csrf.find()).isTrue();
+
+        String invalidForm = form(Map.of(
+                "username", USERNAME,
+                "password", "definitely-wrong",
+                "_csrf", csrf.group(1)));
+        HttpResponse<String> invalidCredentials = browser.client().send(
+                HttpRequest.newBuilder()
+                        .uri(localUri("/login"))
+                        .header("Accept", "text/html")
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .POST(HttpRequest.BodyPublishers.ofString(invalidForm))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(invalidCredentials.statusCode()).isEqualTo(302);
+        assertThat(invalidCredentials.headers()
+                        .firstValue("Cache-Control")
+                        .orElseThrow())
+                .contains("no-store");
+        URI failureLocation = resolve(
+                localUri("/login"),
+                invalidCredentials.headers().firstValue("Location").orElseThrow());
+        assertThat(failureLocation.getPath()).isEqualTo("/login");
+        assertThat(failureLocation.getQuery()).isEqualTo("error");
+
+        HttpResponse<String> credentialFailure =
+                sendGet(browser.client(), failureLocation);
+        assertThat(credentialFailure.statusCode())
+                .withFailMessage(
+                        "credential failure GET location=%s body=%s",
+                        credentialFailure.headers().firstValue("Location").orElse("<none>"),
+                        credentialFailure.body())
+                .isEqualTo(200);
+        assertThat(credentialFailure.body())
+                .contains("data-state=\"credential-error\"")
+                .contains("用户名或密码错误，请重新输入。")
+                .doesNotContain(USERNAME)
+                .doesNotContain("definitely-wrong");
+
+        String missingCsrfForm = form(Map.of(
+                "username", USERNAME,
+                "password", PASSWORD));
+        HttpResponse<String> missingCsrf = browser.client().send(
+                HttpRequest.newBuilder()
+                        .uri(localUri("/login"))
+                        .header("Accept", "text/html")
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .POST(HttpRequest.BodyPublishers.ofString(missingCsrfForm))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(missingCsrf.statusCode()).isEqualTo(302);
+        assertThat(missingCsrf.headers().firstValue("Cache-Control").orElseThrow())
+                .contains("no-store");
+        URI csrfFailureLocation = resolve(
+                localUri("/login"),
+                missingCsrf.headers().firstValue("Location").orElseThrow());
+        assertThat(csrfFailureLocation.getPath()).isEqualTo("/login");
+        assertThat(csrfFailureLocation.getQuery()).isNull();
+
+        HttpResponse<String> tokens =
+                sendGet(newBrowser().client(), localUri("/ainer-login/tokens.css"));
+        HttpResponse<String> implementation =
+                sendGet(newBrowser().client(), localUri("/ainer-login/login.css"));
+        assertThat(tokens.statusCode()).isEqualTo(200);
+        assertThat(tokens.body()).contains("--ainer-login-color-brand: #2458A6");
+        assertThat(implementation.statusCode()).isEqualTo(200);
+        assertThat(implementation.body()).contains("@media (max-width: 767px)");
+    }
+
+    @Test
     void wrongVerifierCannotExchangeAuthorizationCode() throws Exception {
         BrowserSession browser = newBrowser();
         String code = authorize(browser, VERIFIER, REDIRECT_URI);
