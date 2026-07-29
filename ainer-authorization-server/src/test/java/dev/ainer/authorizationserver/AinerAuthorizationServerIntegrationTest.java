@@ -81,6 +81,11 @@ import static org.assertj.core.api.Assertions.assertThat;
                         + "ainer-client-operator-test",
                 "ainer.security.authorization-server.client-control.allowed-scopes="
                         + "ai.invoke,identity.directory.read",
+                "ainer.security.authorization-server.browser-client-control.enabled=true",
+                "ainer.security.authorization-server.browser-client-control.operator-client-ids="
+                        + "ainer-browser-operator-test",
+                "ainer.security.authorization-server.browser-client-control.allowed-scopes="
+                        + "openid,profile,tenant.members.read",
                 "ainer.identity.platform-control.enabled=true",
                 "ainer.identity.platform-control.operator-client-ids="
                         + "ainer-platform-identity-operator-test,"
@@ -103,6 +108,7 @@ class AinerAuthorizationServerIntegrationTest {
     private static final String CLIENT_SECRET = "machine-secret-2026";
     private static final String TENANT_ID = "tenant:machine-test";
     private static final String CLIENT_OPERATOR_ID = "ainer-client-operator-test";
+    private static final String BROWSER_OPERATOR_ID = "ainer-browser-operator-test";
     private static final String PLATFORM_IDENTITY_OPERATOR_ID =
             "ainer-platform-identity-operator-test";
     private static final String PLATFORM_IDENTITY_LIMITED_ID =
@@ -187,6 +193,8 @@ class AinerAuthorizationServerIntegrationTest {
         jdbcTemplate.update("DELETE FROM ainer_passkey_credential");
         jdbcTemplate.update("DELETE FROM user_credentials");
         jdbcTemplate.update("DELETE FROM user_entities");
+        jdbcTemplate.update("DELETE FROM ainer_oauth_browser_client_audit");
+        jdbcTemplate.update("DELETE FROM ainer_oauth_browser_client");
         jdbcTemplate.update("DELETE FROM ainer_oauth_service_client_audit");
         jdbcTemplate.update("DELETE FROM ainer_oauth_service_client");
         jdbcTemplate.update("DELETE FROM oauth2_authorization_consent");
@@ -198,6 +206,8 @@ class AinerAuthorizationServerIntegrationTest {
         registeredClientRepository.save(machineClient());
         registeredClientRepository.save(machineClient(
                 CLIENT_OPERATOR_ID, null, "oauth.clients.manage"));
+        registeredClientRepository.save(machineClient(
+                BROWSER_OPERATOR_ID, null, "oauth.browser-clients.manage"));
         registeredClientRepository.save(machineClient(
                 PLATFORM_IDENTITY_OPERATOR_ID,
                 null,
@@ -749,6 +759,70 @@ class AinerAuthorizationServerIntegrationTest {
         assertThat(jwt.getClaimAsStringList("scope")).contains("ai.invoke");
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM oauth2_authorization", Integer.class))
                 .isEqualTo(1);
+    }
+
+    @Test
+    void browserClientControlCreatesRotatesAndRetiresPublicPkceClients() throws Exception {
+        String operatorToken = accessToken(BROWSER_OPERATOR_ID, "oauth.browser-clients.manage");
+        String redirectUri = "https://app.ainer.test/auth/callback";
+        String postLogoutUri = "https://app.ainer.test/auth/logged-out";
+
+        HttpResponse<String> created = internalPost(
+                "/internal/oauth-browser-clients", operatorToken, Map.of(
+                        "clientId", "ainer-app-test",
+                        "clientName", "Ainer App Test",
+                        "redirectUri", redirectUri,
+                        "postLogoutRedirectUri", postLogoutUri,
+                        "scopes", java.util.List.of("openid", "profile", "tenant.members.read"),
+                        "changeReference", "TICKET-001"));
+        assertThat(created.statusCode()).isEqualTo(200);
+        assertThat(created.body()).contains("\"clientId\":\"ainer-app-test\"").contains("\"status\":\"ACTIVE\"");
+
+        HttpResponse<String> found = internalGet(
+                "/internal/oauth-browser-clients/ainer-app-test", operatorToken);
+        assertThat(found.statusCode()).isEqualTo(200);
+
+        HttpResponse<String> listed = internalGet(
+                "/internal/oauth-browser-clients?page=1&size=20", operatorToken);
+        assertThat(listed.statusCode()).isEqualTo(200);
+        assertThat(listed.body()).contains("\"total\":1");
+
+        String wrongScopeToken = accessToken(CLIENT_OPERATOR_ID, "oauth.clients.manage");
+        HttpResponse<String> forbidden = internalPost(
+                "/internal/oauth-browser-clients", wrongScopeToken, Map.of(
+                        "clientId", "should-fail", "clientName", "Fail",
+                        "redirectUri", redirectUri, "postLogoutRedirectUri", postLogoutUri,
+                        "scopes", java.util.List.of("openid"), "changeReference", "x"));
+        assertThat(forbidden.statusCode()).isEqualTo(403);
+
+        HttpResponse<String> duplicate = internalPost(
+                "/internal/oauth-browser-clients", operatorToken, Map.of(
+                        "clientId", "ainer-app-test", "clientName", "Dup",
+                        "redirectUri", redirectUri, "postLogoutRedirectUri", postLogoutUri,
+                        "scopes", java.util.List.of("openid"), "changeReference", "dup"));
+        assertThat(duplicate.statusCode()).isEqualTo(409);
+
+        HttpResponse<String> rotated = internalPost(
+                "/internal/oauth-browser-clients/ainer-app-test/rotations", operatorToken, Map.of(
+                        "replacementClientId", "ainer-app-test-v2",
+                        "replacementClientName", "Ainer App Test v2",
+                        "redirectUri", redirectUri, "postLogoutRedirectUri", postLogoutUri,
+                        "changeReference", "rotate"));
+        assertThat(rotated.statusCode()).isEqualTo(200);
+        assertThat(rotated.body()).contains("\"replacesClientId\":\"ainer-app-test\"");
+
+        HttpResponse<String> retired = internalPost(
+                "/internal/oauth-browser-clients/ainer-app-test/retirement", operatorToken, Map.of(
+                        "changeReference", "retire"));
+        assertThat(retired.statusCode()).isEqualTo(200);
+        assertThat(retired.body()).contains("\"status\":\"RETIRED\"");
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_oauth_browser_client_audit WHERE client_id = ?",
+                Integer.class, "ainer-app-test")).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_oauth_browser_client_audit WHERE client_id = ?",
+                Integer.class, "ainer-app-test-v2")).isEqualTo(1);
     }
 
     @Test

@@ -166,7 +166,7 @@ public class OAuthBrowserClientControlService {
                         + "SET status = 'RETIRED', retired_by_service_id = ?, retired_at = ?, "
                         + "version = version + 1 "
                         + "WHERE client_id = ? AND status = 'ACTIVE' AND version = ?",
-                actor.serviceId(), now, clientId, managed.version());
+                actor.serviceId(), java.sql.Timestamp.from(now), clientId, managed.version());
         if (updated != 1) {
             throw new BusinessException(OAuthBrowserClientControlErrorCode.CLIENT_STATE_CONFLICT);
         }
@@ -243,7 +243,7 @@ public class OAuthBrowserClientControlService {
                             + "created_by_service_id, created_at, version) "
                             + "VALUES (?, ?, ?, 'ACTIVE', ?, ?, ?, 0)",
                     registeredClientId, clientId, clientName, replacesClientId,
-                    actor.serviceId(), now);
+                    actor.serviceId(), java.sql.Timestamp.from(now));
         } catch (DuplicateKeyException exception) {
             throw new BusinessException(OAuthBrowserClientControlErrorCode.CLIENT_ALREADY_EXISTS);
         }
@@ -257,7 +257,8 @@ public class OAuthBrowserClientControlService {
                         + "request_id, change_reference, occurred_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 UUID.randomUUID(), operation, clientId, relatedClientId,
-                actor.serviceId(), actor.requestId(), changeReference, occurredAt);
+                actor.serviceId(), actor.requestId(), changeReference,
+                java.sql.Timestamp.from(occurredAt));
     }
 
     private void requireActor(OperationActor actor) {
