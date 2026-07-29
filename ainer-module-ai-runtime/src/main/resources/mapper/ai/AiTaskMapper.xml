@@ -14,8 +14,11 @@
     </insert>
 
     <select id="selectTaskById" resultType="dev.ainer.module.ai.gateway.infrastructure.mybatis.AiTaskRow">
-        SELECT id, tenant_id, workspace_id, task_type, target_identity_id,
-               status, trigger, triggered_by, policy_version, created_at, updated_at
+        SELECT id, tenant_id AS tenantId, workspace_id AS workspaceId,
+               task_type AS taskType, target_identity_id AS targetIdentityId,
+               status, trigger, triggered_by AS triggeredBy,
+               policy_version AS policyVersion,
+               created_at AS createdAt, updated_at AS updatedAt
         FROM ainer_ai_task
         WHERE id = #{id}
     </select>
@@ -50,8 +53,9 @@
     </update>
 
     <select id="selectTaskRunById" resultType="dev.ainer.module.ai.gateway.infrastructure.mybatis.AiTaskRunRow">
-        SELECT id, task_id, context_snapshot_id, governed_context::text AS governedContext,
-               status, started_at, completed_at
+        SELECT id, task_id AS taskId, context_snapshot_id AS contextSnapshotId,
+               governed_context::text AS governedContext,
+               status, started_at AS startedAt, completed_at AS completedAt
         FROM ainer_ai_task_run
         WHERE id = #{id}
     </select>
@@ -65,9 +69,9 @@
     </insert>
 
     <select id="selectResultByRunId" resultType="dev.ainer.module.ai.gateway.infrastructure.mybatis.AiResultRow">
-        SELECT id, run_id, invocation_id, content,
+        SELECT id, run_id AS runId, invocation_id AS invocationId, content,
                fact_refs::text AS factRefs, inferences::text AS inferences,
-               result_schema_version AS resultSchemaVersion, created_at
+               result_schema_version AS resultSchemaVersion, created_at AS createdAt
         FROM ainer_ai_result
         WHERE run_id = #{runId}
         ORDER BY created_at DESC

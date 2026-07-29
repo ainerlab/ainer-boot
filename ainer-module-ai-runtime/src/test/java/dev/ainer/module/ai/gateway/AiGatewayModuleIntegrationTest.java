@@ -106,12 +106,23 @@ class AiGatewayModuleIntegrationTest {
     private AiInvocationAuditService auditService;
 
     @Autowired
+    private dev.ainer.module.ai.gateway.application.AiTaskRunService taskRunService;
+
+    @Autowired
+    private dev.ainer.module.ai.gateway.application.AiFeedbackService feedbackService;
+
+    @Autowired
     private Clock clock;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM ainer_ai_feedback");
+        jdbcTemplate.update("DELETE FROM ainer_ai_result");
+        jdbcTemplate.update("DELETE FROM ainer_ai_task_run");
+        jdbcTemplate.update("DELETE FROM ainer_ai_context_snapshot");
+        jdbcTemplate.update("DELETE FROM ainer_ai_task");
         jdbcTemplate.update("DELETE FROM ainer_ai_invocation");
         provider.reset();
     }
@@ -277,6 +288,100 @@ class AiGatewayModuleIntegrationTest {
     static class TestApplication {
     }
 
+    @Test
+    void governedAiTaskProducesCompleteAuditableLoopWithFeedback() {
+        UUID tenantId = UUID.randomUUID();
+        UUID identityId = UUID.randomUUID();
+        dev.ainer.security.actor.AuthenticatedActor actor =
+                new dev.ainer.security.actor.AuthenticatedActor(
+                        "actor-test-001", tenantId.toString(), "USER",
+                        java.util.Set.of("SCOPE_ai.invoke"));
+
+        dev.ainer.module.ai.gateway.application.AiTaskRunService.AiTaskCreateCommand command =
+                new dev.ainer.module.ai.gateway.application.AiTaskRunService.AiTaskCreateCommand(
+                        "identity-weekly-report",
+                        identityId,
+                        "weekly-summary",
+                        "manual",
+                        "test/model",
+                        "你是经营分析助手。基于以下事实生成本周经营周报，区分事实和推断。",
+                        "请基于提供的数据生成周报。",
+                        4096);
+
+        dev.ainer.module.ai.gateway.application.AiTaskRunService.AiTaskRunResult result =
+                taskRunService.executeTask(command, actor);
+
+        // Q1: 谁触发了这次任务？
+        assertThat(result).isNotNull();
+        UUID taskId = result.taskId();
+        UUID runId = result.taskRunId();
+        UUID resultId = result.resultId();
+        assertThat(taskId).isNotNull();
+        assertThat(runId).isNotNull();
+        assertThat(resultId).isNotNull();
+
+        // 验证 Task 记录
+        java.util.Map<String, Object> taskRow = jdbcTemplate.queryForMap(
+                "SELECT * FROM ainer_ai_task WHERE id = ?", taskId);
+        assertThat(taskRow.get("triggered_by")).isEqualTo("actor-test-001");       // Q1
+        assertThat(taskRow.get("tenant_id")).isEqualTo(tenantId);                   // Q2
+        assertThat(taskRow.get("task_type")).isEqualTo("identity-weekly-report");
+        assertThat(taskRow.get("status")).isEqualTo("COMPLETED");
+
+        // Q3+Q4: Identity Version + Context Snapshot
+        java.util.Map<String, Object> runRow = jdbcTemplate.queryForMap(
+                "SELECT * FROM ainer_ai_task_run WHERE id = ?", runId);
+        UUID snapshotId = (UUID) runRow.get("context_snapshot_id");
+        java.util.Map<String, Object> snapshotRow = jdbcTemplate.queryForMap(
+                "SELECT * FROM ainer_ai_context_snapshot WHERE id = ?", snapshotId);
+        assertThat(snapshotRow.get("identity_id")).isEqualTo(identityId);           // Q3
+        assertThat(snapshotRow.get("identity_version_id")).isNotNull();
+        String evidenceRefs = snapshotRow.get("evidence_refs").toString();
+        assertThat(evidenceRefs).contains("publication").contains("metric");        // Q4
+        String memoryRefs = snapshotRow.get("memory_refs").toString();
+        assertThat(memoryRefs).contains("mem-001");
+
+        // Q5+Q6: 模型、用量、成本
+        java.util.Map<String, Object> resultRow = jdbcTemplate.queryForMap(
+                "SELECT * FROM ainer_ai_result WHERE id = ?", resultId);
+        UUID invocationId = (UUID) resultRow.get("invocation_id");
+        assertThat(invocationId).isNotNull();
+        java.util.Map<String, Object> invocationRow = jdbcTemplate.queryForMap(
+                "SELECT * FROM ainer_ai_invocation WHERE id = ?", invocationId);
+        assertThat(invocationRow.get("resolved_model")).isEqualTo("test/model");     // Q5
+        assertThat(invocationRow.get("input_tokens")).isEqualTo(10);                 // Q6
+        assertThat(invocationRow.get("actual_cost")).isNotNull();
+        assertThat(invocationRow.get("status")).isEqualTo("SUCCEEDED");
+
+        // Q7: 内容（区分事实和推断 — 当前 result 存在，fact_refs/inferences 为空数组）
+        assertThat(resultRow.get("content")).isEqualTo("Ainer answer");
+        assertThat(resultRow.get("fact_refs").toString()).isEqualTo("[]");
+        assertThat(resultRow.get("inferences").toString()).isEqualTo("[]");
+
+        // Q8: 人工反馈
+        dev.ainer.module.ai.gateway.domain.AiFeedback feedback = feedbackService.submitFeedback(
+                new dev.ainer.module.ai.gateway.application.AiFeedbackService.FeedbackCommand(
+                        runId, "EDIT", "修正后的周报内容", "数据更准确", """
+                        [{"proposed_memory":"教程类内容优先级最高","scope":"brand"}]"""),
+                "reviewer-001");
+        assertThat(feedback.decision()).isEqualTo(dev.ainer.module.ai.gateway.domain.AiFeedbackDecision.EDIT);
+
+        java.util.Map<String, Object> feedbackRow = jdbcTemplate.queryForMap(
+                "SELECT * FROM ainer_ai_feedback WHERE result_id = ?", resultId);
+        assertThat(feedbackRow.get("decision")).isEqualTo("EDIT");
+        assertThat(feedbackRow.get("edited_content")).isEqualTo("修正后的周报内容");
+        assertThat(feedbackRow.get("reviewer_id")).isEqualTo("reviewer-001");
+        assertThat(feedbackRow.get("memory_proposal").toString()).contains("教程类内容");
+
+        // Q9+Q10: 可重放和审计 — 所有记录通过外键链关联，时间线完整
+        assertThat(taskRow.get("created_at")).isNotNull();
+        assertThat(taskRow.get("updated_at")).isNotNull();
+        assertThat(runRow.get("started_at")).isNotNull();
+        assertThat(runRow.get("completed_at")).isNotNull();
+        // result → invocation 链路可追溯
+        assertThat(resultRow.get("invocation_id")).isEqualTo(invocationId);
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     static class FakeProviderConfiguration {
 
@@ -284,6 +389,19 @@ class AiGatewayModuleIntegrationTest {
         @Primary
         TestModelProvider testModelProvider() {
             return new TestModelProvider();
+        }
+
+        @Bean
+        @Primary
+        dev.ainer.module.ai.gateway.application.ContextSnapshotBuilder testSnapshotBuilder() {
+            return (task, ctx) -> new dev.ainer.module.ai.gateway.application.ContextSnapshotBuilder.ContextSnapshotData(
+                    task.targetIdentityId(),
+                    UUID.randomUUID(),
+                    "[{\"type\":\"publication\",\"id\":\"pub-001\",\"summary\":\"上周发布3篇笔记\"},"
+                            + "{\"type\":\"metric\",\"id\":\"m-001\",\"summary\":\"总曝光12.3k,互动率4.2%\"},"
+                            + "{\"type\":\"feedback\",\"id\":\"f-001\",\"summary\":\"用户咨询增加15%\"}]",
+                    "[{\"memory_id\":\"mem-001\",\"scope\":\"brand\",\"confidence\":0.85,"
+                            + "\"summary\":\"优先发布教程类内容\"}]");
         }
 
         @Bean

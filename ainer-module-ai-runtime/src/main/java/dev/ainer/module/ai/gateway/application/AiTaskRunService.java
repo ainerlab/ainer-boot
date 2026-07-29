@@ -12,7 +12,6 @@ import dev.ainer.module.ai.gateway.domain.MessageRole;
 import dev.ainer.module.ai.gateway.domain.ModelMessage;
 import dev.ainer.security.actor.AuthenticatedActor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -48,20 +47,37 @@ public class AiTaskRunService {
         this.clock = clock;
     }
 
-    @Transactional
     public AiTaskRunResult executeTask(AiTaskCreateCommand command, AuthenticatedActor actor) {
         Objects.requireNonNull(command, "command");
         Objects.requireNonNull(actor, "actor");
         String requestId = UUID.randomUUID().toString();
 
-        // 1. 解析治理上下文
+        // Phase 1: 创建 Task + Snapshot + TaskRun（独立事务提交，确保后续 Gateway 可见）
+        TaskRunCreated created = createTaskAndRun(command, actor, requestId);
+
+        // Phase 2: 调用 AI Gateway（无外层事务包裹，audit 的 REQUIRES_NEW 可见已提交行）
+        try {
+            ChatCompletionCommand gatewayCommand = buildGatewayCommand(
+                    created.governedCtx(), command, created.snapshot());
+            CompletionResult completion = gatewayService.complete(gatewayCommand);
+
+            // Phase 3: 保存 Result + 完成（独立事务）
+            AiTaskRunResult result = completeTaskRun(created, completion);
+            return result;
+        } catch (RuntimeException failure) {
+            failTaskRun(created);
+            throw failure;
+        }
+    }
+
+    public TaskRunCreated createTaskAndRun(AiTaskCreateCommand command,
+                                            AuthenticatedActor actor, String requestId) {
         GovernedAiExecutionContext governedCtx = contextResolver.resolve(actor, requestId);
         governedCtx = GovernedAiExecutionContextBuilder.from(governedCtx)
                 .purpose(command.purpose())
                 .taskType(command.taskType())
                 .build();
 
-        // 2. 创建 Task（PENDING）
         Instant now = clock.instant();
         AiTask task = new AiTask(
                 UUID.randomUUID(),
@@ -77,7 +93,6 @@ public class AiTaskRunService {
                 now);
         taskRepository.insertTask(task);
 
-        // 3. 构建 Context Snapshot
         ContextSnapshotBuilder.ContextSnapshotData snapshotData =
                 snapshotBuilder.build(task, governedCtx);
         ContextSnapshot snapshot = new ContextSnapshot(
@@ -92,12 +107,10 @@ public class AiTaskRunService {
                 now);
         taskRepository.insertContextSnapshot(snapshot);
 
-        // 4. Task → RUNNING
         if (!taskRepository.updateTaskStatus(task.id(), AiTaskStatus.PENDING, AiTaskStatus.RUNNING, now)) {
             throw new BusinessException(StandardErrorCode.INTERNAL_ERROR);
         }
 
-        // 5. 创建 TaskRun（RUNNING）
         AiTaskRun run = new AiTaskRun(
                 UUID.randomUUID(),
                 task.id(),
@@ -108,36 +121,30 @@ public class AiTaskRunService {
                 null);
         taskRepository.insertTaskRun(run);
 
-        // 6. 调用 AI Gateway
-        try {
-            ChatCompletionCommand gatewayCommand = buildGatewayCommand(
-                    governedCtx, command, snapshot);
-            CompletionResult completion = gatewayService.complete(gatewayCommand);
+        return new TaskRunCreated(task, run, snapshot, governedCtx);
+    }
 
-            // 7. 保存 Result
-            Instant completedAt = clock.instant();
-            AiResult result = new AiResult(
-                    UUID.randomUUID(),
-                    run.id(),
-                    completion.invocationId(),
-                    completion.completion().content(),
-                    "[]",
-                    "[]",
-                    1,
-                    completedAt);
-            taskRepository.insertResult(result);
+    public AiTaskRunResult completeTaskRun(TaskRunCreated created, CompletionResult completion) {
+        Instant completedAt = clock.instant();
+        AiResult result = new AiResult(
+                UUID.randomUUID(),
+                created.run().id(),
+                completion.invocationId(),
+                completion.completion().content(),
+                "[]",
+                "[]",
+                1,
+                completedAt);
+        taskRepository.insertResult(result);
+        taskRepository.updateTaskRunStatus(created.run().id(), AiTaskRunStatus.COMPLETED.name(), completedAt);
+        taskRepository.updateTaskStatus(created.task().id(), AiTaskStatus.RUNNING, AiTaskStatus.COMPLETED, completedAt);
+        return new AiTaskRunResult(created.task().id(), created.run().id(), result.id(), completion);
+    }
 
-            // 8. 完成
-            taskRepository.updateTaskRunStatus(run.id(), AiTaskRunStatus.COMPLETED.name(), completedAt);
-            taskRepository.updateTaskStatus(task.id(), AiTaskStatus.RUNNING, AiTaskStatus.COMPLETED, completedAt);
-
-            return new AiTaskRunResult(task.id(), run.id(), result.id(), completion);
-        } catch (RuntimeException failure) {
-            Instant failedAt = clock.instant();
-            taskRepository.updateTaskRunStatus(run.id(), AiTaskRunStatus.FAILED.name(), failedAt);
-            taskRepository.updateTaskStatus(task.id(), AiTaskStatus.RUNNING, AiTaskStatus.FAILED, failedAt);
-            throw failure;
-        }
+    public void failTaskRun(TaskRunCreated created) {
+        Instant failedAt = clock.instant();
+        taskRepository.updateTaskRunStatus(created.run().id(), AiTaskRunStatus.FAILED.name(), failedAt);
+        taskRepository.updateTaskStatus(created.task().id(), AiTaskStatus.RUNNING, AiTaskStatus.FAILED, failedAt);
     }
 
     private ChatCompletionCommand buildGatewayCommand(
@@ -156,7 +163,7 @@ public class AiTaskRunService {
                 command.model(),
                 messages,
                 command.maxOutputTokens(),
-                null);
+                new java.math.BigDecimal("0.7"));
     }
 
     private static String serializeContext(GovernedAiExecutionContext ctx) {
@@ -204,6 +211,20 @@ public class AiTaskRunService {
             Objects.requireNonNull(taskRunId, "taskRunId");
             Objects.requireNonNull(resultId, "resultId");
             Objects.requireNonNull(completion, "completion");
+        }
+    }
+
+    public record TaskRunCreated(
+            AiTask task,
+            AiTaskRun run,
+            ContextSnapshot snapshot,
+            GovernedAiExecutionContext governedCtx) {
+
+        public TaskRunCreated {
+            Objects.requireNonNull(task, "task");
+            Objects.requireNonNull(run, "run");
+            Objects.requireNonNull(snapshot, "snapshot");
+            Objects.requireNonNull(governedCtx, "governedCtx");
         }
     }
 }
