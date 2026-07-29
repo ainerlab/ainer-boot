@@ -2,6 +2,7 @@ package dev.ainer.authorizationserver.config;
 
 import dev.ainer.authorizationserver.passkey.AinerPasskeyWebSecurity;
 import dev.ainer.authorizationserver.tenantcontext.AinerTenantSelectionFilter;
+import dev.ainer.authorizationserver.identity.OwnershipTransferStepUpFilter;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.security.AinerSecurityScopes;
@@ -218,12 +219,38 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
     }
 
     @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+            prefix = "ainer.security.authorization-server.ownership-transfer.step-up",
+            name = "enabled",
+            havingValue = "true")
+    OwnershipTransferStepUpFilter ownershipTransferStepUpFilter(
+            Environment environment,
+            ObjectMapper objectMapper) {
+        java.time.Clock clock = java.time.Clock.systemUTC();
+        java.util.List<String> requiredAmr = java.util.List.of(
+                environment.getProperty(
+                        "ainer.security.authorization-server.ownership-transfer.step-up.required-amr",
+                        "mfa").split(","));
+        java.time.Duration maxAuthAge = environment.getProperty(
+                "ainer.security.authorization-server.ownership-transfer.step-up.max-auth-age",
+                java.time.Duration.class,
+                java.time.Duration.ofMinutes(15));
+        java.time.Duration clockSkew = environment.getProperty(
+                "ainer.security.authorization-server.ownership-transfer.step-up.clock-skew",
+                java.time.Duration.class,
+                java.time.Duration.ofSeconds(60));
+        return new OwnershipTransferStepUpFilter(
+                requiredAmr, maxAuthAge, clockSkew, clock, new AinerSecurityFailureWriter(objectMapper));
+    }
+
+    @Bean
     @Order(4)
     SecurityFilterChain tenantMemberApiSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder jwtDecoder,
             OAuth2AuthorizationService authorizationService,
-            ObjectMapper objectMapper) throws Exception {
+            ObjectMapper objectMapper,
+            ObjectProvider<OwnershipTransferStepUpFilter> stepUpFilterProvider) throws Exception {
         AinerSecurityFailureWriter failureWriter = new AinerSecurityFailureWriter(objectMapper);
         http.securityMatcher(
                         "/api/me/access-token-revocations",
@@ -251,6 +278,10 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                         authorizationService,
                         failureWriter),
                 BearerTokenAuthenticationFilter.class);
+        OwnershipTransferStepUpFilter stepUpFilter = stepUpFilterProvider.getIfAvailable();
+        if (stepUpFilter != null) {
+            http.addFilterAfter(stepUpFilter, BearerTokenAuthenticationFilter.class);
+        }
         return http.build();
     }
 
