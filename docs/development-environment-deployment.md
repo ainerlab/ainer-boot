@@ -191,6 +191,12 @@ remote E2E 已在该 release 上通过（第 6 节全链路，无网络拦截）
 合同状态已升 `implemented`。`GET /login?error` 映射 `credential-error`,登录响应
 `no-store`。
 
+同日事故与回滚：另一 session 曾发布 `36ca5700342e-20260729062605`,其新 migration
+`V202607231200__manage_oauth_browser_clients.sql` 版本号早于当时已应用的
+`202607280320`,Flyway 校验失败导致服务崩溃循环、origin 502;已按第 5 节回滚至上述
+`e6cb0b44bb9e-20260729053046` 并复验 remote E2E 通过。后续新增 migration 的版本号
+必须大于当前已应用最大值,发布前在本地以真实数据库验证启动。
+
 Studio 登录视觉合同 1.0.0 明确不显示 Passkey 动作。M6 候选保留既有 WebAuthn 端点、条件 MFA
 过滤器和 `factor.type` / `factor.reason` 表单上下文，但在 Studio 发布包含 Passkey 交互的新合同前，
 不得在需要人员可见 Passkey 登录的环境启用该候选。开发环境当前 Passkey 默认关闭。
