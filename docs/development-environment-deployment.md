@@ -197,6 +197,12 @@ remote E2E 已在该 release 上通过（第 6 节全链路，无网络拦截）
 `e6cb0b44bb9e-20260729053046` 并复验 remote E2E 通过。后续新增 migration 的版本号
 必须大于当前已应用最大值,发布前在本地以真实数据库验证启动。
 
+事故根因之二与修复(2026-07-29):改名后再次发布仍失败,因部署构建未带 `clean`,
+旧 migration 文件残留 `target/classes` 被打入 JAR(`Detected resolved migration not
+applied: 202607231200`)。部署脚本已强制 `clean package`(`8eedb40`),并以干净构建
+重新发布 `8eedb4095028-20260729072939`(含 browser/OIDC client 控制面),remote E2E
+在该 release 上通过;Boot current 现为该 release。
+
 Studio 登录视觉合同 1.0.0 明确不显示 Passkey 动作。M6 候选保留既有 WebAuthn 端点、条件 MFA
 过滤器和 `factor.type` / `factor.reason` 表单上下文，但在 Studio 发布包含 Passkey 交互的新合同前，
 不得在需要人员可见 Passkey 登录的环境启用该候选。开发环境当前 Passkey 默认关闭。
