@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.ai.gateway.infrastructure.mybatis.AiTaskMapper">
+
+    <insert id="insertTask">
+        INSERT INTO ainer_ai_task
+            (id, tenant_id, workspace_id, task_type, target_identity_id,
+             status, trigger, triggered_by, policy_version, created_at, updated_at)
+        VALUES
+            (#{id}, #{tenantId}, #{workspaceId}, #{taskType}, #{targetIdentityId},
+             #{status}, #{trigger}, #{triggeredBy}, #{policyVersion}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <select id="selectTaskById" resultType="dev.ainer.module.ai.gateway.infrastructure.mybatis.AiTaskRow">
+        SELECT id, tenant_id, workspace_id, task_type, target_identity_id,
+               status, trigger, triggered_by, policy_version, created_at, updated_at
+        FROM ainer_ai_task
+        WHERE id = #{id}
+    </select>
+
+    <update id="updateTaskStatus">
+        UPDATE ainer_ai_task
+        SET status = #{newStatus}, updated_at = #{updatedAt}
+        WHERE id = #{id} AND status = #{expectedStatus}
+    </update>
+
+    <insert id="insertContextSnapshot">
+        INSERT INTO ainer_ai_context_snapshot
+            (id, tenant_id, identity_id, identity_version_id,
+             evidence_refs, memory_refs, as_of, schema_version, created_at)
+        VALUES
+            (#{id}, #{tenantId}, #{identityId}, #{identityVersionId},
+             #{evidenceRefs}::jsonb, #{memoryRefs}::jsonb, #{asOf}, #{schemaVersion}, #{createdAt})
+    </insert>
+
+    <insert id="insertTaskRun">
+        INSERT INTO ainer_ai_task_run
+            (id, task_id, context_snapshot_id, governed_context, status, started_at, completed_at)
+        VALUES
+            (#{id}, #{taskId}, #{contextSnapshotId}, #{governedContext}::jsonb,
+             #{status}, #{startedAt}, #{completedAt})
+    </insert>
+
+    <update id="updateTaskRunStatus">
+        UPDATE ainer_ai_task_run
+        SET status = #{status}, completed_at = #{completedAt}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectTaskRunById" resultType="dev.ainer.module.ai.gateway.infrastructure.mybatis.AiTaskRunRow">
+        SELECT id, task_id, context_snapshot_id, governed_context::text AS governedContext,
+               status, started_at, completed_at
+        FROM ainer_ai_task_run
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insertResult">
+        INSERT INTO ainer_ai_result
+            (id, run_id, invocation_id, content, fact_refs, inferences, result_schema_version, created_at)
+        VALUES
+            (#{id}, #{runId}, #{invocationId}, #{content},
+             #{factRefs}::jsonb, #{inferences}::jsonb, #{resultSchemaVersion}, #{createdAt})
+    </insert>
+
+    <select id="selectResultByRunId" resultType="dev.ainer.module.ai.gateway.infrastructure.mybatis.AiResultRow">
+        SELECT id, run_id, invocation_id, content,
+               fact_refs::text AS factRefs, inferences::text AS inferences,
+               result_schema_version AS resultSchemaVersion, created_at
+        FROM ainer_ai_result
+        WHERE run_id = #{runId}
+        ORDER BY created_at DESC
+        LIMIT 1
+    </select>
+
+    <insert id="insertFeedback">
+        INSERT INTO ainer_ai_feedback
+            (id, result_id, decision, edited_content, feedback_reason,
+             memory_proposal, reviewer_id, reviewed_at)
+        VALUES
+            (#{id}, #{resultId}, #{decision}, #{editedContent}, #{feedbackReason},
+             #{memoryProposal}::jsonb, #{reviewerId}, #{reviewedAt})
+    </insert>
+
+</mapper>

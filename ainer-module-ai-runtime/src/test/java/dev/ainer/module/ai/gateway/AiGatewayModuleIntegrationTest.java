@@ -118,7 +118,7 @@ class AiGatewayModuleIntegrationTest {
 
     @Test
     void migrationCreatesAuditSchemaWithoutPromptOrResponseColumns() {
-        assertThat(flyway.info().applied()).hasSize(1);
+        assertThat(flyway.info().applied()).hasSize(2);
         List<String> columns = jdbcTemplate.queryForList(
                 "SELECT column_name FROM information_schema.columns "
                         + "WHERE table_schema = 'public' AND table_name = 'ainer_ai_invocation'",
