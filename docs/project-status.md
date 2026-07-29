@@ -18,7 +18,9 @@ M4.8B 已实现 `GET /api/me/tenants`、Authorization Code + PKCE 多租户选�
 customizer 实时重查 membership；M4.8C 已实现双自然人确认 OWNER 转移状态机、原子角色交换、
 审计与双方 access event 撤销链路、每 tenant 最多一个 ACTIVE OWNER 数据库不变量、OWNER 丢失
 恢复双 SERVICE request/approve 与 ownership-transfer step-up 门禁；M6 已实现由 Authorization
-Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0；候选尚未部署。
+Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并于 2026-07-29 部署 dev
+(release `e6cb0b44bb9e-20260729053046`)、通过真实 remote 联合 E2E,Studio 合同状态已升
+`implemented`。
 `REQUESTED` 仍不是可授权身份事实；真实外部通知网关/供应商联调、供应商回执映射、最终送达证据、
 生产限速/告警尚未完成，0-skipped 仍需在正式发布候选环境重复执行。当前工程是可编译、可运行、
 可用真实 PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到生产或商业发行就绪。

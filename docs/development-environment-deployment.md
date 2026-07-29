@@ -182,10 +182,14 @@ pnpm test:e2e:boot:remote
   `/favicon.ico` 由 Nginx 返回空响应，避免页面样式缺失和无意义的控制台 404。没有因此增加
   宽泛静态目录或 `/api` 代理。
 
-M6 品牌登录候选尚未部署。候选代码将新增精确 `/ainer-login/tokens.css` 与
-`/ainer-login/login.css` 代理；发布后必须先确认 `GET /login` 的合同版本与资源均来自同一 Boot
-release，再通知 Studio 重跑第 6 节 remote E2E。当前线上仍是已验收的 Spring Security 默认登录页，
-不得把本地候选误写成已上线事实。
+M6 品牌登录已于 2026-07-29 部署并验收：Boot current 为
+`e6cb0b44bb9e-20260729053046`(commit `e6cb0b44bb9eaf8512c5a0902584ed370e96de73`,JAR
+SHA-256 `a3be1aebfe319a4fee287330f6373ed980435465cdddd1563d699265f980c091`);nginx
+vhost 已更新（新增 `/ainer-login/tokens.css`、`/ainer-login/login.css` 与 M4.8B/C 端点
+精确代理),`GET /login` 返回合同品牌页且资源与 JAR 同属该 release;2026-07-29 真实
+remote E2E 已在该 release 上通过（第 6 节全链路，无网络拦截）,Studio 侧 `ainer-login`
+合同状态已升 `implemented`。`GET /login?error` 映射 `credential-error`,登录响应
+`no-store`。
 
 Studio 登录视觉合同 1.0.0 明确不显示 Passkey 动作。M6 候选保留既有 WebAuthn 端点、条件 MFA
 过滤器和 `factor.type` / `factor.reason` 表单上下文，但在 Studio 发布包含 Passkey 交互的新合同前，
