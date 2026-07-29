@@ -18,6 +18,12 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   Token 进入撤销链路；数据库部分唯一索引保证每 tenant 最多一个 ACTIVE OWNER 和一个未完成转移；
   暴露 initiate/get/accept/cancel 四个端点，要求 `tenant.ownership.transfer` scope、可信
   tenant claim 与实时角色门禁。
+- 增加默认关闭的 M4.8C OWNER 丢失恢复：双 tenantless SERVICE request/approve（不同 service
+  subject），只能提升现有 ACTIVE ADMIN 为 OWNER 并降原 OWNER 为 ADMIN，不恢复被禁用主体；
+  独立表、端点（`/internal/identity/ownership-recovery/**`）与 scope
+  （`identity.ownership-recovery.request|approve`），与正常转移不共用授权规则。
+- 增加 ownership-transfer step-up 门禁：默认关闭，启用后要求人员 Token 的 `amr` 含强因子且
+  `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 - `ainer-dev.xiaoqu99.com` 可复现 dev 环境已真实上线：独立 PostgreSQL 18.3、loopback
   systemd Authorization Server、版本化 JAR/Studio/Admin release、原子切换/校验回滚、
   Let's Encrypt 与精确同源 Nginx 路由全部启用；远程 Chromium 已跑通 PKCE、成员治理、

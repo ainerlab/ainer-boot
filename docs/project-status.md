@@ -6,8 +6,8 @@
 
 ## 1. 当前阶段
 
-Foundation 已完成 M4.8A 与 Ainer Admin 后端融合，并完成 M4.8B 租户上下文选择与 M4.8C OWNER
-专用转移的代码基线。
+Foundation 已完成 M4.8A 与 Ainer Admin 后端融合，并完成 M4.8B 租户上下文选择、M4.8C OWNER
+专用转移（含正常转移与丢失恢复）的代码基线。
 M4.7 tenant 成员管理与首租户严格 bootstrap 已落地，平台
 预配申请又具备幂等摘要、并发预留、短时一次性 grant、加密 notification outbox、已有用户本人
 接受、原子创建 ACTIVE tenant/OWNER、显式取消、tenant/user 安全分页，以及默认关闭的
@@ -122,16 +122,23 @@ M4.8B 已在独立候选分支实现 `GET /api/me/tenants`、Authorization Code 
   数据库部分唯一索引保证每 tenant 最多一个 ACTIVE OWNER 和一个未完成转移；
   `OwnershipTransferController` 暴露 initiate/get/accept/cancel 四个端点，要求
   `tenant.ownership.transfer` scope、可信 tenant claim 与实时角色门禁。
+- M4.8C OWNER 丢失恢复代码基线：双 tenantless SERVICE request/approve（不同 service subject），
+  只能提升现有 ACTIVE ADMIN 为 OWNER 并降原 OWNER 为 ADMIN，不恢复被禁用主体；独立表/端点
+  （`/internal/identity/ownership-recovery/**`）与 scope（`identity.ownership-recovery.request|approve`），
+  与正常转移不共用授权规则；security operation audit 记录 REQUESTED + EXECUTED 两阶段。
+- ownership-transfer step-up 门禁：默认关闭，启用后要求人员 Token 的 `amr` 含强因子且
+  `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 
 ## 3. 最近验证证据
 
-2026-07-28 的 M4.8B + M4.8C 候选在 macOS Colima、Testcontainers 2.0.5 与
-`postgres:18.3-alpine` 环境完成完整 `mvn clean test`：14 个 Reactor 模块成功，281 个测试全部
+2026-07-28/29 的 M4.8B + M4.8C 候选在 macOS Colima、Testcontainers 2.0.5 与
+`postgres:18.3-alpine` 环境完成完整 `mvn clean test`：14 个 Reactor 模块成功，全部测试
 实际执行通过，0 failure、0 error、0 skipped。真实 PostgreSQL 从空库执行全部 migration，
 覆盖：单租户用户 `GET /api/me/tenants`、SERVICE 403、多租户选择非默认 tenant 后 token
-`tenant_id`/`roles` 来自实时 membership、OWNER 转移角色原子交换（OWNER→ADMIN、ADMIN→OWNER）
-+ 审计 + 双方 access event、非 OWNER 发起被拒、非 ADMIN 目标被拒、每 tenant 最多一个未完成
-转移、发起者取消后可再次发起。
+`tenant_id`/`roles` 来自实时 membership、OWNER 转移角色原子交换 + 审计 + 双方 access event、
+非 OWNER 发起被拒、非 ADMIN 目标被拒、每 tenant 最多一个未完成转移、发起者取消后可再次发起、
+并发接受只能成功一次（4 线程）、过期转移不可接受但可取消、HTTP 端到端 ownership-transfer、
+OWNER 丢失恢复双 SERVICE request/approve + 同一 SERVICE 拒绝 + 非 ADMIN 目标拒绝。
 
 2026-07-27 在 `https://ainer-dev.xiaoqu99.com` 完成首次真实公网联合验收。Authorization Server
 release 为 `3f9420a4425f11e78feace776fe0b15853a0b884`，Ainer Studio/Admin release 为
@@ -352,9 +359,10 @@ M4.8 已形成并接受
 transport、provider-neutral 终态回执接收，以及平台显式取消与 tenant/user 安全分页。M4.8B 已完成
 `GET /api/me/tenants`、Authorization Code + PKCE 多租户选择流程与 token customizer 实时重查的
 代码基线与真实 PostgreSQL + 真实 HTTP 集成证据；M4.8C 已完成双自然人确认 OWNER 转移状态机、
-原子角色交换与双方 access event 撤销链路的代码基线与 PostgreSQL 集成证据；下一步把 M4.8B/C
-候选部署到 dev 公网联合验收，补齐多浏览器会话并行、真实 HTTP ownership-transfer 端到端、
-选择后撤销失效、真实多 tenant UI 与生产 browser/OIDC client 控制面证据。
+原子角色交换与双方 access event 撤销链路的代码基线与 PostgreSQL 集成证据；M4.8C OWNER 丢失
+恢复（decision 30）已完成双 tenantless SERVICE request/approve 代码基线与 PostgreSQL 集成
+证据；下一步把 M4.8B/C 候选部署到 dev 公网联合验收，补齐多浏览器会话并行、真实 HTTP
+ownership-recovery 端到端、选择后撤销失效、真实多 tenant UI 与生产 browser/OIDC client 控制面证据。
 
 M4.8 与商业 entitlement 保持正交：Identity `OWNER/ADMIN/MEMBER` 只表达授权角色，Community /
 Pro / Enterprise、license、订阅和配额留给后续独立 entitlement 边界。生产并行工作仍包括真实
