@@ -19,6 +19,8 @@ public class AinerAuthorizationServerProperties {
     private final MetricsClientBootstrap metricsClientBootstrap = new MetricsClientBootstrap();
     private final ClientControlOperatorBootstrap clientControlOperatorBootstrap =
             new ClientControlOperatorBootstrap();
+    private final BrowserClientControlOperatorBootstrap browserClientControlOperatorBootstrap =
+            new BrowserClientControlOperatorBootstrap();
     private final PlatformIdentityOperatorBootstrap platformIdentityOperatorBootstrap =
             new PlatformIdentityOperatorBootstrap();
     private final ProvisioningNotificationRelayClientBootstrap
@@ -66,6 +68,10 @@ public class AinerAuthorizationServerProperties {
 
     public ClientControlOperatorBootstrap getClientControlOperatorBootstrap() {
         return clientControlOperatorBootstrap;
+    }
+
+    public BrowserClientControlOperatorBootstrap getBrowserClientControlOperatorBootstrap() {
+        return browserClientControlOperatorBootstrap;
     }
 
     public PlatformIdentityOperatorBootstrap getPlatformIdentityOperatorBootstrap() {
@@ -313,6 +319,20 @@ public class AinerAuthorizationServerProperties {
         public void setClientSecret(String clientSecret) {
             this.clientSecret = clientSecret;
         }
+    }
+
+    public static final class BrowserClientControlOperatorBootstrap {
+
+        private boolean enabled;
+        private String clientId;
+        private String clientSecret;
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public String getClientId() { return clientId; }
+        public void setClientId(String clientId) { this.clientId = clientId; }
+        public String getClientSecret() { return clientSecret; }
+        public void setClientSecret(String clientSecret) { this.clientSecret = clientSecret; }
     }
 
     public static final class PlatformIdentityOperatorBootstrap {

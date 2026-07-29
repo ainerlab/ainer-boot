@@ -150,6 +150,9 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                         .requestMatchers("/internal/oauth-service-clients/**")
                         .hasAuthority("SCOPE_" + AinerAuthorizationServerConfiguration
                                 .CLIENT_CONTROL_MANAGE_SCOPE)
+                        .requestMatchers("/internal/oauth-browser-clients/**")
+                        .hasAuthority("SCOPE_" + AinerAuthorizationServerConfiguration
+                                .BROWSER_CLIENT_CONTROL_MANAGE_SCOPE)
                         .requestMatchers("/internal/platform/identity/**")
                         .hasAnyAuthority(
                                 "SCOPE_" + AinerSecurityScopes.PLATFORM_TENANTS_READ,

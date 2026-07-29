@@ -60,15 +60,27 @@ public final class ManagedRegisteredClientRepository implements RegisteredClient
     }
 
     private boolean lifecycleAllows(String registeredClientId) {
+        String status = queryLifecycleStatus(registeredClientId);
+        return status == null || ACTIVE.equals(status);
+    }
+
+    private String queryLifecycleStatus(String registeredClientId) {
+        String serviceStatus = queryStatus(
+                "SELECT status FROM ainer_oauth_service_client WHERE registered_client_id = ?",
+                registeredClientId);
+        if (serviceStatus != null) {
+            return serviceStatus;
+        }
+        return queryStatus(
+                "SELECT status FROM ainer_oauth_browser_client WHERE registered_client_id = ?",
+                registeredClientId);
+    }
+
+    private String queryStatus(String sql, String registeredClientId) {
         try {
-            String status = jdbcTemplate.queryForObject(
-                    "SELECT status FROM ainer_oauth_service_client WHERE registered_client_id = ?",
-                    String.class,
-                    registeredClientId);
-            return ACTIVE.equals(status);
+            return jdbcTemplate.queryForObject(sql, String.class, registeredClientId);
         } catch (EmptyResultDataAccessException exception) {
-            // Bootstrap and manually provisioned legacy clients do not have an Ainer lifecycle row.
-            return true;
+            return null;
         }
     }
 }

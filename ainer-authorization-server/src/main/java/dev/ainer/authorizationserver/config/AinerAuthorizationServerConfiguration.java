@@ -59,6 +59,7 @@ public class AinerAuthorizationServerConfiguration {
     public static final String CLIENT_INTROSPECTION_ALLOWED_SETTING = "ainer.introspection-allowed";
     public static final String INTROSPECTION_CLIENT_SCOPE = "token.introspect";
     public static final String CLIENT_CONTROL_MANAGE_SCOPE = "oauth.clients.manage";
+    public static final String BROWSER_CLIENT_CONTROL_MANAGE_SCOPE = "oauth.browser-clients.manage";
 
     @Bean
     ManagedRegisteredClientRepository registeredClientRepository(JdbcTemplate jdbcTemplate) {
@@ -281,6 +282,19 @@ public class AinerAuthorizationServerConfiguration {
             RegisteredClientRepository registeredClientRepository,
             PasswordEncoder passwordEncoder) {
         return new AinerClientControlOperatorBootstrapRunner(
+                properties, registeredClientRepository, passwordEncoder);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "ainer.security.authorization-server.browser-client-control-operator-bootstrap",
+            name = "enabled",
+            havingValue = "true")
+    AinerBrowserClientOperatorBootstrapRunner ainerBrowserClientOperatorBootstrapRunner(
+            AinerAuthorizationServerProperties properties,
+            RegisteredClientRepository registeredClientRepository,
+            PasswordEncoder passwordEncoder) {
+        return new AinerBrowserClientOperatorBootstrapRunner(
                 properties, registeredClientRepository, passwordEncoder);
     }
 
