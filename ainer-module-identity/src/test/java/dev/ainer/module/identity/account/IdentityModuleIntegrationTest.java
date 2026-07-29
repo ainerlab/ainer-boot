@@ -1835,6 +1835,93 @@ class IdentityModuleIntegrationTest {
                 .isEqualTo(OwnershipTransferStatus.REQUESTED);
     }
 
+    @Test
+    void concurrentOwnershipTransferAcceptOnlyOneSucceeds() throws Exception {
+        ProvisionedIdentity owner = provision(
+                "cc-1", "Concurrent One", "owner@cc1.dev", "CC Owner");
+        ProvisionedIdentity admin = provision(
+                "cc-2", "Concurrent Two", "admin@cc2.dev", "CC Admin");
+        AuthenticatedActor ownerActor = transferActor(owner);
+        memberService.addMember(ownerActor, owner.tenantId(),
+                new AddTenantMemberCommand("ADMIN@CC2.DEV", null, TenantRole.ADMIN, "add"),
+                "req-cc-add");
+        OwnershipTransfer transfer = transferService.initiateTransfer(
+                ownerActor, owner.tenantId(), admin.subjectId(), "concurrent", "req-cc-init");
+        AuthenticatedActor adminActor = transferActorFor(admin, owner.tenantId());
+
+        int threads = 4;
+        java.util.concurrent.ExecutorService executor =
+                java.util.concurrent.Executors.newFixedThreadPool(threads);
+        java.util.concurrent.CountDownLatch ready = new java.util.concurrent.CountDownLatch(threads);
+        java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger successes = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicInteger failures = new java.util.concurrent.atomic.AtomicInteger();
+
+        java.util.List<java.util.concurrent.Future<?>> futures = new java.util.ArrayList<>();
+        for (int i = 0; i < threads; i++) {
+            final String requestId = "req-cc-accept-" + i;
+            futures.add(executor.submit(() -> {
+                ready.countDown();
+                try {
+                    if (!start.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("barrier timeout");
+                    }
+                    transferService.acceptTransfer(
+                            adminActor, owner.tenantId(), transfer.id(),
+                            "concurrent-accept", requestId);
+                    successes.incrementAndGet();
+                } catch (BusinessException exception) {
+                    failures.incrementAndGet();
+                } catch (Exception exception) {
+                    // unexpected
+                }
+                return null;
+            }));
+        }
+        ready.await(5, java.util.concurrent.TimeUnit.SECONDS);
+        start.countDown();
+        executor.shutdown();
+        executor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);
+
+        assertThat(successes.get()).isEqualTo(1);
+        assertThat(failures.get()).isEqualTo(threads - 1);
+        // 最终只有一个 ACTIVE OWNER
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_membership "
+                        + "WHERE tenant_id = ? AND role = 'OWNER' AND status = 'ACTIVE'",
+                Integer.class, owner.tenantId())).isEqualTo(1);
+    }
+
+    @Test
+    void expiredOwnershipTransferCannotBeAccepted() {
+        ProvisionedIdentity owner = provision(
+                "exp-1", "Expired One", "owner@exp1.dev", "EXP Owner");
+        ProvisionedIdentity admin = provision(
+                "exp-2", "Expired Two", "admin@exp2.dev", "EXP Admin");
+        AuthenticatedActor ownerActor = transferActor(owner);
+        memberService.addMember(ownerActor, owner.tenantId(),
+                new AddTenantMemberCommand("ADMIN@EXP2.DEV", null, TenantRole.ADMIN, "add"),
+                "req-exp-add");
+        OwnershipTransfer transfer = transferService.initiateTransfer(
+                ownerActor, owner.tenantId(), admin.subjectId(), "will-expire", "req-exp-init");
+
+        // 手动把 expires_at 设为过去，模拟过期
+        jdbcTemplate.update(
+                "UPDATE ainer_identity_ownership_transfer SET expires_at = NOW() - INTERVAL '1 minute' "
+                        + "WHERE id = ?", transfer.id());
+
+        AuthenticatedActor adminActor = transferActorFor(admin, owner.tenantId());
+        assertIdentityError(
+                () -> transferService.acceptTransfer(
+                        adminActor, owner.tenantId(), transfer.id(), "late", "req-exp-accept"),
+                IdentityErrorCode.OWNERSHIP_TRANSFER_STATE_CONFLICT);
+
+        // 过期的转移仍可取消
+        OwnershipTransfer cancelled = transferService.cancelTransfer(
+                ownerActor, owner.tenantId(), transfer.id(), "expired-cancel", "req-exp-cancel");
+        assertThat(cancelled.status()).isEqualTo(OwnershipTransferStatus.CANCELLED);
+    }
+
     @Autowired
     private dev.ainer.module.identity.account.application.OwnershipTransferService transferService;
 

@@ -172,7 +172,11 @@ class AinerAuthorizationServerIntegrationTest {
         jdbcTemplate.update("DELETE FROM ainer_identity_notification_outbox");
         jdbcTemplate.update("DELETE FROM ainer_identity_activation_grant");
         jdbcTemplate.update("DELETE FROM ainer_identity_tenant_provisioning_request");
+        jdbcTemplate.update("DELETE FROM ainer_identity_ownership_transfer");
         jdbcTemplate.update("DELETE FROM ainer_identity_member_audit");
+        jdbcTemplate.update("DELETE FROM ainer_identity_security_operation_audit");
+        jdbcTemplate.update("DELETE FROM ainer_identity_access_event_replay_request");
+        jdbcTemplate.update("DELETE FROM ainer_identity_access_event");
         jdbcTemplate.update("DELETE FROM ainer_passkey_security_operation_audit");
         jdbcTemplate.update("DELETE FROM ainer_passkey_enrollment_grant");
         jdbcTemplate.update("DELETE FROM ainer_passkey_recovery_lockout");
@@ -983,6 +987,123 @@ class AinerAuthorizationServerIntegrationTest {
                 "SELECT COUNT(*) FROM ainer_identity_member_audit WHERE tenant_id = ?",
                 Integer.class,
                 owner.tenantId())).isEqualTo(3);
+    }
+
+    @Test
+    void ownershipTransferHttpFlowSwapsRolesEndToEnd() throws Exception {
+        ProvisionedIdentity owner = provision(
+                "ot-http", "OT HTTP", "owner@ot-http.dev", "OT HTTP Owner");
+        ProvisionedIdentity admin = provision(
+                "ot-admin", "OT Admin Home", "admin@ot-http.dev", "OT HTTP Admin");
+        // 直接插入 ADMIN membership（绕过 member API，聚焦 transfer HTTP 链路）
+        jdbcTemplate.update(
+                "INSERT INTO ainer_identity_membership "
+                        + "(tenant_id, user_id, role, is_default, status, joined_at, updated_at) "
+                        + "VALUES (?, ?, 'ADMIN', false, 'ACTIVE', NOW(), NOW())",
+                owner.tenantId(), admin.subjectId());
+
+        String ownerToken = activeActorToken(
+                owner.subjectId().toString(),
+                owner.tenantId().toString(),
+                "USER",
+                "tenant.ownership.transfer tenant.members.write");
+
+        // 发起转移
+        String transferPath = "/api/tenants/" + owner.tenantId() + "/ownership-transfers";
+        HttpResponse<String> initiated = memberRequest(
+                "POST", transferPath, ownerToken,
+                """
+                {
+                  "targetSubjectId": "%s",
+                  "reasonCode": "succession"
+                }
+                """.formatted(admin.subjectId().toString()));
+        assertThat(initiated.statusCode()).isEqualTo(200);
+        assertThat(initiated.body())
+                .contains("\"status\":\"REQUESTED\"")
+                .contains(admin.subjectId().toString());
+        String transferId = extractJsonField(initiated.body(), "id");
+
+        // 无 scope / SERVICE / 跨 tenant 被拒
+        assertForbidden(memberRequest("POST", transferPath, activeActorToken(
+                owner.subjectId().toString(), owner.tenantId().toString(),
+                "USER", "tenant.members.write"),
+                """
+                {"targetSubjectId":"%s","reasonCode":"no-scope"}
+                """.formatted(admin.subjectId())));
+        assertForbidden(memberRequest("POST", transferPath, activeActorToken(
+                owner.subjectId().toString(), owner.tenantId().toString(),
+                "SERVICE", "tenant.ownership.transfer"),
+                """
+                {"targetSubjectId":"%s","reasonCode":"service"}
+                """.formatted(admin.subjectId())));
+
+        // 目标 ADMIN 接受转移
+        String adminToken = activeActorToken(
+                admin.subjectId().toString(),
+                owner.tenantId().toString(),
+                "USER",
+                "tenant.ownership.transfer");
+        HttpResponse<String> accepted = memberRequest(
+                "POST", transferPath + "/" + transferId + "/acceptances",
+                adminToken,
+                """
+                {"reasonCode":"accepted"}
+                """);
+        assertThat(accepted.statusCode()).isEqualTo(200);
+        assertThat(accepted.body())
+                .contains("\"status\":\"EXECUTED\"")
+                .contains(admin.subjectId().toString());
+
+        // 验证角色交换
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT role FROM ainer_identity_membership WHERE tenant_id = ? AND user_id = ?",
+                String.class, owner.tenantId(), owner.subjectId())).isEqualTo("ADMIN");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT role FROM ainer_identity_membership WHERE tenant_id = ? AND user_id = ?",
+                String.class, owner.tenantId(), admin.subjectId())).isEqualTo("OWNER");
+    }
+
+    @Test
+    void ownershipTransferHttpRejectsInitiatorSelfAccept() throws Exception {
+        ProvisionedIdentity owner = provision(
+                "ot-self", "OT Self", "owner@ot-self.dev", "OT Self Owner");
+        ProvisionedIdentity admin = provision(
+                "ot-sa", "OT SA Home", "admin@ot-self.dev", "OT Self Admin");
+        jdbcTemplate.update(
+                "INSERT INTO ainer_identity_membership "
+                        + "(tenant_id, user_id, role, is_default, status, joined_at, updated_at) "
+                        + "VALUES (?, ?, 'ADMIN', false, 'ACTIVE', NOW(), NOW())",
+                owner.tenantId(), admin.subjectId());
+
+        String ownerToken = activeActorToken(
+                owner.subjectId().toString(), owner.tenantId().toString(),
+                "USER", "tenant.ownership.transfer");
+        String transferPath = "/api/tenants/" + owner.tenantId() + "/ownership-transfers";
+        HttpResponse<String> initiated = memberRequest(
+                "POST", transferPath, ownerToken,
+                """
+                {"targetSubjectId":"%s","reasonCode":"init"}
+                """.formatted(admin.subjectId()));
+        String transferId = extractJsonField(initiated.body(), "id");
+
+        // OWNER 尝试自己接受 → 403（角色不是 ADMIN）
+        HttpResponse<String> selfAccept = memberRequest(
+                "POST", transferPath + "/" + transferId + "/acceptances",
+                ownerToken,
+                """
+                {"reasonCode":"hijack"}
+                """);
+        assertThat(selfAccept.statusCode()).isEqualTo(403);
+    }
+
+    private static String extractJsonField(String json, String field) {
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
+                "\"" + field + "\"\\s*:\\s*\"([^\"]+)\"").matcher(json);
+        if (!matcher.find()) {
+            throw new AssertionError("Field " + field + " not found in JSON: " + json);
+        }
+        return matcher.group(1);
     }
 
     private RegisteredClient machineClient() {
