@@ -31,7 +31,10 @@ origin_dev="$(git rev-parse origin/dev)"
 [[ "$commit" == "$origin_dev" ]] \
   || fail "deployment commit must equal pushed origin/dev (local=$commit remote=$origin_dev)"
 
-mvn -pl ainer-authorization-server -am package -DskipTests
+# 必须 clean:资源重命名/删除后,不带 clean 的增量构建会把旧文件留在
+# target/classes 一并打包(2026-07-29 V202607231200 旧 migration 残留导致
+# Flyway 校验失败、服务崩溃循环的事故根因)。
+mvn -pl ainer-authorization-server -am clean package -DskipTests
 jar="$(find "$boot_root/ainer-authorization-server/target" -maxdepth 1 -type f \
   -name 'ainer-authorization-server-*.jar' ! -name '*.original' | sort | tail -1)"
 [[ -n "$jar" && -f "$jar" ]] || fail "Authorization Server executable JAR was not found"
