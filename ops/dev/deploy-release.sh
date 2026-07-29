@@ -57,6 +57,7 @@ mv -Tf "$link_tmp" "$deploy_root/current"
 
 wait_for_ready() {
   local ready=false
+  sleep 3
   for _ in {1..180}; do
     if systemctl is-failed --quiet "$service"; then
       journalctl -u "$service" -n 80 --no-pager >&2
@@ -73,6 +74,7 @@ wait_for_ready() {
   [[ "$ready" == true ]] || fail "Authorization Server did not become ready"
 }
 
+systemctl reset-failed "$service" 2>/dev/null || true
 systemctl restart "$service"
 wait_for_ready
 
