@@ -28,6 +28,7 @@ import dev.ainer.module.identity.account.application.ProvisionedIdentity;
 import dev.ainer.module.identity.account.application.TenantMemberManagementService;
 import dev.ainer.module.identity.account.application.TenantContextEntry;
 import dev.ainer.module.identity.account.application.OwnershipTransfer;
+import dev.ainer.module.identity.account.application.OwnershipRecovery;
 import dev.ainer.module.identity.account.application.TenantProvisioningCancellationResult;
 import dev.ainer.module.identity.account.application.TenantProvisioningCompletion;
 import dev.ainer.module.identity.account.application.TenantProvisioningNotification;
@@ -172,6 +173,7 @@ class IdentityModuleIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM ainer_identity_ownership_recovery");
         jdbcTemplate.update("DELETE FROM ainer_identity_ownership_transfer");
         jdbcTemplate.update("DELETE FROM ainer_identity_platform_operation_audit");
         jdbcTemplate.update(
@@ -190,7 +192,7 @@ class IdentityModuleIntegrationTest {
 
     @Test
     void migrationCreatesIdentitySchema() {
-        assertThat(flyway.info().applied()).hasSize(11);
+        assertThat(flyway.info().applied()).hasSize(12);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_name IN ('ainer_identity_tenant','ainer_identity_user',"
@@ -203,8 +205,9 @@ class IdentityModuleIntegrationTest {
                         + "'ainer_identity_activation_grant',"
                         + "'ainer_identity_notification_outbox',"
                         + "'ainer_identity_notification_delivery_receipt',"
-                        + "'ainer_identity_ownership_transfer')",
-                Integer.class)).isEqualTo(13);
+                        + "'ainer_identity_ownership_transfer',"
+                        + "'ainer_identity_ownership_recovery')",
+                Integer.class)).isEqualTo(14);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
     }
 
@@ -1925,6 +1928,73 @@ class IdentityModuleIntegrationTest {
     @Autowired
     private dev.ainer.module.identity.account.application.OwnershipTransferService transferService;
 
+    @Autowired
+    private dev.ainer.module.identity.account.application.OwnershipRecoveryService ownershipRecoveryService;
+
+    @Test
+    void ownershipRecoveryPromotesAdminAndDemotesOldOwnerWithTwoServiceApproval() {
+        ProvisionedIdentity owner = provision(
+                "rec-t", "Recovery Tenant", "owner@rec.dev", "Rec Owner");
+        ProvisionedIdentity admin = provision(
+                "rec-a", "Recovery Admin Home", "admin@rec.dev", "Rec Admin");
+        AuthenticatedActor ownerActor = transferActor(owner);
+        memberService.addMember(ownerActor, owner.tenantId(),
+                new AddTenantMemberCommand("ADMIN@REC.DEV", null, TenantRole.ADMIN, "add"),
+                "req-rec-add");
+
+        // SERVICE-1 发起恢复
+        OwnershipRecovery recovery = ownershipRecoveryService.requestRecovery(
+                "recovery-requester", owner.tenantId(), admin.subjectId(), "INC-2026-001");
+        assertThat(recovery.status()).isEqualTo(OwnershipTransferStatus.REQUESTED);
+
+        // 同一 SERVICE 不能批准
+        assertIdentityError(
+                () -> ownershipRecoveryService.approveAndExecute(
+                        "recovery-requester", owner.tenantId(), recovery.id()),
+                IdentityErrorCode.OWNERSHIP_RECOVERY_APPROVER_MUST_DIFFER);
+
+        // SERVICE-2 批准并执行
+        OwnershipRecovery executed = ownershipRecoveryService.approveAndExecute(
+                "recovery-approver", owner.tenantId(), recovery.id());
+        assertThat(executed.status()).isEqualTo(OwnershipTransferStatus.EXECUTED);
+        assertThat(executed.approverServiceId()).isEqualTo("recovery-approver");
+
+        // 原 OWNER 降为 ADMIN，admin 升为 OWNER
+        assertThat(directoryService.findActiveMember(owner.tenantId(), owner.subjectId())
+                .orElseThrow().role()).isEqualTo(TenantRole.ADMIN);
+        assertThat(directoryService.findActiveMember(owner.tenantId(), admin.subjectId())
+                .orElseThrow().role()).isEqualTo(TenantRole.OWNER);
+
+        // 只有一个 ACTIVE OWNER
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_membership "
+                        + "WHERE tenant_id = ? AND role = 'OWNER' AND status = 'ACTIVE'",
+                Integer.class, owner.tenantId())).isEqualTo(1);
+
+        // 安全操作审计：REQUESTED + EXECUTED
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_security_operation_audit "
+                        + "WHERE operation_id = ? AND operation_type = 'OWNERSHIP_RECOVERY'",
+                Integer.class, recovery.id())).isEqualTo(2);
+    }
+
+    @Test
+    void ownershipRecoveryRejectsNonAdminTarget() {
+        ProvisionedIdentity owner = provision(
+                "rec-n", "Rec N", "owner@recn.dev", "Rec N Owner");
+        ProvisionedIdentity member = provision(
+                "rec-m", "Rec M Home", "member@recm.dev", "Rec M Member");
+        AuthenticatedActor ownerActor = transferActor(owner);
+        memberService.addMember(ownerActor, owner.tenantId(),
+                new AddTenantMemberCommand("MEMBER@RECM.DEV", null, TenantRole.MEMBER, "add"),
+                "req-recn-add");
+
+        assertIdentityError(
+                () -> ownershipRecoveryService.requestRecovery(
+                        "recovery-requester", owner.tenantId(), member.subjectId(), "INC-2026-002"),
+                IdentityErrorCode.OWNERSHIP_RECOVERY_TARGET_INELIGIBLE);
+    }
+
     private ProvisionedIdentity provision(
             String tenantCode,
             String tenantName,
@@ -2116,6 +2186,42 @@ class IdentityModuleIntegrationTest {
         @Override
         public boolean cancelOwnershipTransfer(UUID id, UUID tenantId, Instant updatedAt) {
             return delegate.cancelOwnershipTransfer(id, tenantId, updatedAt);
+        }
+
+        @Override
+        public void insertOwnershipRecovery(OwnershipRecovery recovery) {
+            delegate.insertOwnershipRecovery(recovery);
+        }
+
+        @Override
+        public Optional<OwnershipRecovery> findOwnershipRecovery(UUID id) {
+            return delegate.findOwnershipRecovery(id);
+        }
+
+        @Override
+        public Optional<OwnershipRecovery> findOwnershipRecoveryForUpdate(UUID id) {
+            return delegate.findOwnershipRecoveryForUpdate(id);
+        }
+
+        @Override
+        public boolean executeOwnershipRecovery(
+                UUID id, UUID tenantId, String approverServiceId,
+                Instant executedAt, Instant updatedAt) {
+            return delegate.executeOwnershipRecovery(id, tenantId, approverServiceId, executedAt, updatedAt);
+        }
+
+        @Override
+        public boolean cancelOwnershipRecovery(UUID id, UUID tenantId, Instant updatedAt) {
+            return delegate.cancelOwnershipRecovery(id, tenantId, updatedAt);
+        }
+
+        @Override
+        public void insertSecurityOperationAudit(
+                UUID operationId, UUID tenantId, UUID targetId, String operationType,
+                String phase, String actorServiceId, String incidentReference, Instant occurredAt) {
+            delegate.insertSecurityOperationAudit(
+                    operationId, tenantId, targetId, operationType,
+                    phase, actorServiceId, incidentReference, occurredAt);
         }
 
         @Override

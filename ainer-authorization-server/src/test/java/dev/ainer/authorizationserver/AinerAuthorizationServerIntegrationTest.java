@@ -172,6 +172,7 @@ class AinerAuthorizationServerIntegrationTest {
         jdbcTemplate.update("DELETE FROM ainer_identity_notification_outbox");
         jdbcTemplate.update("DELETE FROM ainer_identity_activation_grant");
         jdbcTemplate.update("DELETE FROM ainer_identity_tenant_provisioning_request");
+        jdbcTemplate.update("DELETE FROM ainer_identity_ownership_recovery");
         jdbcTemplate.update("DELETE FROM ainer_identity_ownership_transfer");
         jdbcTemplate.update("DELETE FROM ainer_identity_member_audit");
         jdbcTemplate.update("DELETE FROM ainer_identity_security_operation_audit");
@@ -216,7 +217,7 @@ class AinerAuthorizationServerIntegrationTest {
 
     @Test
     void migratesIdentityAndOfficialJdbcProtocolStores() {
-        assertThat(flyway.info().applied()).hasSize(18);
+        assertThat(flyway.info().applied()).hasSize(19);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_name IN ('oauth2_registered_client','oauth2_authorization',"

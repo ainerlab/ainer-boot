@@ -207,6 +207,38 @@ class IdentitySecurityLifecycleTest {
         }
 
         @Override
+        public boolean cancelOwnershipRecovery(UUID id, UUID tenantId, Instant updatedAt) {
+            return false;
+        }
+
+        @Override
+        public void insertOwnershipRecovery(OwnershipRecovery recovery) {
+        }
+
+        @Override
+        public Optional<OwnershipRecovery> findOwnershipRecovery(UUID id) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<OwnershipRecovery> findOwnershipRecoveryForUpdate(UUID id) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean executeOwnershipRecovery(
+                UUID id, UUID tenantId, String approverServiceId,
+                Instant executedAt, Instant updatedAt) {
+            return false;
+        }
+
+        @Override
+        public void insertSecurityOperationAudit(
+                UUID operationId, UUID tenantId, UUID targetId, String operationType,
+                String phase, String actorServiceId, String incidentReference, Instant occurredAt) {
+        }
+
+        @Override
         public void insertOwnershipTransfer(OwnershipTransfer transfer) {
         }
 

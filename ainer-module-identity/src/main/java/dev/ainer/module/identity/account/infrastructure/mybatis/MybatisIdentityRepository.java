@@ -6,6 +6,7 @@ import dev.ainer.module.identity.account.application.IdentityRepository;
 import dev.ainer.module.identity.account.application.IdentityTokenStatus;
 import dev.ainer.module.identity.account.application.IdentityTokenStatusRepository;
 import dev.ainer.module.identity.account.application.OwnershipTransfer;
+import dev.ainer.module.identity.account.application.OwnershipRecovery;
 import dev.ainer.module.identity.account.application.TenantContextEntry;
 import dev.ainer.module.identity.account.domain.IdentityAccessEvent;
 import dev.ainer.module.identity.account.domain.IdentityStatus;
@@ -281,6 +282,72 @@ public class MybatisIdentityRepository implements IdentityRepository, IdentityTo
     @Override
     public boolean cancelOwnershipTransfer(UUID id, UUID tenantId, Instant updatedAt) {
         return mapper.cancelOwnershipTransfer(id, tenantId, updatedAt) == 1;
+    }
+
+    @Override
+    public void insertOwnershipRecovery(OwnershipRecovery recovery) {
+        OwnershipRecoveryRow row = new OwnershipRecoveryRow();
+        row.setId(recovery.id());
+        row.setTenantId(recovery.tenantId());
+        row.setTargetSubjectId(recovery.targetSubjectId());
+        row.setStatus(recovery.status().name());
+        row.setRequesterServiceId(recovery.requesterServiceId());
+        row.setApproverServiceId(recovery.approverServiceId());
+        row.setIncidentReference(recovery.incidentReference());
+        row.setExpiresAt(recovery.expiresAt());
+        row.setCreatedAt(recovery.createdAt());
+        row.setUpdatedAt(recovery.updatedAt());
+        requireSingleRow(mapper.insertOwnershipRecovery(row), "ownership recovery");
+    }
+
+    @Override
+    public Optional<OwnershipRecovery> findOwnershipRecovery(UUID id) {
+        return Optional.ofNullable(mapper.selectOwnershipRecoveryById(id))
+                .map(this::toOwnershipRecovery);
+    }
+
+    @Override
+    public Optional<OwnershipRecovery> findOwnershipRecoveryForUpdate(UUID id) {
+        return Optional.ofNullable(mapper.selectOwnershipRecoveryByIdForUpdate(id))
+                .map(this::toOwnershipRecovery);
+    }
+
+    @Override
+    public boolean executeOwnershipRecovery(
+            UUID id, UUID tenantId, String approverServiceId,
+            Instant executedAt, Instant updatedAt) {
+        return mapper.executeOwnershipRecovery(
+                id, tenantId, approverServiceId, executedAt, updatedAt) == 1;
+    }
+
+    @Override
+    public boolean cancelOwnershipRecovery(UUID id, UUID tenantId, Instant updatedAt) {
+        return mapper.cancelOwnershipRecovery(id, tenantId, updatedAt) == 1;
+    }
+
+    @Override
+    public void insertSecurityOperationAudit(
+            UUID operationId, UUID tenantId, UUID targetId, String operationType,
+            String phase, String actorServiceId, String incidentReference, Instant occurredAt) {
+        requireSingleRow(mapper.insertSecurityOperationAudit(
+                UUID.randomUUID(), operationId, tenantId, targetId,
+                operationType, phase, actorServiceId, incidentReference, occurredAt),
+                "security operation audit");
+    }
+
+    private OwnershipRecovery toOwnershipRecovery(OwnershipRecoveryRow row) {
+        return new OwnershipRecovery(
+                row.getId(),
+                row.getTenantId(),
+                row.getTargetSubjectId(),
+                dev.ainer.module.identity.account.domain.OwnershipTransferStatus.valueOf(row.getStatus()),
+                row.getRequesterServiceId(),
+                row.getApproverServiceId(),
+                row.getIncidentReference(),
+                row.getExpiresAt(),
+                row.getCreatedAt(),
+                row.getUpdatedAt(),
+                row.getExecutedAt());
     }
 
     private OwnershipTransfer toOwnershipTransfer(OwnershipTransferRow row) {

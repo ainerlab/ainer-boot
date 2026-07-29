@@ -6,6 +6,7 @@ import dev.ainer.authorizationserver.identity.OwnershipTransferStepUpFilter;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.security.AinerSecurityScopes;
+import dev.ainer.security.AinerSecurityScopes;
 import dev.ainer.security.autoconfigure.AinerSecurityFailureWriter;
 import dev.ainer.security.authorization.PrometheusEndpointRequestMatcher;
 import dev.ainer.security.authorization.TenantlessServiceScopeAuthorizationManager;
@@ -162,6 +163,10 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                         .hasAnyAuthority(
                                 "SCOPE_passkey.enrollment.manage",
                                 "SCOPE_passkey.enrollment.manage.all")
+                        .requestMatchers("/internal/identity/ownership-recovery/**")
+                        .hasAnyAuthority(
+                                "SCOPE_" + AinerSecurityScopes.IDENTITY_OWNERSHIP_RECOVERY_REQUEST,
+                                "SCOPE_" + AinerSecurityScopes.IDENTITY_OWNERSHIP_RECOVERY_APPROVE)
                         .anyRequest().denyAll())
                 .csrf(csrf -> csrf.disable())
                 .requestCache(cache -> cache.disable())

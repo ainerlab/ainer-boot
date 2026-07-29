@@ -16,6 +16,8 @@ public final class AinerSecurityScopes {
     public static final String TENANT_MEMBERS_READ = "tenant.members.read";
     public static final String TENANT_MEMBERS_WRITE = "tenant.members.write";
     public static final String TENANT_OWNERSHIP_TRANSFER = "tenant.ownership.transfer";
+    public static final String IDENTITY_OWNERSHIP_RECOVERY_REQUEST = "identity.ownership-recovery.request";
+    public static final String IDENTITY_OWNERSHIP_RECOVERY_APPROVE = "identity.ownership-recovery.approve";
 
     private AinerSecurityScopes() {
     }

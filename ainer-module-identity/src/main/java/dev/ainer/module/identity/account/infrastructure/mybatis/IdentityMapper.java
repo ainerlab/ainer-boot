@@ -102,6 +102,35 @@ public interface IdentityMapper {
             @Param("tenantId") UUID tenantId,
             @Param("updatedAt") java.time.Instant updatedAt);
 
+    int insertOwnershipRecovery(OwnershipRecoveryRow recovery);
+
+    OwnershipRecoveryRow selectOwnershipRecoveryById(@Param("id") UUID id);
+
+    OwnershipRecoveryRow selectOwnershipRecoveryByIdForUpdate(@Param("id") UUID id);
+
+    int executeOwnershipRecovery(
+            @Param("id") UUID id,
+            @Param("tenantId") UUID tenantId,
+            @Param("approverServiceId") String approverServiceId,
+            @Param("executedAt") java.time.Instant executedAt,
+            @Param("updatedAt") java.time.Instant updatedAt);
+
+    int cancelOwnershipRecovery(
+            @Param("id") UUID id,
+            @Param("tenantId") UUID tenantId,
+            @Param("updatedAt") java.time.Instant updatedAt);
+
+    int insertSecurityOperationAudit(
+            @Param("id") UUID id,
+            @Param("operationId") UUID operationId,
+            @Param("tenantId") UUID tenantId,
+            @Param("targetId") UUID targetId,
+            @Param("operationType") String operationType,
+            @Param("phase") String phase,
+            @Param("actorServiceId") String actorServiceId,
+            @Param("incidentReference") String incidentReference,
+            @Param("occurredAt") java.time.Instant occurredAt);
+
     IdentityDirectoryRow selectActiveDefaultOwner(
             @Param("tenantCode") String tenantCode,
             @Param("username") String username);

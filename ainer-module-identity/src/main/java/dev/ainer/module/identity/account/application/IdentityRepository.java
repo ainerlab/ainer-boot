@@ -89,4 +89,20 @@ public interface IdentityRepository {
             java.time.Instant executedAt, java.time.Instant updatedAt);
 
     boolean cancelOwnershipTransfer(UUID id, UUID tenantId, java.time.Instant updatedAt);
+
+    void insertOwnershipRecovery(OwnershipRecovery recovery);
+
+    java.util.Optional<OwnershipRecovery> findOwnershipRecovery(UUID id);
+
+    java.util.Optional<OwnershipRecovery> findOwnershipRecoveryForUpdate(UUID id);
+
+    boolean executeOwnershipRecovery(
+            UUID id, UUID tenantId, String approverServiceId,
+            java.time.Instant executedAt, java.time.Instant updatedAt);
+
+    boolean cancelOwnershipRecovery(UUID id, UUID tenantId, java.time.Instant updatedAt);
+
+    void insertSecurityOperationAudit(
+            UUID operationId, UUID tenantId, UUID targetId, String operationType,
+            String phase, String actorServiceId, String incidentReference, Instant occurredAt);
 }

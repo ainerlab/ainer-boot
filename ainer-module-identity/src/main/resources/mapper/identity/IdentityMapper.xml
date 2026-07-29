@@ -69,6 +69,21 @@
         <result property="executedBySubjectId" column="executed_by_subject_id"/>
     </resultMap>
 
+    <resultMap id="ownershipRecoveryRow"
+               type="dev.ainer.module.identity.account.infrastructure.mybatis.OwnershipRecoveryRow">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="targetSubjectId" column="target_subject_id"/>
+        <result property="status" column="status"/>
+        <result property="requesterServiceId" column="requester_service_id"/>
+        <result property="approverServiceId" column="approver_service_id"/>
+        <result property="incidentReference" column="incident_reference"/>
+        <result property="expiresAt" column="expires_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="executedAt" column="executed_at"/>
+    </resultMap>
+
     <insert id="insertTenant">
         INSERT INTO ainer_identity_tenant (id, code, name, status, created_at, updated_at)
         VALUES (#{id}, #{code}, #{name}, #{status}, #{createdAt}, #{updatedAt})
@@ -410,4 +425,55 @@
           AND tenant_id = #{tenantId}
           AND status = 'REQUESTED'
     </update>
+
+    <insert id="insertOwnershipRecovery">
+        INSERT INTO ainer_identity_ownership_recovery
+            (id, tenant_id, target_subject_id, status, requester_service_id,
+             incident_reference, expires_at, created_at, updated_at)
+        VALUES (#{id}, #{tenantId}, #{targetSubjectId}, #{status}, #{requesterServiceId},
+                #{incidentReference}, #{expiresAt}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <select id="selectOwnershipRecoveryById" resultMap="ownershipRecoveryRow">
+        SELECT id, tenant_id, target_subject_id, status, requester_service_id,
+               approver_service_id, incident_reference, expires_at, created_at, updated_at, executed_at
+        FROM ainer_identity_ownership_recovery
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectOwnershipRecoveryByIdForUpdate" resultMap="ownershipRecoveryRow">
+        SELECT id, tenant_id, target_subject_id, status, requester_service_id,
+               approver_service_id, incident_reference, expires_at, created_at, updated_at, executed_at
+        FROM ainer_identity_ownership_recovery
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
+    <update id="executeOwnershipRecovery">
+        UPDATE ainer_identity_ownership_recovery
+        SET status = 'EXECUTED',
+            approver_service_id = #{approverServiceId},
+            executed_at = #{executedAt},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+          AND status = 'REQUESTED'
+    </update>
+
+    <update id="cancelOwnershipRecovery">
+        UPDATE ainer_identity_ownership_recovery
+        SET status = 'CANCELLED',
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+          AND status = 'REQUESTED'
+    </update>
+
+    <insert id="insertSecurityOperationAudit">
+        INSERT INTO ainer_identity_security_operation_audit
+            (id, operation_id, tenant_id, target_id, operation_type, phase,
+             actor_service_id, incident_reference, occurred_at)
+        VALUES (#{id}, #{operationId}, #{tenantId}, #{targetId}, #{operationType}, #{phase},
+                #{actorServiceId}, #{incidentReference}, #{occurredAt})
+    </insert>
 </mapper>
