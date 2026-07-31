@@ -37,8 +37,8 @@ class AinerAdminDevFixtureRunnerTest {
 
     @Test
     void equalUsernamesAndMissingSecretsFailBeforeWriting() {
-        AinerAdminDevBootstrapProperties equal = properties();
-        equal.setMemberUsername(" OWNER@AINER.TEST ");
+        AinerAdminDevBootstrapProperties equal =
+                properties(" OWNER@AINER.TEST ", "owner-password-2026");
         RecordingIdentityService equalService = new RecordingIdentityService();
 
         assertThatThrownBy(() -> new AinerAdminDevFixtureRunner(equal, equalService)
@@ -47,8 +47,7 @@ class AinerAdminDevFixtureRunnerTest {
                 .hasMessageContaining("must be different");
         assertThat(equalService.commands).isEmpty();
 
-        AinerAdminDevBootstrapProperties missing = properties();
-        missing.setOwnerPassword("");
+        AinerAdminDevBootstrapProperties missing = properties("member@ainer.test", "");
         RecordingIdentityService missingService = new RecordingIdentityService();
         assertThatThrownBy(() -> new AinerAdminDevFixtureRunner(missing, missingService)
                 .run(new DefaultApplicationArguments(new String[0])))
@@ -58,15 +57,18 @@ class AinerAdminDevFixtureRunnerTest {
     }
 
     private AinerAdminDevBootstrapProperties properties() {
-        AinerAdminDevBootstrapProperties properties = new AinerAdminDevBootstrapProperties();
-        properties.setEnabled(true);
-        properties.setOwnerUsername("owner@ainer.test");
-        properties.setOwnerPassword("owner-password-2026");
-        properties.setOwnerDisplayName("Ainer Admin Owner");
-        properties.setMemberUsername("member@ainer.test");
-        properties.setMemberPassword("member-password-2026");
-        properties.setMemberDisplayName("Ainer Admin Member");
-        return properties;
+        return properties("member@ainer.test", "owner-password-2026");
+    }
+
+    private AinerAdminDevBootstrapProperties properties(String memberUsername, String ownerPassword) {
+        return new AinerAdminDevBootstrapProperties(
+                true,
+                "owner@ainer.test",
+                ownerPassword,
+                "Ainer Admin Owner",
+                memberUsername,
+                "member-password-2026",
+                "Ainer Admin Member");
     }
 
     private static final class RecordingIdentityService extends IdentityApplicationService {
