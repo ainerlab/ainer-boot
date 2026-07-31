@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
 import java.net.URI;
@@ -34,9 +35,17 @@ public class IdentityDirectoryClientConfiguration {
     WorkspaceIdentityDirectory workspaceIdentityDirectory(
             IdentityDirectoryClientProperties properties,
             ClientCredentialsServiceTokenProvider tokenProvider,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            RestClient.Builder restClientBuilder) {
         URI baseUri = requireUri(properties.getBaseUrl(), properties.isAllowInsecureHttp(), "base-url");
-        return new HttpWorkspaceIdentityDirectory(baseUri, tokenProvider, objectMapper);
+        RestClient restClient = restClientBuilder
+                .baseUrl(withoutTrailingSlash(baseUri.toString()))
+                .build();
+        return new HttpWorkspaceIdentityDirectory(restClient, tokenProvider, objectMapper);
+    }
+
+    private static String withoutTrailingSlash(String value) {
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 
     private URI requireUri(String value, boolean allowInsecureHttp, String name) {

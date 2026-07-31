@@ -25,13 +25,15 @@ final class HttpTenantProvisioningNotificationPublisher
     static final String TARGET_UNAVAILABLE =
             "AINER.IDENTITY.PROVISIONING_NOTIFICATION_TARGET_UNAVAILABLE";
 
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient;
     private final URI gatewayUri;
     private final ClientCredentialsServiceTokenProvider tokenProvider;
 
     HttpTenantProvisioningNotificationPublisher(
+            RestClient restClient,
             URI gatewayUri,
             ClientCredentialsServiceTokenProvider tokenProvider) {
+        this.restClient = restClient;
         this.gatewayUri = gatewayUri;
         this.tokenProvider = tokenProvider;
     }

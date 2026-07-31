@@ -7,6 +7,7 @@ import dev.ainer.module.identity.account.domain.IdentityAccessEvent;
 import dev.ainer.security.client.ClientCredentialsServiceTokenProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.client.RestClient;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -56,7 +57,9 @@ class HttpIdentityAccessEventPublisherTest {
                 Set.of("identity.access-events.publish"),
                 true);
         HttpIdentityAccessEventPublisher publisher =
-                new HttpIdentityAccessEventPublisher(baseUri, tokenProvider);
+                new HttpIdentityAccessEventPublisher(
+                        RestClient.builder().baseUrl(baseUri.toString()).build(),
+                        tokenProvider);
         IdentityAccessEvent event = IdentityAccessEvent.membershipRevoked(
                 UUID.randomUUID(), UUID.randomUUID(), Instant.parse("2026-07-23T03:00:00Z"));
 

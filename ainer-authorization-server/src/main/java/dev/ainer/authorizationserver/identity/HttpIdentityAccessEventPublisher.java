@@ -9,8 +9,6 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-import java.net.URI;
-
 final class HttpIdentityAccessEventPublisher implements IdentityAccessEventPublisher {
 
     static final String AUTHENTICATION_REJECTED =
@@ -24,11 +22,9 @@ final class HttpIdentityAccessEventPublisher implements IdentityAccessEventPubli
     private final ClientCredentialsServiceTokenProvider tokenProvider;
 
     HttpIdentityAccessEventPublisher(
-            URI workspaceBaseUri,
+            RestClient restClient,
             ClientCredentialsServiceTokenProvider tokenProvider) {
-        this.restClient = RestClient.builder()
-                .baseUrl(withoutTrailingSlash(workspaceBaseUri.toString()))
-                .build();
+        this.restClient = restClient;
         this.tokenProvider = tokenProvider;
     }
 
@@ -48,9 +44,5 @@ final class HttpIdentityAccessEventPublisher implements IdentityAccessEventPubli
         } catch (RestClientException | dev.ainer.security.client.ServiceTokenException exception) {
             throw new IdentityAccessEventPublicationException(TARGET_UNAVAILABLE, exception);
         }
-    }
-
-    private static String withoutTrailingSlash(String value) {
-        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 }

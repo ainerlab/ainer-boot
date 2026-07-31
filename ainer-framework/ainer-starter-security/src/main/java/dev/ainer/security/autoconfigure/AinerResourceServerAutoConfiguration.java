@@ -13,10 +13,12 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -57,13 +59,16 @@ public class AinerResourceServerAutoConfiguration {
             prefix = "ainer.security.resource-server.online-validation",
             name = "enabled",
             havingValue = "true")
-    public OpaqueTokenIntrospector ainerOnlineTokenIntrospector(AinerResourceServerProperties properties) {
+    public OpaqueTokenIntrospector ainerOnlineTokenIntrospector(
+            AinerResourceServerProperties properties,
+            RestClient.Builder restClientBuilder) {
         AinerResourceServerProperties.OnlineValidation online = properties.getOnlineValidation();
         URI introspectionUri = online.validateAndGetIntrospectionUri();
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(online.getConnectTimeout());
-        requestFactory.setReadTimeout(online.getReadTimeout());
-        RestClient restClient = RestClient.builder()
+        HttpClientSettings settings = HttpClientSettings.defaults()
+                .withConnectTimeout(online.getConnectTimeout())
+                .withReadTimeout(online.getReadTimeout());
+        ClientHttpRequestFactory requestFactory = ClientHttpRequestFactoryBuilder.detect().build(settings);
+        RestClient restClient = restClientBuilder
                 .requestFactory(requestFactory)
                 .defaultHeaders(headers -> headers.setBasicAuth(online.getClientId(), online.getClientSecret()))
                 .build();

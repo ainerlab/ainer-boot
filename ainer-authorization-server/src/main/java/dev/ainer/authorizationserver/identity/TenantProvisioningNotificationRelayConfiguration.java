@@ -12,6 +12,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.web.client.RestClient;
 
 import java.net.URI;
 import java.time.Clock;
@@ -45,13 +46,14 @@ public class TenantProvisioningNotificationRelayConfiguration {
     TenantProvisioningNotificationPublisher tenantProvisioningNotificationPublisher(
             TenantProvisioningNotificationRelayProperties properties,
             @Qualifier("tenantProvisioningNotificationServiceTokenProvider")
-                    ClientCredentialsServiceTokenProvider tokenProvider) {
+                    ClientCredentialsServiceTokenProvider tokenProvider,
+            RestClient.Builder restClientBuilder) {
+        URI gatewayUri = requireUri(
+                properties.getGatewayUri(),
+                properties.isAllowInsecureHttp(),
+                "gateway-uri");
         return new HttpTenantProvisioningNotificationPublisher(
-                requireUri(
-                        properties.getGatewayUri(),
-                        properties.isAllowInsecureHttp(),
-                        "gateway-uri"),
-                tokenProvider);
+                restClientBuilder.build(), gatewayUri, tokenProvider);
     }
 
     @Bean

@@ -10,6 +10,7 @@ import dev.ainer.security.AinerSecurityScopes;
 import dev.ainer.security.client.ClientCredentialsServiceTokenProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.client.RestClient;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -70,6 +71,7 @@ class HttpTenantProvisioningNotificationPublisherTest {
                         true);
         HttpTenantProvisioningNotificationPublisher publisher =
                 new HttpTenantProvisioningNotificationPublisher(
+                        RestClient.builder().build(),
                         baseUri.resolve(
                                 "/internal/identity/"
                                         + "tenant-provisioning-notifications"),

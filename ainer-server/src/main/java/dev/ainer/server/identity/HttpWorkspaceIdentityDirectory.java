@@ -12,7 +12,6 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import java.net.URI;
 import java.util.UUID;
 
 final class HttpWorkspaceIdentityDirectory implements WorkspaceIdentityDirectory {
@@ -22,10 +21,10 @@ final class HttpWorkspaceIdentityDirectory implements WorkspaceIdentityDirectory
     private final ObjectMapper objectMapper;
 
     HttpWorkspaceIdentityDirectory(
-            URI baseUri,
+            RestClient restClient,
             ClientCredentialsServiceTokenProvider tokenProvider,
             ObjectMapper objectMapper) {
-        this.restClient = RestClient.builder().baseUrl(withoutTrailingSlash(baseUri.toString())).build();
+        this.restClient = restClient;
         this.tokenProvider = tokenProvider;
         this.objectMapper = objectMapper;
     }
@@ -55,9 +54,5 @@ final class HttpWorkspaceIdentityDirectory implements WorkspaceIdentityDirectory
         } catch (RuntimeException exception) {
             throw new BusinessException(WorkspaceErrorCode.IDENTITY_DIRECTORY_UNAVAILABLE);
         }
-    }
-
-    private static String withoutTrailingSlash(String value) {
-        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 }
