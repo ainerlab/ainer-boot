@@ -13,7 +13,8 @@ class AinerResourceServerPropertiesTest {
     @Test
     void onlineValidationIsDisabledByDefaultWithExplicitProtectedRules() {
         AinerResourceServerProperties.OnlineValidation properties =
-                new AinerResourceServerProperties().getOnlineValidation();
+                new AinerResourceServerProperties.OnlineValidation(
+                        false, null, null, null, null, null, false, null, null, null);
 
         assertThat(properties.isEnabled()).isFalse();
         assertThat(properties.getAlwaysProtectedPaths()).contains("/internal/**");
@@ -31,54 +32,69 @@ class AinerResourceServerPropertiesTest {
 
     @Test
     void loopbackHttpRequiresExplicitTestOptIn() {
-        AinerResourceServerProperties.OnlineValidation properties = validProperties();
-        properties.setIntrospectionUri("http://127.0.0.1:9000/oauth2/introspect");
-
-        assertThatThrownBy(properties::validateAndGetIntrospectionUri)
+        assertThatThrownBy(() -> onlineValidation(
+                "http://127.0.0.1:9000/oauth2/introspect", false, "test-only-introspection-secret", null, null, null)
+                .validateAndGetIntrospectionUri())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("HTTPS");
 
-        properties.setAllowInsecureHttp(true);
-        assertThat(properties.validateAndGetIntrospectionUri()).hasScheme("http");
+        assertThat(onlineValidation(
+                "http://127.0.0.1:9000/oauth2/introspect", true, "test-only-introspection-secret", null, null, null)
+                .validateAndGetIntrospectionUri()).hasScheme("http");
     }
 
     @Test
     void nonLoopbackHttpIsRejectedEvenWithInsecureOptIn() {
-        AinerResourceServerProperties.OnlineValidation properties = validProperties();
-        properties.setIntrospectionUri("http://auth.example.com/oauth2/introspect");
-        properties.setAllowInsecureHttp(true);
-
-        assertThatThrownBy(properties::validateAndGetIntrospectionUri)
+        assertThatThrownBy(() -> onlineValidation(
+                "http://auth.example.com/oauth2/introspect", true, "test-only-introspection-secret", null, null, null)
+                .validateAndGetIntrospectionUri())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("loopback");
     }
 
     @Test
     void missingSecretNonPositiveTimeoutAndEmptyRulesFailClosed() {
-        AinerResourceServerProperties.OnlineValidation missingSecret = validProperties();
-        missingSecret.setClientSecret(" ");
-        assertThatThrownBy(missingSecret::validateAndGetIntrospectionUri)
+        assertThatThrownBy(() -> onlineValidation(
+                "https://auth.example.com/oauth2/introspect", false, " ", null, null, null)
+                .validateAndGetIntrospectionUri())
                 .hasMessageContaining("client secret");
 
-        AinerResourceServerProperties.OnlineValidation invalidTimeout = validProperties();
-        invalidTimeout.setReadTimeout(Duration.ZERO);
-        assertThatThrownBy(invalidTimeout::validateAndGetIntrospectionUri)
+        assertThatThrownBy(() -> onlineValidation(
+                "https://auth.example.com/oauth2/introspect", false, "test-only-introspection-secret",
+                Duration.ZERO, null, null)
+                .validateAndGetIntrospectionUri())
                 .hasMessageContaining("read timeout");
 
-        AinerResourceServerProperties.OnlineValidation emptyRules = validProperties();
-        emptyRules.setAlwaysProtectedPaths(List.of());
-        emptyRules.setMutatingProtectedPaths(List.of());
-        assertThatThrownBy(emptyRules::validateAndGetIntrospectionUri)
+        assertThatThrownBy(() -> onlineValidation(
+                "https://auth.example.com/oauth2/introspect", false, "test-only-introspection-secret",
+                null, List.of(), List.of())
+                .validateAndGetIntrospectionUri())
                 .hasMessageContaining("at least one protected rule");
     }
 
     private AinerResourceServerProperties.OnlineValidation validProperties() {
-        AinerResourceServerProperties.OnlineValidation properties =
-                new AinerResourceServerProperties().getOnlineValidation();
-        properties.setEnabled(true);
-        properties.setIntrospectionUri("https://auth.example.com/oauth2/introspect");
-        properties.setClientId("ainer-resource-server");
-        properties.setClientSecret("test-only-introspection-secret");
-        return properties;
+        return onlineValidation(
+                "https://auth.example.com/oauth2/introspect", false, "test-only-introspection-secret",
+                null, null, null);
+    }
+
+    private static AinerResourceServerProperties.OnlineValidation onlineValidation(
+            String introspectionUri,
+            boolean allowInsecureHttp,
+            String clientSecret,
+            Duration readTimeout,
+            List<String> alwaysProtectedPaths,
+            List<String> mutatingProtectedPaths) {
+        return new AinerResourceServerProperties.OnlineValidation(
+                true,
+                introspectionUri,
+                "ainer-resource-server",
+                clientSecret,
+                null,
+                readTimeout,
+                allowInsecureHttp,
+                alwaysProtectedPaths,
+                mutatingProtectedPaths,
+                null);
     }
 }
