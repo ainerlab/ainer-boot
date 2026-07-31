@@ -71,10 +71,16 @@ done < <(find "$installed_root" -type f -name '*.pom' ! -name '*-build.pom' -pri
 [[ "${#installed_poms[@]}" -eq 14 ]] \
   || fail "expected 14 installed Ainer consumer POMs, found ${#installed_poms[@]}"
 
-spring_jar="$installed_root/ainer-spring/$ainer_version/ainer-spring-$ainer_version.jar"
-[[ -f "$spring_jar" ]] || fail "Ainer Spring JAR was not installed: $spring_jar"
-jar tf "$spring_jar" | grep -Fxq 'META-INF/spring-configuration-metadata.json' \
-  || fail "Ainer Spring JAR is missing configuration metadata"
+# Ainer 的公开配置类（含 @ConfigurationProperties 的 library/module 制品）必须随 JAR
+# 生成 spring-configuration-metadata.json（ADR-0029 P0-3）。应用可执行 JAR（ainer-server、
+# ainer-authorization-server）经 spring-boot 重打包后元数据位于 BOOT-INF/classes，不在此校验。
+config_artifacts=(ainer-spring ainer-starter-security ainer-module-ai-runtime)
+for artifact in "${config_artifacts[@]}"; do
+  jar_path="$installed_root/$artifact/$ainer_version/$artifact-$ainer_version.jar"
+  [[ -f "$jar_path" ]] || fail "$artifact JAR was not installed: $jar_path"
+  jar tf "$jar_path" | grep -Fxq 'META-INF/spring-configuration-metadata.json' \
+    || fail "$artifact JAR is missing configuration metadata"
+done
 
 "$wrapper" --batch-mode --no-transfer-progress \
   -Dmaven.repo.local="$local_repository" \
