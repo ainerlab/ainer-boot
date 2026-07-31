@@ -7,112 +7,91 @@ import java.time.Duration;
 @ConfigurationProperties("ainer.identity.access-event-relay")
 public class IdentityAccessEventRelayProperties {
 
-    private boolean enabled;
-    private String workspaceBaseUrl;
-    private String tokenUri;
-    private String clientId;
-    private String clientSecret;
-    private String scope = "identity.access-events.publish";
-    private boolean allowInsecureHttp;
-    private Duration fixedDelay = Duration.ofSeconds(5);
-    private Duration leaseDuration = Duration.ofSeconds(30);
-    private Duration retryDelay = Duration.ofSeconds(30);
-    private int maxAttempts = 10;
-    private int batchSize = 50;
+    private final boolean enabled;
+    private final String workspaceBaseUrl;
+    private final String tokenUri;
+    private final String clientId;
+    private final String clientSecret;
+    private final String scope;
+    private final boolean allowInsecureHttp;
+    private final Duration fixedDelay;
+    private final Duration leaseDuration;
+    private final Duration retryDelay;
+    private final int maxAttempts;
+    private final int batchSize;
+
+    public IdentityAccessEventRelayProperties(
+            boolean enabled,
+            String workspaceBaseUrl,
+            String tokenUri,
+            String clientId,
+            String clientSecret,
+            String scope,
+            boolean allowInsecureHttp,
+            Duration fixedDelay,
+            Duration leaseDuration,
+            Duration retryDelay,
+            Integer maxAttempts,
+            Integer batchSize) {
+        this.enabled = enabled;
+        this.workspaceBaseUrl = workspaceBaseUrl;
+        this.tokenUri = tokenUri;
+        this.clientId = clientId;
+        this.clientSecret = clientSecret;
+        this.scope = scope != null ? scope : "identity.access-events.publish";
+        this.allowInsecureHttp = allowInsecureHttp;
+        this.fixedDelay = fixedDelay != null ? fixedDelay : Duration.ofSeconds(5);
+        this.leaseDuration = leaseDuration != null ? leaseDuration : Duration.ofSeconds(30);
+        this.retryDelay = retryDelay != null ? retryDelay : Duration.ofSeconds(30);
+        this.maxAttempts = maxAttempts != null ? maxAttempts : 10;
+        this.batchSize = batchSize != null ? batchSize : 50;
+    }
 
     public boolean isEnabled() {
         return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
     }
 
     public String getWorkspaceBaseUrl() {
         return workspaceBaseUrl;
     }
 
-    public void setWorkspaceBaseUrl(String workspaceBaseUrl) {
-        this.workspaceBaseUrl = workspaceBaseUrl;
-    }
-
     public String getTokenUri() {
         return tokenUri;
-    }
-
-    public void setTokenUri(String tokenUri) {
-        this.tokenUri = tokenUri;
     }
 
     public String getClientId() {
         return clientId;
     }
 
-    public void setClientId(String clientId) {
-        this.clientId = clientId;
-    }
-
     public String getClientSecret() {
         return clientSecret;
-    }
-
-    public void setClientSecret(String clientSecret) {
-        this.clientSecret = clientSecret;
     }
 
     public String getScope() {
         return scope;
     }
 
-    public void setScope(String scope) {
-        this.scope = scope;
-    }
-
     public boolean isAllowInsecureHttp() {
         return allowInsecureHttp;
-    }
-
-    public void setAllowInsecureHttp(boolean allowInsecureHttp) {
-        this.allowInsecureHttp = allowInsecureHttp;
     }
 
     public Duration getFixedDelay() {
         return fixedDelay;
     }
 
-    public void setFixedDelay(Duration fixedDelay) {
-        this.fixedDelay = fixedDelay;
-    }
-
     public Duration getLeaseDuration() {
         return leaseDuration;
-    }
-
-    public void setLeaseDuration(Duration leaseDuration) {
-        this.leaseDuration = leaseDuration;
     }
 
     public Duration getRetryDelay() {
         return retryDelay;
     }
 
-    public void setRetryDelay(Duration retryDelay) {
-        this.retryDelay = retryDelay;
-    }
-
     public int getMaxAttempts() {
         return maxAttempts;
     }
 
-    public void setMaxAttempts(int maxAttempts) {
-        this.maxAttempts = maxAttempts;
-    }
-
     public int getBatchSize() {
         return batchSize;
-    }
-
-    public void setBatchSize(int batchSize) {
-        this.batchSize = batchSize;
     }
 }

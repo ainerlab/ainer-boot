@@ -9,42 +9,37 @@ import java.util.Set;
 @ConfigurationProperties("ainer.security.authorization-server.login-rate-limit")
 public final class AinerLoginRateLimitProperties {
 
-    private boolean enabled;
-    private Duration window = Duration.ofMinutes(1);
-    private int maxRequests = 20;
-    private Set<String> paths = new LinkedHashSet<>(
-            Set.of("/login", "/login/webauthn", "/webauthn/authenticate/options"));
+    private static final Set<String> DEFAULT_PATHS = Set.of(
+            "/login", "/login/webauthn", "/webauthn/authenticate/options");
+
+    private final boolean enabled;
+    private final Duration window;
+    private final int maxRequests;
+    private final Set<String> paths;
+
+    public AinerLoginRateLimitProperties(boolean enabled, Duration window, Integer maxRequests, Set<String> paths) {
+        this.enabled = enabled;
+        this.window = window != null ? window : Duration.ofMinutes(1);
+        this.maxRequests = maxRequests != null ? maxRequests : 20;
+        this.paths = (paths == null || paths.isEmpty())
+                ? new LinkedHashSet<>(DEFAULT_PATHS)
+                : new LinkedHashSet<>(paths);
+    }
 
     public boolean isEnabled() {
         return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
     }
 
     public Duration getWindow() {
         return window;
     }
 
-    public void setWindow(Duration window) {
-        this.window = window;
-    }
-
     public int getMaxRequests() {
         return maxRequests;
     }
 
-    public void setMaxRequests(int maxRequests) {
-        this.maxRequests = maxRequests;
-    }
-
     public Set<String> getPaths() {
         return new LinkedHashSet<>(paths);
-    }
-
-    public void setPaths(Set<String> paths) {
-        this.paths = paths == null ? new LinkedHashSet<>() : new LinkedHashSet<>(paths);
     }
 
     void validate() {
