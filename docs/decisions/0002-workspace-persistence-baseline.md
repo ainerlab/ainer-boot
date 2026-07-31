@@ -2,6 +2,10 @@
 
 - 状态：Accepted
 - 日期：2026-07-22
+- 被部分取代：[ADR-0028](0028-mybatis-plus-infrastructure-baseline.md)（仅第 3 项
+  “不引入 MyBatis-Plus”的 M1 阶段性工具选择）
+- 当前关系：本 ADR 保留 M1 历史基线；其余 PostgreSQL、Flyway、UUID、事务、模块数据所有权和
+  抽取时机决策继续有效。
 
 ## 背景
 
@@ -45,3 +49,10 @@ Foundation v0.1 证明了 JDK 25、Spring Boot 4.1、核心错误契约、自动
 M2 的 AI invocation 成为第二个 PostgreSQL 业务模块后，已经抽取 `aurora-starter-persistence`。当前仅 UUID TypeHandler 与 MyBatis/Flyway/PostgreSQL 装配进入 framework；业务表、migration、领域 Repository、事务与错误码继续留在所属模块。
 
 后续只有在两个以上模块再次证明共性时，才扩展 starter。审计字段、分页模型和软删除等仍不得因为“常见”而提前固化。
+
+## 当前演进
+
+2026-07-30，Ainer 在真实 PostgreSQL 18.3 上验证 Spring Boot 4 专用 MyBatis-Plus starter 后，
+接受 ADR-0028：MyBatis-Plus 只作为 infrastructure 的简单 CRUD/分页增强，原有复杂 XML、
+Repository 端口、应用事务和显式 tenant 条件保持不变。本节只说明 M1 之后的决策关系，不改写
+本 ADR 发生时的背景和结论。

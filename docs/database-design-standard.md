@@ -1,6 +1,6 @@
 # Ainer 数据库设计规范（PostgreSQL 18）
 
-> 文档类型：长期规范 · 状态：生效 · 规范版本：1.2 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
+> 文档类型：长期规范 · 状态：生效 · 规范版本：1.2 · 最近核对：2026-07-30 · 适用版本：`0.1.x`
 
 ## 1. 目的、范围与规则等级
 
@@ -523,7 +523,7 @@ SELECT ...;
 - DDL 和依赖代码必须具备向前兼容窗口；应用回滚不等于 schema 回滚；
 - 每次变更都要说明失败点、锁范围、升级耗时、备份/恢复和向前修复方案。
 
-## 12. MyBatis 与 Java 映射
+## 12. MyBatis、MyBatis-Plus 与 Java 映射
 
 | PostgreSQL | Java |
 |---|---|
@@ -541,12 +541,26 @@ SELECT ...;
 
 - `uuid` 通过项目显式 TypeHandler 以 `Types.OTHER` 绑定；
 - 金额计算和比较使用 `BigDecimal`，禁止转 `double`；
-- 持久化 Row/Mapper/Repository adapter 位于模块 infrastructure，领域层不依赖 MyBatis；
+- 持久化 Row/Mapper/Repository adapter 位于模块 infrastructure，领域、应用和 API 不依赖
+  MyBatis/MyBatis-Plus 类型；
+- `BaseMapper`、Wrapper、Page 和 MyBatis-Plus 注解只用于简单、单表且权限条件明确的
+  infrastructure 实现；Repository 端口继续返回 Ainer 应用或领域类型；
+- CTE、锁、`RETURNING`、advisory lock、outbox、审计归档、稳定游标等复杂或安全敏感路径使用
+  显式 Mapper 方法和 XML；
+- 全局 `IdType.AUTO` 只用于让 PostgreSQL `DEFAULT uuidv7()` 生成并通过 JDBC generated keys
+  回填 ID；多返回列或显式变更语义仍使用 `RETURNING`。不得使用 `ASSIGN_ID` /
+  `ASSIGN_UUID`；必须预分配 ID 的用例遵守 ADR-0020；
+- tenant interceptor 当前不启用；所有租户查询仍显式绑定 tenant，不能依赖 ORM 插件替代授权；
+- 不默认使用逻辑删除或 MetaObject 自动填充表达状态、actor、tenant、时间和审计事实；
+- 分页使用 PostgreSQL 方言，最大单页 100；若存在其他 inner interceptor，分页放在链尾；
 - SQL 必须参数绑定，tenant、排序字段和用户输入不得字符串拼接；
 - 动态排序只能从服务端白名单映射为固定 SQL 片段；
 - Repository 签名必须暴露 tenant 与并发条件；
 - 乐观更新使用 `WHERE id = ? AND version = ?` 并原子增加版本，0 行更新映射为明确冲突；
 - 大批量操作要限制 batch size，不把无限集合展开为单条 `IN (...)`。
+
+MyBatis-Plus 的版本、依赖和架构边界见
+[ADR-0028](decisions/0028-mybatis-plus-infrastructure-baseline.md)。
 
 ## 13. 设计交付与评审清单
 

@@ -87,7 +87,7 @@ ainer:
       input-per-million-tokens: ${AINER_AI_INPUT_PER_MILLION_TOKENS:0}
       output-per-million-tokens: ${AINER_AI_OUTPUT_PER_MILLION_TOKENS:0}
 
-mybatis:
+mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: true

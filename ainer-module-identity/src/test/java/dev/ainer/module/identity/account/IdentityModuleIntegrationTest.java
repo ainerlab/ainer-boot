@@ -103,7 +103,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         classes = IdentityModuleIntegrationTest.TestApplication.class,
         properties = {
                 "ainer.identity.enabled=true",
-                "mybatis.mapper-locations=classpath*:/mapper/**/*.xml",
+                "mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml",
                 "spring.profiles.active=identity-module-integration-test",
                 "spring.main.banner-mode=off"
         })

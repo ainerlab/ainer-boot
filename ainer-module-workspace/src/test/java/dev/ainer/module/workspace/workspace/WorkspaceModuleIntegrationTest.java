@@ -76,7 +76,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         classes = WorkspaceModuleIntegrationTest.TestApplication.class,
         properties = {
                 "ainer.workspace.enabled=true",
-                "mybatis.mapper-locations=classpath*:/mapper/**/*.xml",
+                "mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml",
                 "spring.main.banner-mode=off"
         })
 class WorkspaceModuleIntegrationTest {

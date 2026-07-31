@@ -141,7 +141,7 @@ ainer:
         client-secret-ttl: ${AINER_AUTHORIZATION_CLIENT_CONTROL_CLIENT_SECRET_TTL:90d}
         secret-bytes: ${AINER_AUTHORIZATION_CLIENT_CONTROL_SECRET_BYTES:32}
 
-mybatis:
+mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: true
