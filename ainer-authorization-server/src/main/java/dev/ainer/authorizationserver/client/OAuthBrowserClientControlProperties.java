@@ -10,21 +10,33 @@ import java.util.Set;
 @ConfigurationProperties("ainer.security.authorization-server.browser-client-control")
 public class OAuthBrowserClientControlProperties {
 
-    private boolean enabled;
-    private Set<String> operatorClientIds = Set.of();
-    private Set<String> allowedScopes = Set.of();
+    private final boolean enabled;
+    private final Set<String> operatorClientIds;
+    private final Set<String> allowedScopes;
     @Min(1)
-    private int defaultAccessTokenMinutes = 5;
+    private final int defaultAccessTokenMinutes;
 
-    public boolean isEnabled() { return enabled; }
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public OAuthBrowserClientControlProperties(
+            boolean enabled, Set<String> operatorClientIds, Set<String> allowedScopes, Integer defaultAccessTokenMinutes) {
+        this.enabled = enabled;
+        this.operatorClientIds = operatorClientIds != null ? operatorClientIds : Set.of();
+        this.allowedScopes = allowedScopes != null ? allowedScopes : Set.of();
+        this.defaultAccessTokenMinutes = defaultAccessTokenMinutes != null ? defaultAccessTokenMinutes : 5;
+    }
 
-    public Set<String> getOperatorClientIds() { return operatorClientIds; }
-    public void setOperatorClientIds(Set<String> operatorClientIds) { this.operatorClientIds = operatorClientIds; }
+    public boolean isEnabled() {
+        return enabled;
+    }
 
-    public Set<String> getAllowedScopes() { return allowedScopes; }
-    public void setAllowedScopes(Set<String> allowedScopes) { this.allowedScopes = allowedScopes; }
+    public Set<String> getOperatorClientIds() {
+        return operatorClientIds;
+    }
 
-    public int getDefaultAccessTokenMinutes() { return defaultAccessTokenMinutes; }
-    public void setDefaultAccessTokenMinutes(int minutes) { this.defaultAccessTokenMinutes = minutes; }
+    public Set<String> getAllowedScopes() {
+        return allowedScopes;
+    }
+
+    public int getDefaultAccessTokenMinutes() {
+        return defaultAccessTokenMinutes;
+    }
 }

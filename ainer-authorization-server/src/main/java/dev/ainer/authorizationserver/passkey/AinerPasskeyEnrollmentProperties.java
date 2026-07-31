@@ -5,14 +5,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("ainer.security.authorization-server.passkey.enrollment")
 public final class AinerPasskeyEnrollmentProperties {
 
-    private Mode mode = Mode.OPTIONAL;
+    private final Mode mode;
+
+    public AinerPasskeyEnrollmentProperties(Mode mode) {
+        this.mode = mode != null ? mode : Mode.OPTIONAL;
+    }
 
     public Mode getMode() {
         return mode;
-    }
-
-    public void setMode(Mode mode) {
-        this.mode = mode == null ? Mode.OPTIONAL : mode;
     }
 
     public boolean isRequireInvite() {

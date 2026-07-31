@@ -10,23 +10,20 @@ import java.time.Duration;
 @ConfigurationProperties("ainer.workspace.owner-recovery")
 public class WorkspaceOwnerRecoveryProperties {
 
-    private boolean enabled;
+    private final boolean enabled;
     @Positive
-    private Duration approvalTtl = Duration.ofMinutes(15);
+    private final Duration approvalTtl;
+
+    public WorkspaceOwnerRecoveryProperties(boolean enabled, Duration approvalTtl) {
+        this.enabled = enabled;
+        this.approvalTtl = approvalTtl != null ? approvalTtl : Duration.ofMinutes(15);
+    }
 
     public boolean isEnabled() {
         return enabled;
     }
 
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
     public Duration getApprovalTtl() {
         return approvalTtl;
-    }
-
-    public void setApprovalTtl(Duration approvalTtl) {
-        this.approvalTtl = approvalTtl;
     }
 }

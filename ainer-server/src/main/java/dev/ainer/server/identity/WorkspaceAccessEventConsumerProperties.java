@@ -10,42 +10,34 @@ import java.time.Duration;
 @ConfigurationProperties("ainer.workspace.access-event-consumer")
 public class WorkspaceAccessEventConsumerProperties {
 
-    private boolean enabled;
-    private String trustedPublisherSubject;
+    private final boolean enabled;
+    private final String trustedPublisherSubject;
     @Positive
-    private Duration maxFutureSkew = Duration.ofMinutes(5);
+    private final Duration maxFutureSkew;
     @Positive
-    private Duration propagationSlo = Duration.ofSeconds(60);
+    private final Duration propagationSlo;
+
+    public WorkspaceAccessEventConsumerProperties(
+            boolean enabled, String trustedPublisherSubject, Duration maxFutureSkew, Duration propagationSlo) {
+        this.enabled = enabled;
+        this.trustedPublisherSubject = trustedPublisherSubject;
+        this.maxFutureSkew = maxFutureSkew != null ? maxFutureSkew : Duration.ofMinutes(5);
+        this.propagationSlo = propagationSlo != null ? propagationSlo : Duration.ofSeconds(60);
+    }
 
     public boolean isEnabled() {
         return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
     }
 
     public String getTrustedPublisherSubject() {
         return trustedPublisherSubject;
     }
 
-    public void setTrustedPublisherSubject(String trustedPublisherSubject) {
-        this.trustedPublisherSubject = trustedPublisherSubject;
-    }
-
     public Duration getMaxFutureSkew() {
         return maxFutureSkew;
     }
 
-    public void setMaxFutureSkew(Duration maxFutureSkew) {
-        this.maxFutureSkew = maxFutureSkew;
-    }
-
     public Duration getPropagationSlo() {
         return propagationSlo;
-    }
-
-    public void setPropagationSlo(Duration propagationSlo) {
-        this.propagationSlo = propagationSlo;
     }
 }

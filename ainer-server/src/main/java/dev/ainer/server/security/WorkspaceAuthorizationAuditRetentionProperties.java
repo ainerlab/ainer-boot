@@ -11,24 +11,42 @@ import java.time.Duration;
 @ConfigurationProperties("ainer.workspace.authorization-audit-retention")
 public class WorkspaceAuthorizationAuditRetentionProperties {
 
-    private boolean enabled;
+    private final boolean enabled;
     @Positive
-    private Duration hotRetention = Duration.ofDays(90);
+    private final Duration hotRetention;
     @Positive
-    private Duration fixedDelay = Duration.ofMinutes(5);
+    private final Duration fixedDelay;
     @Positive
-    private Duration deniedWindow = Duration.ofMinutes(5);
+    private final Duration deniedWindow;
     @Min(1)
-    private int batchSize = 500;
+    private final int batchSize;
 
-    public boolean isEnabled() { return enabled; }
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
-    public Duration getHotRetention() { return hotRetention; }
-    public void setHotRetention(Duration hotRetention) { this.hotRetention = hotRetention; }
-    public Duration getFixedDelay() { return fixedDelay; }
-    public void setFixedDelay(Duration fixedDelay) { this.fixedDelay = fixedDelay; }
-    public Duration getDeniedWindow() { return deniedWindow; }
-    public void setDeniedWindow(Duration deniedWindow) { this.deniedWindow = deniedWindow; }
-    public int getBatchSize() { return batchSize; }
-    public void setBatchSize(int batchSize) { this.batchSize = batchSize; }
+    public WorkspaceAuthorizationAuditRetentionProperties(
+            boolean enabled, Duration hotRetention, Duration fixedDelay, Duration deniedWindow, Integer batchSize) {
+        this.enabled = enabled;
+        this.hotRetention = hotRetention != null ? hotRetention : Duration.ofDays(90);
+        this.fixedDelay = fixedDelay != null ? fixedDelay : Duration.ofMinutes(5);
+        this.deniedWindow = deniedWindow != null ? deniedWindow : Duration.ofMinutes(5);
+        this.batchSize = batchSize != null ? batchSize : 500;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public Duration getHotRetention() {
+        return hotRetention;
+    }
+
+    public Duration getFixedDelay() {
+        return fixedDelay;
+    }
+
+    public Duration getDeniedWindow() {
+        return deniedWindow;
+    }
+
+    public int getBatchSize() {
+        return batchSize;
+    }
 }
