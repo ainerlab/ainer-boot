@@ -17,15 +17,15 @@ class PlatformIdentityControlConfigurationTest {
     @Test
     void acceptsExactOperatorsAndBoundedRequestTtl() {
         PlatformIdentityControlProperties properties =
-                new PlatformIdentityControlProperties();
-        properties.setOperatorClientIds(List.of("platform-identity-operator"));
-        properties.setRequestTtl(Duration.ofDays(7));
-        properties.setActivationTtl(Duration.ofHours(24));
-        properties.setActivationMaxAttempts(5);
-        properties.setNotificationProtectionActiveKeyVersion("v1");
-        properties.setNotificationProtectionKeys(List.of(
-                "v1:" + Base64.getUrlEncoder().withoutPadding()
-                        .encodeToString(new byte[32])));
+                new PlatformIdentityControlProperties(
+                        false,
+                        List.of("platform-identity-operator"),
+                        Duration.ofDays(7),
+                        Duration.ofHours(24),
+                        5,
+                        "v1",
+                        List.of("v1:" + Base64.getUrlEncoder().withoutPadding()
+                                .encodeToString(new byte[32])));
 
         PlatformIdentityControlSettings settings =
                 configuration.platformIdentityControlSettings(properties);
@@ -42,7 +42,7 @@ class PlatformIdentityControlConfigurationTest {
     @Test
     void rejectsMissingOperatorAllowlist() {
         assertThatThrownBy(() -> configuration.platformIdentityControlSettings(
-                new PlatformIdentityControlProperties()))
+                new PlatformIdentityControlProperties(false, null, null, null, null, null, null)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("operator-client-ids");
     }
@@ -50,17 +50,21 @@ class PlatformIdentityControlConfigurationTest {
     @Test
     void rejectsMissingOrInvalidNotificationProtectionKeyRing() {
         PlatformIdentityControlProperties missing =
-                new PlatformIdentityControlProperties();
-        missing.setOperatorClientIds(List.of("platform-identity-operator"));
+                new PlatformIdentityControlProperties(
+                        false, List.of("platform-identity-operator"), null, null, null, null, null);
         assertThatThrownBy(() -> configuration.platformIdentityControlSettings(missing))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("active key version");
 
         PlatformIdentityControlProperties invalid =
-                new PlatformIdentityControlProperties();
-        invalid.setOperatorClientIds(List.of("platform-identity-operator"));
-        invalid.setNotificationProtectionActiveKeyVersion("v1");
-        invalid.setNotificationProtectionKeys(List.of("v1:AQID"));
+                new PlatformIdentityControlProperties(
+                        false,
+                        List.of("platform-identity-operator"),
+                        null,
+                        null,
+                        null,
+                        "v1",
+                        List.of("v1:AQID"));
         assertThatThrownBy(() -> configuration.platformIdentityControlSettings(invalid))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("key ring");
@@ -69,16 +73,21 @@ class PlatformIdentityControlConfigurationTest {
     @Test
     void rejectsUnsafeOperatorAndOutOfRangeTtl() {
         PlatformIdentityControlProperties unsafe =
-                new PlatformIdentityControlProperties();
-        unsafe.setOperatorClientIds(List.of("unsafe operator"));
+                new PlatformIdentityControlProperties(
+                        false, List.of("unsafe operator"), null, null, null, null, null);
         assertThatThrownBy(() -> configuration.platformIdentityControlSettings(unsafe))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("operator client id");
 
         PlatformIdentityControlProperties longLived =
-                new PlatformIdentityControlProperties();
-        longLived.setOperatorClientIds(List.of("platform-identity-operator"));
-        longLived.setRequestTtl(Duration.ofDays(31));
+                new PlatformIdentityControlProperties(
+                        false,
+                        List.of("platform-identity-operator"),
+                        Duration.ofDays(31),
+                        null,
+                        null,
+                        null,
+                        null);
         assertThatThrownBy(() -> configuration.platformIdentityControlSettings(longLived))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("request-ttl");
