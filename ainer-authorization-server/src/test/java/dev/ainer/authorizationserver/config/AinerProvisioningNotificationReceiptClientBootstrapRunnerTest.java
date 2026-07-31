@@ -55,9 +55,11 @@ class AinerProvisioningNotificationReceiptClientBootstrapRunnerTest {
 
     @Test
     void weakSecretAndIncompatibleExistingClientFailClosed() {
-        AinerAuthorizationServerProperties weak = properties();
-        weak.getProvisioningNotificationReceiptClientBootstrap()
-                .setClientSecret("too-short");
+        AinerAuthorizationServerProperties weak =
+                withProvisioningNotificationReceiptClientBootstrap(
+                        new AinerAuthorizationServerProperties
+                                .ProvisioningNotificationReceiptClientBootstrap(
+                                true, "provisioning-notification-receipt", "too-short"));
         assertThatThrownBy(() ->
                 new AinerProvisioningNotificationReceiptClientBootstrapRunner(
                         weak,
@@ -95,16 +97,16 @@ class AinerProvisioningNotificationReceiptClientBootstrapRunnerTest {
     }
 
     private AinerAuthorizationServerProperties properties() {
-        AinerAuthorizationServerProperties properties =
-                new AinerAuthorizationServerProperties();
-        AinerAuthorizationServerProperties
-                .ProvisioningNotificationReceiptClientBootstrap bootstrap =
-                        properties
-                                .getProvisioningNotificationReceiptClientBootstrap();
-        bootstrap.setEnabled(true);
-        bootstrap.setClientId("provisioning-notification-receipt");
-        bootstrap.setClientSecret("notification-receipt-secret-2026");
-        return properties;
+        return withProvisioningNotificationReceiptClientBootstrap(
+                new AinerAuthorizationServerProperties
+                        .ProvisioningNotificationReceiptClientBootstrap(
+                        true, "provisioning-notification-receipt", "notification-receipt-secret-2026"));
+    }
+
+    private static AinerAuthorizationServerProperties withProvisioningNotificationReceiptClientBootstrap(
+            AinerAuthorizationServerProperties.ProvisioningNotificationReceiptClientBootstrap bootstrap) {
+        return new AinerAuthorizationServerProperties(
+                null, null, null, null, null, null, null, null, null, null, null, bootstrap);
     }
 
     private static final class InMemoryRepository

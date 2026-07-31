@@ -55,8 +55,9 @@ class AinerMachineClientBootstrapRunnerTest {
 
     @Test
     void weakBootstrapSecretFailsClosed() {
-        AinerAuthorizationServerProperties properties = properties();
-        properties.getMachineClientBootstrap().setClientSecret("too-short");
+        AinerAuthorizationServerProperties properties = withMachineClientBootstrap(
+                new AinerAuthorizationServerProperties.MachineClientBootstrap(
+                        true, "machine-client", "too-short", "tenant:machine", null));
 
         assertThatThrownBy(() -> new AinerMachineClientBootstrapRunner(
                 properties,
@@ -68,14 +69,14 @@ class AinerMachineClientBootstrapRunnerTest {
     }
 
     private AinerAuthorizationServerProperties properties() {
-        AinerAuthorizationServerProperties properties = new AinerAuthorizationServerProperties();
-        AinerAuthorizationServerProperties.MachineClientBootstrap bootstrap =
-                properties.getMachineClientBootstrap();
-        bootstrap.setEnabled(true);
-        bootstrap.setClientId("machine-client");
-        bootstrap.setClientSecret("machine-client-secret-2026");
-        bootstrap.setTenantId("tenant:machine");
-        return properties;
+        return withMachineClientBootstrap(new AinerAuthorizationServerProperties.MachineClientBootstrap(
+                true, "machine-client", "machine-client-secret-2026", "tenant:machine", null));
+    }
+
+    private static AinerAuthorizationServerProperties withMachineClientBootstrap(
+            AinerAuthorizationServerProperties.MachineClientBootstrap bootstrap) {
+        return new AinerAuthorizationServerProperties(
+                null, null, null, null, bootstrap, null, null, null, null, null, null, null);
     }
 
     private static final class InMemoryRepository implements RegisteredClientRepository {

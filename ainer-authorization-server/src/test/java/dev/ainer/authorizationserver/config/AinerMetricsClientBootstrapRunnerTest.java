@@ -42,8 +42,9 @@ class AinerMetricsClientBootstrapRunnerTest {
 
     @Test
     void weakSecretFailsClosed() {
-        AinerAuthorizationServerProperties properties = properties();
-        properties.getMetricsClientBootstrap().setClientSecret("too-short");
+        AinerAuthorizationServerProperties properties = withMetricsClientBootstrap(
+                new AinerAuthorizationServerProperties.MetricsClientBootstrap(
+                        true, "metrics-client", "too-short"));
 
         assertThatThrownBy(() -> new AinerMetricsClientBootstrapRunner(
                 properties,
@@ -55,13 +56,14 @@ class AinerMetricsClientBootstrapRunnerTest {
     }
 
     private AinerAuthorizationServerProperties properties() {
-        AinerAuthorizationServerProperties properties = new AinerAuthorizationServerProperties();
-        AinerAuthorizationServerProperties.MetricsClientBootstrap bootstrap =
-                properties.getMetricsClientBootstrap();
-        bootstrap.setEnabled(true);
-        bootstrap.setClientId("metrics-client");
-        bootstrap.setClientSecret("metrics-client-secret-2026");
-        return properties;
+        return withMetricsClientBootstrap(new AinerAuthorizationServerProperties.MetricsClientBootstrap(
+                true, "metrics-client", "metrics-client-secret-2026"));
+    }
+
+    private static AinerAuthorizationServerProperties withMetricsClientBootstrap(
+            AinerAuthorizationServerProperties.MetricsClientBootstrap bootstrap) {
+        return new AinerAuthorizationServerProperties(
+                null, null, null, null, null, null, bootstrap, null, null, null, null, null);
     }
 
     private static final class InMemoryRepository implements RegisteredClientRepository {

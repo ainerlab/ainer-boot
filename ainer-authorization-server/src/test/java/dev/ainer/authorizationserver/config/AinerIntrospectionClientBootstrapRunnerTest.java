@@ -35,8 +35,9 @@ class AinerIntrospectionClientBootstrapRunnerTest {
 
     @Test
     void weakSecretFailsClosed() {
-        AinerAuthorizationServerProperties properties = properties();
-        properties.getIntrospectionClientBootstrap().setClientSecret("too-short");
+        AinerAuthorizationServerProperties properties = withIntrospectionClientBootstrap(
+                new AinerAuthorizationServerProperties.IntrospectionClientBootstrap(
+                        true, "introspection-client", "too-short"));
 
         assertThatThrownBy(() -> new AinerIntrospectionClientBootstrapRunner(
                 properties,
@@ -48,13 +49,15 @@ class AinerIntrospectionClientBootstrapRunnerTest {
     }
 
     private AinerAuthorizationServerProperties properties() {
-        AinerAuthorizationServerProperties properties = new AinerAuthorizationServerProperties();
-        AinerAuthorizationServerProperties.IntrospectionClientBootstrap bootstrap =
-                properties.getIntrospectionClientBootstrap();
-        bootstrap.setEnabled(true);
-        bootstrap.setClientId("introspection-client");
-        bootstrap.setClientSecret("introspection-client-secret-2026");
-        return properties;
+        return withIntrospectionClientBootstrap(
+                new AinerAuthorizationServerProperties.IntrospectionClientBootstrap(
+                        true, "introspection-client", "introspection-client-secret-2026"));
+    }
+
+    private static AinerAuthorizationServerProperties withIntrospectionClientBootstrap(
+            AinerAuthorizationServerProperties.IntrospectionClientBootstrap bootstrap) {
+        return new AinerAuthorizationServerProperties(
+                null, null, null, null, null, bootstrap, null, null, null, null, null, null);
     }
 
     private static final class InMemoryRepository implements RegisteredClientRepository {

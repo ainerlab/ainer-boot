@@ -30,8 +30,9 @@ class AinerPasskeySettingsTest {
     void rejectsInsecureNonLoopbackOriginEvenWhenOverrideIsEnabled() {
         AinerAuthorizationServerProperties properties = properties(
                 "auth.ainer.dev",
-                List.of("http://auth.ainer.dev"));
-        properties.getPasskey().setAllowInsecureHttp(true);
+                List.of("http://auth.ainer.dev"),
+                true,
+                null);
 
         assertThatThrownBy(() -> AinerPasskeySettings.from(properties))
                 .isInstanceOf(IllegalStateException.class)
@@ -42,8 +43,9 @@ class AinerPasskeySettingsTest {
     void acceptsExplicitLocalhostHttpForAutomatedTestsOnly() {
         AinerAuthorizationServerProperties properties = properties(
                 "localhost",
-                List.of("http://localhost:9000"));
-        properties.getPasskey().setAllowInsecureHttp(true);
+                List.of("http://localhost:9000"),
+                true,
+                null);
 
         assertThat(AinerPasskeySettings.from(properties).allowedOrigins())
                 .containsExactly("http://localhost:9000");
@@ -89,22 +91,29 @@ class AinerPasskeySettingsTest {
 
         AinerAuthorizationServerProperties timeout = properties(
                 "auth.ainer.dev",
-                List.of("https://auth.ainer.dev"));
-        timeout.getPasskey().setCeremonyTimeout(Duration.ofMinutes(11));
+                List.of("https://auth.ainer.dev"),
+                false,
+                Duration.ofMinutes(11));
         assertThatThrownBy(() -> AinerPasskeySettings.from(timeout))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("at most 10 minutes");
     }
 
+    private AinerAuthorizationServerProperties properties(String rpId, List<String> allowedOrigins) {
+        return properties(rpId, allowedOrigins, false, null);
+    }
+
     private AinerAuthorizationServerProperties properties(
             String rpId,
-            List<String> allowedOrigins) {
-        AinerAuthorizationServerProperties properties =
-                new AinerAuthorizationServerProperties();
-        properties.getPasskey().setEnabled(true);
-        properties.getPasskey().setRpId(rpId);
-        properties.getPasskey().setRpName("Ainer");
-        properties.getPasskey().setAllowedOrigins(allowedOrigins);
-        return properties;
+            List<String> allowedOrigins,
+            boolean allowInsecureHttp,
+            Duration ceremonyTimeout) {
+        return new AinerAuthorizationServerProperties(
+                null,
+                null,
+                null,
+                new AinerAuthorizationServerProperties.Passkey(
+                        true, rpId, "Ainer", allowedOrigins, allowInsecureHttp, ceremonyTimeout),
+                null, null, null, null, null, null, null, null);
     }
 }
