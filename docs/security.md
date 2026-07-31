@@ -169,7 +169,7 @@ export AINER_AUTHORIZATION_BOOTSTRAP_METRICS_CLIENT_ID=ainer-prometheus
 export AINER_AUTHORIZATION_BOOTSTRAP_METRICS_CLIENT_SECRET='at-least-24-characters-secret'
 ```
 
-它只支持 Client Credentials，access token TTL 为 1 分钟，不携带 tenant，也没有 introspection 标记。创建完成后立即移除开关和明文 secret。Prometheus 应使用 OAuth2 配置从 secret file 获取 client secret，不能保存长期静态 Bearer Token。完整边界与尚未完成的 HA/轮换证据见 [ADR-0012](decisions/0012-production-observability-and-auth-availability.md)。
+它只支持 Client Credentials，access token TTL 为 1 分钟，不携带 tenant，也没有 introspection 标记。创建完成后立即移除开关和明文 secret。Prometheus 应使用 OAuth2 配置从 secret file 获取 client secret，不能保存长期静态 Bearer Token。完整边界与尚未完成的 HA/轮换验证见 [ADR-0012](decisions/0012-production-observability-and-auth-availability.md)。
 
 ### 5.4 受审计 tenant 服务 Client 控制面
 
@@ -318,7 +318,7 @@ M4.5 已用测试专用 public client 完成真实 HTTP 浏览器会话与 Postg
 `CredentialsContainer`，认证成功后擦除 password hash；持久化 mixin 忽略 password 属性，集成
 测试直接检查授权记录不含密码或 password 字段。
 
-这些证据不创建生产默认 browser client，也不提供注册/轮换 API、同意页、租户选择、会话治理或
+这些自动化验证不创建生产默认 browser client，也不提供注册/轮换 API、同意页、租户选择、会话治理或
 完整 MFA。测试 issuer、测试 client 和测试 RSA key 不能用于发行环境。
 
 M6 使用 Ainer Studio `a73f40b` 的视觉合同 1.0.0 提供纯服务端品牌登录页。它保持
@@ -374,7 +374,7 @@ M4.6 增加默认关闭的 Passkey/WebAuthn 协议基础。启用时：
 它只匹配配置的 POST 路径，且明确是 node-local。step-up 只处理 USER token，校验必需 `amr`、
 `auth_time` 最大年龄、未来时间和可配时钟偏差；匿名仍返回 401。
 
-当前仍未覆盖主流真实设备/浏览器兼容矩阵、恢复通知和多节点 session/共享限流证据。TOTP 只保留为
+当前仍未覆盖主流真实设备/浏览器兼容矩阵、恢复通知和多节点 session/共享限流验证。TOTP 只保留为
 后续受限恢复 fallback 的候选，不能作为抗钓鱼主因子。完整决策和威胁模型见 ADR-0014 至 ADR-0017。
 
 人员账号由 `ainer-module-identity` 保存 delegating password hash、状态和唯一默认租户。Authorization Server 的 `UserDetailsService` 从该端口加载账号，签发时把稳定 UUID 写入 `sub`，把默认租户写入 `tenant_id`，并把成员角色写入 `roles`。
@@ -443,7 +443,7 @@ M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存�
 429 和 step-up 的 200/401/403。租户成员管理还要以真实 PostgreSQL + HTTP 覆盖 USER/SERVICE、
 scope、跨 tenant、实时资源角色与审计。平台预配还要覆盖 tenantless SERVICE、成对 scope、
 operator 白名单、幂等摘要、共享锁、并发预留、过期、核心表零污染、同事务审计和秘密不落库。
-真实 PostgreSQL 和协议 smoke 证据维护在
+真实 PostgreSQL 和协议 smoke 结果维护在
 [`project-status.md`](project-status.md)。
 
 Ainer Admin 还必须以同一个 browser cookie session 覆盖 PKCE、成员操作、当前 access token

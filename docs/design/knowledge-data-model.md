@@ -11,7 +11,7 @@
 数据集上另立 ADR；数据库通用规则见
 [`database-design-standard.md`](../database-design-standard.md)。
 
-## 2. 从现状得到的证据
+## 2. 现状与结论
 
 xq 当前知识模型已经证明 `knowledge -> document -> segment` 是真实需求，同时也说明仅有这三层
 仍不够：
@@ -22,7 +22,7 @@ xq 当前知识模型已经证明 `knowledge -> document -> segment` 是真实�
 - 角色上的 knowledge ID 列表不能表达资源级授权、发布版本和检索策略；
 - 客户画像、销售事实等来源数据放进 AI 命名空间会模糊事实所有权。
 
-因此 Ainer 应补足 revision、派生版本和授权证据，但不能照搬现有表。
+因此 Ainer 应补足 revision、派生版本和授权决策记录，但不能照搬现有表。
 
 ## 3. 责任边界
 
@@ -38,7 +38,7 @@ xq 当前知识模型已经证明 `knowledge -> document -> segment` 是真实�
 - 被批准来源的摄取状态和来源引用；
 - 文档的不可变 revision；
 - 切分、embedding 和索引代际等可重建派生数据；
-- 检索时实际使用的 revision、chunk、得分与授权决策证据；
+- 检索时实际使用的 revision、chunk、得分与授权决策记录；
 - 派生数据的重建、切换、过期和清理。
 
 Knowledge 数据是**可重建投影**，不是业务事实的新权威副本。共享数据库不授予 Knowledge 直接
@@ -48,7 +48,7 @@ Knowledge 数据是**可重建投影**，不是业务事实的新权威副本。
 
 ```text
 Document
-  └── Revision (immutable source evidence)
+  └── Revision (immutable source snapshot)
         └── Chunk (immutable derivation)
               └── Embedding (per index generation)
 
@@ -56,7 +56,7 @@ Index Generation
   └── selects parser/splitter/embedding configuration and active cutover
 
 Retrieval
-  └── optional evidence of query + selected chunks
+  └── optional query + selected chunk references
 ```
 
 这里的每个概念都需要独立的不变量，但不表示首个 migration 必须一次创建全部表。
@@ -150,11 +150,11 @@ Embedding 绑定 `chunk_id + generation_id`，不能只保存模型展示名或�
 3. 查询必须在向量检索前完成可执行过滤，不能先召回敏感 chunk 再在应用层丢弃；
 4. 授权投影通过可靠事件更新，撤销延迟必须有 SLO；
 5. 高风险场景在返回内容前可以向来源授权端口重新确认；
-6. 检索证据记录使用的策略/投影版本。
+6. 检索轨迹记录使用的策略/投影版本。
 
 没有上述能力时，客户、成交、内部销售经验等敏感资料不得进入宣称“资源级隔离”的知识集合。
 
-## 9. Retrieval 证据
+## 9. Retrieval 轨迹
 
 不是每次检索都必须进入业务 OLTP 表。只有产品需要引用、问题追查、在线评测或合规重放时才
 持久化 Retrieval。
@@ -197,7 +197,7 @@ Ainer Knowledge
 
 Ainer AI Runtime
   -> tenant 过滤检索
-  -> 记录必要引用证据
+  -> 记录必要引用来源
   -> 生成 Artifact
 
 xq 业务 owner
@@ -232,4 +232,4 @@ xq 业务 owner
 7. Artifact/业务结果如何保存引用。
 
 首版只实现满足该用例的物理表和端口。资源级 ACL、外部向量库、自动爬取、通用管理 UI、知识图谱
-和在线 Feedback 在有独立证据后逐项增加。
+和在线 Feedback 在出现明确需求后逐项增加。

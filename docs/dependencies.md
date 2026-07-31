@@ -192,7 +192,7 @@ final class ContextSnapshotJacksonAdapter {
 
 - 服务间 Token 获取使用 Spring Security 官方 `spring-security-oauth2-client` 的 Client Credentials provider、authorized-client service 与到期缓存，不自造 Token HTTP/缓存协议。
 - 首个撤销 transport 使用 Boot 已有 `RestClient` 与 Jackson 3，没有引入 Feign、消息中间件 SDK 或专有服务发现依赖；outbox 端口保留后续替换 transport 的能力。
-- PostgreSQL `FOR UPDATE SKIP LOCKED`、条件更新和 receipt 提供并发领取/幂等基础，没有为当前容量证据提前引入 Kafka、RabbitMQ 或 Redis。
+- PostgreSQL `FOR UPDATE SKIP LOCKED`、条件更新和 receipt 提供并发领取/幂等基础，没有在完成容量验证前引入 Kafka、RabbitMQ 或 Redis。
 
 ## M4.2 取舍
 

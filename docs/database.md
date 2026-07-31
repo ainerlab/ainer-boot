@@ -246,7 +246,7 @@ export SPRING_DATASOURCE_PASSWORD='local-only-password'
 验证回执 ID 为 UUIDv7、合法终态可写、重复 notification 被唯一约束拒绝。该 smoke 还揭示 SQL
 三值逻辑会让仅写 `failure_code ~ pattern` 的 check 在 NULL 时得到 UNKNOWN 并放行，因此最终
 migration 对 `FAILED` 显式增加 `failure_code IS NOT NULL`；修正后 NULL 失败码被数据库拒绝。
-隔离 schema 已删除。此证据补充 DDL 真实性，但不替代发布候选环境的完整 Testcontainers/HTTP
+隔离 schema 已删除。该实测结果补充 DDL 真实性验证，但不替代发布候选环境的完整 Testcontainers/HTTP
 门禁。
 
 发布前还必须在备份恢复出的接近真实规模数据库上验证升级耗时、锁等待和回滚方案。当前项目尚未建立生产备份恢复自动化，不能把空库测试等同于生产升级演练。

@@ -185,7 +185,7 @@ RFC 7009 revocation、Authorization Code + PKCE，以及 Resource Server JWT + �
 真实 PostgreSQL 验证还覆盖 JDBC claim/人员 principal 反序列化、凭证不落协议记录和 Identity
 revocation epoch。
 
-PKCE 证据覆盖测试专用 public client、S256、表单登录、授权码单次交换、错误 verifier、缺失或
+PKCE 验证覆盖测试专用 public client、S256、表单登录、授权码单次交换、错误 verifier、缺失或
 `plain` challenge 和未注册回调拒绝。它不代表生产 browser client 注册/轮换、登录 UI、MFA、
 Refresh Token 策略、设备码、Token Exchange、密钥轮换或多节点容量已经验证。
 

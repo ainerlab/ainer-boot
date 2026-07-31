@@ -100,7 +100,7 @@ scrape_configs:
 
 指标 client 当前只支持“新 ID 蓝绿切换”，完整退役旧 client 仍等待受审计 Client 控制面。轮换时先创建新 client、更新 Prometheus、确认持续抓取，再按变更窗口停用旧 client；在停用能力落地前不能宣称轮换闭环完成。
 
-Authorization Server 多实例接受门禁至少包括：两实例共享 PostgreSQL、相同 active JWK、滚动更新、单节点中断、Token 签发/introspection/metrics 连续性、数据库中断与恢复，以及 `ainer-server` 高风险请求在依赖故障时保持 503 失败关闭。浏览器登录会话若依赖节点本地状态，入口必须显式使用粘性会话或后续设计共享会话；当前尚无多节点证据。
+Authorization Server 多实例接受门禁至少包括：两实例共享 PostgreSQL、相同 active JWK、滚动更新、单节点中断、Token 签发/introspection/metrics 连续性、数据库中断与恢复，以及 `ainer-server` 高风险请求在依赖故障时保持 503 失败关闭。浏览器登录会话若依赖节点本地状态，入口必须显式使用粘性会话或后续设计共享会话；当前尚未完成多节点验证。
 
 ### 2.5 tenant 服务 Client 生命周期
 
@@ -206,7 +206,7 @@ OAuth authorization 恢复为密码路径，属于安全降级，必须审批、
     数据库唯一冲突，以及 provisioning notification 的 pending/failed/exhausted/cancelled/
     oldest-ready 指标。仓库只有 provider-neutral 回执接收端，不包含真实外部通知网关或邮件/
     短信/站内信供应商；完成真实供应商联调和告警前不得接入商业开户，或把 `REQUESTED`/
-    `PUBLISHED`/本地合成 `DELIVERED` 当作真实客户可达证据。
+    `PUBLISHED`/本地合成 `DELIVERED` 当作真实客户可达验证结果。
 
 回滚先关闭通知回执 endpoint，再关闭通知 relay，最后关闭平台控制面和新申请；保留
 request/grant/outbox/receipt/audit 及已经激活的核心事实，不回删 tenant/user/membership。开放预留会在 GET、消费或后续冲突检查时惰性转为
@@ -312,7 +312,7 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 
 ## 7. 最小事件记录模板
 
-发生故障时记录：时间线、版本与配置摘要、影响 tenant/功能范围、request/event/invocation ID、HTTP/稳定错误码、数据库 migration 状态、采取的动作、恢复证据和后续预防项。记录中必须移除密码、Token、私钥、API key、prompt 和客户敏感正文。
+发生故障时记录：时间线、版本与配置摘要、影响 tenant/功能范围、request/event/invocation ID、HTTP/稳定错误码、数据库 migration 状态、采取的动作、恢复确认记录和后续预防项。记录中必须移除密码、Token、私钥、API key、prompt 和客户敏感正文。
 
 ## 8. 当前可观测性与告警基线
 

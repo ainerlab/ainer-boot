@@ -247,7 +247,7 @@ fixture 严格幂等：完整状态匹配时不覆盖密码，部分占用或状
 关闭 fixture 开关并从进程环境移除明文密码。该 fixture、client ID 和账号不得用于生产开户。
 全部配置键与失败条件见 [`configuration.md`](configuration.md)。
 
-## 7. 验收与测试证据
+## 7. 验收与测试记录
 
 关键端到端门禁：
 
@@ -277,7 +277,7 @@ TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock \
   `/ainer-admin/auth/logged-out`，并清除登录 session。
 
 形成发布候选前还必须运行 `./mvnw clean verify`，并确认 Testcontainers 用例实际启动、`skipped=0`。本地
-缺少 Docker 而产生的自动跳过不能作为 Ainer Admin 后端基线的验收证据。
+缺少 Docker 而产生的自动跳过不能作为 Ainer Admin 后端基线的验收结果。
 
 ## 8. 当前风险与后续边界
 
