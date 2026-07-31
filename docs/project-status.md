@@ -447,6 +447,16 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 consumer 原型已有验证结果，但不能因此宣称 P1 Scaffold Ready；P2 Initializer 与 P3 外部消费者尚未
 交付。该设计文档只维护长期阶段和退出条件，本页继续独占当前阶段、完成记录与缺口。
 
+ADR-0029「JDK 25 / Boot 4 现代化基线」P0-3「配置即契约」已完成可安全交付的部分：公开制品统一
+生成 `spring-configuration-metadata.json` 并纳入消费者门禁；为原本无校验的 8 个配置类补齐 `@Validated`
+声明式约束（`@Positive`/`@Min`，默认值合法）；22 个 `@ConfigurationProperties` 中已有 17 个改为
+构造器绑定的不可变配置（保留 getter 名以零破坏调用点，构造器内处理默认值；含密钥/密码的用不可变
+**类**而非 record，故无 `toString()` 泄露）。剩余为改动面大、且当前 Maven 4 verify 受阻难以充分验证
+的专项，建议作为聚焦的一次性迁移（Maven 4 恢复后）：`AinerResourceServerProperties`+嵌套、
+`AinerAuthorizationServerProperties`+~10 嵌套 bootstrap 类、`AiRuntimeProperties`（`Pricing.validate()`
+会改字段，需重构）、`AinerAdminDevBootstrapProperties`（含密码 + 测试 setter）；`AinerRuntimeProperties`
+（ainer-spring 核心库单枚举字段）刻意跳过，价值不抵给核心库引入 validation 依赖的成本。
+
 ## 5. 下一里程碑
 
 产品化主线调整为先关闭 P0，再依次进入 P1 Scaffold Ready、P2 Create & Generate 和 P3 首个外部
