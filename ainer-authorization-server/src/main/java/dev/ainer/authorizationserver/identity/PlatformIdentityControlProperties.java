@@ -1,18 +1,25 @@
 package dev.ainer.authorizationserver.identity;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+@Validated
 @ConfigurationProperties("ainer.identity.platform-control")
 public class PlatformIdentityControlProperties {
 
     private boolean enabled;
     private List<String> operatorClientIds = new ArrayList<>();
+    @Positive
     private Duration requestTtl = Duration.ofDays(7);
+    @Positive
     private Duration activationTtl = Duration.ofHours(24);
+    @Min(1)
     private int activationMaxAttempts = 5;
     private String notificationProtectionActiveKeyVersion = "";
     private List<String> notificationProtectionKeys = new ArrayList<>();

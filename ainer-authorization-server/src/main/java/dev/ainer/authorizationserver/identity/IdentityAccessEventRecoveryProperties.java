@@ -1,14 +1,20 @@
 package dev.ainer.authorizationserver.identity;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
 
+@Validated
 @ConfigurationProperties("ainer.identity.access-event-recovery")
 public class IdentityAccessEventRecoveryProperties {
 
     private boolean enabled;
+    @Positive
     private Duration approvalTtl = Duration.ofMinutes(15);
+    @Min(1)
     private int maxAttempts = 10;
 
     public boolean isEnabled() {

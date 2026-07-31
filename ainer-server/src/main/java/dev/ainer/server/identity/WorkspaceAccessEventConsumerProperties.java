@@ -1,15 +1,20 @@
 package dev.ainer.server.identity;
 
+import jakarta.validation.constraints.Positive;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
 
+@Validated
 @ConfigurationProperties("ainer.workspace.access-event-consumer")
 public class WorkspaceAccessEventConsumerProperties {
 
     private boolean enabled;
     private String trustedPublisherSubject;
+    @Positive
     private Duration maxFutureSkew = Duration.ofMinutes(5);
+    @Positive
     private Duration propagationSlo = Duration.ofSeconds(60);
 
     public boolean isEnabled() {
