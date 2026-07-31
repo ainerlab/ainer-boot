@@ -83,7 +83,9 @@ public class AiRuntimeModuleConfiguration {
         return new TenantRateLimiter(properties.getLimits().getRequestsPerMinute(), clock);
     }
 
-    @Bean(destroyMethod = "close")
+    // 仅用于 AI SSE 流式任务，按名显式注入；标记 defaultCandidate=false 避免被当作 Boot 通用
+    // TaskExecutor/ExecutorService 默认候选，从而不影响 MVC 异步、@Async 与虚拟线程自动配置（ADR-0029 第 5 项）。
+    @Bean(defaultCandidate = false, destroyMethod = "close")
     ExecutorService aiStreamExecutor() {
         return Executors.newThreadPerTaskExecutor(
                 Thread.ofVirtual().name("ainer-ai-stream-", 0).factory());
