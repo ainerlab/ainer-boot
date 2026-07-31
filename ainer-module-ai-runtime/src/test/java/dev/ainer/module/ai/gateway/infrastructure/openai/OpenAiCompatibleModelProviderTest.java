@@ -43,15 +43,15 @@ class OpenAiCompatibleModelProviderTest {
         server.createContext("/v1/chat/completions", exchange -> handler.get().handle(exchange));
         server.start();
 
-        AiRuntimeProperties.Provider properties = new AiRuntimeProperties.Provider();
-        properties.setName("contract-provider");
-        properties.setBaseUrl("http://localhost:" + server.getAddress().getPort());
-        properties.setApiKey("contract-secret");
-        properties.setDefaultModel("test/model");
-        properties.setAllowedModels(List.of("test/model"));
-        properties.setAllowInsecureHttp(true);
-        properties.setConnectTimeout(Duration.ofSeconds(1));
-        properties.setRequestTimeout(Duration.ofSeconds(2));
+        AiRuntimeProperties.Provider properties = new AiRuntimeProperties.Provider(
+                "contract-provider",
+                "http://localhost:" + server.getAddress().getPort(),
+                "contract-secret",
+                "test/model",
+                List.of("test/model"),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(2),
+                true);
         provider = new OpenAiCompatibleModelProvider(
                 properties,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build(),

@@ -12,41 +12,33 @@ import java.util.Locale;
 @ConfigurationProperties("ainer.ai")
 public class AiRuntimeProperties {
 
-    private boolean enabled;
-    private Provider provider = new Provider();
-    private Limits limits = new Limits();
-    private Pricing pricing = new Pricing();
+    private final boolean enabled;
+    private final Provider provider;
+    private final Limits limits;
+    private final Pricing pricing;
+
+    public AiRuntimeProperties(boolean enabled, Provider provider, Limits limits, Pricing pricing) {
+        this.enabled = enabled;
+        this.provider = provider != null ? provider
+                : new Provider(null, null, null, null, null, null, null, false);
+        this.limits = limits != null ? limits : new Limits(null, null, null);
+        this.pricing = pricing != null ? pricing : new Pricing(null, null, null);
+    }
 
     public boolean isEnabled() {
         return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
     }
 
     public Provider getProvider() {
         return provider;
     }
 
-    public void setProvider(Provider provider) {
-        this.provider = provider;
-    }
-
     public Limits getLimits() {
         return limits;
     }
 
-    public void setLimits(Limits limits) {
-        this.limits = limits;
-    }
-
     public Pricing getPricing() {
         return pricing;
-    }
-
-    public void setPricing(Pricing pricing) {
-        this.pricing = pricing;
     }
 
     public void validate() {
@@ -64,83 +56,68 @@ public class AiRuntimeProperties {
         }
     }
 
-    public static class Provider {
+    public static final class Provider {
 
-        private String name = "openai-compatible";
-        private String baseUrl;
-        private String apiKey;
-        private String defaultModel;
-        private List<String> allowedModels = new ArrayList<>();
-        private Duration connectTimeout = Duration.ofSeconds(5);
-        private Duration requestTimeout = Duration.ofSeconds(60);
-        private boolean allowInsecureHttp;
+        private final String name;
+        private final String baseUrl;
+        private final String apiKey;
+        private final String defaultModel;
+        private final List<String> allowedModels;
+        private final Duration connectTimeout;
+        private final Duration requestTimeout;
+        private final boolean allowInsecureHttp;
+
+        public Provider(
+                String name,
+                String baseUrl,
+                String apiKey,
+                String defaultModel,
+                List<String> allowedModels,
+                Duration connectTimeout,
+                Duration requestTimeout,
+                boolean allowInsecureHttp) {
+            this.name = name != null && !name.isBlank() ? name.trim() : "openai-compatible";
+            this.baseUrl = baseUrl != null ? baseUrl.trim() : null;
+            this.apiKey = apiKey;
+            this.defaultModel = defaultModel != null ? defaultModel.trim() : null;
+            this.allowedModels = allowedModels != null
+                    ? allowedModels.stream().map(model -> model == null ? null : model.trim()).toList()
+                    : new ArrayList<>();
+            this.connectTimeout = connectTimeout != null ? connectTimeout : Duration.ofSeconds(5);
+            this.requestTimeout = requestTimeout != null ? requestTimeout : Duration.ofSeconds(60);
+            this.allowInsecureHttp = allowInsecureHttp;
+        }
 
         public String getName() {
             return name;
-        }
-
-        public void setName(String name) {
-            this.name = name == null ? null : name.trim();
         }
 
         public String getBaseUrl() {
             return baseUrl;
         }
 
-        public void setBaseUrl(String baseUrl) {
-            this.baseUrl = baseUrl == null ? null : baseUrl.trim();
-        }
-
         public String getApiKey() {
             return apiKey;
-        }
-
-        public void setApiKey(String apiKey) {
-            this.apiKey = apiKey;
         }
 
         public String getDefaultModel() {
             return defaultModel;
         }
 
-        public void setDefaultModel(String defaultModel) {
-            this.defaultModel = defaultModel == null ? null : defaultModel.trim();
-        }
-
         public List<String> getAllowedModels() {
             return allowedModels;
-        }
-
-        public void setAllowedModels(List<String> allowedModels) {
-            this.allowedModels = allowedModels == null
-                    ? new ArrayList<>()
-                    : allowedModels.stream()
-                            .map(model -> model == null ? null : model.trim())
-                            .toList();
         }
 
         public Duration getConnectTimeout() {
             return connectTimeout;
         }
 
-        public void setConnectTimeout(Duration connectTimeout) {
-            this.connectTimeout = connectTimeout;
-        }
-
         public Duration getRequestTimeout() {
             return requestTimeout;
         }
 
-        public void setRequestTimeout(Duration requestTimeout) {
-            this.requestTimeout = requestTimeout;
-        }
-
         public boolean isAllowInsecureHttp() {
             return allowInsecureHttp;
-        }
-
-        public void setAllowInsecureHttp(boolean allowInsecureHttp) {
-            this.allowInsecureHttp = allowInsecureHttp;
         }
 
         public List<String> effectiveAllowedModels() {
@@ -179,34 +156,28 @@ public class AiRuntimeProperties {
         }
     }
 
-    public static class Limits {
+    public static final class Limits {
 
-        private int requestsPerMinute = 60;
-        private BigDecimal tenantDailyBudget = new BigDecimal("10.00");
-        private int maxPromptCharacters = 100_000;
+        private final int requestsPerMinute;
+        private final BigDecimal tenantDailyBudget;
+        private final int maxPromptCharacters;
+
+        public Limits(Integer requestsPerMinute, BigDecimal tenantDailyBudget, Integer maxPromptCharacters) {
+            this.requestsPerMinute = requestsPerMinute != null ? requestsPerMinute : 60;
+            this.tenantDailyBudget = tenantDailyBudget != null ? tenantDailyBudget : new BigDecimal("10.00");
+            this.maxPromptCharacters = maxPromptCharacters != null ? maxPromptCharacters : 100_000;
+        }
 
         public int getRequestsPerMinute() {
             return requestsPerMinute;
-        }
-
-        public void setRequestsPerMinute(int requestsPerMinute) {
-            this.requestsPerMinute = requestsPerMinute;
         }
 
         public BigDecimal getTenantDailyBudget() {
             return tenantDailyBudget;
         }
 
-        public void setTenantDailyBudget(BigDecimal tenantDailyBudget) {
-            this.tenantDailyBudget = tenantDailyBudget;
-        }
-
         public int getMaxPromptCharacters() {
             return maxPromptCharacters;
-        }
-
-        public void setMaxPromptCharacters(int maxPromptCharacters) {
-            this.maxPromptCharacters = maxPromptCharacters;
         }
 
         private void validate() {
@@ -219,38 +190,37 @@ public class AiRuntimeProperties {
         }
     }
 
-    public static class Pricing {
+    public static final class Pricing {
 
-        private String currency = "USD";
-        private BigDecimal inputPerMillionTokens = BigDecimal.ZERO;
-        private BigDecimal outputPerMillionTokens = BigDecimal.ZERO;
+        private final String currency;
+        private final BigDecimal inputPerMillionTokens;
+        private final BigDecimal outputPerMillionTokens;
+
+        public Pricing(String currency, BigDecimal inputPerMillionTokens, BigDecimal outputPerMillionTokens) {
+            this.currency = currency != null && !currency.isBlank()
+                    ? currency.trim().toUpperCase(Locale.ROOT)
+                    : "USD";
+            this.inputPerMillionTokens = inputPerMillionTokens != null
+                    ? inputPerMillionTokens
+                    : BigDecimal.ZERO;
+            this.outputPerMillionTokens = outputPerMillionTokens != null
+                    ? outputPerMillionTokens
+                    : BigDecimal.ZERO;
+        }
 
         public String getCurrency() {
             return currency;
-        }
-
-        public void setCurrency(String currency) {
-            this.currency = currency;
         }
 
         public BigDecimal getInputPerMillionTokens() {
             return inputPerMillionTokens;
         }
 
-        public void setInputPerMillionTokens(BigDecimal inputPerMillionTokens) {
-            this.inputPerMillionTokens = inputPerMillionTokens;
-        }
-
         public BigDecimal getOutputPerMillionTokens() {
             return outputPerMillionTokens;
         }
 
-        public void setOutputPerMillionTokens(BigDecimal outputPerMillionTokens) {
-            this.outputPerMillionTokens = outputPerMillionTokens;
-        }
-
         private void validate() {
-            currency = currency == null ? null : currency.trim().toUpperCase(Locale.ROOT);
             require(currency != null && currency.matches("[A-Z]{3}"),
                     "ainer.ai.pricing.currency must be an ISO-like three-letter code");
             require(inputPerMillionTokens != null && inputPerMillionTokens.signum() >= 0,
