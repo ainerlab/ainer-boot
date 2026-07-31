@@ -8,24 +8,21 @@ import java.util.List;
 @ConfigurationProperties("ainer.identity.provisioning-notification-receipts")
 public class TenantProvisioningNotificationReceiptProperties {
 
-    private boolean enabled;
-    private List<String> gatewayClientIds = new ArrayList<>();
+    private final boolean enabled;
+    private final List<String> gatewayClientIds;
+
+    public TenantProvisioningNotificationReceiptProperties(boolean enabled, List<String> gatewayClientIds) {
+        this.enabled = enabled;
+        this.gatewayClientIds = gatewayClientIds == null
+                ? new ArrayList<>()
+                : new ArrayList<>(gatewayClientIds);
+    }
 
     public boolean isEnabled() {
         return enabled;
     }
 
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
     public List<String> getGatewayClientIds() {
         return new ArrayList<>(gatewayClientIds);
-    }
-
-    public void setGatewayClientIds(List<String> gatewayClientIds) {
-        this.gatewayClientIds = gatewayClientIds == null
-                ? new ArrayList<>()
-                : new ArrayList<>(gatewayClientIds);
     }
 }

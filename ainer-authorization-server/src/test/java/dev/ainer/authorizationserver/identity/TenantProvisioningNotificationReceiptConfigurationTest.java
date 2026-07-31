@@ -15,10 +15,9 @@ class TenantProvisioningNotificationReceiptConfigurationTest {
     @Test
     void acceptsDistinctExactGatewayClientIds() {
         TenantProvisioningNotificationReceiptProperties properties =
-                new TenantProvisioningNotificationReceiptProperties();
-        properties.setGatewayClientIds(List.of(
-                "notification-gateway",
-                "notification-gateway"));
+                new TenantProvisioningNotificationReceiptProperties(false, List.of(
+                        "notification-gateway",
+                        "notification-gateway"));
 
         TenantProvisioningNotificationReceiptSettings settings =
                 configuration.tenantProvisioningNotificationReceiptSettings(
@@ -32,13 +31,12 @@ class TenantProvisioningNotificationReceiptConfigurationTest {
     void rejectsMissingOrUnsafeGatewayClientIds() {
         assertThatThrownBy(() ->
                 configuration.tenantProvisioningNotificationReceiptSettings(
-                        new TenantProvisioningNotificationReceiptProperties()))
+                        new TenantProvisioningNotificationReceiptProperties(false, null)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("gateway-client-ids");
 
         TenantProvisioningNotificationReceiptProperties unsafe =
-                new TenantProvisioningNotificationReceiptProperties();
-        unsafe.setGatewayClientIds(List.of("unsafe gateway"));
+                new TenantProvisioningNotificationReceiptProperties(false, List.of("unsafe gateway"));
         assertThatThrownBy(() ->
                 configuration.tenantProvisioningNotificationReceiptSettings(
                         unsafe))
