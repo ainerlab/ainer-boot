@@ -1,6 +1,6 @@
 # Ainer 工程约定
 
-> 适用状态：M4.3 selective online token validation
+> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-07-30 · 适用版本：`0.1.x`
 
 ## 1. 基本原则
 
@@ -9,15 +9,43 @@
 - 依赖只能指向更稳定的层；framework 不能依赖业务。
 - 使用构造器注入，禁止字段注入和跨模块 Service 互注。
 - 循环依赖是设计错误，`allow-circular-references=false`。
+- 封装政策，不封装语法糖；不建立万能 `common`、`tool` 或静态 `XxxUtil`。
 
 ## 2. Java 与构建
 
-- JDK 25，Maven 3.9+；根 POM 使用 Enforcer 校验。
+- JDK 25；Ainer 生产者构建统一使用 Maven Wrapper 锁定的 Maven 4.0.0-rc-6 preview，
+  根 POM 使用 Enforcer 校验。不得用开发机全局 Maven 替代 Wrapper。
 - 使用 `maven.compiler.release=25` 和 `-parameters`。
 - 生产代码使用 `jakarta.*`；仅 JDK 自带处理器 API 保留 `javax.*`。
 - 子模块依赖不写版本，统一由 `ainer-dependencies` 管理。
-- 使用 `${revision}` 的子模块通过 Flatten Maven Plugin 发布可消费 POM；`install` 后的 POM 不得残留未解析 `${revision}`。
+- `${revision}` 的消费侧 POM 由 Maven 4 内建 Consumer POM 处理，不使用 Flatten Maven Plugin；
+  `.mvn/maven-user.properties` 固定 `maven.consumer.pom.flatten=false`，安装或发布后的标准
+  Consumer POM 不得残留未解析的 `${revision}`。
+- clean、resources、compiler、surefire、jar、install、deploy 与 artifact 等实际使用的构建插件
+  必须显式锁定版本；插件升级作为独立变更验证。
+- JDK 23+ 注解处理器必须在 Maven Compiler Plugin 中显式声明，不能依赖普通 optional
+  dependency 的 classpath 自动扫描；需要生成配置元数据的模块必须断言对应产物存在。
+- Maven 3.9+ 只用于独立下游项目导入 BOM、消费已安装或已发布制品的兼容门禁，不得构建、
+  安装或发布 Ainer Reactor。
+- 默认完整门禁为 `./mvnw clean verify`；`install` 只用于 golden consumer 或发布前的本地仓库
+  消费验证。
 - `ainer-core` 禁止出现 Spring、Servlet、ORM、Jackson 注解依赖。
+
+完整构建与 Consumer POM 决策见
+[ADR-0026](decisions/0026-maven-4-build-and-consumer-pom-baseline.md)。
+
+### 2.1 公共制品与工具
+
+- Git 仓库边界不等于 Maven 制品边界；当前保持单仓、多制品。
+- 公共制品使用能力名称，不使用 `ainer-tool`、`ainer-common`、`ainer-misc`。
+- 集合、字符串、时间和文件优先使用 JDK；Spring 工具只在 Spring-bound 模块使用。
+- JSON 使用构造器注入的 Boot `ObjectMapper`；HTTP 使用 JDK `HttpClient`、Spring `RestClient`
+  或明确需要响应式时的 `WebClient`。
+- 外部系统建立类型化 `Gateway`、`Client` 或 `Codec`，不得暴露任意 URL 和厂商 DTO。
+- 只有需要表达安全、身份、超时、错误、幂等或版本政策时才建立 Ainer 包装。
+- 新制品与独立仓库准入条件见
+  [ADR-0025](decisions/0025-public-artifacts-utilities-and-repository-boundary.md)，具体标准能力选择见
+  [`dependencies.md`](dependencies.md#公共工具与标准能力选择)。
 
 ## 3. 包与类型命名
 
@@ -103,10 +131,25 @@ public enum WorkspaceErrorCode implements ErrorCode {
 - SQL 使用参数绑定。权限条件不得通过字符串拼接进入 SQL。
 - `CREATE INDEX CONCURRENTLY` 与事务 migration 分开执行。
 - 集成测试使用 Testcontainers PostgreSQL，禁止依赖 H2 compatibility mode 证明兼容性。
-- MyBatis adapter 位于业务模块 infrastructure；应用与领域层不依赖 Mapper。
-- `ainer-starter-persistence` 只提供 MyBatis/Flyway/PostgreSQL/UUID 共性装配，不放业务 Row、Mapper、Repository 或 migration。
+- MyBatis/MyBatis-Plus adapter 位于业务模块 infrastructure；应用、领域与 API 不依赖 Mapper、
+  Wrapper、MyBatis-Plus Page 或 ORM 注解。
+- 简单单表 CRUD 与分页可以在 infrastructure 使用 `BaseMapper`、Wrapper 和 Page；不得默认
+  继承 `IService` / `ServiceImpl`、使用 ActiveRecord 或生成通用 CRUD Controller。
+- CTE、锁、`RETURNING`、advisory lock、outbox、审计、稳定游标等复杂或安全敏感路径继续使用
+  显式 Mapper 方法和 XML，不为统一框架 API 改写。
+- `ainer-starter-persistence` 只提供 MyBatis-Plus/MyBatis/Flyway/PostgreSQL/UUID 共性装配，
+  不放业务 Row、Mapper、Repository 或 migration。
+- 全局 ID 类型使用 `IdType.AUTO`，让 PostgreSQL `DEFAULT uuidv7()` 生成并回填 ID；禁止使用
+  `ASSIGN_ID` / `ASSIGN_UUID` 生成 Ainer 持久化身份。
+- tenant interceptor 当前不启用。Repository 与 SQL/Wrapper 必须显式绑定可信 tenant；未来即使
+  启用也只可作为纵深防御，不能替代授权。
+- 不默认启用逻辑删除和 MetaObject 自动填充。分页固定 PostgreSQL 方言、`maxLimit=100`，且在
+  interceptor 链尾。
 - PostgreSQL UUID 使用显式 TypeHandler 并以 `Types.OTHER` 绑定，不能假设驱动或框架自动完成转换。
 - 事务边界位于应用用例；涉及聚合与附属记录的写入必须有失败回滚测试。
+
+完整持久化增强边界见
+[ADR-0028](decisions/0028-mybatis-plus-infrastructure-baseline.md)。
 
 ## 9. 安全与隐私
 
@@ -148,7 +191,7 @@ public enum WorkspaceErrorCode implements ErrorCode {
 - 全量验收命令：
 
 ```bash
-mvn test
+./mvnw clean verify
 ```
 
 ## 12. Git

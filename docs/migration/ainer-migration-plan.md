@@ -1,6 +1,6 @@
 # xiaoqu-platform → Ainer 渐进迁移路线
 
-> 状态：v1.0 · 2026-07-22
+> 状态：v1.1 · 2026-07-30
 
 ## 1. 迁移原则
 
@@ -123,7 +123,7 @@ Ainer 采用 strangler + vertical slice：
   预留、短时限次 grant、AES-GCM notification outbox、已有用户本人接受与原子创建 ACTIVE
   tenant/OWNER；随后补齐独立 OAuth2 client、HTTPS notification gateway publisher、调度、
   幂等与积压指标、tenant/user 安全分页、未完成申请显式取消，以及 provider-neutral 的
-  `DELIVERED|FAILED` 终态回执接收基线。真实外部通知网关/供应商联调、最终送达证据、生产告警和
+  `DELIVERED|FAILED` 终态回执接收基线。真实外部通知网关/供应商联调、最终送达验证、生产告警和
   0-skipped 发布门禁仍是 M4.8A 后续收口。
 - 后续再依次推进 Authorization Server 租户上下文选择与 Identity OWNER 双方确认转移；
   `is_default` 只保留为首次登录落点，不作为并行会话的租户切换机制。
@@ -131,7 +131,7 @@ Ainer 采用 strangler + vertical slice：
 
 ### M4：低耦合业务切片
 
-状态：首个 Workspace 权限与成员生命周期切片已完成，其他业务切片待选择。
+状态：首个 Workspace 权限与成员生命周期切片已完成；首个 xq 产品纵向切片已经选定但尚未实现。
 
 - Workspace 已由 M1 技术样本升级为可信租户资源：创建者/tenant 来自 JWT，客户端不能自报 owner。
 - Workspace 查询、更新和分页已显式绑定 tenant，并只接受当前主体的 ACTIVE 成员关系。
@@ -141,15 +141,24 @@ Ainer 采用 strangler + vertical slice：
 - 关键允许/拒绝授权决策已进入独立事务审计；Identity Directory、禁用/撤销事务与 access-event outbox 已在 Identity 侧落地。
 - Workspace 审计已支持 `workspace.audit.read` + ACTIVE OWNER/ADMIN 的 tenant/resource 绑定分页查询。
 - 跨运行时 Directory adapter、outbox relay、Workspace 幂等撤销消费者、热/冷归档和 SIEM 拉取
-  均已落地；生产外部不可变副本、告警路由与多节点容量证据仍未完成。
+  均已落地；生产外部不可变副本、告警路由与多节点容量验证仍未完成。
 
-优先选择：
+首个 xq 产品纵向切片固定为：
 
-- 独立查询类能力；
-- 新建业务；
-- 对外依赖少、规则清晰、有测试的能力。
+1. `xq-zhiwu` 员工登录；
+2. 商品或单品登记；
+3. 品控检查；
+4. 图片上传；
+5. 审核并发布；
+6. `xq-shop-next` 市集流读取；
+7. 唯一商品详情；
+8. 喜欢、收藏或咨询信号。
 
-不优先选择 trade 大模块整体迁移，也不把 ai/cdp/wecom 三方耦合圈原样搬入。
+该切片同时验证应用注册、员工/顾客身份硬分轨、岗位 capability、对象存储、商品事实、审计、
+OpenAPI SDK 和两个小程序接口。第一阶段不以购物车、标准订单、支付或 AI 对话为主线。
+
+后续仍优先选择独立查询、新建业务，以及对外依赖少、规则清晰、有测试的能力。不优先迁移
+trade 大模块，也不把 ai/cdp/wecom 三方耦合圈原样搬入。
 
 ### M5：核心交易域
 
@@ -159,7 +168,7 @@ Ainer 采用 strangler + vertical slice：
 - settlement/finance；
 - advisor；
 - attribution；
-- AI assistant。
+- 有独立数据、权限和验收场景支持的 AI 辅助能力。
 
 每个边界都必须先消除跨表读取并建立数据所有权，之后才决定是否成为独立 Ainer 模块或服务。
 
@@ -192,3 +201,35 @@ Ainer 采用 strangler + vertical slice：
 - 迁移时同时改变所有业务规则和所有数据结构。
 - 没有对账和回退方案就进行双写切换。
 - 把竞品受限源码作为迁移捷径。
+
+## 8. 2.0 项目映射与切流边界
+
+以下映射于 2026-07-30 确认，属于后续路线的统一命名：
+
+本文 `M0–M5` 只表示 `xiaoqu` 迁移波次；Ainer Boot 的全局 `P0–P5` 产品化阶段与首个外部
+消费者合同以
+[`Ainer Boot 产品定位、竞品能力矩阵与路线图`](../design/ainer-scaffold-design.md)
+为准，两套编号不得混用。
+
+| 产品范围 | 1.0 项目 | 2.0 项目 |
+|---|---|---|
+| 顾客端 | `xq-shop` | `xq-shop-next`，正式切换后接管 `xq-shop` 名称 |
+| 供应链员工端 | `xq-assistant` | **`xq-zhiwu`** |
+| 两个 2.0 小程序的共同后台 | `xiaoqu-platform` 中的旧实现 | `xq-platform-next` |
+
+`xq-assistant` 的 2.0 版本只能称为 `xq-zhiwu`。它服务采购、品控、拍照、录货等供应链岗位，
+不能因为旧项目名含 assistant 而被当成通用 AI 助手。
+
+两个小程序按接口面切分，不按 tenant 切分：
+
+- shop API 面向 `xq-shop-next` 顾客主体；
+- zhiwu API 面向 `xq-zhiwu` 员工主体；
+- admin API 面向运营管理端；
+- 三个接口面共享明确所有权的产品领域，不共享 Controller DTO 或持久化对象；
+- 每个切片保持单一写入主系统，通过影子读、对账、灰度和可操作回退完成切流。
+
+具体 URL 前缀和旧接口兼容策略在实现前由独立 API 决策确定；项目名称映射不自动决定 URL。
+
+`xq-platform-next` 通过已发布的 Ainer Maven 制品组合构建，不复制 Ainer 源码，也不在
+`xiaoqu-platform` 内继续扩张新的第二套平台内核。现有 `xq-server` 只作为运行中的业务事实和
+迁移来源；历史 `mysql` 等数据库厂商包名、目录和抽象不得复制到新后台。

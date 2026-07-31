@@ -1,8 +1,13 @@
 # Ainer Boot
 
-> 正式品牌：Ainer · M4.8A + Ainer Admin integration · 2026-07-26 · JDK 25 + Spring Boot 4.1.0
+> 正式品牌：Ainer · 开源脚手架：Ainer Boot · JDK 25 + Spring Boot 4.1.0
+> · Maven 4.0.0-rc-6 preview
 
-Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 AI 时代的企业应用平台底座。它从模块化单体开始，通过明确的契约、适配器和独立发行物演进为服务化系统；它不继承 yudao、BladeX、Dante 或 Snowy 的代码与框架范式。
+Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 AI-native、但不局限于 AI
+的通用企业 Java 脚手架与运行基线。它从模块化单体开始，通过明确的契约、适配器和独立发行物
+演进为服务化系统；它不继承 Yudao、BladeX、Dante 或 Snowy 的代码与框架范式。产品边界、
+多标杆能力矩阵和 P0–P5 路线见
+[Ainer Boot 产品定位、竞品能力矩阵与路线图](docs/design/ainer-scaffold-design.md)。
 
 品牌与活动技术标识现已统一为 Ainer，开源脚手架产品名为 **Ainer Boot**。正式决策、产品命名、域名状态、目标标识和迁移记录见 [ADR-0004：Ainer 品牌与技术命名基线](docs/decisions/0004-ainer-brand-and-naming-baseline.md)。
 
@@ -14,7 +19,7 @@ Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 
 | `ainer-core` | ✅ | 零 Spring 依赖的错误契约、响应模型与注册表 |
 | `ainer-spring` | ✅ | Spring 基础设施、运行模式属性和条件装配 |
 | `ainer-starter-web` | ✅ | 真实 HTTP 状态、统一响应、请求 ID、全局异常处理 |
-| `ainer-starter-persistence` | ✅ | MyBatis、Flyway、PostgreSQL 与 UUID 的公共装配 |
+| `ainer-starter-persistence` | ✅ | MyBatis-Plus/MyBatis、Flyway、PostgreSQL UUID 与受控分页的公共装配 |
 | `ainer-security` | ✅ | 与框架无关的可信参与者与 authority 契约 |
 | `ainer-starter-security` | ✅ | Resource Server、人员/服务 JWT 投影、选择性 RFC 7662 在线校验、tenantless 指标授权与统一 401/403/503 |
 | `ainer-module-identity` | ✅ | 用户/租户、成员管理、平台预配/激活/取消与安全分页、安全 Directory、禁用/撤销、revocation epoch 与可靠 outbox |
@@ -27,6 +32,15 @@ Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 
 
 ## 架构立场
 
+- **演进式模块化平台架构**：使用 DDD 识别领域边界，使用端口和适配器隔离外部依赖，以模块化
+  单体交付当前系统，并在满足明确条件后按需服务化；完整决策见
+  [ADR-0024](docs/decisions/0024-evolutionary-modular-platform-architecture.md)。
+- **小制品而非万能工具包**：公共能力以 BOM、Framework、Starter、Test Support 和 Build Tools
+  分别发布，当前保持 Git 单仓，不建立 `ainer-tool` 大包；见
+  [ADR-0025](docs/decisions/0025-public-artifacts-utilities-and-repository-boundary.md)。
+- **MyBatis-Plus 只增强基础设施**：简单 CRUD/分页可使用 MyBatis-Plus，复杂 PostgreSQL SQL
+  与现有 XML 保持显式，ORM 类型不进入 application/domain/API；见
+  [ADR-0028](docs/decisions/0028-mybatis-plus-infrastructure-baseline.md)。
 - **模块化单体优先**：先把边界、事务与测试做对，再根据真实负载拆服务。
 - **两个装配模型，不是 YAML 魔法**：单体与服务化使用独立可执行发行物；`ainer.runtime.mode` 只选择当前发行物内的本地或远程适配器。
 - **标准优先**：认证规划采用 Spring Security、OAuth 2.1/OIDC 与 Spring Authorization Server，不自造 Token 协议。
@@ -37,9 +51,19 @@ Ainer（**AI-Native Extensible Runtime**，中文读音“艾纳”）是面向 
 
 ## 快速验证
 
+Ainer 的生产者构建统一使用仓库内 Maven Wrapper，它锁定 Maven 4.0.0-rc-6；该版本仍是
+preview，不表示 Maven 4 已进入稳定版。请使用 JDK 25，并从仓库根目录执行：
+
 ```bash
-mvn test
+./mvnw --version
+./mvnw clean verify
 ```
+
+系统 Maven 3.9+ 只用于 `scripts/verify-maven-consumers.sh` 的下游兼容门禁，不能替代 Wrapper
+构建、安装或发布 Ainer reactor。
+若 Apache 刚发布新的 rc、持久下载端点尚在同步，新环境首次启动 Wrapper 可能暂时返回 404；
+不要把仓库 URL 改到会被删除的临时候选目录，当前同步状态见
+[`docs/project-status.md`](docs/project-status.md)。
 
 数据库集成测试使用 Testcontainers；本机没有 Docker 时会明确跳过，不会退回 H2。运行应用前提供一个空 PostgreSQL 数据库，Flyway 会自动建表：
 
@@ -49,7 +73,7 @@ export SPRING_DATASOURCE_USERNAME=ainer
 export SPRING_DATASOURCE_PASSWORD=your-local-password
 export AINER_SECURITY_ISSUER_URI=https://issuer.example
 export AINER_SECURITY_AUDIENCES=ainer-api
-mvn -pl ainer-server -am spring-boot:run
+./mvnw -pl ainer-server -am spring-boot:run
 ```
 
 启动后可验证平台与 Workspace API。Workspace 的 tenant、owner 只取自 Bearer JWT，token 需要 `workspace.read` / `workspace.write` scope；请求体不能指定身份归属：
@@ -143,11 +167,11 @@ M4.3 已为高风险 API 建立选择性在线撤销基线：本地 JWT 认证�
 生产指标代码基线现已开始落地：两个发行物提供受 JWT 保护的 Prometheus exporter，抓取凭据使用独立无 tenant metrics client。tenant-bound Client Credentials 也已具备默认关闭、服务端生成一次性 secret、scope/operator 双白名单、蓝绿轮换、显式退役和同事务审计的内部控制面；browser/OIDC 与平台 client 尚未纳管。
 
 Authorization Code + PKCE 已建立真实 PostgreSQL 与浏览器 HTTP 会话门禁，覆盖 S256、登录、
-授权码单次交换和回调地址拒绝；该证据使用测试专用 public client，不代表生产 browser client
+授权码单次交换和回调地址拒绝；该验证使用测试专用 public client，不代表生产 browser client
 控制面或登录体验已经交付。
 
 M4.6 已完成默认关闭的 Passkey 代码主线：真实签名 ceremony、条件 MFA、恢复码、管理员双人恢复、
-受控首次 enrollment、登录限速和 Resource Server step-up 均有自动化证据。本轮又修复恢复/enrollment
+受控首次 enrollment、登录限速和 Resource Server step-up 均有自动化验证。本轮又修复恢复/enrollment
 跨租户目标绑定、限速 HTTP 契约以及 step-up 匿名/服务身份/未来时间语义。主流真实设备矩阵、恢复
 通知、共享限流和多节点会话仍未完成，详见 ADR-0014 至 ADR-0017。
 
@@ -185,9 +209,9 @@ OAuth2 Client Credentials + HTTPS 通知网关 relay，以稳定 notification ID
 `DELIVERED` 或 `FAILED`；Identity 只保存 UUIDv7 notification 关联、受限事件/失败码和时间，不接收
 正文、联系地址或供应商原始 body。`DELIVERED` 仍只表示供应商确认交付，不表示自然人已阅读。
 平台现在还提供 tenant/user 的受限安全分页，以及对未完成申请的显式幂等取消；取消会在同一事务
-收口 request、一次性 grant、未发布通知 payload 和阶段审计。外部通知网关联调、最终送达证据、
+收口 request、一次性 grant、未发布通知 payload 和阶段审计。外部通知网关联调、最终送达验证、
 生产边缘限速/告警和 0-skipped 发布门禁仍未完成，因此当前还不能宣称可达的生产开户已经闭环。
 
 生产并行工作仍需部署真实 Prometheus、dashboard/告警，并完成 Authorization Server 多实例容量、
-故障切换和平台旧凭据退役证据；随后继续 IAM 职责分离、外部不可变审计副本、多节点 SLO、
+故障切换和平台旧凭据退役验证；随后继续 IAM 职责分离、外部不可变审计副本、多节点 SLO、
 恢复通知与真实设备兼容矩阵、browser/OIDC client 控制面和签名密钥轮换。

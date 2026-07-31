@@ -1,6 +1,6 @@
 # Ainer 架构决策记录
 
-> 文档类型：决策索引 · 状态：生效 · 最近核对：2026-07-26
+> 文档类型：决策索引 · 状态：生效 · 最近核对：2026-07-30
 
 ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是实现日志，也不替代 API 或运行手册。
 
@@ -9,7 +9,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | ADR | 状态 | 主题 |
 |---|---|---|
 | [0001](0001-independent-architecture-baseline.md) | Accepted | 自主架构基线与竞品隔离 |
-| [0002](0002-workspace-persistence-baseline.md) | Accepted | Workspace 持久化基线 |
+| [0002](0002-workspace-persistence-baseline.md) | Accepted | Workspace 持久化历史基线（工具选择部分由 0028 取代） |
 | [0003](0003-ai-model-gateway-baseline.md) | Accepted | AI Model Gateway 基线 |
 | [0004](0004-ainer-brand-and-naming-baseline.md) | Accepted | Ainer 品牌与技术命名 |
 | [0005](0005-identity-and-oauth2-security-baseline.md) | Accepted | Identity 与 OAuth 2.1 安全基线 |
@@ -30,6 +30,13 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0020](0020-postgresql-native-greenfield-baseline.md) | Accepted | PostgreSQL Native-First Greenfield 数据基线 |
 | [0021](0021-provisioning-notification-delivery-receipts.md) | Proposed | 供应通知最终投递回执边界 |
 | [0022](0022-ainer-admin-browser-integration-baseline.md) | Accepted | Ainer Admin 浏览器集成基线 |
+| [0023](0023-governed-ai-task-execution-and-identity-weekly-report.md) | Proposed | 受治理 AI 任务执行模型与 Identity 周报验收场景 |
+| [0024](0024-evolutionary-modular-platform-architecture.md) | Accepted | 演进式模块化平台架构 |
+| [0025](0025-public-artifacts-utilities-and-repository-boundary.md) | Accepted | 公共制品、工具类与仓库边界 |
+| [0026](0026-maven-4-build-and-consumer-pom-baseline.md) | Accepted | Maven 4 构建与 Consumer POM 基线 |
+| [0027](0027-keep-jdk-25-production-baseline.md) | Accepted | 保留 JDK 25 生产基线并跟踪 JDK 27 |
+| [0028](0028-mybatis-plus-infrastructure-baseline.md) | Accepted | MyBatis-Plus 基础设施增强基线 |
+| [0029](0029-jdk25-boot4-modern-baseline.md) | Proposed | JDK 25 / Spring Boot 4 现代化基线 |
 
 ## 何时需要 ADR
 
@@ -55,4 +62,5 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 NNNN-short-kebab-title.md
 ```
 
-复制 [`0000-template.md`](0000-template.md)，填写背景、决策、备选、后果、安全/数据/运维影响、验收证据和迁移方式。不得只写最终方案而省略取舍依据。
+复制 [`0000-template.md`](0000-template.md)，填写背景、决策、备选、后果、安全/数据/运维影响、
+验收记录和迁移方式。不得只写最终方案而省略取舍依据。

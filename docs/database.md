@@ -1,6 +1,6 @@
 # Ainer 数据库与 Migration 手册
 
-> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
+> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-07-30 · 适用版本：`0.1.x`
 
 本文负责数据库归属、当前表、Flyway 执行、安全演进和运行验证。新表/字段设计、命名、类型、
 约束、索引、tenant 完整性和评审门禁以
@@ -9,13 +9,30 @@
 
 ## 1. 基线
 
-Ainer 以 PostgreSQL 18.x 为唯一业务数据库基线，使用 Flyway 管理 schema，使用 MyBatis 实现
-业务持久化。项目不提供 MySQL、H2 或旧 PostgreSQL 方言兼容；禁止用 H2 compatibility mode
-替代 PostgreSQL 行为验证。新 Ainer 持久化 ID 与 tenant 类型遵守
+Ainer 以 PostgreSQL 18.x 为唯一业务数据库基线，使用 Flyway 管理 schema，使用
+MyBatis-Plus/MyBatis 实现业务持久化。MyBatis-Plus 只作为 infrastructure 的简单 CRUD 与分页
+增强，不改变显式 SQL、Repository 端口、事务或数据所有权。项目不提供 MySQL、H2 或旧
+PostgreSQL 方言兼容；禁止用 H2 compatibility mode 替代 PostgreSQL 行为验证。新 Ainer 持久化
+ID 与 tenant 类型遵守
 [ADR-0020](decisions/0020-postgresql-native-greenfield-baseline.md)：ID 默认 UUIDv7，
 `tenant_id` 全链路统一 UUID。
 
 UUID、时间、金额、约束和锁语义必须按 PostgreSQL 设计。SQL 参数必须绑定，不得拼接 tenant、subject、URL 或用户输入。
+
+### 1.1 MyBatis-Plus 使用边界
+
+- 统一入口是 `ainer-starter-persistence`，使用 Boot 4 专用 MyBatis-Plus starter；不维护原生与
+  Plus 两套 starter。
+- `BaseMapper`、Wrapper、Page 和 ORM 注解只允许在 infrastructure；application、domain 和 API
+  不暴露这些类型，也不默认采用 `IService`、`ServiceImpl` 或 ActiveRecord。
+- 现有 Mapper XML 继续有效。CTE、锁、`RETURNING`、advisory lock、outbox、审计归档和稳定游标
+  继续使用显式 SQL。
+- 全局 `IdType.AUTO` 让数据库 `DEFAULT uuidv7()` 生成并回填 ID；禁止 `ASSIGN_ID` /
+  `ASSIGN_UUID`。不默认启用逻辑删除或 MetaObject 自动填充。
+- tenant interceptor 当前不启用，所有租户查询仍显式传入并绑定可信 tenant。分页最大单页
+  `100`，并位于 interceptor 链尾。
+
+完整决策见 [ADR-0028](decisions/0028-mybatis-plus-infrastructure-baseline.md)。
 
 ## 2. 当前数据库归属
 
@@ -219,10 +236,10 @@ export SPRING_DATASOURCE_PASSWORD='local-only-password'
 应用启动时 Flyway 自动执行。自动化验证由 Testcontainers 从空库执行全部 migration：
 
 ```bash
-mvn -pl ainer-module-workspace -am test
-mvn -pl ainer-module-identity -am test
-mvn -pl ainer-module-ai-runtime -am test
-mvn -pl ainer-authorization-server -am test
+./mvnw -pl ainer-module-workspace -am test
+./mvnw -pl ainer-module-identity -am test
+./mvnw -pl ainer-module-ai-runtime -am test
+./mvnw -pl ainer-authorization-server -am test
 ```
 
 2026-07-26 的 PostgreSQL 18.4 隔离 schema smoke 从空库重放 Identity 全部 9 份 migration，并

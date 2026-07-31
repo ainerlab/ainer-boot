@@ -100,6 +100,23 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   1.0 前待清理实现债；PostgreSQL 19 Beta 被规划为前向测试目标而非生产承诺。
 - 建立架构决策、HTTP API、开发、测试、数据库、配置、运行和发布文档体系。
 
+### Changed
+
+- `ainer-starter-persistence` 切换为 Spring Boot 4 专用
+  `mybatis-plus-spring-boot4-starter:3.5.17`，并显式引入
+  `mybatis-plus-jsqlparser:3.5.17`；MyBatis-Plus 仅用于 infrastructure 的简单 CRUD 和最大
+  100 条分页，现有复杂 XML 与 PostgreSQL 原生 SQL 保持显式。全局 `IdType.AUTO` 保留数据库
+  `DEFAULT uuidv7()` 生成与回填，不启用 tenant interceptor、逻辑删除、自动填充或代码生成器。
+- 明确保留 JDK 25 LTS、`--release 25` 与 Enforcer `[25,26)` 作为生产基线；JDK 27 EA 仅作为
+  未来候选，待 GA、Spring Boot 官方兼容范围和 ArchUnit major 71 支持就绪后另行评审。
+- 生产者构建基线切换为 Maven 4.0.0-rc-6 preview，并选择 Maven Wrapper 3.3.4 固定构建工具；
+  clean、resources、compiler、surefire、jar、install、deploy 与 artifact 等构建插件显式锁定，
+  根 POM 与 parentless BOM 都通过 Enforcer 拒绝旧 Maven，避免失败前写入 Ainer 制品。
+- 移除 Flatten Maven Plugin，改由 Maven 4 内建 Consumer POM 处理 `${revision}`，并固定
+  `maven.consumer.pom.flatten=false`；Maven 3.9+ 只保留为已安装或已发布制品的下游消费兼容门禁。
+- JDK 23+ 注解处理器改为 Compiler Plugin 显式输入；Spring Boot 配置属性模块增加配置元数据
+  产物断言，不再依赖 classpath 自动扫描。
+
 ### Security
 
 - tenant 与 subject 只从已验证 JWT 投影，不接受外部身份请求头。
@@ -161,6 +178,8 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 ### Known limitations
 
 - 当前仍为 `0.1.0-SNAPSHOT` foundation，不是生产就绪发行版。
+- Maven 4.0.0-rc-6 仍是 preview；Wrapper 已配置 Maven Central 持久地址和校验值，但该发行包
+  当前尚未同步，`./mvnw --version` 仍会下载失败；不使用临时候选目录替代。
 - 在线撤销只覆盖配置的高风险路径；普通低风险自包含 JWT 仍存在自然到期窗口。
 - Authorization Server 已成为高风险 API 的在线依赖；Prometheus 导出与独立抓取凭据已有代码基线，但生产高可用、容量、凭据退役轮换、dashboard 和告警路由尚未完成。
 - PKCE 自动化除通用测试 client 外已覆盖固定的 Ainer Admin 开发 public client；Passkey 代码
