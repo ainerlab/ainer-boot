@@ -20,6 +20,10 @@
             <artifactId>ainer-core</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
+        <dependency>
             <groupId>dev.ainer</groupId>
             <artifactId>ainer-spring</artifactId>
         </dependency>
