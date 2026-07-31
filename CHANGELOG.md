@@ -99,6 +99,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   UUIDv7、`tenant_id` 全链路统一 UUID，现有 UUIDv4/字符串 tenant 和早期 migration 只作为
   1.0 前待清理实现债；PostgreSQL 19 Beta 被规划为前向测试目标而非生产承诺。
 - 建立架构决策、HTTP API、开发、测试、数据库、配置、运行和发布文档体系。
+- 增加只读权限的候选 GitHub Actions 质量门禁：锁定 JDK 25，验证 Maven 4 Wrapper 与 Docker，
+  执行完整 Reactor、强制 Surefire `skipped=0`、验证 Maven 3/4 外部消费者，并生成短期
+  CycloneDX SBOM 工作流制品；正式发布、签名和 provenance 仍保持阻断。
 
 ### Changed
 

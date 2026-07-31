@@ -419,11 +419,16 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
   Central 发行包尚未同步，持久地址返回 404，当前无法完成最终的 `./mvnw --version` 与
   `./mvnw clean verify`；完成 Wrapper 端到端验证前不能把构建切换描述为实施完成，也不能据此
   形成发布候选；
-- 没有正式 CI、制品签名、SBOM、发布仓库和自动部署；
+- 已增加只读权限的候选 GitHub Actions 质量门禁，编排 JDK 25、Maven 4、Docker、
+  PostgreSQL/Testcontainers `skipped=0`、Maven 3/4 consumer 与短期 CycloneDX SBOM；RC6
+  官方发行包仍返回 404，工作流尚未首次成功，也尚未设为分支必需检查，因此不能称为正式 CI；
+  制品签名、发布仓库、provenance 和自动部署仍未实现；
 - 没有具名模块维护者矩阵、`CODEOWNERS` 和正式审查责任分配；
 - 没有生产备份恢复、容量测试、正式错误预算/告警路由和灾难恢复演练；
 - 没有稳定版兼容政策、商业许可证文本和付费产品交付系统；
-- Testcontainers 仍使用 `disabledWithoutDocker`；本机 Colima 已能完整执行，但正式 CI 尚未建立“数据库测试不得跳过”的自动门禁。
+- Testcontainers 仍使用 `disabledWithoutDocker`；本机 Colima 已能完整执行，候选 CI 已用
+  `scripts/check-surefire-results.sh` 明确拒绝任何 skipped 测试，但该门禁仍需首次成功并纳入
+  分支保护。
 
 ### 脚手架产品化评估
 
@@ -437,8 +442,8 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 按
 [`Ainer Boot 产品定位、竞品能力矩阵与路线图`](design/ainer-scaffold-design.md)
-定义的全局产品化阶段，当前尚未退出 **P0 Baseline Integrity**：正式 CI 的 PostgreSQL
-`0 skipped`、Wrapper 官方持久端点、许可证/SBOM/发布门禁仍未闭环。P1 的 BOM/Starter 与
+定义的全局产品化阶段，当前尚未退出 **P0 Baseline Integrity**：候选 CI 尚未首次成功并纳入
+分支保护，Wrapper 官方持久端点、许可证和正式发布门禁仍未闭环。P1 的 BOM/Starter 与
 consumer 原型已有验证结果，但不能因此宣称 P1 Scaffold Ready；P2 Initializer 与 P3 外部消费者尚未
 交付。该设计文档只维护长期阶段和退出条件，本页继续独占当前阶段、完成记录与缺口。
 
@@ -447,7 +452,8 @@ consumer 原型已有验证结果，但不能因此宣称 P1 Scaffold Ready；P2
 产品化主线调整为先关闭 P0，再依次进入 P1 Scaffold Ready、P2 Create & Generate 和 P3 首个外部
 消费者。近期可交付顺序是：
 
-1. 建立正式 CI 的 PostgreSQL 18 `0 skipped`、秘密/许可证/SBOM 与文档一致性门禁，关闭 P0；
+1. 等待 RC6 官方持久发行包同步，跑通候选 CI 的 PostgreSQL 18 `0 skipped`、consumer、SBOM
+   与文档一致性门禁，并把成功工作流设为分支必需检查；随后补齐许可证选择和秘密扫描，关闭 P0；
 2. 让 Wrapper 官方持久端点、非 SNAPSHOT 制品、最小 off-state 应用与 Maven 3.9+/4 外部消费者
    形成可重复发布验证记录，关闭 P1；
 3. 交付 manifest v1、preview/diff、确定性生成与 TTFR/TTCRUD golden consumer，关闭 P2；

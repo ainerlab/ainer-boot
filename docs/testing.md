@@ -1,6 +1,6 @@
 # Ainer 测试与质量门禁
 
-> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-07-30 · 适用版本：`0.1.x`
+> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-07-31 · 适用版本：`0.1.x`
 
 ## 1. 目标
 
@@ -47,12 +47,17 @@
 Surefire XML 报告位于各模块 `target/surefire-reports/`。`target/` 是构建产物，不提交。
 生产者验证必须使用锁定 Maven 4.0.0-rc-6 preview 的 Wrapper；系统 Maven 3.9+ 只由
 `scripts/verify-maven-consumers.sh` 用于下游兼容门禁。
+发布质量检查还必须执行 `./scripts/check-surefire-results.sh`；该脚本在没有报告、没有执行测试、
+存在 failure/error 或任何 skipped 测试时失败。
 
 ## 4. PostgreSQL 与 Testcontainers
 
 当前集成测试固定使用 `postgres:18.3-alpine`。没有 Docker-compatible runtime 时，`@Testcontainers(disabledWithoutDocker = true)` 会明确跳过数据库测试，不会降级为 H2。
 
-本地迭代允许跳过，但必须在结果中说明。发布候选必须在 Docker 可用环境运行，确认 PostgreSQL 集成测试实际执行；在 CI 尚未自动阻止跳过前，这是人工发布门禁。
+本地迭代允许跳过，但必须在结果中说明。发布候选必须在 Docker 可用环境运行，确认 PostgreSQL
+集成测试实际执行。候选 GitHub Actions 工作流会运行
+`scripts/check-surefire-results.sh` 强制 `skipped=0`；在该工作流首次成功并被设为分支必需检查前，
+它仍是尚未闭环的自动化门禁。
 
 macOS 使用 Colima 时，Docker CLI context 本身不会自动成为 Testcontainers 的 socket 配置。先启动运行时，再把实际 Colima socket 和容器内 Docker socket 显式传给 Maven；将示例中的 `your-name` 替换为本机短用户名：
 
@@ -204,7 +209,8 @@ AINER_REPRO_REPOSITORY="$(mktemp -d)"
 系统 Maven 3.9+ 外部项目都能只通过 BOM 和公开坐标完成构建；同时检查 14 个标准 Consumer
 POM 中的 `${revision}` 都有当前安装版本属性可解析，并检查 `ainer-spring` JAR 含
 `META-INF/spring-configuration-metadata.json`。这些门禁是发布前本地/自动化要求，不表示当前已经
-存在正式 CI 或制品仓库发布流程。脚本默认读取根 POM 的 `revision`；发布过程通过
+存在正式制品仓库发布流程。候选 CI 已编排上述命令，但在 Maven 4 RC6 官方持久发行包可下载并首次
+完整成功前，不能称为生效的正式 CI。脚本默认读取根 POM 的 `revision`；发布过程通过
 `AINER_VERSION=<目标版本>` 覆盖时，该值也会作为 `-Drevision` 传给两次生产者构建和两个
 consumer。
 

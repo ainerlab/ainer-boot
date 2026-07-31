@@ -55,8 +55,9 @@ git status --short --branch
 省略 `AINER_VERSION`，脚本会读取根 POM 的 `revision`；发布候选必须显式传入目标版本。
 
 发布记录至少保存：源码 commit、版本、构建 JDK/Maven、依赖锁定结果、测试摘要、consumer 与
-可重复构建结果、数据库验证、制品 checksum、部署环境和批准人。未来自动化管线应生成并签名这些
-provenance；当前尚未实现正式 CI、制品发布和签名管线。
+可重复构建结果、数据库验证、制品 checksum、部署环境和批准人。候选 GitHub Actions 工作流已经
+编排 JDK 25、Maven 4、Docker、`skipped=0`、consumer 与短期 SBOM 门禁，但在 Maven 4 RC6
+官方发行包可下载并首次完整成功前不能称为正式 CI。制品发布、签名与 provenance 管线仍未实现。
 
 ## 5. 数据库发布
 
