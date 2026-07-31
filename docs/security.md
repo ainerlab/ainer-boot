@@ -104,7 +104,7 @@ export AINER_AUTHORIZATION_SIGNING_KEY_ID=ainer-signing-2026-01
 export AINER_AUTHORIZATION_PRIVATE_KEY_LOCATION=file:/run/secrets/ainer-private.pem
 export AINER_AUTHORIZATION_PUBLIC_KEY_LOCATION=file:/run/secrets/ainer-public.pem
 
-mvn -pl ainer-authorization-server -am spring-boot:run
+./mvnw -pl ainer-authorization-server -am spring-boot:run
 ```
 
 私钥必须是 PKCS#8 PEM，公钥必须是 X.509 SubjectPublicKeyInfo PEM。开发环境可生成：
@@ -422,11 +422,11 @@ OWNER 恢复只在 Workspace 无 ACTIVE OWNER、至少有一个 REVOKED OWNER，
 ## 8. 验证
 
 ```bash
-mvn -pl ainer-framework/ainer-starter-security -am test
-mvn -pl ainer-authorization-server -am test
-mvn -pl ainer-module-identity -am test
-mvn -pl ainer-module-workspace -am test
-mvn test
+./mvnw -pl ainer-framework/ainer-starter-security -am test
+./mvnw -pl ainer-authorization-server -am test
+./mvnw -pl ainer-module-identity -am test
+./mvnw -pl ainer-module-workspace -am test
+./mvnw clean verify
 ```
 
 Resource Server 的 401/403、可信 claim、伪造身份头以及 Workspace 应用授权测试不依赖 Docker。Identity、JDBC 协议表、Client Credentials 签发与 Workspace tenant SQL 测试使用 PostgreSQL Testcontainers；没有 Docker 时会明确跳过，不会改用 H2。

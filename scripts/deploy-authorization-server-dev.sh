@@ -17,9 +17,10 @@ elif [[ "$#" -ne 0 ]]; then
 fi
 
 [[ "$deploy_host" =~ ^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+$ ]] || fail "unsafe deploy host"
-for command in git mvn node scp ssh curl; do
+for command in git node scp ssh curl; do
   command -v "$command" >/dev/null 2>&1 || fail "required command is missing: $command"
 done
+[[ -x "$boot_root/mvnw" ]] || fail "Maven Wrapper is missing or not executable: $boot_root/mvnw"
 
 cd "$boot_root"
 bash scripts/check-dev-deployment.sh
@@ -34,7 +35,7 @@ origin_dev="$(git rev-parse origin/dev)"
 # 必须 clean:资源重命名/删除后,不带 clean 的增量构建会把旧文件留在
 # target/classes 一并打包(2026-07-29 V202607231200 旧 migration 残留导致
 # Flyway 校验失败、服务崩溃循环的事故根因)。
-mvn -pl ainer-authorization-server -am clean package -DskipTests
+./mvnw -pl ainer-authorization-server -am clean package -DskipTests
 jar="$(find "$boot_root/ainer-authorization-server/target" -maxdepth 1 -type f \
   -name 'ainer-authorization-server-*.jar' ! -name '*.original' | sort | tail -1)"
 [[ -n "$jar" && -f "$jar" ]] || fail "Authorization Server executable JAR was not found"

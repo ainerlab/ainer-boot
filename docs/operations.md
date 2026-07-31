@@ -7,7 +7,7 @@
 ## 1. 构建产物
 
 ```bash
-mvn clean package
+./mvnw clean verify
 ```
 
 可执行 JAR：

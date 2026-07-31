@@ -98,7 +98,7 @@ Server 官方 JDBC authorization，不建立 Ainer 自定义 Token 表，也不�
 从仓库根目录运行：
 
 ```bash
-mvn -pl ainer-authorization-server -Painer-admin-sdk generate-resources
+./mvnw -pl ainer-authorization-server -Painer-admin-sdk generate-resources
 ```
 
 命令先严格校验 `ainer-admin-v1.yaml`，再用固定版本 OpenAPI Generator 的
