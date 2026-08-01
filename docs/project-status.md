@@ -447,15 +447,26 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 consumer 原型已有验证结果，但不能因此宣称 P1 Scaffold Ready；P2 Initializer 与 P3 外部消费者尚未
 交付。该设计文档只维护长期阶段和退出条件，本页继续独占当前阶段、完成记录与缺口。
 
-ADR-0029「JDK 25 / Boot 4 现代化基线」P0-3「配置即契约」已完成可安全交付的部分：公开制品统一
-生成 `spring-configuration-metadata.json` 并纳入消费者门禁；为原本无校验的 8 个配置类补齐 `@Validated`
-声明式约束（`@Positive`/`@Min`，默认值合法）；22 个 `@ConfigurationProperties` 中已有 17 个改为
-构造器绑定的不可变配置（保留 getter 名以零破坏调用点，构造器内处理默认值；含密钥/密码的用不可变
-**类**而非 record，故无 `toString()` 泄露）。剩余为改动面大、且当前 Maven 4 verify 受阻难以充分验证
-的专项，建议作为聚焦的一次性迁移（Maven 4 恢复后）：`AinerResourceServerProperties`+嵌套、
-`AinerAuthorizationServerProperties`+~10 嵌套 bootstrap 类、`AiRuntimeProperties`（`Pricing.validate()`
-会改字段，需重构）、`AinerAdminDevBootstrapProperties`（含密码 + 测试 setter）；`AinerRuntimeProperties`
-（ainer-spring 核心库单枚举字段）刻意跳过，价值不抵给核心库引入 validation 依赖的成本。
+ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -Denforcer.skip=true` 验证；正式
+`./mvnw clean verify`、零跳过门禁与 Testcontainers 集成仍待 Maven 4 RC6 官方发行包恢复后执行）：
+
+- P0-2 出站 HTTP：消除全部 4 处 `RestClient.create()/builder()` 反模式，统一注入 Boot 管理的
+  `RestClient.Builder`；AI SSE 保留 JDK `HttpClient` 并显式注释例外。`@HttpExchange` + Service Client Group
+  延后——现有 relay 各有独立 client-credentials token provider，套用 group/configurer 比当前显式注入更重。
+- P0-3 配置即契约：公开制品统一生成 `spring-configuration-metadata.json` 并纳入消费者门禁；为原本无校验的
+  配置类补齐 `@Validated` 声明式约束；**全部 22 个 `@ConfigurationProperties` 已改为构造器绑定不可变**
+  （保留 getter 名零破坏调用点，构造器内处理默认值；含密钥/密码的用不可变**类**而非 record，故无
+  `toString()` 泄露；`Pricing.validate()` 的字段改写已移入构造器）。
+- P0-4 空安全基线：`@NullMarked` 已覆盖 ainer-core、ainer-spring、ainer-security、ainer-starter-web
+  （8 包）并标注真实 `@Nullable`；@NullMarked 模块已声明 jspecify 直接依赖。**NullAway 强制未接入**：
+  error-prone 2.50 + NullAway 0.12.7 在 Maven 3.9.16/compiler 3.14.0 + JDK 25 下无法工作：forked 编译拿不到
+  `--add-exports` 致 error-prone 崩溃；in-process 下即便经 `MAVEN_OPTS` 确保 `--add-exports` 生效，
+  `-Xplugin:ErrorProne` 插件仍不挂载、javac 拒绝 `-Xep` 标志——属 compiler 3.14.0/JDK 25 插件加载不兼容，
+  非配置可调。多次尝试（模块局部 forked、根 forked、根 in-process + `.mvn/jvm.config`、`MAVEN_OPTS`）均失败，
+  且 CI 因 Maven 4 RC6 仍 404 无法验证，故已还原配置保持构建绿色；NullAway 作为「CI 接入」项推迟到
+  Maven 4/CI 恢复后在正式工具链上重新评估。
+- P0-5 虚拟线程：`aiStreamExecutor` 已标记 `@Bean(defaultCandidate=false)`。**双模式压测矩阵与「新 MVC 项目
+  默认开启 v-thread」仍待办**——需 Docker/运行环境，当前未运行。
 
 ## 5. 下一里程碑
 
