@@ -12,14 +12,30 @@ import java.util.UUID;
  */
 public sealed interface Scope permits Scope.Global, Scope.Tenant, Scope.Resource {
 
+    /**
+     * Whether this scope authoritatively covers the given resource (ADR-0030 §6.2). No recursive parent
+     * traversal, path wildcards or scope trees in the first version.
+     */
+    boolean covers(ResourceRef resource);
+
     /** Platform-global scope; only controlled platform services may hold it. */
     record Global() implements Scope {
+        @Override
+        public boolean covers(ResourceRef resource) {
+            return true;
+        }
     }
 
     /** Scoped to exactly one tenant. */
     record Tenant(UUID tenantId) implements Scope {
         public Tenant {
             Objects.requireNonNull(tenantId, "tenantId");
+        }
+
+        @Override
+        public boolean covers(ResourceRef resource) {
+            return resource.authoritativeTenantId() != null
+                    && resource.authoritativeTenantId().equals(tenantId);
         }
     }
 
@@ -29,6 +45,13 @@ public sealed interface Scope permits Scope.Global, Scope.Tenant, Scope.Resource
             Objects.requireNonNull(tenantId, "tenantId");
             Objects.requireNonNull(resourceType, "resourceType");
             Objects.requireNonNull(resourceId, "resourceId");
+        }
+
+        @Override
+        public boolean covers(ResourceRef resource) {
+            return tenantId.equals(resource.authoritativeTenantId())
+                    && resourceType.equals(resource.resourceType())
+                    && resourceId.equals(resource.resourceId());
         }
     }
 }
