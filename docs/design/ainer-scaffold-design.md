@@ -1,6 +1,6 @@
 # Ainer Boot 产品定位、竞品能力矩阵与路线图
 
-> 版本：v1.4 · 2026-07-31
+> 版本：v1.5 · 2026-07-31
 > 文档类型：长期产品与架构设计 · 状态：当前权威设计
 >
 > 本文负责产品定位、能力目标、产品化阶段和长期边界；当前完成度、测试数字、临时缺口与下一步
@@ -420,10 +420,16 @@ P3 不等待 P4 或 P5。否则 Ainer 会继续成为只被自身使用的平台
 
 - `xq-shop` 2.0 的开发期项目为 `xq-shop-next`；
 - `xq-assistant` 2.0 的正式项目名为 **`xq-zhiwu`**；
-- `xq-zhiwu` 是采购、品控、拍照、录货等供应链员工工具，不是通用 AI 对话助手。
+- `xq-zhiwu` 是面向翡翠同行、珠宝公司、商家、采购与供给人员的公开行业信息与协作网络；
+- 录货是具备 capability 的全局能力，不是产品定位、底部 Tab 或内部员工工作台；
+- `xq-shop-next` 是面向消费者的独立发现、决策与交易产品，不是旧商城页面重写或
+  `xq-zhiwu` 的商家后台；
+- 两端共享中立的 Object/Version/Media/Evidence 事实，但 Industry Listing、Consumer Offer、
+  价格、发布、服务、交易和售后语义独立。
 
 名称映射和产品范围属于迁移合同，后续设计、接口、测试和发布说明不得把
-`xq-assistant 2.0` 另行映射为其他项目，也不得因名称中的 assistant 将其误建模为 AI 产品。
+`xq-assistant 2.0` 另行映射为其他项目，也不得因历史名称或旧代码将其误建模为 AI 对话产品、
+员工供应链工具或旧页面重写。
 
 ### 13.2 应用、租户与身份边界
 
@@ -432,7 +438,13 @@ P3 不等待 P4 或 P5。否则 Ainer 会继续成为只被自身使用的平台
 - `platform_app` 至少拥有 `appCode`、渠道类型、微信 AppId、密钥引用、回调、状态、品牌与功能开关；
 - 社交身份绑定唯一键至少包含 `platformAppId + provider + openId`；
 - tenant 只表达组织与数据隔离，不用于区分小程序；
-- `xq-zhiwu` 员工使用 Ainer Identity/Workspace 和产品级岗位 capability；
+- Ainer Identity 的固定 `OWNER/ADMIN/MEMBER` 只表达 tenant 治理，不承载录货员、采购或商家
+  发布人等业务角色；
+- Ainer 在首个消费者前提供通用 Permission/Role/Binding/Decision 扩展，XQ 自己拥有 Public
+  Actor、Acting Identity、operator relation、业务 grant 和 Merchant/Business Location scope；
+- `X-Acting-Identity-Id` 只是服务端有效关系中的身份选择器，不是授权凭据；
+- 公开行业图谱不要求访问者成为 Workspace/tenant member，业务写仍需 permission、资源 scope
+  和领域关系校验；
 - `xq-shop` 顾客使用独立 customer/member 主体，不能被强制建成 OWNER/ADMIN/MEMBER 租户成员；
 - Authorization 组合层必须支持没有 Workspace membership 的 C 端主体，同时继续拒绝客户端自报
   tenant、subject 或 owner。
@@ -448,8 +460,10 @@ Ainer 负责稳定、跨产品可复用的能力：
 
 `xq-platform-next` 负责产品语义：
 
-- customer/member、员工岗位与产品 capability；
-- 商品/单品、采购登记、品控、图片、上架、市集、偏好、咨询与后续交易；
+- Industry Public Actor、Acting Identity、relation、行业 capability 与 data scope；
+- customer/member、匿名身份接续与内部平台人员隔离；
+- Object Asset、Object Version、Industry Listing、Consumer Offer 与各自独立发布状态；
+- 商家、经营点、录货、搜索、求货、QuoteEvent、Agreement、Deal、偏好、服务和后续交易；
 - 微信、旧系统和其他产品 adapter；
 - 具体 AI 场景、prompt、source adapter 和人工反馈规则。
 
@@ -474,14 +488,17 @@ xq-platform-next/
 │   ├── xq-zhiwu-api/
 │   └── xq-admin-api/
 ├── xq-modules/
-│   ├── xq-module-access/
-│   ├── xq-module-customer/
-│   └── xq-module-product-foundation/
-│       ├── intake/
-│       ├── quality/
-│       ├── media/
-│       ├── listing/
-│       └── market/
+│   ├── xq-module-platform-access/
+│   ├── xq-module-industry/
+│   │   ├── industry-access/
+│   │   ├── object/
+│   │   ├── merchant/
+│   │   ├── industry-listing/
+│   │   └── collection/
+│   └── xq-module-consumer/
+│       ├── customer-relation/
+│       ├── consumer-offer/
+│       └── service-transaction/
 ├── xq-adapters/
 │   ├── xq-wechat/
 │   └── xq-legacy/
@@ -502,7 +519,12 @@ port 和 local adapter；只有满足 ADR-0024 的拆分条件后再增加 remot
 4. 空库 migration、启动、JWT 保护接口、真实 HTTP 错误和 request ID 验证通过；
 5. Workspace、AI 等可选模块关闭时，最小应用仍可构建和启动；
 6. OpenAPI 生成的 TypeScript 客户端能被两个 weapp-vite 项目编译；
-7. 开发 Compose、秘密注入、许可证、SBOM、版本与升级政策形成可重复验证。
+7. 开发 Compose、秘密注入、许可证、SBOM、版本与升级政策形成可重复验证；
+8. 通用 Permission、Role、Role Permission、Subject Binding、结构化 Scope 与 Authorization
+   Decision 最小闭环已被外部 Golden Consumer 验证；
+9. Ainer Admin 能通过 OpenAPI/SDK 管理最小 Role/Binding 并展示 Effective Access，隐藏菜单或
+   修改前端状态不能绕过服务端；
+10. 撤销 binding 后，仍有效 Token 在批准的授权失效 SLA 内不能继续执行受保护业务写。
 
 满足这些门禁后立即创建首个消费者，并通过真实纵向切片继续校验脚手架；不得把“所有企业功能
 完成”作为创建产品仓库的前置条件。
