@@ -11,6 +11,7 @@ import dev.ainer.authorization.domain.BindingStatus;
 import dev.ainer.authorization.domain.GrantPath;
 import dev.ainer.authorization.domain.Permission;
 import dev.ainer.authorization.domain.PermissionCode;
+import dev.ainer.authorization.domain.PublicProjection;
 import dev.ainer.authorization.domain.ResourceRef;
 import dev.ainer.authorization.domain.ResourceType;
 import dev.ainer.authorization.domain.RiskTier;
@@ -91,42 +92,42 @@ class AuthorizationServiceTest {
 
     @Test
     void unknownPermissionDenies() {
-        var svc = service((p, r) -> false, alwaysBinding(READ), none());
+        var svc = service((p, r) -> java.util.Optional.empty(), alwaysBinding(READ), none());
         assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, new PermissionCode("x"), DOC, ownedDocId)
                 .outcome()).isEqualTo(AuthorizationOutcome.DENY);
     }
 
     @Test
     void resourceTypeMismatchDenies() {
-        var svc = service((p, r) -> false, alwaysBinding(READ), none());
+        var svc = service((p, r) -> java.util.Optional.empty(), alwaysBinding(READ), none());
         assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, READ, TENANT, ownedDocId)
                 .outcome()).isEqualTo(AuthorizationOutcome.DENY);
     }
 
     @Test
     void systemOnlyPermissionDeniesForUser() {
-        var svc = service((p, r) -> false, alwaysBinding(SYS_ADMIN), none());
+        var svc = service((p, r) -> java.util.Optional.empty(), alwaysBinding(SYS_ADMIN), none());
         assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, SYS_ADMIN, TENANT, ownedDocId)
                 .outcome()).isEqualTo(AuthorizationOutcome.DENY);
     }
 
     @Test
     void publicProjectionAllowsWhenPolicyPresentAndSkipsAuthenticated() {
-        var svc = service((p, r) -> r.resourceId().equals(publicDocId), alwaysBinding(READ), none());
+        var svc = service((p, r) -> r.resourceId().equals(publicDocId) ? java.util.Optional.of(new PublicProjection("public")) : java.util.Optional.empty(), alwaysBinding(READ), none());
         assertThat(auth(svc, new Requester.Anonymous(), AccessMode.PUBLIC_PROJECTION, READ, DOC, publicDocId)
                 .outcome()).isEqualTo(AuthorizationOutcome.ALLOW);
     }
 
     @Test
     void publicProjectionDeniesWithoutPolicy() {
-        var svc = service((p, r) -> false, alwaysBinding(READ), none());
+        var svc = service((p, r) -> java.util.Optional.empty(), alwaysBinding(READ), none());
         assertThat(auth(svc, new Requester.Anonymous(), AccessMode.PUBLIC_PROJECTION, READ, DOC, publicDocId)
                 .outcome()).isEqualTo(AuthorizationOutcome.DENY);
     }
 
     @Test
     void authenticatedDenyDoesNotFallBackToPublic() {
-        var svc = service((p, r) -> true, alwaysBinding(READ), none());
+        var svc = service((p, r) -> java.util.Optional.of(new PublicProjection("public")), alwaysBinding(READ), none());
         assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, READ, DOC, otherDocId)
                 .outcome()).isEqualTo(AuthorizationOutcome.DENY);
     }
@@ -138,7 +139,7 @@ class AuthorizationServiceTest {
         // P1-4 fix: BINDING_REQUIRED requires BOTH binding AND state; state DENIED → DENY.
         Map<SubjectRef, Set<SubjectBinding>> table = new HashMap<>();
         table.put(user, Set.of(binding(READ, ownedDocId)));
-        var svc = service((p, r) -> false, bindingRequiredWithState(READ, false), subject -> table.getOrDefault(subject, Set.of()));
+        var svc = service((p, r) -> java.util.Optional.empty(), bindingRequiredWithState(READ, false), subject -> table.getOrDefault(subject, Set.of()));
 
         assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, READ, DOC, ownedDocId)
                 .outcome()).isEqualTo(AuthorizationOutcome.DENY);
@@ -148,7 +149,7 @@ class AuthorizationServiceTest {
     void bindingRequiredWithStateAllowedAllows() {
         Map<SubjectRef, Set<SubjectBinding>> table = new HashMap<>();
         table.put(user, Set.of(binding(READ, ownedDocId)));
-        var svc = service((p, r) -> false, bindingRequiredWithState(READ, true), subject -> table.getOrDefault(subject, Set.of()));
+        var svc = service((p, r) -> java.util.Optional.empty(), bindingRequiredWithState(READ, true), subject -> table.getOrDefault(subject, Set.of()));
 
         assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, READ, DOC, ownedDocId)
                 .outcome()).isEqualTo(AuthorizationOutcome.ALLOW);
@@ -156,7 +157,7 @@ class AuthorizationServiceTest {
 
     @Test
     void relationDerivedWithStateDeniedDenies() {
-        var svc = service((p, r) -> false,
+        var svc = service((p, r) -> java.util.Optional.empty(),
                 policy(GrantPath.RELATION_DERIVED, r -> r.resourceId().equals(ownedDocId), false),
                 none());
         assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, READ, DOC, ownedDocId)
@@ -169,7 +170,7 @@ class AuthorizationServiceTest {
     void highRiskChallengesWithoutRecentStrongAuth() {
         Map<SubjectRef, Set<SubjectBinding>> table = new HashMap<>();
         table.put(user, Set.of(binding(PUBLISH, ownedDocId)));
-        var svc = service((p, r) -> false, bindingRequiredWithState(PUBLISH, true),
+        var svc = service((p, r) -> java.util.Optional.empty(), bindingRequiredWithState(PUBLISH, true),
                 subject -> table.getOrDefault(subject, Set.of()));
 
         assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, PUBLISH, DOC, ownedDocId,
@@ -180,7 +181,7 @@ class AuthorizationServiceTest {
     void highRiskAllowsWithRecentStrongAuth() {
         Map<SubjectRef, Set<SubjectBinding>> table = new HashMap<>();
         table.put(user, Set.of(binding(PUBLISH, ownedDocId)));
-        var svc = service((p, r) -> false, bindingRequiredWithState(PUBLISH, true),
+        var svc = service((p, r) -> java.util.Optional.empty(), bindingRequiredWithState(PUBLISH, true),
                 subject -> table.getOrDefault(subject, Set.of()));
 
         assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, PUBLISH, DOC, ownedDocId)

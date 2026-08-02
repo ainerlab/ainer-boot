@@ -121,6 +121,10 @@ cat >"$consumer_dir/pom.xml" <<EOF
             <groupId>dev.ainer</groupId>
             <artifactId>ainer-starter-persistence</artifactId>
         </dependency>
+        <dependency>
+            <groupId>dev.ainer</groupId>
+            <artifactId>ainer-module-authorization</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
@@ -142,6 +146,7 @@ cat >"$consumer_dir/src/main/java/dev/ainer/consumer/ConsumerSmoke.java" <<'EOF'
 package dev.ainer.consumer;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import dev.ainer.authorization.domain.PermissionCode;
 import dev.ainer.core.web.ApiResponse;
 
 final class ConsumerSmoke {
@@ -151,6 +156,10 @@ final class ConsumerSmoke {
 
     static ApiResponse<String> response() {
         return ApiResponse.success("consumer", "maven-smoke");
+    }
+
+    static String permissionCode() {
+        return new PermissionCode("consumer.smoke").value();
     }
 
     static boolean isPersistenceMapper(BaseMapper<?> mapper) {

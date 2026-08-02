@@ -1,5 +1,7 @@
 package dev.ainer.authorization.domain;
 
+import org.jspecify.annotations.Nullable;
+
 import java.time.Instant;
 import java.util.Objects;
 
@@ -13,7 +15,7 @@ public record SubjectBinding(
         Scope scope,
         BindingStatus status,
         Instant validFrom,
-        Instant validUntil,
+        @Nullable Instant validUntil,
         long version) {
 
     public SubjectBinding {

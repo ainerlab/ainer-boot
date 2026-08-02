@@ -58,7 +58,7 @@ public class AinerResourceServerProperties {
     }
 
     public List<String> getPublicPaths() {
-        return publicPaths;
+        return List.copyOf(publicPaths);
     }
 
     public static final class OnlineValidation {
@@ -133,15 +133,15 @@ public class AinerResourceServerProperties {
         }
 
         public List<String> getAlwaysProtectedPaths() {
-            return alwaysProtectedPaths;
+            return List.copyOf(alwaysProtectedPaths);
         }
 
         public List<String> getMutatingProtectedPaths() {
-            return mutatingProtectedPaths;
+            return List.copyOf(mutatingProtectedPaths);
         }
 
         public List<HttpMethod> getMutatingMethods() {
-            return mutatingMethods;
+            return List.copyOf(mutatingMethods);
         }
 
         URI validateAndGetIntrospectionUri() {
@@ -250,19 +250,19 @@ public class AinerResourceServerProperties {
         }
 
         public List<String> getRequiredAmr() {
-            return requiredAmr;
+            return List.copyOf(requiredAmr);
         }
 
         public List<String> getAlwaysProtectedPaths() {
-            return alwaysProtectedPaths;
+            return List.copyOf(alwaysProtectedPaths);
         }
 
         public List<String> getMutatingProtectedPaths() {
-            return mutatingProtectedPaths;
+            return List.copyOf(mutatingProtectedPaths);
         }
 
         public List<HttpMethod> getMutatingMethods() {
-            return mutatingMethods;
+            return List.copyOf(mutatingMethods);
         }
 
         void validate() {

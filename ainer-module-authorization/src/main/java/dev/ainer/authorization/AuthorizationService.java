@@ -85,7 +85,8 @@ public final class AuthorizationService {
     }
 
     private AuthorizationDecision decidePublic(AuthorizationRequest request, Permission permission) {
-        if (!publicAccessPolicy.allows(request.permission(), request.resource())) {
+        var projection = publicAccessPolicy.evaluate(request.permission(), request.resource());
+        if (projection.isEmpty()) {
             return deny(request, AuthorizationReasonCodes.NO_PUBLIC_POLICY);
         }
         if (permission.riskTier() == RiskTier.HIGH
@@ -93,7 +94,9 @@ public final class AuthorizationService {
             return AuthorizationDecision.challenge(
                     AuthorizationReasonCodes.STRONG_AUTH_REQUIRED, policyVersion, request.context().evaluatedAt());
         }
-        return allow(request, AuthorizationReasonCodes.PUBLIC_ALLOWED);
+        return AuthorizationDecision.allowPublic(
+                AuthorizationReasonCodes.PUBLIC_ALLOWED, policyVersion,
+                request.context().evaluatedAt(), projection.get());
     }
 
     private AuthorizationDecision decideAuthenticated(AuthorizationRequest request, Permission permission) {

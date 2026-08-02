@@ -9,8 +9,8 @@ import java.util.UUID;
 /**
  * Immutable authorization decision (ADR-0030 §6). {@link AuthorizationOutcome#CHALLENGE} means the action
  * must not execute until the requested challenge is satisfied and the decision re-evaluated; it is never
- * an ALLOW. {@code policyVersion} supports audit and re-evaluation and is not a signed authorization
- * credential.
+ * an ALLOW. {@code publicProjection} carries the required field projection for PUBLIC ALLOW; the HTTP
+ * adapter must apply it before sending the response.
  */
 public record AuthorizationDecision(
         UUID decisionId,
@@ -18,7 +18,8 @@ public record AuthorizationDecision(
         ReasonCode reasonCode,
         String policyVersion,
         Instant evaluatedAt,
-        @Nullable Instant validUntil) {
+        @Nullable Instant validUntil,
+        @Nullable PublicProjection publicProjection) {
 
     public AuthorizationDecision {
         Objects.requireNonNull(decisionId, "decisionId");
@@ -34,16 +35,22 @@ public record AuthorizationDecision(
 
     public static AuthorizationDecision allow(ReasonCode reasonCode, String policyVersion, Instant evaluatedAt) {
         return new AuthorizationDecision(
-                UUID.randomUUID(), AuthorizationOutcome.ALLOW, reasonCode, policyVersion, evaluatedAt, null);
+                UUID.randomUUID(), AuthorizationOutcome.ALLOW, reasonCode, policyVersion, evaluatedAt, null, null);
+    }
+
+    public static AuthorizationDecision allowPublic(
+            ReasonCode reasonCode, String policyVersion, Instant evaluatedAt, PublicProjection projection) {
+        return new AuthorizationDecision(
+                UUID.randomUUID(), AuthorizationOutcome.ALLOW, reasonCode, policyVersion, evaluatedAt, null, projection);
     }
 
     public static AuthorizationDecision deny(ReasonCode reasonCode, String policyVersion, Instant evaluatedAt) {
         return new AuthorizationDecision(
-                UUID.randomUUID(), AuthorizationOutcome.DENY, reasonCode, policyVersion, evaluatedAt, null);
+                UUID.randomUUID(), AuthorizationOutcome.DENY, reasonCode, policyVersion, evaluatedAt, null, null);
     }
 
     public static AuthorizationDecision challenge(ReasonCode reasonCode, String policyVersion, Instant evaluatedAt) {
         return new AuthorizationDecision(
-                UUID.randomUUID(), AuthorizationOutcome.CHALLENGE, reasonCode, policyVersion, evaluatedAt, null);
+                UUID.randomUUID(), AuthorizationOutcome.CHALLENGE, reasonCode, policyVersion, evaluatedAt, null, null);
     }
 }

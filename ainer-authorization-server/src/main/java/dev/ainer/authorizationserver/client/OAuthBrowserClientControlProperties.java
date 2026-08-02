@@ -29,11 +29,11 @@ public class OAuthBrowserClientControlProperties {
     }
 
     public Set<String> getOperatorClientIds() {
-        return operatorClientIds;
+        return Set.copyOf(operatorClientIds);
     }
 
     public Set<String> getAllowedScopes() {
-        return allowedScopes;
+        return Set.copyOf(allowedScopes);
     }
 
     public int getDefaultAccessTokenMinutes() {

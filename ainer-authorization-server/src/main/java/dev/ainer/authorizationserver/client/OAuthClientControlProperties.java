@@ -47,11 +47,11 @@ public class OAuthClientControlProperties {
     }
 
     public List<String> getOperatorClientIds() {
-        return operatorClientIds;
+        return List.copyOf(operatorClientIds);
     }
 
     public List<String> getAllowedScopes() {
-        return allowedScopes;
+        return List.copyOf(allowedScopes);
     }
 
     public Duration getAccessTokenTtl() {

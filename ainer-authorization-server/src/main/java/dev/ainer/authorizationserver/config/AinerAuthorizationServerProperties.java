@@ -225,7 +225,7 @@ public class AinerAuthorizationServerProperties {
         }
 
         public List<String> getScopes() {
-            return scopes;
+            return List.copyOf(scopes);
         }
     }
 
