@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-07-31 · 工程版本：`0.1.0-SNAPSHOT`
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-02 · 工程版本：`0.1.0-SNAPSHOT`
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -114,7 +114,7 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
   Let's Encrypt 和精确同源 Nginx 配置；真实 Chromium 已完成 PKCE、成员治理、revoke、
   OIDC logout 和退出后重新登录门禁；
 - ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0020、ADR-0022 与 ADR-0024 至 ADR-0028 已接受，
-  ADR-0012 至 ADR-0014、ADR-0021、ADR-0023 与 ADR-0029 处于 Proposed；
+  ADR-0012 至 ADR-0014、ADR-0021、ADR-0023、ADR-0029 至 ADR-0032 处于 Proposed；
   架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
 - M4.8B 租户上下文选择代码基线：`GET /api/me/tenants` 返回当前 USER 的 ACTIVE membership
   安全投影（tenant ID/code/name/role/is_default），LOCKED/DISABLED tenant/user/membership
@@ -370,6 +370,17 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 ### 访问控制
 
+- 通用混合细粒度授权与 Agent 代行当前只有 ADR-0030/0031 和详细方案；
+  `ainer-module-authorization`、Permission/Role/Binding/Decision、集合查询授权、管理 API、
+  外部 Golden Consumer 与 ActingGrant 尚未实现，不能把设计描述为已交付能力；现有人员登录与
+  `AuthenticatedActorResolver` 仍要求 ACTIVE tenant membership，tenantless USER consumer client/
+  签发/解析/撤销合同也尚未实现，不能仅凭 Proposed 可空 principal 宣称已支持真实顾客；
+- 组织与员工目录当前只有 ADR-0032 和详细方案；`ainer-module-organization`、OrgUnit、
+  WorkforceEngagement、Position/Assignment、SubjectSetBinding、管理 API 和 XQ 岗位纵向切片均未
+  实现。普通 tenant 成员角色变更/移除还没有完整写入 access-event outbox，Identity 已定义的
+  role-changed 事件与 Workspace consumer 合同也不兼容；在修复并验证 Token 失效、Workspace 撤销、
+  workforce-derived grant 撤销三条独立语义前，不能承诺调岗/离职即时失权；当前 subject-scoped
+  access event 也不能表达 tenant-wide disable，需补 tenant epoch/event 或等价在线门禁；
 - 选择性在线校验只覆盖配置的高风险 API；普通低风险自包含 JWT 仍有自然到期窗口；
 - Authorization Server 已成为高风险 API 在线依赖；受保护 exporter 与独立 metrics/introspection 凭据创建基线已有代码，但尚未完成生产高可用、容量、旧凭据退役、真实 Prometheus、dashboard 与告警；
 - 重放与 OWNER 恢复已做服务 `sub` 分离，但生产 IAM 仍需证明凭据由不同人员/职责保管；

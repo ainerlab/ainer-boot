@@ -1,6 +1,6 @@
 # xiaoqu-platform → Ainer 渐进迁移路线
 
-> 状态：v1.1 · 2026-07-30
+> 状态：v1.2 · 2026-08-02
 
 ## 1. 迁移原则
 
@@ -45,7 +45,9 @@ Ainer 采用 strangler + vertical slice：
 
 ### 3.3 实现
 
-1. 在 Ainer 建立垂直切片。
+1. 在能力所有者所在的目标系统建立垂直切片：Ainer 通用平台能力进入 Ainer；Object、Listing、
+   Offer、Customer 等 XQ 产品能力进入由已发布 Ainer 制品生成的 `xq-platform-next`，不得反向写入
+   脚手架。
 2. 用 PostgreSQL Testcontainers 验证 migration 和查询。
 3. 添加权限、审计、可观测性和失败路径测试。
 4. 必要时在 xiaoqu 添加薄适配器，而不是把 Ainer 代码反向塞入旧框架。
@@ -145,17 +147,29 @@ Ainer 采用 strangler + vertical slice：
 
 首个 xq 产品纵向切片固定为：
 
-1. `xq-zhiwu` 员工登录；
-2. 商品或单品登记；
-3. 品控检查；
-4. 图片上传；
-5. 审核并发布；
-6. `xq-shop-next` 市集流读取；
-7. 唯一商品详情；
-8. 喜欢、收藏或咨询信号。
+1. `xq-zhiwu` 匿名读取公开行业信息流与详情；
+2. 已认证用户选择服务端验证过的 Acting Identity；
+3. 商家 operator 建立 Object/Version 与 Industry Listing 草稿；
+4. 具备相应 capability 的主体完成采购、品控、拍摄或录货协作；
+5. 审核并发布 Industry Listing；
+6. `xq-shop-next` 独立发布并读取 Consumer Offer 流与详情；
+7. 顾客以非 Workspace membership 主体完成喜欢、收藏或咨询；
+8. 运营后台通过 Effective Access 执行受限审核并查看关联审计。
 
-该切片同时验证应用注册、员工/顾客身份硬分轨、岗位 capability、对象存储、商品事实、审计、
-OpenAPI SDK 和两个小程序接口。第一阶段不以购物车、标准订单、支付或 AI 对话为主线。
+该切片同时验证 platform-app 注册、匿名/顾客/业务 Acting Identity 分轨、通用 Role/Binding、领域
+relation、员工任职/岗位事实、产品 capability、对象存储、共享 Object 事实、独立 Listing/Offer
+发布语义、审计、OpenAPI SDK 和两个小程序接口。完整授权模型见
+[`Ainer 通用授权与 AI 代行详细方案`](../design/authorization-architecture-plan.md)。公司内部部门、
+员工任职与岗位的迁移必须遵循
+[`Ainer 组织与员工目录详细方案`](../design/organization-workforce-architecture-plan.md)：
+`TenantMembership != WorkforceEngagement`、Position 不等于 Role、BusinessLocation 不等于 OrgUnit，
+离职不删除同一 Subject 的 Customer/Seller 身份。第一阶段不以购物车、标准订单、支付或 AI 对话为主线。
+
+该产品切片还必须以真实 HTTP/序列化验证：tenantless USER 能凭 Customer owner/participant 关系
+访问本人资源而不能访问他人资源；Anonymous 与已登录 public path 得到相同公开字段投影；Industry
+Listing 的发布状态/权限不能推出 Consumer Offer 已发布或可发布，Consumer Offer 也不能反向改变
+Industry Listing。上述产品代码、表和 migration 均位于 `xq-platform-next`，Ainer 只提供已发布的
+通用契约、适配器与 Golden Consumer 门禁。
 
 后续仍优先选择独立查询、新建业务，以及对外依赖少、规则清晰、有测试的能力。不优先迁移
 trade 大模块，也不把 ai/cdp/wecom 三方耦合圈原样搬入。
@@ -174,7 +188,9 @@ trade 大模块，也不把 ai/cdp/wecom 三方耦合圈原样搬入。
 
 ## 5. 数据策略
 
-- 新表只由 Ainer migration 创建。
+- 新表只由数据所有者所在项目的 migration 创建：Ainer migration 只创建 Ainer 通用表；Object、
+  Industry Listing、Consumer Offer、Customer、订单等产品表只由 `xq-platform-next` 所属模块的
+  migration 创建。
 - 已发布 migration 不修改。
 - 数据回填脚本可重复、可审计、可断点续跑。
 - 双写必须包含幂等键和对账任务。
@@ -214,16 +230,17 @@ trade 大模块，也不把 ai/cdp/wecom 三方耦合圈原样搬入。
 | 产品范围 | 1.0 项目 | 2.0 项目 |
 |---|---|---|
 | 顾客端 | `xq-shop` | `xq-shop-next`，正式切换后接管 `xq-shop` 名称 |
-| 供应链员工端 | `xq-assistant` | **`xq-zhiwu`** |
+| 行业信息与协作端 | `xq-assistant` | **`xq-zhiwu`** |
 | 两个 2.0 小程序的共同后台 | `xiaoqu-platform` 中的旧实现 | `xq-platform-next` |
 
-`xq-assistant` 的 2.0 版本只能称为 `xq-zhiwu`。它服务采购、品控、拍照、录货等供应链岗位，
-不能因为旧项目名含 assistant 而被当成通用 AI 助手。
+`xq-assistant` 的 2.0 版本只能称为 `xq-zhiwu`。它是面向翡翠同行、珠宝公司、商家、采购与供给
+人员的公开行业信息与协作网络；采购、品控、拍照和录货是其中按 relation/capability 授权的协作
+能力，不是产品被定义为内部员工工具的理由，也不能因为旧项目名含 assistant 而被当成通用 AI 助手。
 
 两个小程序按接口面切分，不按 tenant 切分：
 
-- shop API 面向 `xq-shop-next` 顾客主体；
-- zhiwu API 面向 `xq-zhiwu` 员工主体；
+- shop API 面向 `xq-shop-next` 的匿名访问者与顾客主体；
+- zhiwu API 面向 `xq-zhiwu` 的匿名访问者、行业参与者与业务 Acting Identity；
 - admin API 面向运营管理端；
 - 三个接口面共享明确所有权的产品领域，不共享 Controller DTO 或持久化对象；
 - 每个切片保持单一写入主系统，通过影子读、对账、灰度和可操作回退完成切流。

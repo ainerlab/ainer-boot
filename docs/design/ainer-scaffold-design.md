@@ -1,6 +1,6 @@
 # Ainer Boot 产品定位、竞品能力矩阵与路线图
 
-> 版本：v1.5 · 2026-07-31
+> 版本：v1.6 · 2026-08-02
 > 文档类型：长期产品与架构设计 · 状态：当前权威设计
 >
 > 本文负责产品定位、能力目标、产品化阶段和长期边界；当前完成度、测试数字、临时缺口与下一步
@@ -296,6 +296,21 @@ Spring Authorization Server 当前标准能力不包含 password grant。短信�
 - 数据权限以主体、动作、资源、上下文建模，不绑定 servletPath 字符串。
 - 复杂范围查询使用参数化策略或预计算授权关系；禁止拼接 `IN SQL`。
 - 缺失身份或策略时默认拒绝。
+- 通用授权采用 OAuth scope ceiling + Role/Binding + 领域关系 + 类型化状态/上下文的混合模型；
+  Permission、Role 与 Binding 不替代 Identity/Workspace/产品各自拥有的关系事实。
+- 单对象 `authorize` 与集合 `AuthorizedQueryPlan` 同时作为脚手架契约；Ainer 不输出产品 SQL，
+  产品 adapter 把类型化约束翻译为参数化查询。
+- 匿名公开访问不是 `PUBLIC` 登录身份；`platform_app` 是渠道上下文，不是 tenant、Role 或 Scope。
+- Agent 代行、Capability 与 Context authorization 在通用授权之上作为第二切片实现，不扩大
+  principal 权限，也不把 AI 调用审计与授权审计合表。
+
+完整 Proposed 方案见
+[`Ainer 通用授权与 AI 代行详细方案`](authorization-architecture-plan.md)、
+[ADR-0030](../decisions/0030-hybrid-fine-grained-authorization-baseline.md) 与
+[ADR-0031](../decisions/0031-agent-delegation-and-ai-context-authorization.md)。公司内部部门、员工任职、
+岗位、Team 与组织派生授权的可选模块边界见
+[`Ainer 组织与员工目录详细方案`](organization-workforce-architecture-plan.md) 与
+[ADR-0032](../decisions/0032-organization-workforce-directory-baseline.md)。
 
 ## 9. AI runtime
 
@@ -385,7 +400,7 @@ Industry Products
 | **P0 Baseline Integrity** | 让代码、文档、测试、数据与许可证事实可信 | PostgreSQL 18 正式门禁 0 skipped；未验收能力保持 Proposed 或默认关闭；秘密扫描与依赖许可证无未处置问题；权威文档与 ADR 无冲突 |
 | **P1 Scaffold Ready** | 把平台内核变成可发布、可独立消费的制品 | 非 SNAPSHOT BOM/Starter 发布；Maven 3.9+ 与 Maven 4 独立消费者通过；最小应用关闭全部可选模块仍能启动；source/Javadoc、LICENSE/NOTICE、SBOM、checksum/signature/provenance 和兼容政策齐全 |
 | **P2 Create & Generate** | 安全、确定性地创建项目和纵向 CRUD | manifest v1、preview/diff、默认不覆盖/不改菜单/不写数据库；同版本同 manifest 生成无差异；TTFR 与 TTCRUD 目标通过；生成物通过 PostgreSQL 与 golden consumer 门禁 |
-| **P3 Minimum Admin & First Consumer** | 用可用管理面和真实产品证明脚手架边界 | Identity、组织/成员、RBAC/数据范围、菜单/字典/配置、文件与审计形成关键 E2E；Initializer 生成 `xq-platform-next`；不含 Ainer 源码副本或 SNAPSHOT；两个小程序 SDK 可编译；至少一个真实纵向切片和一次 Ainer minor 升级通过 |
+| **P3 Minimum Admin & First Consumer** | 用可用管理面和真实产品证明脚手架边界 | Identity、可选 Organization/Workforce（部门、员工任职、岗位）、RBAC/数据范围、菜单/字典/配置、文件与审计形成关键 E2E；Initializer 生成 `xq-platform-next`；C 端关闭组织模块仍可启动；不含 Ainer 源码副本或 SNAPSHOT；两个小程序 SDK 可编译；至少一个真实纵向切片和一次 Ainer minor 升级通过 |
 | **P4 AI-Native Enterprise Scaffold** | 达到通用企业后台能力下限并形成 AI 差异化 | 通知、任务、观测等常用模块闭环；Agent/Tool/RAG/Evaluation 具备身份、权限、预算、数据治理、人工反馈和回归门禁；模块开关组合可构建与启动；生成器覆盖树表和主子表 |
 | **P5 Ecosystem & Commercial Delivery** | 建立生态、升级、LTS 和商业交付闭环 | 至少两个独立消费者；模块安装/移除不改 core；连续两个 minor 完成升级验证；兼容清单、升级助手、entitlement、LTS/补丁与行业模块交付流程落地 |
 
@@ -440,14 +455,16 @@ P3 不等待 P4 或 P5。否则 Ainer 会继续成为只被自身使用的平台
 - tenant 只表达组织与数据隔离，不用于区分小程序；
 - Ainer Identity 的固定 `OWNER/ADMIN/MEMBER` 只表达 tenant 治理，不承载录货员、采购或商家
   发布人等业务角色；
-- Ainer 在首个消费者前提供通用 Permission/Role/Binding/Decision 扩展，XQ 自己拥有 Public
-  Actor、Acting Identity、operator relation、业务 grant 和 Merchant/Business Location scope；
+- Ainer 在首个消费者前提供通用 Permission/Role/Binding/Decision、public policy 与 tenant-optional
+  principal 扩展；XQ 自己拥有公开状态/字段投影、Acting Identity、operator relation、业务 grant 和
+  Merchant/Business Location scope；
 - `X-Acting-Identity-Id` 只是服务端有效关系中的身份选择器，不是授权凭据；
 - 公开行业图谱不要求访问者成为 Workspace/tenant member，业务写仍需 permission、资源 scope
   和领域关系校验；
 - `xq-shop` 顾客使用独立 customer/member 主体，不能被强制建成 OWNER/ADMIN/MEMBER 租户成员；
 - Authorization 组合层必须支持没有 Workspace membership 的 C 端主体，同时继续拒绝客户端自报
-  tenant、subject 或 owner。
+  tenant、subject 或 owner；创建首个消费者前还必须用真实 Authorization Server/受信外部 OIDC
+  完成 tenantless USER 的签发、解析、撤销与 tenant API 隔离合同，不能只增加可空 Java 字段。
 
 ### 13.3 代码与制品边界
 
@@ -460,7 +477,7 @@ Ainer 负责稳定、跨产品可复用的能力：
 
 `xq-platform-next` 负责产品语义：
 
-- Industry Public Actor、Acting Identity、relation、行业 capability 与 data scope；
+- 行业公开策略/字段投影、Acting Identity、relation、行业 capability 与 data scope；
 - customer/member、匿名身份接续与内部平台人员隔离；
 - Object Asset、Object Version、Industry Listing、Consumer Offer 与各自独立发布状态；
 - 商家、经营点、录货、搜索、求货、QuoteEvent、Agreement、Deal、偏好、服务和后续交易；

@@ -1,6 +1,6 @@
 # Ainer 文档总览：从这里开始
 
-> 文档类型：统一入口 · 状态：生效 · 最近核对：2026-07-31 · 适用版本：`0.1.x`
+> 文档类型：统一入口 · 状态：生效 · 最近核对：2026-08-02 · 适用版本：`0.1.x`
 
 本文是 Ainer Boot 文档的唯一权威入口。它帮助开发者、架构师和 AI agent 先建立同一份项目心智
 模型，再进入具体规范。它不复制各专题文档的细节，也不替代当前状态、架构规范或 ADR。
@@ -214,6 +214,8 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 | [`database.md`](database.md) | 数据库归属、当前表、Flyway 和 Migration 运行手册 |
 | [`security.md`](security.md) | OAuth、Identity、tenant、Passkey 和安全边界 |
 | [`ai-gateway.md`](ai-gateway.md) | 模型网关、SSE、策略、费用和安全基线 |
+| [`design/authorization-architecture-plan.md`](design/authorization-architecture-plan.md) | 通用混合授权、集合查询、Spring Security 适配与 Agent 代行详细方案（Proposed） |
+| [`design/organization-workforce-architecture-plan.md`](design/organization-workforce-architecture-plan.md) | 部门、员工任职、岗位、团队及 SubjectSet 授权集成详细方案（Proposed） |
 | [`design/ai-runtime-data-model.md`](design/ai-runtime-data-model.md) | Run、Invocation、Artifact 与业务结果的候选边界 |
 | [`design/knowledge-data-model.md`](design/knowledge-data-model.md) | Knowledge revision、chunk、索引代际与检索授权提案 |
 

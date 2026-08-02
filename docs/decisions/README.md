@@ -1,6 +1,6 @@
 # Ainer 架构决策记录
 
-> 文档类型：决策索引 · 状态：生效 · 最近核对：2026-07-30
+> 文档类型：决策索引 · 状态：生效 · 最近核对：2026-08-02
 
 ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是实现日志，也不替代 API 或运行手册。
 
@@ -37,6 +37,9 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0027](0027-keep-jdk-25-production-baseline.md) | Accepted | 保留 JDK 25 生产基线并跟踪 JDK 27 |
 | [0028](0028-mybatis-plus-infrastructure-baseline.md) | Accepted | MyBatis-Plus 基础设施增强基线 |
 | [0029](0029-jdk25-boot4-modern-baseline.md) | Proposed | JDK 25 / Spring Boot 4 现代化基线 |
+| [0030](0030-hybrid-fine-grained-authorization-baseline.md) | Proposed | 通用混合细粒度授权基线 |
+| [0031](0031-agent-delegation-and-ai-context-authorization.md) | Proposed | Agent 代行、Capability 与 AI 上下文授权基线 |
+| [0032](0032-organization-workforce-directory-baseline.md) | Proposed | 组织、员工任职与 SubjectSet 授权基线 |
 
 ## 何时需要 ADR
 

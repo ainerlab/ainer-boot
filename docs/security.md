@@ -1,6 +1,6 @@
 # Ainer Identity 与 OAuth 2.1 使用基线
 
-> 适用版本：M4.8A + Ainer Admin integration · 2026-07-26
+> 适用版本：M4.8A + Ainer Admin integration · 核对 2026-08-02
 
 ## 1. 已落地边界
 
@@ -394,7 +394,14 @@ Identity 表。Ainer Admin API 在本地 JWT 验证后逐请求查询官方 auth
 RFC 7009 的 client 授权边界。撤销直接失效 Spring Authorization Server 官方 JDBC
 authorization 中的当前 access token；不存在、过期或已撤销统一按 401 处理。
 
-账号禁用会阻止后续人员 token 签发，非 OWNER tenant membership 可以被撤销。每次实际状态变化与 `ainer_identity_access_event` outbox 在同一事务提交；事件只保存 tenant、subject、类型、版本和时间。relay 通过短事务使用 `FOR UPDATE SKIP LOCKED` 领取并提交 lease，随后在事务外通过 HTTPS + Client Credentials 投递；成功或失败确认使用 event ID 与 lease owner 条件更新。
+账号禁用会阻止后续人员 token 签发；`IdentityAccessLifecycleService` 执行的账号禁用与非 OWNER
+membership revoke 会把 `ainer_identity_access_event` outbox 放在同一事务，事件只保存 tenant、
+subject、类型、版本和时间。普通 tenant 成员管理入口的角色变更/移除当前只写成员审计，没有完整
+写入 access event；已定义的 role-changed 事件也尚未与 Workspace consumer 合同对齐。这是
+[`project-status.md`](project-status.md) 和 [ADR-0032](decisions/0032-organization-workforce-directory-baseline.md)
+记录的待修复项，不能把上述窄链路表述为覆盖“每次状态变化”。relay 通过短事务使用
+`FOR UPDATE SKIP LOCKED` 领取并提交 lease，随后在事务外通过 HTTPS + Client Credentials 投递；
+成功或失败确认使用 event ID 与 lease owner 条件更新。
 
 Workspace 事件端点要求 `actor_type=SERVICE`、`identity.access-events.publish` 和精确可信 publisher `sub`。消费事务先插入 event receipt，再将同 tenant/subject、创建时间不晚于事件时间的 PENDING/ACTIVE membership 置为 `REVOKED`。重复 event ID 幂等成功，旧事件不影响后来创建的 membership，跨 tenant 不受影响。安全禁用可以让 OWNER 变为 REVOKED 并暂时留下无 ACTIVE OWNER 的 Workspace；这优先于继续放行已禁用账号，恢复/所有权处置必须使用后续专用流程。
 

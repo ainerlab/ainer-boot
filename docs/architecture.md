@@ -1,6 +1,6 @@
 # Ainer 架构总览
 
-> 权威状态：M4.8A + Ainer Admin integration · 2026-07-30
+> 权威状态：M4.8A + Ainer Admin integration；通用授权与组织/员工目录方案 Proposed · 2026-08-02
 
 ## 1. 系统定位
 
@@ -79,7 +79,9 @@ ainer-boot/
 │   ├── ainer-starter-security/          # Resource Server 通用能力
 │   ├── ainer-starter-observability/
 │   └── ainer-starter-test/
-├── ainer-module-identity/                # 用户、组织、角色、授权业务
+├── ainer-module-identity/                # 用户、tenant、成员关系与身份生命周期
+├── ainer-module-authorization/           # Proposed：Permission、Role、Binding、Decision 与查询授权扩展
+├── ainer-module-organization/            # Proposed：可选组织、员工任职、岗位与团队目录
 ├── ainer-module-workspace/               # 已租户化的资源授权参考切片
 ├── ainer-module-ai-runtime/              # 模型网关、调用与费用审计
 ├── ainer-server/                          # 已落地的业务 Resource Server 发行物
@@ -88,6 +90,20 @@ ainer-boot/
 ```
 
 这些是演进方向，不代表应一次性创建所有空模块。模块只在拥有明确职责、测试和消费者时落地。
+
+`ainer-module-authorization` 当前尚未创建，其通用混合细粒度授权、集合查询、Spring Security
+适配与 Agent 第二切片边界见
+[`Ainer 通用授权与 AI 代行详细方案`](design/authorization-architecture-plan.md)、
+[ADR-0030](decisions/0030-hybrid-fine-grained-authorization-baseline.md) 与
+[ADR-0031](decisions/0031-agent-delegation-and-ai-context-authorization.md)。该模块不会接管
+Identity TenantRole、WorkspaceRole 或产品领域关系。
+
+`ainer-module-organization` 当前同样尚未创建。它作为可选模块装配在 `ainer-server`，不并入
+Identity 或 Authorization Server；Tenant、OrganizationDirectory、Company、Merchant、OrgUnit 与
+Workspace 各自保持独立语义。员工目录的最小模型、有效期、SubjectSetBinding、撤销前置门禁和
+XQ 映射见
+[`Ainer 组织与员工目录详细方案`](design/organization-workforce-architecture-plan.md) 与
+[ADR-0032](decisions/0032-organization-workforce-directory-baseline.md)。
 
 M1 有意没有提前抽取 persistence starter。M2 的 AI invocation 成为第二个 PostgreSQL 消费者
 后，才把 MyBatis/Flyway/PostgreSQL/UUID 装配提炼到 `ainer-starter-persistence`。2026-07-30
