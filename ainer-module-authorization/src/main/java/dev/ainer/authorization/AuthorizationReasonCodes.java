@@ -17,6 +17,9 @@ public final class AuthorizationReasonCodes {
     public static final ReasonCode TENANT_CEILING = new ReasonCode("TENANT_CEILING");
     public static final ReasonCode NO_BINDING = new ReasonCode("NO_BINDING");
     public static final ReasonCode NO_RELATION = new ReasonCode("NO_RELATION");
+    public static final ReasonCode STATE_DENIED = new ReasonCode("STATE_DENIED");
+    public static final ReasonCode RESOURCE_TYPE_MISMATCH = new ReasonCode("RESOURCE_TYPE_MISMATCH");
+    public static final ReasonCode SYSTEM_ONLY = new ReasonCode("SYSTEM_ONLY");
     public static final ReasonCode STRONG_AUTH_REQUIRED = new ReasonCode("STRONG_AUTH_REQUIRED");
     public static final ReasonCode AUTHORIZED = new ReasonCode("AUTHORIZED");
     public static final ReasonCode UNEXPECTED = new ReasonCode("UNEXPECTED");

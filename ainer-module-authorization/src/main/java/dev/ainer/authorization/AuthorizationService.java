@@ -1,6 +1,7 @@
 package dev.ainer.authorization;
 
 import dev.ainer.authorization.catalog.PermissionRegistry;
+import dev.ainer.authorization.domain.AccessMode;
 import dev.ainer.authorization.domain.AuthorizationContext;
 import dev.ainer.authorization.domain.AuthorizationDecision;
 import dev.ainer.authorization.domain.AuthorizationRequest;
@@ -9,23 +10,29 @@ import dev.ainer.authorization.domain.Permission;
 import dev.ainer.authorization.domain.PermissionCode;
 import dev.ainer.authorization.domain.ReasonCode;
 import dev.ainer.authorization.domain.Requester;
+import dev.ainer.authorization.domain.ResourceRef;
 import dev.ainer.authorization.domain.RiskTier;
+import dev.ainer.authorization.domain.Scope;
+import dev.ainer.authorization.domain.SubjectType;
 import dev.ainer.authorization.policy.BindingResolver;
 import dev.ainer.authorization.policy.DomainAuthorizationPolicy;
 import dev.ainer.authorization.policy.PublicAccessPolicy;
-import dev.ainer.authorization.policy.RelationOutcome;
 import dev.ainer.authorization.policy.ScopePermissionCeiling;
 
 import java.util.Objects;
 
 /**
- * Pure authorization decision evaluator (ADR-0030 §6). Implements the grant-path truth table with default
- * deny, access-mode pipeline isolation (no PUBLIC/AUTHENTICATED fall-back), OAuth scope ceiling, scope-matched
- * live {@code SubjectBinding}, relation-derived grants, tenant ceiling and HIGH-risk step-up challenge.
- *
- * <p>S0 is in-memory: {@link BindingResolver} is a test fixture here and becomes PostgreSQL-backed in S1.
- * Unknown permission, unknown policy, conflicts and exceptions always deny; an AUTHENTICATED deny never
- * falls back to the public path.
+ * Pure authorization decision evaluator (ADR-0030 §6). Implements the grant-path truth table with:
+ * <ul>
+ *   <li>Default deny, no PUBLIC→AUTHENTICATED or AUTHENTICATED→PUBLIC fall-back.
+ *   <li>Resource-type check: {@code Permission.resourceType} must match {@code ResourceRef.resourceType}.
+ *   <li>System-only enforcement: {@code systemOnly} permissions require a SERVICE subject.
+ *   <li>Binding ownership defense: resolver-returned bindings must belong to the requesting subject.
+ *   <li>GLOBAL scope restricted to SERVICE subjects.
+ *   <li>Grant ∩ state intersection: BINDING_REQUIRED = binding ∧ state; RELATION_DERIVED = relation ∧ state;
+ *       BINDING_OR_RELATION = (binding ∨ relation) ∧ state.
+ *   <li>Risk收口 applied uniformly (including PUBLIC path): HIGH risk without recent strong auth → CHALLENGE.
+ * </ul>
  */
 public final class AuthorizationService {
 
@@ -56,7 +63,6 @@ public final class AuthorizationService {
         try {
             return decide(request);
         } catch (RuntimeException unexpected) {
-            // ADR-0030: any unknown/conflicting/exceptional state denies; never ALLOW.
             return AuthorizationDecision.deny(
                     AuthorizationReasonCodes.UNEXPECTED, policyVersion, request.context().evaluatedAt());
         }
@@ -68,27 +74,43 @@ public final class AuthorizationService {
             return deny(request, AuthorizationReasonCodes.UNKNOWN_PERMISSION);
         }
 
-        if (request.accessMode() == dev.ainer.authorization.domain.AccessMode.PUBLIC_PROJECTION) {
-            // PUBLIC pipeline: explicit policy only; skip scope/binding/relation entirely.
-            if (publicAccessPolicy.allows(request.permission(), request.resource())) {
-                return allow(request, AuthorizationReasonCodes.PUBLIC_ALLOWED);
-            }
-            return deny(request, AuthorizationReasonCodes.NO_PUBLIC_POLICY);
+        if (!permission.resourceType().equals(request.resource().resourceType())) {
+            return deny(request, AuthorizationReasonCodes.RESOURCE_TYPE_MISMATCH);
         }
 
-        // AUTHENTICATED pipeline: anonymous can never enter it.
+        if (request.accessMode() == AccessMode.PUBLIC_PROJECTION) {
+            return decidePublic(request, permission);
+        }
+        return decideAuthenticated(request, permission);
+    }
+
+    private AuthorizationDecision decidePublic(AuthorizationRequest request, Permission permission) {
+        if (!publicAccessPolicy.allows(request.permission(), request.resource())) {
+            return deny(request, AuthorizationReasonCodes.NO_PUBLIC_POLICY);
+        }
+        if (permission.riskTier() == RiskTier.HIGH
+                && request.context().assurance() != AuthorizationContext.Assurance.RECENT_STRONG) {
+            return AuthorizationDecision.challenge(
+                    AuthorizationReasonCodes.STRONG_AUTH_REQUIRED, policyVersion, request.context().evaluatedAt());
+        }
+        return allow(request, AuthorizationReasonCodes.PUBLIC_ALLOWED);
+    }
+
+    private AuthorizationDecision decideAuthenticated(AuthorizationRequest request, Permission permission) {
         if (!(request.requester() instanceof Requester.Authenticated subject)) {
             return deny(request, AuthorizationReasonCodes.AUTHENTICATED_REQUIRED);
         }
 
-        // OAuth scope ceiling (issuer/audience are resolved by the security layer, not this module).
+        if (permission.systemOnly() && subject.subjectRef().type() != SubjectType.SERVICE) {
+            return deny(request, AuthorizationReasonCodes.SYSTEM_ONLY);
+        }
+
         boolean scopeOk = subject.scopeCeiling().stream()
                 .anyMatch(scope -> scopeCeiling.permits(scope, request.permission()));
         if (!scopeOk) {
             return deny(request, AuthorizationReasonCodes.SCOPE_CEILING);
         }
 
-        // credential tenant is an uncrossable ceiling for tenant-owned resources.
         if (subject.credentialTenantId() != null
                 && request.resource().authoritativeTenantId() != null
                 && !subject.credentialTenantId().equals(request.resource().authoritativeTenantId())) {
@@ -96,23 +118,32 @@ public final class AuthorizationService {
         }
 
         GrantPath path = domainPolicy.pathFor(request.permission());
-        boolean bindingOk = bindingResolver.liveBindings(subject.subjectRef()).stream()
-                .anyMatch(binding -> binding.isLive(request.permission(), request.resource(), request.context().evaluatedAt()));
-        boolean relationOk = domainPolicy.relationAllows(
-                subject, request.permission(), request.resource(), request.context()) == RelationOutcome.ALLOWED;
+
+        boolean bindingGrant = bindingResolver.liveBindings(subject.subjectRef()).stream()
+                .filter(b -> b.subject().equals(subject.subjectRef()))
+                .filter(b -> !(b.scope() instanceof Scope.Global)
+                        || subject.subjectRef().type() == SubjectType.SERVICE)
+                .anyMatch(b -> b.isLive(request.permission(), request.resource(), request.context().evaluatedAt()));
+
+        boolean relationGrant = domainPolicy.relationGrants(
+                subject, request.permission(), request.resource(), request.context());
+
+        boolean stateOk = domainPolicy.resourceStateSatisfies(
+                subject, request.permission(), request.resource(), request.context());
 
         boolean granted = switch (path) {
-            case BINDING_REQUIRED -> bindingOk;
-            case RELATION_DERIVED -> relationOk;
-            case BINDING_OR_RELATION -> bindingOk || relationOk;
+            case BINDING_REQUIRED -> bindingGrant && stateOk;
+            case RELATION_DERIVED -> relationGrant && stateOk;
+            case BINDING_OR_RELATION -> (bindingGrant || relationGrant) && stateOk;
         };
+
         if (!granted) {
             return deny(request, path == GrantPath.RELATION_DERIVED
                     ? AuthorizationReasonCodes.NO_RELATION
+                    : !stateOk ? AuthorizationReasonCodes.STATE_DENIED
                     : AuthorizationReasonCodes.NO_BINDING);
         }
 
-        // HIGH-risk actions require recent strong authentication; otherwise CHALLENGE (never ALLOW).
         if (permission.riskTier() == RiskTier.HIGH
                 && request.context().assurance() != AuthorizationContext.Assurance.RECENT_STRONG) {
             return AuthorizationDecision.challenge(
