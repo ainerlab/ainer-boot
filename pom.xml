@@ -18,6 +18,7 @@
         <module>ainer-module-identity</module>
         <module>ainer-module-workspace</module>
         <module>ainer-module-ai-runtime</module>
+        <module>ainer-module-authorization</module>
         <module>ainer-server</module>
         <module>ainer-authorization-server</module>
     </modules>
