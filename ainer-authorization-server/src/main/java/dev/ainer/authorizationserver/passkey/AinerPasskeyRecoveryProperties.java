@@ -1,6 +1,6 @@
 package dev.ainer.authorizationserver.passkey;
 
-import jakarta.validation.constraints.Positive;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -12,7 +12,7 @@ public final class AinerPasskeyRecoveryProperties {
 
     private final boolean enabled;
     private final boolean selfServiceEnabled;
-    @Positive
+    @DurationMin(nanos = 1)
     private final Duration approvalTtl;
 
     public AinerPasskeyRecoveryProperties(boolean enabled, boolean selfServiceEnabled, Duration approvalTtl) {

@@ -1,6 +1,6 @@
 package dev.ainer.server.identity;
 
-import jakarta.validation.constraints.Positive;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -12,9 +12,9 @@ public class WorkspaceAccessEventConsumerProperties {
 
     private final boolean enabled;
     private final String trustedPublisherSubject;
-    @Positive
+    @DurationMin(nanos = 1)
     private final Duration maxFutureSkew;
-    @Positive
+    @DurationMin(nanos = 1)
     private final Duration propagationSlo;
 
     public WorkspaceAccessEventConsumerProperties(

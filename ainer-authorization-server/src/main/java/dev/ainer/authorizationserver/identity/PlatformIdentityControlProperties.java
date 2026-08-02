@@ -1,7 +1,7 @@
 package dev.ainer.authorizationserver.identity;
 
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.Positive;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -15,9 +15,9 @@ public class PlatformIdentityControlProperties {
 
     private final boolean enabled;
     private final List<String> operatorClientIds;
-    @Positive
+    @DurationMin(nanos = 1)
     private final Duration requestTtl;
-    @Positive
+    @DurationMin(nanos = 1)
     private final Duration activationTtl;
     @Min(1)
     private final int activationMaxAttempts;

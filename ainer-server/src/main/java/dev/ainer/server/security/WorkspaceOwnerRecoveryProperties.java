@@ -1,6 +1,6 @@
 package dev.ainer.server.security;
 
-import jakarta.validation.constraints.Positive;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -11,7 +11,7 @@ import java.time.Duration;
 public class WorkspaceOwnerRecoveryProperties {
 
     private final boolean enabled;
-    @Positive
+    @DurationMin(nanos = 1)
     private final Duration approvalTtl;
 
     public WorkspaceOwnerRecoveryProperties(boolean enabled, Duration approvalTtl) {

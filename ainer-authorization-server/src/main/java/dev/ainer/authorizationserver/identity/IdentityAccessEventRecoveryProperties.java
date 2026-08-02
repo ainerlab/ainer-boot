@@ -1,7 +1,7 @@
 package dev.ainer.authorizationserver.identity;
 
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.Positive;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -12,7 +12,7 @@ import java.time.Duration;
 public class IdentityAccessEventRecoveryProperties {
 
     private final boolean enabled;
-    @Positive
+    @DurationMin(nanos = 1)
     private final Duration approvalTtl;
     @Min(1)
     private final int maxAttempts;

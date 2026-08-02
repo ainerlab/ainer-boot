@@ -1,7 +1,7 @@
 package dev.ainer.server.security;
 
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.Positive;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -12,11 +12,11 @@ import java.time.Duration;
 public class WorkspaceAuthorizationAuditRetentionProperties {
 
     private final boolean enabled;
-    @Positive
+    @DurationMin(nanos = 1)
     private final Duration hotRetention;
-    @Positive
+    @DurationMin(nanos = 1)
     private final Duration fixedDelay;
-    @Positive
+    @DurationMin(nanos = 1)
     private final Duration deniedWindow;
     @Min(1)
     private final int batchSize;

@@ -13,6 +13,7 @@ import dev.ainer.module.ai.gateway.policy.PromptFingerprint;
 import dev.ainer.module.ai.gateway.policy.SensitiveDataPolicy;
 import dev.ainer.module.ai.gateway.policy.TenantRateLimiter;
 import dev.ainer.module.ai.gateway.policy.TokenEstimator;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -48,7 +49,7 @@ public class AiGatewayApplicationService {
             PromptFingerprint promptFingerprint,
             SensitiveDataPolicy sensitiveDataPolicy,
             TenantRateLimiter rateLimiter,
-            ExecutorService streamExecutor,
+            @Qualifier("aiStreamExecutor") ExecutorService streamExecutor,
             Clock clock) {
         this.properties = properties;
         this.provider = provider;
