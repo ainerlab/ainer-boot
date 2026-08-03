@@ -3,17 +3,19 @@ package dev.ainer.authorization.domain;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Immutable authorization decision (ADR-0030 §6). {@link AuthorizationOutcome#CHALLENGE} means the action
- * must not execute until the requested challenge is satisfied and the decision re-evaluated; it is never
- * an ALLOW. {@code publicProjection} carries the required field projection for PUBLIC ALLOW.
+ * must not execute until {@link #challenge()} is satisfied and the decision re-evaluated; it is never an
+ * ALLOW. {@link #obligations()} carries typed constraints the caller must execute before the effect reaches
+ * the client.
  *
- * <p>{@code decisionId} is a <strong>UUIDv7</strong> (RFC 9562) — time-ordered for audit correlation,
- * consistent with Ainer's PostgreSQL 18 {@code uuidv7()} convention (ADR-0020).
+ * <p>{@code decisionId} is a UUIDv7 (RFC 9562) — time-ordered for audit correlation, consistent with Ainer's
+ * PostgreSQL 18 {@code uuidv7()} convention (ADR-0020).
  */
 public record AuthorizationDecision(
         UUID decisionId,
@@ -22,7 +24,8 @@ public record AuthorizationDecision(
         String policyVersion,
         Instant evaluatedAt,
         @Nullable Instant validUntil,
-        @Nullable PublicProjection publicProjection) {
+        @Nullable Challenge challenge,
+        List<DecisionObligation> obligations) {
 
     public AuthorizationDecision {
         Objects.requireNonNull(decisionId, "decisionId");
@@ -30,18 +33,13 @@ public record AuthorizationDecision(
         Objects.requireNonNull(reasonCode, "reasonCode");
         Objects.requireNonNull(policyVersion, "policyVersion");
         Objects.requireNonNull(evaluatedAt, "evaluatedAt");
+        obligations = obligations != null ? List.copyOf(obligations) : List.of();
     }
 
     public boolean isAllowed() {
         return outcome == AuthorizationOutcome.ALLOW;
     }
 
-    /**
-     * Generates a UUIDv7 (RFC 9562): 48-bit Unix-millisecond timestamp + version 7 + 74 random bits.
-     * Time-ordered for audit sortability; generated in-JVM because the decision is evaluated before any
-     * database round-trip. Persisted audit rows in S1 use PostgreSQL {@code uuidv7()} for their own PKs
-     * and store this decisionId as a correlation column.
-     */
     private static UUID newDecisionId() {
         long timestampMs = System.currentTimeMillis();
         var random = ThreadLocalRandom.current();
@@ -52,22 +50,25 @@ public record AuthorizationDecision(
 
     public static AuthorizationDecision allow(ReasonCode reasonCode, String policyVersion, Instant evaluatedAt) {
         return new AuthorizationDecision(
-                newDecisionId(), AuthorizationOutcome.ALLOW, reasonCode, policyVersion, evaluatedAt, null, null);
+                newDecisionId(), AuthorizationOutcome.ALLOW, reasonCode, policyVersion, evaluatedAt, null, null, List.of());
     }
 
     public static AuthorizationDecision allowPublic(
             ReasonCode reasonCode, String policyVersion, Instant evaluatedAt, PublicProjection projection) {
         return new AuthorizationDecision(
-                newDecisionId(), AuthorizationOutcome.ALLOW, reasonCode, policyVersion, evaluatedAt, null, projection);
+                newDecisionId(), AuthorizationOutcome.ALLOW, reasonCode, policyVersion,
+                evaluatedAt, null, null, List.of(projection));
     }
 
     public static AuthorizationDecision deny(ReasonCode reasonCode, String policyVersion, Instant evaluatedAt) {
         return new AuthorizationDecision(
-                newDecisionId(), AuthorizationOutcome.DENY, reasonCode, policyVersion, evaluatedAt, null, null);
+                newDecisionId(), AuthorizationOutcome.DENY, reasonCode, policyVersion, evaluatedAt, null, null, List.of());
     }
 
-    public static AuthorizationDecision challenge(ReasonCode reasonCode, String policyVersion, Instant evaluatedAt) {
+    public static AuthorizationDecision challengeAuthentication(
+            ReasonCode reasonCode, String policyVersion, Instant evaluatedAt) {
         return new AuthorizationDecision(
-                newDecisionId(), AuthorizationOutcome.CHALLENGE, reasonCode, policyVersion, evaluatedAt, null, null);
+                newDecisionId(), AuthorizationOutcome.CHALLENGE, reasonCode, policyVersion, evaluatedAt,
+                null, new Challenge.AuthenticationChallenge(AuthorizationContext.Assurance.RECENT_STRONG), List.of());
     }
 }

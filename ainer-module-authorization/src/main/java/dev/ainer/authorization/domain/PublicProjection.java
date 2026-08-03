@@ -7,7 +7,7 @@ import java.util.Objects;
  * anonymous/public access is allowed; the HTTP adapter must apply this projection before sending the
  * response. A bare boolean ALLOW without a projection is insufficient.
  */
-public record PublicProjection(String descriptor) {
+public record PublicProjection(String descriptor) implements DecisionObligation {
 
     public PublicProjection {
         Objects.requireNonNull(descriptor, "descriptor");

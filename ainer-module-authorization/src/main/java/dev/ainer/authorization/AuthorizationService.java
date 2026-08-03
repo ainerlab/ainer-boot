@@ -91,7 +91,7 @@ public final class AuthorizationService {
         }
         if (permission.riskTier() == RiskTier.HIGH
                 && request.context().assurance() != AuthorizationContext.Assurance.RECENT_STRONG) {
-            return AuthorizationDecision.challenge(
+            return AuthorizationDecision.challengeAuthentication(
                     AuthorizationReasonCodes.STRONG_AUTH_REQUIRED, policyVersion, request.context().evaluatedAt());
         }
         return AuthorizationDecision.allowPublic(
@@ -149,7 +149,7 @@ public final class AuthorizationService {
 
         if (permission.riskTier() == RiskTier.HIGH
                 && request.context().assurance() != AuthorizationContext.Assurance.RECENT_STRONG) {
-            return AuthorizationDecision.challenge(
+            return AuthorizationDecision.challengeAuthentication(
                     AuthorizationReasonCodes.STRONG_AUTH_REQUIRED, policyVersion, request.context().evaluatedAt());
         }
         return allow(request, AuthorizationReasonCodes.AUTHORIZED);
