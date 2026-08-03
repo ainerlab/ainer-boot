@@ -112,6 +112,29 @@ class AuthorizationServiceTest {
     }
 
     @Test
+    void globalScopeBindingDeniedForNonServiceSubject() {
+        SubjectBinding globalBinding = new SubjectBinding(
+                user, new Role("r", Set.of(READ)), new Scope.Global(),
+                BindingStatus.ACTIVE, NOW.minusSeconds(3600), null, 1L);
+        var svc = service((p, r) -> java.util.Optional.empty(), bindingRequiredWithState(READ, true),
+                subject -> Set.of(globalBinding));
+        assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, READ, DOC, ownedDocId)
+                .outcome()).isEqualTo(AuthorizationOutcome.DENY);
+    }
+
+    @Test
+    void bindingFromDifferentSubjectFilteredOut() {
+        SubjectRef otherUser = new SubjectRef("ainer", "user-2", SubjectType.USER);
+        SubjectBinding othersBinding = new SubjectBinding(
+                otherUser, new Role("r", Set.of(READ)), new Scope.Resource(tenant, DOC, ownedDocId),
+                BindingStatus.ACTIVE, NOW.minusSeconds(3600), null, 1L);
+        var svc = service((p, r) -> java.util.Optional.empty(), bindingRequiredWithState(READ, true),
+                subject -> Set.of(othersBinding));
+        assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, READ, DOC, ownedDocId)
+                .outcome()).isEqualTo(AuthorizationOutcome.DENY);
+    }
+
+    @Test
     void publicProjectionAllowsWhenPolicyPresentAndSkipsAuthenticated() {
         var svc = service((p, r) -> r.resourceId().equals(publicDocId) ? java.util.Optional.of(new PublicProjection("public")) : java.util.Optional.empty(), alwaysBinding(READ), none());
         assertThat(auth(svc, new Requester.Anonymous(), AccessMode.PUBLIC_PROJECTION, READ, DOC, publicDocId)
