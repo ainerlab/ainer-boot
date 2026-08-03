@@ -80,7 +80,7 @@ ainer-boot/
 │   ├── ainer-starter-observability/
 │   └── ainer-starter-test/
 ├── ainer-module-identity/                # 用户、tenant、成员关系与身份生命周期
-├── ainer-module-authorization/           # Proposed：Permission、Role、Binding、Decision 与查询授权扩展
+├── ainer-module-authorization/           # S0 已落地：Permission/Role/Binding/Decision 契约与纯决策器；S1-S3 待实施
 ├── ainer-module-organization/            # Proposed：可选组织、员工任职、岗位与团队目录
 ├── ainer-module-workspace/               # 已租户化的资源授权参考切片
 ├── ainer-module-ai-runtime/              # 模型网关、调用与费用审计
@@ -91,8 +91,12 @@ ainer-boot/
 
 这些是演进方向，不代表应一次性创建所有空模块。模块只在拥有明确职责、测试和消费者时落地。
 
-`ainer-module-authorization` 当前尚未创建，其通用混合细粒度授权、集合查询、Spring Security
-适配与 Agent 第二切片边界见
+`ainer-module-authorization` 已落地 S0（ADR-0030）：不可变领域类型（Permission、Role、SubjectBinding、
+Scope、AuthorizationDecision）、PermissionRegistry（冲突检测）、AuthorizationService（grant-path
+真值表纯决策器，含 resourceType/systemOnly/GLOBAL/scope 安全检查与 HIGH-risk Challenge 收口），
+全部 Spring-free、@NullMarked，16 项测试通过。S1（PostgreSQL 持久化 + DB Binding resolver）、
+S2（Spring AuthorizationManager adapter + 管理 API）、S3（关系/查询/Golden Consumer）及 Agent
+（ADR-0031）与组织（ADR-0032）尚未实现。详见
 [`Ainer 通用授权与 AI 代行详细方案`](design/authorization-architecture-plan.md)、
 [ADR-0030](decisions/0030-hybrid-fine-grained-authorization-baseline.md) 与
 [ADR-0031](decisions/0031-agent-delegation-and-ai-context-authorization.md)。该模块不会接管

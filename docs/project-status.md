@@ -370,9 +370,12 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 ### 访问控制
 
-- 通用混合细粒度授权与 Agent 代行当前只有 ADR-0030/0031 和详细方案；
-  `ainer-module-authorization`、Permission/Role/Binding/Decision、集合查询授权、管理 API、
-  外部 Golden Consumer 与 ActingGrant 尚未实现，不能把设计描述为已交付能力；现有人员登录与
+- 通用混合细粒度授权 S0 已落地（ADR-0030）：`ainer-module-authorization` 拥有不可变领域契约
+  （Permission/Role/SubjectBinding/Scope/AuthorizationDecision）、PermissionRegistry（冲突检测）
+  和 AuthorizationService 纯决策器（grant-path 真值表 + resourceType/systemOnly/GLOBAL/scope 安全
+  检查 + HIGH-risk Challenge + PublicAccessPolicy 投影），16 项测试通过。但 S1（PostgreSQL 持久化）、
+  S2（Spring adapter + 管理 API）、S3（关系/查询/Golden Consumer 验证）、Agent 代行（ADR-0031）
+  与组织（ADR-0032）尚未实现；现有人员登录与
   `AuthenticatedActorResolver` 仍要求 ACTIVE tenant membership，tenantless USER consumer client/
   签发/解析/撤销合同也尚未实现，不能仅凭 Proposed 可空 principal 宣称已支持真实顾客；
 - 组织与员工目录当前只有 ADR-0032 和详细方案；`ainer-module-organization`、OrgUnit、
