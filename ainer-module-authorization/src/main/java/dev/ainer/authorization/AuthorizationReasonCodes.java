@@ -20,6 +20,7 @@ public final class AuthorizationReasonCodes {
     public static final ReasonCode STATE_DENIED = new ReasonCode("STATE_DENIED");
     public static final ReasonCode RESOURCE_TYPE_MISMATCH = new ReasonCode("RESOURCE_TYPE_MISMATCH");
     public static final ReasonCode SYSTEM_ONLY = new ReasonCode("SYSTEM_ONLY");
+    public static final ReasonCode UNKNOWN_POLICY = new ReasonCode("UNKNOWN_POLICY");
     public static final ReasonCode STRONG_AUTH_REQUIRED = new ReasonCode("STRONG_AUTH_REQUIRED");
     public static final ReasonCode AUTHORIZED = new ReasonCode("AUTHORIZED");
     public static final ReasonCode UNEXPECTED = new ReasonCode("UNEXPECTED");

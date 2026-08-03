@@ -5,6 +5,7 @@ import dev.ainer.authorization.domain.GrantPath;
 import dev.ainer.authorization.domain.PermissionCode;
 import dev.ainer.authorization.domain.Requester;
 import dev.ainer.authorization.domain.ResourceRef;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Declares the authenticated grant path for an action and evaluates two independent facets
@@ -21,7 +22,7 @@ import dev.ainer.authorization.domain.ResourceRef;
  */
 public interface DomainAuthorizationPolicy {
 
-    GrantPath pathFor(PermissionCode permission);
+    @Nullable GrantPath pathFor(PermissionCode permission);
 
     boolean relationGrants(
             Requester.Authenticated subject,

@@ -121,6 +121,9 @@ public final class AuthorizationService {
         }
 
         GrantPath path = domainPolicy.pathFor(request.permission());
+        if (path == null) {
+            return deny(request, AuthorizationReasonCodes.UNKNOWN_POLICY);
+        }
 
         boolean bindingGrant = bindingResolver.liveBindings(subject.subjectRef()).stream()
                 .filter(b -> b.subject().equals(subject.subjectRef()))
