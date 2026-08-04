@@ -168,6 +168,18 @@ Maven 4 基线必须持续通过以下门禁：
 - 两次干净构建通过项目定义的可重复性比较；
 - POM 4.1、`packaging=bom` 和版本推导未混入本阶段变更。
 
+## 验收记录
+
+- 2026-08-04：RC6 现已正式同步到 Maven Central（`repo.maven.apache.org`，HTTP 200）。此前 wrapper 的
+  `distributionSha256Sum` 取自 Apache 临时候选目录那份发行包，与 Central 正式发布版字节不同，导致
+  `./mvnw` SHA 校验失败。已用 Central 正式发布版的 SHA-256（`e7a17cac…`，经官方 `.sha512` 兄弟文件
+  `8167e73d…` 交叉校验）更新 `.mvn/wrapper/maven-wrapper.properties`。更新后从干净缓存首次跑通：
+  `./mvnw --version` 与 `./mvnw clean verify`（JDK 25）均通过，15 模块 BUILD SUCCESS，
+  326 tests / 0 failure / 0 error。
+- 仍待关闭：`./mvnw clean verify` 的 0-skipped Testcontainers 门禁（Testcontainers 2.0.5 在 macOS Colima
+  下不自动探测 colima socket，105 个集成测试仍 skip；CI Docker 环境与 socket 探测配置另作）；候选 CI
+  首次成功与分支保护；许可证与秘密扫描。这些不改变「Wrapper 已端到端可用」的事实。
+
 ## 参考
 
 - [Ainer 工程约定](../conventions.md)

@@ -142,6 +142,20 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
 
 ## 3. 最近验证记录
 
+2026-08-04 关闭 P0 的 Maven 4 Wrapper 阻断。RC6 现已正式同步到 Maven Central
+（`https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/4.0.0-rc-6/`，HTTP 200）。此前
+`.mvn/wrapper/maven-wrapper.properties` 的 `distributionSha256Sum` 取自 Apache 临时候选目录那份发行包，
+与 Central 正式发布版字节不同，导致 `./mvnw` 报 "Failed to validate Maven distribution SHA-256"。已用
+Central 正式发布版的 SHA-256 更新 wrapper（`e7a17cac…`，并经官方 `.sha512` 兄弟文件 `8167e73d…` 交叉
+校验证明为 Apache 真品）。更新后从干净缓存首次跑通：`./mvnw --version` 显示 Maven 4.0.0-rc-6；
+`./mvnw clean verify`（JDK 25、Docker/Colima 在线）15 模块 BUILD SUCCESS，326 tests / 0 failure / 0 error /
+**105 skipped**。根因不是「Central 未同步 RC6」，而是 wrapper SHA 过期。仍待关闭：0-skipped 门禁——
+Testcontainers 2.0.5 在 macOS Colima 下只探测 `/var/run/docker.sock`、docker-machine 与 Docker Desktop，
+不读 active docker context（colima）也不读 `DOCKER_HOST`，故 105 个 `@Testcontainers(disabledWithoutDocker=true)`
+集成测试即便 Colima 在线仍跳过；`DOCKER_HOST` 与 `~/.testcontainers.properties` 的 `docker.host` 在本机均未
+生效，需 CI Docker 环境与 socket 探测配置。此前 07-30 曾在 Colima 取得过 0-skipped，因此可达，属本机/CI
+环境配置而非构建问题。
+
 2026-07-31 静态核对当前工作树：`ainer-starter-web` 已使用
 `spring-boot-starter-webmvc` 与 `spring-boot-starter-webmvc-test`，ADR-0029 T0 第 1 项的
 Web Starter 实现范围已经落地。当前工作树的最终 Maven 4 验证仍未完成：Wrapper 配置的
@@ -431,13 +445,15 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 - MyBatis-Plus Boot 4 starter 的真实 PostgreSQL 原型、全量 Reactor、既有复杂 XML 与
   Maven 3/Maven 4 外部 consumer 回归已经通过；后续风险转为版本升级回归、规则误用和正式 CI
   尚未固化这些门禁；
-- Maven 4.0.0-rc-6 仍是 preview；隔离原型、Wrapper 配置和相关 POM 修改已经实现，但 Maven
-  Central 发行包尚未同步，持久地址返回 404，当前无法完成最终的 `./mvnw --version` 与
-  `./mvnw clean verify`；完成 Wrapper 端到端验证前不能把构建切换描述为实施完成，也不能据此
-  形成发布候选；
+- Maven 4.0.0-rc-6 仍是 preview；RC6 已于 2026-08-04 确认正式同步到 Maven Central，wrapper SHA 已
+  修正为 Central 正式发布版校验值，`./mvnw --version` 与 `./mvnw clean verify` 已从干净缓存跑通
+  （15 模块 BUILD SUCCESS，0 failure/0 error）。仍待关闭的是 0-skipped Testcontainers 门禁：
+  Testcontainers 2.0.5 在 macOS Colima 下不自动探测 colima socket（见 §3 2026-08-04 记录），
+  以及候选 CI 首次成功、分支保护、许可证与秘密扫描；在此之前不能形成发布候选；
 - 已增加只读权限的候选 GitHub Actions 质量门禁，编排 JDK 25、Maven 4、Docker、
-  PostgreSQL/Testcontainers `skipped=0`、Maven 3/4 consumer 与短期 CycloneDX SBOM；RC6
-  官方发行包仍返回 404，工作流尚未首次成功，也尚未设为分支必需检查，因此不能称为正式 CI；
+  PostgreSQL/Testcontainers `skipped=0`、Maven 3/4 consumer 与短期 CycloneDX SBOM；RC6 已上
+  Central 且本地 `./mvnw clean verify` 通过，但工作流尚未首次成功（0-skipped Testcontainers 探测与
+  CI Docker 环境仍待配置），也尚未设为分支必需检查，因此不能称为正式 CI；
   制品签名、发布仓库、provenance 和自动部署仍未实现；
 - 没有具名模块维护者矩阵、`CODEOWNERS` 和正式审查责任分配；
 - 没有生产备份恢复、容量测试、正式错误预算/告警路由和灾难恢复演练；
@@ -489,8 +505,10 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 产品化主线调整为先关闭 P0，再依次进入 P1 Scaffold Ready、P2 Create & Generate 和 P3 首个外部
 消费者。近期可交付顺序是：
 
-1. 等待 RC6 官方持久发行包同步，跑通候选 CI 的 PostgreSQL 18 `0 skipped`、consumer、SBOM
-   与文档一致性门禁，并把成功工作流设为分支必需检查；随后补齐许可证选择和秘密扫描，关闭 P0；
+1. RC6 已上 Central、wrapper 已修正、本地 `./mvnw clean verify` 已通过（2026-08-04）；下一步在 CI
+   环境配置 Testcontainers 对 Colima/Docker socket 的探测以达成 `0 skipped`，跑通候选 CI 的
+   PostgreSQL 18、consumer、SBOM 与文档一致性门禁，并把成功工作流设为分支必需检查；随后补齐
+   许可证选择和秘密扫描，关闭 P0；
 2. 让 Wrapper 官方持久端点、非 SNAPSHOT 制品、最小 off-state 应用与 Maven 3.9+/4 外部消费者
    形成可重复发布验证记录，关闭 P1；
 3. 交付 manifest v1、preview/diff、确定性生成与 TTFR/TTCRUD golden consumer，关闭 P2；
