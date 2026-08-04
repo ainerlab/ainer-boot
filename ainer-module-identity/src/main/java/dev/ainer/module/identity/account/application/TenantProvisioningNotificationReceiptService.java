@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
@@ -139,7 +140,7 @@ public class TenantProvisioningNotificationReceiptService {
                 command.eventId(),
                 command.notificationId(),
                 command.status(),
-                command.occurredAt(),
+                command.occurredAt().truncatedTo(ChronoUnit.MICROS),
                 failureCode);
     }
 
