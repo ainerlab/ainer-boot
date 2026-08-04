@@ -69,7 +69,10 @@ TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock \
 ./mvnw clean verify
 ```
 
-启动后可用 `colima status` 与 `docker context inspect colima` 核对 runtime 和 socket。最终仍以 Surefire 报告中的 `skipped=0` 为准，不能仅根据 Docker daemon 可访问就宣称数据库测试已执行。
+`TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 不可省略：否则 Testcontainers 的 Ryuk 容器会尝试 bind-mount 裸 Colima
+socket 路径，virtiofs 报 `operation not supported`，Ryuk 启动失败使 `DockerAvailableDetector` 误判无 Docker，
+`disabledWithoutDocker` 会跳过全部集成测试。启动后可用 `colima status` 与 `docker context inspect colima` 核对
+runtime 和 socket。最终仍以 Surefire 报告中的 `skipped=0` 为准，不能仅根据 Docker daemon 可访问就宣称数据库测试已执行。
 
 修改 `ainer-starter-persistence`、MyBatis-Plus 或 JSqlParser 时，除完整 Reactor 外还必须执行
 starter 的真实 PostgreSQL 兼容测试，覆盖 `BaseMapper`、数据库 UUIDv7 生成键回填、自定义 XML、
