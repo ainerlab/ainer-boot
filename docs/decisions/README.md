@@ -1,6 +1,6 @@
 # Ainer 架构决策记录
 
-> 文档类型：决策索引 · 状态：生效 · 最近核对：2026-08-02
+> 文档类型：决策索引 · 状态：生效 · 最近核对：2026-08-04
 
 ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是实现日志，也不替代 API 或运行手册。
 
@@ -40,6 +40,21 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0030](0030-hybrid-fine-grained-authorization-baseline.md) | Proposed | 通用混合细粒度授权基线 |
 | [0031](0031-agent-delegation-and-ai-context-authorization.md) | Proposed | Agent 代行、Capability 与 AI 上下文授权基线 |
 | [0032](0032-organization-workforce-directory-baseline.md) | Proposed | 组织、员工任职与 SubjectSet 授权基线 |
+| [0033 Greenfield](0033-account-workspace-subject-isolation-greenfield-baseline.md) | Accepted | Account、Workspace、Subject 与 Isolation Greenfield 基线（Option B：完全移除 Tenant；目标基线，按 Impact Stage 0–8 执行） |
+| [0034](0034-knowledge-foundation-and-ai-context-model.md) | Proposed | Knowledge Foundation 与 AI Context Model 基线 |
+
+## 历史草案与审查记录
+
+| Record | Standing | Document status | Note |
+|---|---|---|---|
+| [ADR-0033 v1](0033-account-workspace-isolation-model-baseline.md) | Historical draft; never effective | Historical | 保留 Account-first / God Workspace 初稿；2026-08-04 由 Greenfield 收口 |
+| [ADR-0033 v2](0033-account-workspace-isolation-model-baseline-v2.md) | Historical draft; never effective | Historical | 迁移兼容路线草案（LegacyTenantRef/facet mapping）；2026-08-04 不采用，保留为迁移备选语境 |
+| [ADR-0033 Adversarial Review](../architecture/adr-0033-adversarial-review.md) | Review record | N/A | 结论：`C. Major revision required`，导致 v2，最终导向 Greenfield |
+
+ADR-0033 Greenfield（Option B）于 2026-08-04 被 Accepted 为 Foundation 目标基线；v1/v2 均为 Historical，
+不采用。Greenfield reset 按 [Impact 文档](../architecture/ainer-foundation-greenfield-reset-impact.md) Stage 0–8
+执行，完成前既有 Accepted tenant、JWT、内层 Workspace 与 OWNER 规则仍是当前运行权威；接受不授权立即
+修改代码，每个 Stage 独立验收。
 
 ## 何时需要 ADR
 

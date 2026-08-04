@@ -113,9 +113,11 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
   loopback Authorization Server systemd、版本化 JAR/Studio/Admin、原子切换/校验回滚、
   Let's Encrypt 和精确同源 Nginx 配置；真实 Chromium 已完成 PKCE、成员治理、revoke、
   OIDC logout 和退出后重新登录门禁；
-- ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0020、ADR-0022 与 ADR-0024 至 ADR-0028 已接受，
-  ADR-0012 至 ADR-0014、ADR-0021、ADR-0023、ADR-0029 至 ADR-0032 处于 Proposed；
-  架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
+- ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0020、ADR-0022、ADR-0024 至 ADR-0028 与 ADR-0033 Greenfield
+  已接受（0033 Greenfield 为目标基线，Option B：完全移除 Tenant；按
+  [Impact](architecture/ainer-foundation-greenfield-reset-impact.md) Stage 0–8 执行，接受不授权
+  立即改代码）；ADR-0012 至 ADR-0014、ADR-0021、ADR-0023、ADR-0029 至 ADR-0032 与 ADR-0034 处于 Proposed；
+  ADR-0033 v1/v2 标记 Historical；架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
 - M4.8B 租户上下文选择代码基线：`GET /api/me/tenants` 返回当前 USER 的 ACTIVE membership
   安全投影（tenant ID/code/name/role/is_default），LOCKED/DISABLED tenant/user/membership
   不返回；`AinerTenantSelectionFilter` 在 Authorization Code + PKCE 流程的 authorization

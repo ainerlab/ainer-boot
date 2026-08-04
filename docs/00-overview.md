@@ -1,6 +1,6 @@
 # Ainer 文档总览：从这里开始
 
-> 文档类型：统一入口 · 状态：生效 · 最近核对：2026-08-02 · 适用版本：`0.1.x`
+> 文档类型：统一入口 · 状态：生效 · 最近核对：2026-08-03 · 适用版本：`0.1.x`
 
 本文是 Ainer Boot 文档的唯一权威入口。它帮助开发者、架构师和 AI agent 先建立同一份项目心智
 模型，再进入具体规范。它不复制各专题文档的细节，也不替代当前状态、架构规范或 ADR。
@@ -108,8 +108,13 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 1. [`design/paradigm-redesign.md`](design/paradigm-redesign.md)
 2. [`architecture.md`](architecture.md)
 3. [`design/ainer-scaffold-design.md`](design/ainer-scaffold-design.md)
-4. [`decisions/README.md`](decisions/README.md)
-5. 先新增或取代 ADR，再实现重大决策
+4. [`architecture/ainer-boot-ai-application-foundation-audit.md`](architecture/ainer-boot-ai-application-foundation-audit.md)
+5. [`architecture/ainer-foundation-v1-roadmap.md`](architecture/ainer-foundation-v1-roadmap.md)
+6. [`decisions/README.md`](decisions/README.md)
+7. 先新增或取代 ADR，再实现重大决策
+
+Foundation Roadmap 仍是 Proposed；其 mdpress-first 是有条件的路线建议，不会自动取代当前
+`xq-platform-next` first-consumer 决策。消费者顺序改变必须先有独立 ADR。
 
 ### 4.3 HTTP API
 
@@ -130,29 +135,38 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 
 1. [`security.md`](security.md)
 2. [`architecture.md`](architecture.md) 的安全与数据边界
-3. [`decisions/README.md`](decisions/README.md) 中相关安全 ADR；平台 Identity 供应与通知回执
+3. 设计未来 Account、Workspace 与 Isolation 语义时阅读
+   [ADR-0033 Greenfield](decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md)
+   （Accepted 为目标基线，Option B：完全移除 Tenant；按 [Impact](architecture/ainer-foundation-greenfield-reset-impact.md)
+   Stage 0–8 执行）；[v2](decisions/0033-account-workspace-isolation-model-baseline-v2.md)、
+   [v1](decisions/0033-account-workspace-isolation-model-baseline.md) 与
+   [对抗性审查](architecture/adr-0033-adversarial-review.md) 为决策历史。Reset 完成前，当前运行行为仍以
+   既有 Accepted ADR 为准
+4. [`decisions/README.md`](decisions/README.md) 中相关安全 ADR；平台 Identity 供应与通知回执
    重点阅读 [ADR-0019](decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)
    和 [ADR-0021](decisions/0021-provisioning-notification-delivery-receipts.md)
-4. 集成官方参考管理应用时阅读
+5. 集成官方参考管理应用时阅读
    [`ainer-admin-integration.md`](ainer-admin-integration.md) 与
    [ADR-0022](decisions/0022-ainer-admin-browser-integration-baseline.md)
-5. [`configuration.md`](configuration.md)
-6. [`testing.md`](testing.md)
+6. [`configuration.md`](configuration.md)
+7. [`testing.md`](testing.md)
 
 ### 4.6 AI、模型网关、RAG 或 Agent
 
 1. [`ai-gateway.md`](ai-gateway.md)
 2. [ADR-0003](decisions/0003-ai-model-gateway-baseline.md)
-3. 设计多阶段任务或持久产物时读
+3. 设计 Knowledge、Content、Grounding 或 Context Assembly 时先读
+   [ADR-0034](decisions/0034-knowledge-foundation-and-ai-context-model.md)（Proposed）
+4. 设计多阶段任务或持久产物时读
    [`design/ai-runtime-data-model.md`](design/ai-runtime-data-model.md)
-4. 设计 RAG、文档、embedding 或检索时读
+5. 设计 RAG、文档、embedding 或检索时读
    [`design/knowledge-data-model.md`](design/knowledge-data-model.md)
-5. [`security.md`](security.md) 的数据与身份约束
-6. [`database-design-standard.md`](database-design-standard.md) 的 AI 数据规则
-7. [`testing.md`](testing.md)
+6. [`security.md`](security.md) 的数据与身份约束
+7. [`database-design-standard.md`](database-design-standard.md) 的 AI 数据规则
+8. [`testing.md`](testing.md)
 
-两份 `design/` 文档均为 Proposed，只定义候选语义和实现门槛，不代表 Run、Artifact 或 Knowledge
-物理表已经交付。
+ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义边界，后两者提供候选实现模型，
+均不代表 Run、Artifact 或 Knowledge 物理能力已经交付。
 
 ### 4.7 运行、故障处理与发布
 
@@ -192,6 +206,14 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 | [`architecture.md`](architecture.md) | 模块、依赖、发行物、运行模式和数据所有权 |
 | [`design/paradigm-redesign.md`](design/paradigm-redesign.md) | 为什么不沿用旧脚手架范式 |
 | [`design/ainer-scaffold-design.md`](design/ainer-scaffold-design.md) | Ainer Boot 产品定位、竞品能力矩阵、P0–P5 路线与长期架构设计 |
+| [`architecture/ainer-boot-ai-application-foundation-audit.md`](architecture/ainer-boot-ai-application-foundation-audit.md) | 面向 xq-platform 与 mdpress 的 AI Application Foundation 架构审计快照 |
+| [`architecture/ainer-foundation-v1-roadmap.md`](architecture/ainer-foundation-v1-roadmap.md) | Foundation v1 的能力盘点、FV1-P0～P3 施工顺序、产品验证和明确不做（Proposed） |
+| [`decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md`](decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md) | ADR-0033 Greenfield 基线（Accepted 为目标，Option B：完全移除 Tenant；按 Impact Stage 0–8 执行） |
+| [`architecture/ainer-foundation-greenfield-reset-impact.md`](architecture/ainer-foundation-greenfield-reset-impact.md) | Greenfield reset 的删除/重建范围、迁移 baseline、JWT/API/event reset 与 Stage 0–8 执行顺序 |
+| [`decisions/0033-account-workspace-isolation-model-baseline.md`](decisions/0033-account-workspace-isolation-model-baseline.md) | ADR-0033 v1 历史草案（Historical，未生效） |
+| [`architecture/adr-0033-adversarial-review.md`](architecture/adr-0033-adversarial-review.md) | ADR-0033 v1 的对抗性审查与 Major Revision 依据 |
+| [`decisions/0033-account-workspace-isolation-model-baseline-v2.md`](decisions/0033-account-workspace-isolation-model-baseline-v2.md) | ADR-0033 v2 迁移路线草案（Historical，不采用，保留为迁移备选语境） |
+| [`decisions/0034-knowledge-foundation-and-ai-context-model.md`](decisions/0034-knowledge-foundation-and-ai-context-model.md) | Knowledge Foundation、Content/Asset 边界与 AI Context Assembly 基线（Proposed） |
 | [`decisions/README.md`](decisions/README.md) | ADR 状态、索引和模板 |
 
 ### 工程规范
