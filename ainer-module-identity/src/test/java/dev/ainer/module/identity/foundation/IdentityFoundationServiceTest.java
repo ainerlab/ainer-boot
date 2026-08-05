@@ -124,6 +124,11 @@ class IdentityFoundationServiceTest {
             return Optional.ofNullable(store.get(accountId));
         }
 
+        @Override
+        public UUID nextUuidV7() {
+            return UUID.randomUUID();
+        }
+
         int count() {
             return store.size();
         }
@@ -143,7 +148,8 @@ class IdentityFoundationServiceTest {
             return store.values().stream()
                     .filter(l -> l.type() == type
                             && l.providerAuthority().equals(providerAuthority)
-                            && l.normalizedIdentifier().equals(normalizedIdentifier))
+                            && l.normalizedIdentifier().equals(normalizedIdentifier)
+                            && l.status() == LoginIdentityStatus.ACTIVE)
                     .findFirst();
         }
 

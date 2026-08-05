@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.identity.foundation.HumanAccountMapper">
+
+    <resultMap id="humanAccountRow" type="dev.ainer.module.identity.foundation.HumanAccountRow">
+        <id property="id" column="id"/>
+        <result property="issuer" column="issuer"/>
+        <result property="realm" column="realm"/>
+        <result property="status" column="status"/>
+        <result property="securityEpoch" column="security_epoch"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <select id="selectUuidV7" resultType="java.util.UUID">
+        SELECT uuidv7()
+    </select>
+
+    <insert id="insertAccount"
+            parameterType="dev.ainer.module.identity.foundation.HumanAccountRow">
+        INSERT INTO ainer_identity_human_account
+            (id, issuer, realm, status, security_epoch, created_at)
+        VALUES
+            (#{id}, #{issuer}, #{realm}, #{status}, #{securityEpoch}, #{createdAt})
+    </insert>
+
+    <select id="selectByAccountId" resultMap="humanAccountRow">
+        SELECT id, issuer, realm, status, security_epoch, created_at
+        FROM ainer_identity_human_account
+        WHERE id = #{accountId}
+    </select>
+</mapper>

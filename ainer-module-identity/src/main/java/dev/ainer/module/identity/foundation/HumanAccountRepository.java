@@ -16,4 +16,10 @@ public interface HumanAccountRepository {
     void save(HumanAccount account);
 
     Optional<HumanAccount> findByAccountId(UUID accountId);
+
+    /**
+     * Next PostgreSQL UUIDv7 primary key for the foundation aggregate. The account repository owns
+     * id generation so the {@link IdentityFoundationService} can stay persistence-agnostic via a supplier.
+     */
+    UUID nextUuidV7();
 }

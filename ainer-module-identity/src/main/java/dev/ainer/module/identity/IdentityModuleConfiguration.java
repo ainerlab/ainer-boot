@@ -4,7 +4,10 @@ import dev.ainer.core.error.ErrorCodeContributor;
 import dev.ainer.module.identity.account.IdentityFeatureMarker;
 import dev.ainer.module.identity.account.application.IdentityErrorCode;
 import dev.ainer.module.identity.account.infrastructure.mybatis.IdentityMapper;
+import dev.ainer.module.identity.foundation.IdentityFoundationMarker;
+import org.apache.ibatis.annotations.Mapper;
 import org.mybatis.spring.annotation.MapperScan;
+import org.mybatis.spring.annotation.MapperScans;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -18,8 +21,11 @@ import java.util.List;
 
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "ainer.identity", name = "enabled", havingValue = "true", matchIfMissing = true)
-@ComponentScan(basePackageClasses = IdentityFeatureMarker.class)
-@MapperScan(basePackageClasses = IdentityMapper.class)
+@ComponentScan(basePackageClasses = {IdentityFeatureMarker.class, IdentityFoundationMarker.class})
+@MapperScans({
+        @MapperScan(basePackageClasses = IdentityMapper.class),
+        @MapperScan(basePackageClasses = IdentityFoundationMarker.class, annotationClass = Mapper.class)
+})
 public class IdentityModuleConfiguration {
 
     @Bean
