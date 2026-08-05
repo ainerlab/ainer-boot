@@ -210,6 +210,7 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 | [`architecture/ainer-foundation-v1-roadmap.md`](architecture/ainer-foundation-v1-roadmap.md) | Foundation v1 的能力盘点、FV1-P0～P3 施工顺序、产品验证和明确不做（Proposed） |
 | [`decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md`](decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md) | ADR-0033 Greenfield 基线（Accepted 为目标，Option B：完全移除 Tenant；按 Impact Stage 0–8 执行） |
 | [`architecture/ainer-foundation-greenfield-reset-impact.md`](architecture/ainer-foundation-greenfield-reset-impact.md) | Greenfield reset 的删除/重建范围、迁移 baseline、JWT/API/event reset 与 Stage 0–8 执行顺序 |
+| [`architecture/0033-greenfield-cutover-plan.md`](architecture/0033-greenfield-cutover-plan.md) | Greenfield cutover 执行计划：已就绪脊柱基线、C1–C5 有序测试门、开放决策与评审指引 |
 | [`decisions/0033-account-workspace-isolation-model-baseline.md`](decisions/0033-account-workspace-isolation-model-baseline.md) | ADR-0033 v1 历史草案（Historical，未生效） |
 | [`architecture/adr-0033-adversarial-review.md`](architecture/adr-0033-adversarial-review.md) | ADR-0033 v1 的对抗性审查与 Major Revision 依据 |
 | [`decisions/0033-account-workspace-isolation-model-baseline-v2.md`](decisions/0033-account-workspace-isolation-model-baseline-v2.md) | ADR-0033 v2 迁移路线草案（Historical，不采用，保留为迁移备选语境） |

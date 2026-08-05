@@ -118,6 +118,9 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
   [Impact](architecture/ainer-foundation-greenfield-reset-impact.md) Stage 0–8 执行，接受不授权
   立即改代码）；ADR-0012 至 ADR-0014、ADR-0021、ADR-0023、ADR-0029 至 ADR-0032 与 ADR-0034 处于 Proposed；
   ADR-0033 v1/v2 标记 Historical；架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
+- Greenfield S1.2 加法脊柱在 `reset/0033-greenfield` 分支成型且已验证（principal/token-profile/Identity 领域+
+  服务+PostgreSQL 持久化+resolver 参考实现，共 identity 74 + security 26 tests / 0 fail），与 legacy 共存、
+  未接 runtime；破坏性 cutover 待执行，有序施工清单见 [`0033-greenfield-cutover-plan.md`](architecture/0033-greenfield-cutover-plan.md)。
 - M4.8B 租户上下文选择代码基线：`GET /api/me/tenants` 返回当前 USER 的 ACTIVE membership
   安全投影（tenant ID/code/name/role/is_default），LOCKED/DISABLED tenant/user/membership
   不返回；`AinerTenantSelectionFilter` 在 Authorization Code + PKCE 流程的 authorization
