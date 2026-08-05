@@ -142,6 +142,16 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
 
 ## 3. 最近验证记录
 
+2026-08-04(续) CI 首次跑绿 + 基线合入 dev + 许可证决策。
+- CI run 30904716377（`ubuntu-24.04` 原生 Docker）`completed=success`：全量 reactor verify +
+  `check-surefire-results.sh` 0-skipped + Maven 3.9/4 consumer + CycloneDX SBOM。修复 2 个 Instant flaky
+  （纳秒 vs PG `timestamptz` 微秒，commit `397b021`）后首次跑绿——关闭「CI 首次成功」P0 门。
+- PR #2（`codex/scaffold-modern-baseline` → `dev`）已 merge（`5480457`）；scaffold 现代化基线
+  （ADR-0029 P0 / 授权 S0 / Maven 4 RC6 / ADR-0033 Greenfield）集成进 `dev`。
+- 许可证决策：**暂不开源**（私有/专有）。LICENSE P0 项按「不需要 OSS 许可」处理；未来若开源或对外发布，再定商业/开源许可。
+- 分支保护：private 仓库 + GitHub 免费版**无法启用分支保护**（HTTP 403，需 GitHub Pro 或转 public）。CI 仍跑在
+  `pull_request` / `push(dev,main)`，靠「绿了再合」软约束；硬性 gate 待仓库可见性/计费决策。
+
 2026-08-04 关闭 P0 的 Maven 4 Wrapper 阻断。RC6 现已正式同步到 Maven Central
 （`https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/4.0.0-rc-6/`，HTTP 200）。此前
 `.mvn/wrapper/maven-wrapper.properties` 的 `distributionSha256Sum` 取自 Apache 临时候选目录那份发行包，
@@ -149,12 +159,16 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
 Central 正式发布版的 SHA-256 更新 wrapper（`e7a17cac…`，并经官方 `.sha512` 兄弟文件 `8167e73d…` 交叉
 校验证明为 Apache 真品）。更新后从干净缓存首次跑通：`./mvnw --version` 显示 Maven 4.0.0-rc-6；
 `./mvnw clean verify`（JDK 25、Docker/Colima 在线）15 模块 BUILD SUCCESS，326 tests / 0 failure / 0 error /
-**105 skipped**。根因不是「Central 未同步 RC6」，而是 wrapper SHA 过期。仍待关闭：0-skipped 门禁——
-Testcontainers 2.0.5 在 macOS Colima 下只探测 `/var/run/docker.sock`、docker-machine 与 Docker Desktop，
-不读 active docker context（colima）也不读 `DOCKER_HOST`，故 105 个 `@Testcontainers(disabledWithoutDocker=true)`
-集成测试即便 Colima 在线仍跳过；`DOCKER_HOST` 与 `~/.testcontainers.properties` 的 `docker.host` 在本机均未
-生效，需 CI Docker 环境与 socket 探测配置。此前 07-30 曾在 Colima 取得过 0-skipped，因此可达，属本机/CI
-环境配置而非构建问题。
+起初一次跑得 **105 skipped**（根因是 wrapper SHA 过期，已修）。0-skipped 门禁同日关闭：用 `testing.md` §4
+既有的 Colima 配方（`DOCKER_HOST` 指向 Colima socket + `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`）
+跑全量 `./mvnw clean verify`，达成 **326 tests / 0 failure / 0 error / 0 skipped**，`scripts/check-surefire-results.sh`
+通过。先前 105-skip 的真因是 Testcontainers 的 Ryuk 容器无法 bind-mount 裸 Colima socket 路径（virtiofs
+`operation not supported`），导致 `DockerAvailableDetector` 误判无 Docker、`disabledWithoutDocker` 跳过全部 105 个
+集成测试；单独设 `DOCKER_HOST` 不够，必须配合 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 让 Ryuk 把 socket 挂到
+`/var/run/docker.sock`（Colima 映射）。同日 `scripts/verify-maven-consumers.sh` 通过：15 个 consumer POM 无裸
+`${revision}`、3 个制品含配置元数据、`artifact:compare` 可重复性、Maven 3.9+ 与 Maven 4 golden consumer 均能
+经 BOM 构建。至此 ADR-0026 §验收方式 全部本地满足。后续（见下条）：CI 已首次跑绿、PR #2 合入 dev、
+许可证决策为暂不开源；P0 仅剩分支保护（受 private + GitHub 免费版限制）与秘密扫描。
 
 2026-07-31 静态核对当前工作树：`ainer-starter-web` 已使用
 `spring-boot-starter-webmvc` 与 `spring-boot-starter-webmvc-test`，ADR-0029 T0 第 1 项的
@@ -447,17 +461,20 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
   尚未固化这些门禁；
 - Maven 4.0.0-rc-6 仍是 preview；RC6 已于 2026-08-04 确认正式同步到 Maven Central，wrapper SHA 已
   修正为 Central 正式发布版校验值，`./mvnw --version` 与 `./mvnw clean verify` 已从干净缓存跑通
-  （15 模块 BUILD SUCCESS，0 failure/0 error）。仍待关闭的是 0-skipped Testcontainers 门禁：
-  Testcontainers 2.0.5 在 macOS Colima 下不自动探测 colima socket（见 §3 2026-08-04 记录），
-  以及候选 CI 首次成功、分支保护、许可证与秘密扫描；在此之前不能形成发布候选；
+  （15 模块 BUILD SUCCESS）。用 `testing.md` §4 Colima 配方跑全量 verify 已达成 `0 skipped`
+  （326/0/0/0，见 §3 2026-08-04 记录）；`scripts/verify-maven-consumers.sh` 也已通过（consumer POM、
+  配置元数据、可重复性、M3.9+/M4 consumer）。ADR-0026 §验收方式 已本地满足；CI 已首次跑绿（见 §3
+  2026-08-04(续)）、PR #2 合入 dev、许可证决策为暂不开源（私有/专有）；P0 仅剩分支保护（private + GitHub
+  免费版无法启用，待可见性/计费决策）与秘密扫描（pre-public 前最有价值）；
 - 已增加只读权限的候选 GitHub Actions 质量门禁，编排 JDK 25、Maven 4、Docker、
-  PostgreSQL/Testcontainers `skipped=0`、Maven 3/4 consumer 与短期 CycloneDX SBOM；RC6 已上
-  Central 且本地 `./mvnw clean verify` 通过，但工作流尚未首次成功（0-skipped Testcontainers 探测与
-  CI Docker 环境仍待配置），也尚未设为分支必需检查，因此不能称为正式 CI；
+  PostgreSQL/Testcontainers `skipped=0`、Maven 3/4 consumer 与短期 CycloneDX SBOM；RC6 已上 Central、
+  wrapper 已修、本地 `./mvnw clean verify` 已达成 `0 skipped`、consumer 门禁已通过（2026-08-04），工作流已
+  首次跑绿（run 30904716377，ubuntu 原生 Docker）；但 private + GitHub 免费版无法启用分支保护/必需检查，
+  目前靠「绿了再合」软约束，硬性 gate 待仓库可见性/计费决策，故尚未称为正式 CI；
   制品签名、发布仓库、provenance 和自动部署仍未实现；
 - 没有具名模块维护者矩阵、`CODEOWNERS` 和正式审查责任分配；
 - 没有生产备份恢复、容量测试、正式错误预算/告警路由和灾难恢复演练；
-- 没有稳定版兼容政策、商业许可证文本和付费产品交付系统；
+- 没有稳定版兼容政策；许可证决策为暂不开源（私有/专有），未来若开源或对外发布再定商业/开源许可；付费产品交付系统未建立；
 - Testcontainers 仍使用 `disabledWithoutDocker`；本机 Colima 已能完整执行，候选 CI 已用
   `scripts/check-surefire-results.sh` 明确拒绝任何 skipped 测试，但该门禁仍需首次成功并纳入
   分支保护。
@@ -495,8 +512,8 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
   `--add-exports` 致 error-prone 崩溃；in-process 下即便经 `MAVEN_OPTS` 确保 `--add-exports` 生效，
   `-Xplugin:ErrorProne` 插件仍不挂载、javac 拒绝 `-Xep` 标志——属 compiler 3.14.0/JDK 25 插件加载不兼容，
   非配置可调。多次尝试（模块局部 forked、根 forked、根 in-process + `.mvn/jvm.config`、`MAVEN_OPTS`）均失败，
-  且 CI 因 Maven 4 RC6 仍 404 无法验证，故已还原配置保持构建绿色；NullAway 作为「CI 接入」项推迟到
-  Maven 4/CI 恢复后在正式工具链上重新评估。
+  此前因 Maven 4 RC6 wrapper 阻断无法在正式工具链验证（该阻断已于 2026-08-04 修复，见 §3），故已还原配置
+  保持构建绿色；NullAway 作为「CI 接入」项可在现已可用的 Maven 4 工具链上重新评估。
 - P0-5 虚拟线程：`aiStreamExecutor` 已标记 `@Bean(defaultCandidate=false)`。**双模式压测矩阵与「新 MVC 项目
   默认开启 v-thread」仍待办**——需 Docker/运行环境，当前未运行。
 
@@ -505,10 +522,10 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 产品化主线调整为先关闭 P0，再依次进入 P1 Scaffold Ready、P2 Create & Generate 和 P3 首个外部
 消费者。近期可交付顺序是：
 
-1. RC6 已上 Central、wrapper 已修正、本地 `./mvnw clean verify` 已通过（2026-08-04）；下一步在 CI
-   环境配置 Testcontainers 对 Colima/Docker socket 的探测以达成 `0 skipped`，跑通候选 CI 的
-   PostgreSQL 18、consumer、SBOM 与文档一致性门禁，并把成功工作流设为分支必需检查；随后补齐
-   许可证选择和秘密扫描，关闭 P0；
+1. RC6 已上 Central、wrapper 已修正、本地 `./mvnw clean verify` 已达成 `0 skipped`、consumer 门禁已通过、
+   CI 已首次跑绿（2026-08-04 run 30904716377）、scaffold 基线已合入 `dev`（PR #2）、许可证已决策（暂不开源，
+   私有/专有）。P0 仅剩：分支保护（private + GitHub 免费版受限，需仓库可见性/计费决策）与秘密扫描
+   （pre-public 前最有价值）；
 2. 让 Wrapper 官方持久端点、非 SNAPSHOT 制品、最小 off-state 应用与 Maven 3.9+/4 外部消费者
    形成可重复发布验证记录，关闭 P1；
 3. 交付 manifest v1、preview/diff、确定性生成与 TTFR/TTCRUD golden consumer，关闭 P2；

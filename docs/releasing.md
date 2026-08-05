@@ -55,9 +55,25 @@ git status --short --branch
 省略 `AINER_VERSION`，脚本会读取根 POM 的 `revision`；发布候选必须显式传入目标版本。
 
 发布记录至少保存：源码 commit、版本、构建 JDK/Maven、依赖锁定结果、测试摘要、consumer 与
-可重复构建结果、数据库验证、制品 checksum、部署环境和批准人。候选 GitHub Actions 工作流已经
-编排 JDK 25、Maven 4、Docker、`skipped=0`、consumer 与短期 SBOM 门禁，但在 Maven 4 RC6
-官方发行包可下载并首次完整成功前不能称为正式 CI。制品发布、签名与 provenance 管线仍未实现。
+可重复构建结果、数据库验证、制品 checksum、部署环境和批准人。CI 工作流编排 JDK 25、Maven 4、
+Docker、`skipped=0`、consumer、SBOM 与 gitleaks 秘密扫描门禁；RC6 已上 Central、CI 已于 2026-08-04
+首次跑绿（详见 `project-status.md` §3）。制品发布到 GitHub Packages 的 `distributionManagement`
+与 `release.yml` 工作流已配置（见 §4.1）；制品签名（GPG）与 provenance（SLSA）仍待接入。
+
+### 4.1 GitHub Packages 发布
+
+私有仓库目前以 **GitHub Packages** 作为 Maven 制品发布目标（`distributionManagement` 已在根 POM 与
+parentless `ainer-dependencies` BOM 配置，id=`github-packages`，URL
+`https://maven.pkg.github.com/ainerlab/ainer-boot`）。发布由 tag 驱动：
+
+1. 更新 `CHANGELOG.md`，确认 `./mvnw clean verify`（含 `0 skipped`）与 consumer 门禁通过；
+2. 打 tag `v<版本>`（如 `v0.1.0`）并推送——`.github/workflows/release.yml` 自动触发；
+3. 工作流从 tag 解析非 SNAPSHOT 版本（`v0.1.0` → `0.1.0`），用 `GITHUB_TOKEN` 认证后
+   `./mvnw -Drevision=<版本> deploy` 发布全部 reactor 制品（含 BOM）；
+4. GitHub Packages 对同一 release 版本不可覆盖；SNAPSHOT 可在 dev 期间用，正式发布前必须去掉 SNAPSHOT。
+
+本地手动发布需在 `~/.m2/settings.xml` 为 `github-packages` 配置 GitHub 用户名 + PAT（`write:packages`）。
+下游消费私有 GitHub Packages 制品同样需要 PAT（`read:packages`）认证。
 
 ## 5. 数据库发布
 

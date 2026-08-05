@@ -21,6 +21,7 @@
         <module>ainer-module-authorization</module>
         <module>ainer-server</module>
         <module>ainer-authorization-server</module>
+        <module>ainer-offstate-app</module>
     </modules>
 
     <properties>
@@ -56,6 +57,19 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <distributionManagement>
+        <repository>
+            <id>github-packages</id>
+            <name>GitHub Packages (ainerlab/ainer-boot)</name>
+            <url>https://maven.pkg.github.com/ainerlab/ainer-boot</url>
+        </repository>
+        <snapshotRepository>
+            <id>github-packages</id>
+            <name>GitHub Packages (ainerlab/ainer-boot)</name>
+            <url>https://maven.pkg.github.com/ainerlab/ainer-boot</url>
+        </snapshotRepository>
+    </distributionManagement>
 
     <build>
         <pluginManagement>

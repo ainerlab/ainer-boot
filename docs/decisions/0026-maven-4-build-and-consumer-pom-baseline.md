@@ -176,9 +176,13 @@ Maven 4 基线必须持续通过以下门禁：
   `8167e73d…` 交叉校验）更新 `.mvn/wrapper/maven-wrapper.properties`。更新后从干净缓存首次跑通：
   `./mvnw --version` 与 `./mvnw clean verify`（JDK 25）均通过，15 模块 BUILD SUCCESS，
   326 tests / 0 failure / 0 error。
-- 仍待关闭：`./mvnw clean verify` 的 0-skipped Testcontainers 门禁（Testcontainers 2.0.5 在 macOS Colima
-  下不自动探测 colima socket，105 个集成测试仍 skip；CI Docker 环境与 socket 探测配置另作）；候选 CI
-  首次成功与分支保护；许可证与秘密扫描。这些不改变「Wrapper 已端到端可用」的事实。
+- 同日（2026-08-04）0-skipped Testcontainers 门禁本地达成：用 `testing.md` §4 Colima 配方
+  （`DOCKER_HOST` + `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`）跑全量 verify，326 tests /
+  0 failure / 0 error / 0 skipped，`check-surefire-results.sh` 通过。先前 105-skip 真因是 Ryuk 容器无法
+  bind-mount 裸 Colima socket（virtiofs `operation not supported`）→ `DockerAvailableDetector` 误判无 Docker。
+  同日 `verify-maven-consumers.sh` 通过（15 consumer POM、配置元数据、`artifact:compare`、M3.9+/M4 consumer）。
+  §验收方式 全部本地满足。
+- 仍待关闭：候选 CI 工作流首次成功与分支保护、许可证与秘密扫描。这些属发布流程而非构建验收。
 
 ## 参考
 
