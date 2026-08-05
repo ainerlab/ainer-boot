@@ -1,0 +1,16 @@
+# gitleaks configuration for ainer-boot.
+#
+# Docs 按项目规范只含占位/示例凭据（AGENTS.md：文档示例禁止真实密码、Token、私钥、API key），
+# 整体 allowlist；其余源码、配置、migration 与脚本全量扫描默认规则集。
+# 私有仓库走 gitleaks CLI（非 gitleaks-action，后者对 private repo 需付费 license）。
+
+title = "ainer-boot"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Documentation examples are placeholders per AGENTS.md (no real credentials)"
+paths = [
+    '''docs/.*''',
+]
