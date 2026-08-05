@@ -192,7 +192,7 @@ class IdentityModuleIntegrationTest {
 
     @Test
     void migrationCreatesIdentitySchema() {
-        assertThat(flyway.info().applied()).hasSize(12);
+        assertThat(flyway.info().applied()).hasSize(13);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_name IN ('ainer_identity_tenant','ainer_identity_user',"
@@ -206,8 +206,10 @@ class IdentityModuleIntegrationTest {
                         + "'ainer_identity_notification_outbox',"
                         + "'ainer_identity_notification_delivery_receipt',"
                         + "'ainer_identity_ownership_transfer',"
-                        + "'ainer_identity_ownership_recovery')",
-                Integer.class)).isEqualTo(14);
+                        + "'ainer_identity_ownership_recovery',"
+                        + "'ainer_identity_human_account',"
+                        + "'ainer_identity_login_identity')",
+                Integer.class)).isEqualTo(16);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
     }
 
