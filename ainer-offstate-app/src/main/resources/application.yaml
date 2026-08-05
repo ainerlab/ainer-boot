@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: ainer-offstate-app
+  main:
+    banner-mode: "off"
+
+server:
+  port: 0
