@@ -1,66 +1,68 @@
 package dev.ainer.authorizationserver.client;
 
+import jakarta.validation.constraints.Min;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+@Validated
 @ConfigurationProperties("ainer.security.authorization-server.client-control")
 public class OAuthClientControlProperties {
 
-    private boolean enabled;
-    private List<String> operatorClientIds = new ArrayList<>();
-    private List<String> allowedScopes = new ArrayList<>(List.of("ai.invoke"));
-    private Duration accessTokenTtl = Duration.ofMinutes(5);
-    private Duration clientSecretTtl = Duration.ofDays(90);
-    private int secretBytes = 32;
+    private final boolean enabled;
+    private final List<String> operatorClientIds;
+    private final List<String> allowedScopes;
+    @DurationMin(nanos = 1)
+    private final Duration accessTokenTtl;
+    @DurationMin(nanos = 1)
+    private final Duration clientSecretTtl;
+    @Min(1)
+    private final int secretBytes;
+
+    public OAuthClientControlProperties(
+            boolean enabled,
+            List<String> operatorClientIds,
+            List<String> allowedScopes,
+            Duration accessTokenTtl,
+            Duration clientSecretTtl,
+            Integer secretBytes) {
+        this.enabled = enabled;
+        this.operatorClientIds = operatorClientIds != null
+                ? new ArrayList<>(operatorClientIds)
+                : new ArrayList<>();
+        this.allowedScopes = allowedScopes != null
+                ? new ArrayList<>(allowedScopes)
+                : new ArrayList<>(List.of("ai.invoke"));
+        this.accessTokenTtl = accessTokenTtl != null ? accessTokenTtl : Duration.ofMinutes(5);
+        this.clientSecretTtl = clientSecretTtl != null ? clientSecretTtl : Duration.ofDays(90);
+        this.secretBytes = secretBytes != null ? secretBytes : 32;
+    }
 
     public boolean isEnabled() {
         return enabled;
     }
 
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
     public List<String> getOperatorClientIds() {
-        return operatorClientIds;
-    }
-
-    public void setOperatorClientIds(List<String> operatorClientIds) {
-        this.operatorClientIds = new ArrayList<>(operatorClientIds);
+        return List.copyOf(operatorClientIds);
     }
 
     public List<String> getAllowedScopes() {
-        return allowedScopes;
-    }
-
-    public void setAllowedScopes(List<String> allowedScopes) {
-        this.allowedScopes = new ArrayList<>(allowedScopes);
+        return List.copyOf(allowedScopes);
     }
 
     public Duration getAccessTokenTtl() {
         return accessTokenTtl;
     }
 
-    public void setAccessTokenTtl(Duration accessTokenTtl) {
-        this.accessTokenTtl = accessTokenTtl;
-    }
-
     public Duration getClientSecretTtl() {
         return clientSecretTtl;
     }
 
-    public void setClientSecretTtl(Duration clientSecretTtl) {
-        this.clientSecretTtl = clientSecretTtl;
-    }
-
     public int getSecretBytes() {
         return secretBytes;
-    }
-
-    public void setSecretBytes(int secretBytes) {
-        this.secretBytes = secretBytes;
     }
 }

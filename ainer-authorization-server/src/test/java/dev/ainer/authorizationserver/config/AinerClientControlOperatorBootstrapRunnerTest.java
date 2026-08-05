@@ -46,8 +46,9 @@ class AinerClientControlOperatorBootstrapRunnerTest {
 
     @Test
     void weakSecretFailsClosed() {
-        AinerAuthorizationServerProperties properties = properties();
-        properties.getClientControlOperatorBootstrap().setClientSecret("too-short");
+        AinerAuthorizationServerProperties properties = withClientControlOperatorBootstrap(
+                new AinerAuthorizationServerProperties.ClientControlOperatorBootstrap(
+                        true, "client-control-operator", "too-short"));
 
         assertThatThrownBy(() -> new AinerClientControlOperatorBootstrapRunner(
                 properties,
@@ -59,13 +60,15 @@ class AinerClientControlOperatorBootstrapRunnerTest {
     }
 
     private AinerAuthorizationServerProperties properties() {
-        AinerAuthorizationServerProperties properties = new AinerAuthorizationServerProperties();
-        AinerAuthorizationServerProperties.ClientControlOperatorBootstrap bootstrap =
-                properties.getClientControlOperatorBootstrap();
-        bootstrap.setEnabled(true);
-        bootstrap.setClientId("client-control-operator");
-        bootstrap.setClientSecret("client-control-operator-secret-2026");
-        return properties;
+        return withClientControlOperatorBootstrap(
+                new AinerAuthorizationServerProperties.ClientControlOperatorBootstrap(
+                        true, "client-control-operator", "client-control-operator-secret-2026"));
+    }
+
+    private static AinerAuthorizationServerProperties withClientControlOperatorBootstrap(
+            AinerAuthorizationServerProperties.ClientControlOperatorBootstrap bootstrap) {
+        return new AinerAuthorizationServerProperties(
+                null, null, null, null, null, null, null, bootstrap, null, null, null, null);
     }
 
     private static final class InMemoryRepository implements RegisteredClientRepository {

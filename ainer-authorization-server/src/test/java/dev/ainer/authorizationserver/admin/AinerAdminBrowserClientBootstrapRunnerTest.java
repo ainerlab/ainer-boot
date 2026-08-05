@@ -77,8 +77,9 @@ class AinerAdminBrowserClientBootstrapRunnerTest {
 
     @Test
     void redirectContractRejectsCrossOriginAndUnsafeHttp() {
-        AinerAdminBrowserClientProperties crossOrigin = properties();
-        crossOrigin.setPostLogoutRedirectUri(
+        AinerAdminBrowserClientProperties crossOrigin = new AinerAdminBrowserClientProperties(
+                true,
+                "http://127.0.0.1:5173/ainer-admin/auth/callback",
                 "http://localhost:5173/ainer-admin/auth/logged-out");
         assertThatThrownBy(() -> new AinerAdminBrowserClientBootstrapRunner(
                 crossOrigin, new InMemoryRepository())
@@ -86,9 +87,10 @@ class AinerAdminBrowserClientBootstrapRunnerTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("same origin");
 
-        AinerAdminBrowserClientProperties unsafe = properties();
-        unsafe.setRedirectUri("http://admin.example/ainer-admin/auth/callback");
-        unsafe.setPostLogoutRedirectUri("http://admin.example/ainer-admin/auth/logged-out");
+        AinerAdminBrowserClientProperties unsafe = new AinerAdminBrowserClientProperties(
+                true,
+                "http://admin.example/ainer-admin/auth/callback",
+                "http://admin.example/ainer-admin/auth/logged-out");
         assertThatThrownBy(() -> new AinerAdminBrowserClientBootstrapRunner(
                 unsafe, new InMemoryRepository())
                 .run(new DefaultApplicationArguments(new String[0])))
@@ -97,13 +99,10 @@ class AinerAdminBrowserClientBootstrapRunnerTest {
     }
 
     private AinerAdminBrowserClientProperties properties() {
-        AinerAdminBrowserClientProperties properties = new AinerAdminBrowserClientProperties();
-        properties.setEnabled(true);
-        properties.setRedirectUri(
-                "http://127.0.0.1:5173/ainer-admin/auth/callback");
-        properties.setPostLogoutRedirectUri(
+        return new AinerAdminBrowserClientProperties(
+                true,
+                "http://127.0.0.1:5173/ainer-admin/auth/callback",
                 "http://127.0.0.1:5173/ainer-admin/auth/logged-out");
-        return properties;
     }
 
     private static final class InMemoryRepository implements RegisteredClientRepository {

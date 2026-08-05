@@ -14,6 +14,9 @@
 
 架构、安全、数据归属、外部协议或许可证发生变化时，还必须阅读相关 ADR。
 
+Ainer 的生产者构建要求 JDK 25，并统一使用锁定 Maven 4.0.0-rc-6 preview 的
+`./mvnw`。系统 Maven 3.9+ 只用于 `scripts/verify-maven-consumers.sh` 的下游兼容验证。
+
 ## 开发原则
 
 - 禁止复制商业竞品或许可证不兼容项目的源码、注释、模板和专有命名。
@@ -28,14 +31,15 @@
 ```bash
 git status --short --branch
 git log --oneline --decorate -12
-mvn test
+./mvnw --version
+./mvnw clean verify
 ```
 
 1. 确认工作区现状，保留他人未提交改动。
 2. 从测试或可验证验收行为开始定义改动。
 3. 小步实现，只修改任务范围内文件。
 4. 更新相关代码、migration、测试和文档。
-5. 执行模块测试，再执行完整 `mvn clean test`。
+5. 执行受影响模块的 `./mvnw test` 或 `verify`，再执行完整 `./mvnw clean verify`。
 6. 检查 `git diff --check` 和最终文件范围。
 
 详细命令见 [`docs/development.md`](docs/development.md) 和 [`docs/testing.md`](docs/testing.md)。

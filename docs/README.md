@@ -11,7 +11,7 @@
 
 最常用的后续入口：
 
-- 当前完成项、证据与缺口：[`project-status.md`](project-status.md)
+- 当前完成项、验证记录与缺口：[`project-status.md`](project-status.md)
 - 架构与模块边界：[`architecture.md`](architecture.md)
 - 开发环境与流程：[`development.md`](development.md)
 - 工程约定：[`conventions.md`](conventions.md)

@@ -1,6 +1,6 @@
 # Ainer 架构总览
 
-> 权威状态：M4.8A + Ainer Admin integration · 2026-07-26
+> 权威状态：M4.8A + Ainer Admin integration；通用授权与组织/员工目录方案 Proposed · 2026-08-02
 
 ## 1. 系统定位
 
@@ -12,12 +12,21 @@ Ainer 同时承担三种职责：
 
 它不是把竞品模块重新命名，也不是通过配置把任意单体自动转换为微服务。
 
+正式架构名称为
+[演进式模块化平台架构](decisions/0024-evolutionary-modular-platform-architecture.md)：
+
+- 用战略 DDD 识别领域、上下游和数据所有权，战术 DDD 只用于存在真实不变量的能力；
+- 用端口和适配器隔离 HTTP、数据库、消息、身份、AI Provider 与其他外部系统；
+- 以模块化单体作为默认业务运行形态，Authorization Server 因安全边界独立发行；
+- 满足明确触发条件和工程准备条件后，再通过独立装配与 remote adapter 按需服务化；
+- 不为简单 CRUD 机械增加层次，也不把微服务基础设施预建成脚手架默认依赖。
+
 ## 2. 当前模块图
 
 ```text
 ainer-server                         JWT Resource Server、Actuator、平台/内部端点
 ├── ainer-module-workspace           租户资源、成员生命周期、撤销消费、OWNER 恢复、审计热/冷生命周期
-│   ├── ainer-starter-persistence    MyBatis、Flyway、PostgreSQL、UUID
+│   ├── ainer-starter-persistence    MyBatis-Plus/MyBatis、Flyway、PostgreSQL、UUID
 │   └── ainer-starter-web            HTTP 异常与请求追踪
 ├── ainer-module-ai-runtime          模型端口、Provider、策略、SSE、费用审计
 │   ├── ainer-starter-persistence
@@ -53,7 +62,9 @@ ainer-dependencies                   独立 BOM，统一依赖版本
 - 跨运行时调用使用服务 JWT 和最小 scope：Directory 是同步只读端口，撤销是至少一次 outbox + Workspace receipt；网络调用不进入 Identity 数据库事务。
 - 高风险安全运维使用短时双人审批：申请者和批准者是不同服务主体、分别持有最小 scope，批准事务锁定并重新验证目标状态。
 - Workspace 授权审计以同事务热/冷搬迁控制热表增长，在线查询和 SIEM 稳定游标读取两表并集；归档数据仍属于 Workspace 数据库。
-- persistence starter 只装配共性，不拥有任何业务表或 Repository。
+- persistence starter 只装配共性，不拥有任何业务表或 Repository。MyBatis-Plus 只增强
+  infrastructure 的简单 CRUD 与受控分页；复杂 XML、显式 tenant 条件和 PostgreSQL 原生 SQL
+  保持业务模块所有。
 
 ## 3. 目标模块模型
 
@@ -64,21 +75,49 @@ ainer-boot/
 │   ├── ainer-core/
 │   ├── ainer-spring/
 │   ├── ainer-starter-web/
-│   ├── ainer-starter-persistence/       # 已落地的 MyBatis/Flyway/PostgreSQL 共性
+│   ├── ainer-starter-persistence/       # 已落地的 MyBatis-Plus/MyBatis/Flyway/PostgreSQL 共性
 │   ├── ainer-starter-security/          # Resource Server 通用能力
 │   ├── ainer-starter-observability/
 │   └── ainer-starter-test/
-├── ainer-module-identity/                # 用户、组织、角色、授权业务
+├── ainer-module-identity/                # 用户、tenant、成员关系与身份生命周期
+├── ainer-module-authorization/           # S0 已落地：Permission/Role/Binding/Decision 契约与纯决策器；S1-S3 待实施
+├── ainer-module-organization/            # Proposed：可选组织、员工任职、岗位与团队目录
 ├── ainer-module-workspace/               # 已租户化的资源授权参考切片
 ├── ainer-module-ai-runtime/              # 模型网关、调用与费用审计
 ├── ainer-server/                          # 已落地的业务 Resource Server 发行物
 ├── ainer-authorization-server/            # 已落地的独立认证发行物
-└── ainer-app-*/                           # 经证据支持后拆出的服务发行物
+└── ainer-app-*/                           # 满足明确拆分条件后创建的服务发行物
 ```
 
 这些是演进方向，不代表应一次性创建所有空模块。模块只在拥有明确职责、测试和消费者时落地。
 
-M1 有意没有提前抽取 persistence starter。M2 的 AI invocation 成为第二个 PostgreSQL 消费者后，才把 MyBatis/Flyway/PostgreSQL/UUID 装配提炼到 `ainer-starter-persistence`。业务 Mapper、Repository、migration 和事务仍属于各自模块。
+`ainer-module-authorization` 已落地 S0（ADR-0030）：不可变领域类型（Permission、Role、SubjectBinding、
+Scope、AuthorizationDecision）、PermissionRegistry（冲突检测）、AuthorizationService（grant-path
+真值表纯决策器，含 resourceType/systemOnly/GLOBAL/scope 安全检查与 HIGH-risk Challenge 收口），
+全部 Spring-free、@NullMarked，16 项测试通过。S1（PostgreSQL 持久化 + DB Binding resolver）、
+S2（Spring AuthorizationManager adapter + 管理 API）、S3（关系/查询/Golden Consumer）及 Agent
+（ADR-0031）与组织（ADR-0032）尚未实现。详见
+[`Ainer 通用授权与 AI 代行详细方案`](design/authorization-architecture-plan.md)、
+[ADR-0030](decisions/0030-hybrid-fine-grained-authorization-baseline.md) 与
+[ADR-0031](decisions/0031-agent-delegation-and-ai-context-authorization.md)。该模块不会接管
+Identity TenantRole、WorkspaceRole 或产品领域关系。
+
+`ainer-module-organization` 当前同样尚未创建。它作为可选模块装配在 `ainer-server`，不并入
+Identity 或 Authorization Server；Tenant、OrganizationDirectory、Company、Merchant、OrgUnit 与
+Workspace 各自保持独立语义。员工目录的最小模型、有效期、SubjectSetBinding、撤销前置门禁和
+XQ 映射见
+[`Ainer 组织与员工目录详细方案`](design/organization-workforce-architecture-plan.md) 与
+[ADR-0032](decisions/0032-organization-workforce-directory-baseline.md)。
+
+M1 有意没有提前抽取 persistence starter。M2 的 AI invocation 成为第二个 PostgreSQL 消费者
+后，才把 MyBatis/Flyway/PostgreSQL/UUID 装配提炼到 `ainer-starter-persistence`。2026-07-30
+又按 [ADR-0028](decisions/0028-mybatis-plus-infrastructure-baseline.md) 在同一个 starter 内引入
+Spring Boot 4 专用 MyBatis-Plus，作为简单 CRUD 与分页的 infrastructure 增强。业务 Mapper、
+Repository、migration 和事务仍属于各自模块；不建立原生/Plus 双 starter。
+
+公共 framework 采用“Git 单仓、Maven 多制品”，不建立万能 `ainer-tool`，也不在当前阶段拆分
+独立 Engine 仓库。公共制品分类、工具类替代规则、发布前收口和未来拆仓条件见
+[ADR-0025](decisions/0025-public-artifacts-utilities-and-repository-boundary.md)。
 
 ## 4. 业务模块内部结构
 
@@ -105,7 +144,10 @@ domain -> Java standard library only
 `api` 可以位于业务模块，也可以位于可执行发行物的 adapter 包；关键约束是 application/domain
 不能反向依赖 Web，传输 DTO 不成为应用命令或领域模型的兼容包袱。Identity 成员管理采用后者。
 
-不会要求每个简单 CRUD 都机械创建四层接口；复杂度必须由真实业务规则证明。
+不会要求每个简单 CRUD 都机械创建四层接口；只有存在相应业务规则和边界时才引入复杂结构。
+MyBatis-Plus 的 `BaseMapper`、Wrapper、Page 和注解只能位于 infrastructure；application、
+domain 与 API 仍使用 Ainer 自己的端口和模型。`IService`、`ServiceImpl` 与 ActiveRecord 不作为
+默认业务架构。
 
 ## 5. 单体与服务化
 
@@ -113,6 +155,9 @@ domain -> Java standard library only
 
 1. **共享业务代码**：领域、应用用例和稳定契约可复用。
 2. **独立应用装配**：单体和每个服务拥有明确依赖清单、配置、数据库职责和发布生命周期。
+
+是否拆分服务以及拆分前必须完成的准备条件，以
+[ADR-0024](decisions/0024-evolutionary-modular-platform-architecture.md) 为准。
 
 `ainer.runtime.mode` 的含义严格限定为：
 
@@ -169,7 +214,7 @@ M3/M4 已形成以下边界：
   与回调地址拒绝；生产 browser client 控制面、会话治理和登录 UI 仍是独立能力。
 - Ainer Admin 在 `dev` profile 下使用固定 public client、PKCE S256、default tenant 与四个最小
   scope；成员 API 在 JWT 后继续读取官方 authorization active 状态，当前 access token 可自助
-  撤销。该开发 client 与同源自动化证据不等于生产 browser client 生命周期控制面。
+  撤销。该开发 client 与同源自动化验证不等于生产 browser client 生命周期控制面。
 - M4.6 使用 Spring Security 7.1 WebAuthn 建立默认关闭的 Passkey 主线：UV-required、真实签名
   ceremony、条件 MFA、ACTIVE/REVOKED 生命周期、恢复码/管理员双人恢复、受控首次 enrollment、
   登录限速和 Resource Server step-up。最后一个 ACTIVE Passkey 不允许普通自助删除；真实设备
@@ -195,7 +240,7 @@ M3/M4 已形成以下边界：
   销毁本地可解密 payload；`PUBLISHED` 只表示网关持久接收，不代表最终触达。
 - 外部通知网关负责把供应商回执归一化为 `DELIVERED|FAILED`，再使用另一组 tenantless SERVICE
   credential 回调 Identity。Identity 只保存一条与 UUIDv7 notification 关联的最小终态事实，
-  不保存供应商原始 body、联系地址或自由文本错误；该接收端代码基线不等同于真实供应商联调证据。
+  不保存供应商原始 body、联系地址或自由文本错误；该接收端代码基线不等同于真实供应商联调结果。
 - 新邀请是 PENDING，只有同 tenant 的目标 JWT 主体本人接受后才激活；启用可选 Directory client 时，邀请创建前还必须通过远程 ACTIVE member 校验。Workspace 不跨模块读取 Identity 私有表。
 - 通用角色变更不能触碰 OWNER；所有权转移锁定 Workspace 并由 PostgreSQL 部分唯一索引保证最多一个 ACTIVE OWNER。
 - 跨租户和非 ACTIVE 成员访问按 404 隐藏资源；成员角色不足返回 403。关键允许/拒绝授权决策持久化到独立事务审计。PENDING/ACTIVE membership 接到可信 Identity 撤销事件后单调变为 REVOKED，不再参与授权；OWNER 也可因全局安全禁用而被撤销。

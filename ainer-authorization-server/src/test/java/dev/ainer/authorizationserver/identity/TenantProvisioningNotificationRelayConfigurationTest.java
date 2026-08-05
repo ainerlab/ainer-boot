@@ -50,8 +50,8 @@ class TenantProvisioningNotificationRelayConfigurationTest {
                 .hasMessageContaining("gateway-uri");
 
         TenantProvisioningNotificationRelayProperties invalid =
-                new TenantProvisioningNotificationRelayProperties();
-        invalid.setRetryDelay(Duration.ZERO);
+                new TenantProvisioningNotificationRelayProperties(
+                        false, null, null, null, null, null, false, null, null, Duration.ZERO, null, null);
         assertThatThrownBy(() -> configuration.validateSettings(invalid))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("settings");

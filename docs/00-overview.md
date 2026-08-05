@@ -1,6 +1,6 @@
 # Ainer 文档总览：从这里开始
 
-> 文档类型：统一入口 · 状态：生效 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
+> 文档类型：统一入口 · 状态：生效 · 最近核对：2026-08-03 · 适用版本：`0.1.x`
 
 本文是 Ainer Boot 文档的唯一权威入口。它帮助开发者、架构师和 AI agent 先建立同一份项目心智
 模型，再进入具体规范。它不复制各专题文档的细节，也不替代当前状态、架构规范或 ADR。
@@ -10,7 +10,7 @@
 按顺序阅读：
 
 1. 本文：理解项目、文档边界和阅读路线；
-2. [`project-status.md`](project-status.md)：确认当前真正完成了什么、验证证据和已知缺口；
+2. [`project-status.md`](project-status.md)：确认当前真正完成了什么、验证记录和已知缺口；
 3. [`architecture.md`](architecture.md)：理解模块、发行物、依赖和数据所有权；
 4. [`conventions.md`](conventions.md)：理解实现必须遵守的工程规则。
 
@@ -20,14 +20,28 @@
 ## 2. 项目心智模型
 
 Ainer（AI-Native Extensible Runtime）是基于 JDK 25、Spring Boot 4.1 和 PostgreSQL 18 的
-AI 原生企业应用平台底座。它同时面向三个层次：
+AI-native、但不局限于 AI 的通用企业应用脚手架与平台底座。它同时面向三个层次：
 
-- 可独立发布的 Java framework、starter 与 BOM；
-- 承载 Identity、Workspace 和 AI runtime 的模块化应用；
+- 可独立发布的 Java BOM、framework、starter、test support 与 build tools；
+- Project Initializer、通用企业模块、可选 AI runtime 与参考应用；
 - 未来社区版、企业版和行业产品的工程与商业交付基线。
+
+`xq-platform-next` 是规划中的首个外部产品消费者，不是 Ainer 源码副本；Ainer Studio 独立负责
+管理端模板、Blocks 与视觉交付。完整产品边界见
+[`design/ainer-scaffold-design.md`](design/ainer-scaffold-design.md)。
 
 当前优先做正确的模块化单体边界；服务化通过独立发行物、稳定契约、明确数据所有权和可靠事件
 演进，不依靠一个配置开关伪装成微服务。
+
+这一方向正式定义为
+[演进式模块化平台架构](decisions/0024-evolutionary-modular-platform-architecture.md)：使用 DDD
+识别领域边界，使用端口和适配器控制依赖，以模块化单体交付当前系统，并在满足明确条件后按需
+演进为独立服务。
+
+Ainer 生产者构建通过 Maven Wrapper 使用 Maven 4.0.0-rc-6 preview，由 Maven 4 内建
+Consumer POM 处理 `${revision}`，不再使用 Flatten Maven Plugin；Maven 3.9+ 只作为已发布制品
+的下游消费兼容门禁。完整边界见
+[ADR-0026](decisions/0026-maven-4-build-and-consumer-pom-baseline.md)。
 
 ```text
 ainer-dependencies                    统一依赖版本
@@ -37,7 +51,7 @@ ainer-framework/
 ├── ainer-spring                      Spring 共性
 ├── ainer-security                    可信主体与 authority 契约
 ├── ainer-starter-web                 HTTP、错误与请求追踪
-├── ainer-starter-persistence         MyBatis、Flyway、PostgreSQL、UUID
+├── ainer-starter-persistence         MyBatis-Plus/MyBatis、Flyway、PostgreSQL、UUID
 └── ainer-starter-security            JWT Resource Server 共性
 
 ainer-server                          业务 Resource Server
@@ -56,18 +70,19 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 4. tenant、subject 和 owner 来自可信身份上下文，不接受客户端自声明。
 
 完整依据见 [`architecture.md`](architecture.md) 和
-[ADR-0001](decisions/0001-independent-architecture-baseline.md)。
+[ADR-0001](decisions/0001-independent-architecture-baseline.md)、
+[ADR-0024](decisions/0024-evolutionary-modular-platform-architecture.md)。
 
 ## 3. 如何判断哪份文档可信
 
 | 文档类型 | 回答的问题 | 权威文档 | 更新方式 |
 |---|---|---|---|
 | 产品入口 | Ainer 是什么，如何快速运行 | [`../README.md`](../README.md) | 用户可见能力变化时更新 |
-| 当前状态 | 现在完成了什么，证据和缺口是什么 | [`project-status.md`](project-status.md) | 每个里程碑、发布候选或风险变化时更新 |
+| 当前状态 | 现在完成了什么、验证结果和缺口是什么 | [`project-status.md`](project-status.md) | 每个里程碑、发布候选或风险变化时更新 |
 | 长期规范 | 以后应当如何设计和实现 | `architecture.md`、`conventions.md` 等 | 代码与规范同一变更 |
 | ADR | 为什么选择这个不可轻易逆转的方案 | [`decisions/README.md`](decisions/README.md) | 接受后不改写结论，以新 ADR 取代 |
 | 专题手册 | 某一领域如何开发、验证和运行 | 数据库、安全、AI、运维等文档 | 对应能力变化时更新 |
-| 研究/设计 | 候选方案、兼容证据和未来路线 | `design/`、`migration/`、Boot 4 备忘 | 不得写成已交付事实 |
+| 研究/设计 | 候选方案、兼容验证和未来路线 | `design/`、`migration/`、Boot 4 备忘 | 不得写成已交付事实 |
 | 变更记录 | 用户可见版本变化 | [`../CHANGELOG.md`](../CHANGELOG.md) | 随功能和发布维护 |
 
 没有一条“代码永远高于文档”或“文档永远高于代码”的简单规则：
@@ -88,13 +103,18 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 5. [`testing.md`](testing.md)
 6. 与任务相关的专题文档和 ADR
 
-### 4.2 架构、模块边界或商业基线
+### 4.2 架构、脚手架产品路线或商业基线
 
 1. [`design/paradigm-redesign.md`](design/paradigm-redesign.md)
 2. [`architecture.md`](architecture.md)
 3. [`design/ainer-scaffold-design.md`](design/ainer-scaffold-design.md)
-4. [`decisions/README.md`](decisions/README.md)
-5. 先新增或取代 ADR，再实现重大决策
+4. [`architecture/ainer-boot-ai-application-foundation-audit.md`](architecture/ainer-boot-ai-application-foundation-audit.md)
+5. [`architecture/ainer-foundation-v1-roadmap.md`](architecture/ainer-foundation-v1-roadmap.md)
+6. [`decisions/README.md`](decisions/README.md)
+7. 先新增或取代 ADR，再实现重大决策
+
+Foundation Roadmap 仍是 Proposed；其 mdpress-first 是有条件的路线建议，不会自动取代当前
+`xq-platform-next` first-consumer 决策。消费者顺序改变必须先有独立 ADR。
 
 ### 4.3 HTTP API
 
@@ -106,37 +126,47 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 ### 4.4 数据库与持久化
 
 1. [`database-design-standard.md`](database-design-standard.md)
-2. [`database.md`](database.md)
-3. [`testing.md`](testing.md)
-4. 所属模块的现有 migration、Mapper 和 PostgreSQL 集成测试
+2. [ADR-0028](decisions/0028-mybatis-plus-infrastructure-baseline.md)
+3. [`database.md`](database.md)
+4. [`testing.md`](testing.md)
+5. 所属模块的现有 migration、Mapper 和 PostgreSQL 集成测试
 
 ### 4.5 身份、安全与 tenant 授权
 
 1. [`security.md`](security.md)
 2. [`architecture.md`](architecture.md) 的安全与数据边界
-3. [`decisions/README.md`](decisions/README.md) 中相关安全 ADR；平台 Identity 供应与通知回执
+3. 设计未来 Account、Workspace 与 Isolation 语义时阅读
+   [ADR-0033 Greenfield](decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md)
+   （Accepted 为目标基线，Option B：完全移除 Tenant；按 [Impact](architecture/ainer-foundation-greenfield-reset-impact.md)
+   Stage 0–8 执行）；[v2](decisions/0033-account-workspace-isolation-model-baseline-v2.md)、
+   [v1](decisions/0033-account-workspace-isolation-model-baseline.md) 与
+   [对抗性审查](architecture/adr-0033-adversarial-review.md) 为决策历史。Reset 完成前，当前运行行为仍以
+   既有 Accepted ADR 为准
+4. [`decisions/README.md`](decisions/README.md) 中相关安全 ADR；平台 Identity 供应与通知回执
    重点阅读 [ADR-0019](decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)
    和 [ADR-0021](decisions/0021-provisioning-notification-delivery-receipts.md)
-4. 集成官方参考管理应用时阅读
+5. 集成官方参考管理应用时阅读
    [`ainer-admin-integration.md`](ainer-admin-integration.md) 与
    [ADR-0022](decisions/0022-ainer-admin-browser-integration-baseline.md)
-5. [`configuration.md`](configuration.md)
-6. [`testing.md`](testing.md)
+6. [`configuration.md`](configuration.md)
+7. [`testing.md`](testing.md)
 
 ### 4.6 AI、模型网关、RAG 或 Agent
 
 1. [`ai-gateway.md`](ai-gateway.md)
 2. [ADR-0003](decisions/0003-ai-model-gateway-baseline.md)
-3. 设计多阶段任务或持久产物时读
+3. 设计 Knowledge、Content、Grounding 或 Context Assembly 时先读
+   [ADR-0034](decisions/0034-knowledge-foundation-and-ai-context-model.md)（Proposed）
+4. 设计多阶段任务或持久产物时读
    [`design/ai-runtime-data-model.md`](design/ai-runtime-data-model.md)
-4. 设计 RAG、文档、embedding 或检索时读
+5. 设计 RAG、文档、embedding 或检索时读
    [`design/knowledge-data-model.md`](design/knowledge-data-model.md)
-5. [`security.md`](security.md) 的数据与身份约束
-6. [`database-design-standard.md`](database-design-standard.md) 的 AI 数据规则
-7. [`testing.md`](testing.md)
+6. [`security.md`](security.md) 的数据与身份约束
+7. [`database-design-standard.md`](database-design-standard.md) 的 AI 数据规则
+8. [`testing.md`](testing.md)
 
-两份 `design/` 文档均为 Proposed，只定义候选语义和实现门槛，不代表 Run、Artifact 或 Knowledge
-物理表已经交付。
+ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义边界，后两者提供候选实现模型，
+均不代表 Run、Artifact 或 Knowledge 物理能力已经交付。
 
 ### 4.7 运行、故障处理与发布
 
@@ -153,7 +183,18 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 2. [`migration/ainer-migration-plan.md`](migration/ainer-migration-plan.md)
 3. [`design/paradigm-redesign.md`](design/paradigm-redesign.md)
 
-研究材料只提供证据和路线，最终实现仍受当前架构、长期规范与已接受 ADR 约束。
+研究材料只提供事实依据和候选路线，最终实现仍受当前架构、长期规范与已接受 ADR 约束。
+
+### 4.9 构建、Consumer POM 或下游消费
+
+1. [ADR-0026](decisions/0026-maven-4-build-and-consumer-pom-baseline.md)
+2. [`development.md`](development.md)
+3. [`testing.md`](testing.md)
+4. [`releasing.md`](releasing.md)
+5. [`dependencies.md`](dependencies.md)
+
+先区分 Ainer 的 Maven 4 生产者构建与 Maven 3.9+/Maven 4 外部 consumer 门禁。POM 4.1 和
+`packaging=bom` 尚未进入当前实施范围，不能因 XML 精简而绕过安装后 POM 与真实下游验证。
 
 ## 5. 完整文档地图
 
@@ -161,10 +202,18 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 
 | 文档 | 作用 |
 |---|---|
-| [`project-status.md`](project-status.md) | 当前阶段、完成项、验证证据、缺口和下一步 |
+| [`project-status.md`](project-status.md) | 当前阶段、完成项、验证记录、缺口和下一步 |
 | [`architecture.md`](architecture.md) | 模块、依赖、发行物、运行模式和数据所有权 |
 | [`design/paradigm-redesign.md`](design/paradigm-redesign.md) | 为什么不沿用旧脚手架范式 |
-| [`design/ainer-scaffold-design.md`](design/ainer-scaffold-design.md) | 脚手架产品与长期架构设计 |
+| [`design/ainer-scaffold-design.md`](design/ainer-scaffold-design.md) | Ainer Boot 产品定位、竞品能力矩阵、P0–P5 路线与长期架构设计 |
+| [`architecture/ainer-boot-ai-application-foundation-audit.md`](architecture/ainer-boot-ai-application-foundation-audit.md) | 面向 xq-platform 与 mdpress 的 AI Application Foundation 架构审计快照 |
+| [`architecture/ainer-foundation-v1-roadmap.md`](architecture/ainer-foundation-v1-roadmap.md) | Foundation v1 的能力盘点、FV1-P0～P3 施工顺序、产品验证和明确不做（Proposed） |
+| [`decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md`](decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md) | ADR-0033 Greenfield 基线（Accepted 为目标，Option B：完全移除 Tenant；按 Impact Stage 0–8 执行） |
+| [`architecture/ainer-foundation-greenfield-reset-impact.md`](architecture/ainer-foundation-greenfield-reset-impact.md) | Greenfield reset 的删除/重建范围、迁移 baseline、JWT/API/event reset 与 Stage 0–8 执行顺序 |
+| [`decisions/0033-account-workspace-isolation-model-baseline.md`](decisions/0033-account-workspace-isolation-model-baseline.md) | ADR-0033 v1 历史草案（Historical，未生效） |
+| [`architecture/adr-0033-adversarial-review.md`](architecture/adr-0033-adversarial-review.md) | ADR-0033 v1 的对抗性审查与 Major Revision 依据 |
+| [`decisions/0033-account-workspace-isolation-model-baseline-v2.md`](decisions/0033-account-workspace-isolation-model-baseline-v2.md) | ADR-0033 v2 迁移路线草案（Historical，不采用，保留为迁移备选语境） |
+| [`decisions/0034-knowledge-foundation-and-ai-context-model.md`](decisions/0034-knowledge-foundation-and-ai-context-model.md) | Knowledge Foundation、Content/Asset 边界与 AI Context Assembly 基线（Proposed） |
 | [`decisions/README.md`](decisions/README.md) | ADR 状态、索引和模板 |
 
 ### 工程规范
@@ -187,6 +236,8 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 | [`database.md`](database.md) | 数据库归属、当前表、Flyway 和 Migration 运行手册 |
 | [`security.md`](security.md) | OAuth、Identity、tenant、Passkey 和安全边界 |
 | [`ai-gateway.md`](ai-gateway.md) | 模型网关、SSE、策略、费用和安全基线 |
+| [`design/authorization-architecture-plan.md`](design/authorization-architecture-plan.md) | 通用混合授权、集合查询、Spring Security 适配与 Agent 代行详细方案（Proposed） |
+| [`design/organization-workforce-architecture-plan.md`](design/organization-workforce-architecture-plan.md) | 部门、员工任职、岗位、团队及 SubjectSet 授权集成详细方案（Proposed） |
 | [`design/ai-runtime-data-model.md`](design/ai-runtime-data-model.md) | Run、Invocation、Artifact 与业务结果的候选边界 |
 | [`design/knowledge-data-model.md`](design/knowledge-data-model.md) | Knowledge revision、chunk、索引代际与检索授权提案 |
 
@@ -228,7 +279,7 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 - `docs/README.md` 只是目录门面，不承载第二套导航或项目事实；
 - 新文档必须接入本文，禁止孤岛文档；
 - 已接受 ADR 不改写结论；方案变化新增 ADR，并标记取代关系；
-- 计划使用“拟议”“未实现”，已完成能力必须指向代码、migration 或测试证据；
+- 计划使用“拟议”“未实现”，已完成能力必须指向代码、migration 或测试结果；
 - 重大删除保留迁移、弃用或取代说明，不能通过删除文档抹去历史。
 
 ## 8. 代码变化应更新哪里
@@ -236,7 +287,7 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 | 变化 | 必须检查或更新 |
 |---|---|
 | 用户可见能力、启动方式 | 根 `README.md` |
-| 当前完成项、测试证据、缺口、下一步 | `project-status.md` |
+| 当前完成项、测试结果、缺口、下一步 | `project-status.md` |
 | HTTP 路径、字段、状态码、scope、错误 | `api.md` |
 | 模块边界、事务、安全、兼容或商业承诺 | `architecture.md` + 新 ADR |
 | 配置键、默认值、secret | `configuration.md` |

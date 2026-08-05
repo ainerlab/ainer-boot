@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "spring.flyway.enabled=false",
                 "spring.autoconfigure.exclude="
                         + "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,"
-                        + "org.mybatis.spring.boot.autoconfigure.MybatisAutoConfiguration"
+                        + "com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration"
         })
 @Import(AinerServerMetricsSecurityTest.JwtTestConfiguration.class)
 class AinerServerMetricsSecurityTest {

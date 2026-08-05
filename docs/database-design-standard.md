@@ -1,6 +1,6 @@
 # Ainer 数据库设计规范（PostgreSQL 18）
 
-> 文档类型：长期规范 · 状态：生效 · 规范版本：1.2 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
+> 文档类型：长期规范 · 状态：生效 · 规范版本：1.2 · 最近核对：2026-07-30 · 适用版本：`0.1.x`
 
 ## 1. 目的、范围与规则等级
 
@@ -13,7 +13,7 @@ Ainer 是 greenfield 脚手架，不提供 MySQL、H2、旧 PostgreSQL、yudao �
 规则等级：
 
 - **必须**：违反即不得合并，除非已接受 ADR 明确记录原因、风险和退出方案；
-- **应当**：默认选择，偏离时必须在设计或评审记录中说明证据；
+- **应当**：默认选择，偏离时必须在设计或评审记录中说明理由；
 - **可以**：按真实业务和负载选用，不能因“以后可能有用”提前引入；
 - 文中的 DDL 是设计范例，不是可直接执行的 migration，名称和字段必须按所属领域调整。
 
@@ -90,7 +90,7 @@ Ainer 是 greenfield 脚手架，不提供 MySQL、H2、旧 PostgreSQL、yudao �
 | named/`NOT VALID` constraints | 大表在线约束演进和后续验证 |
 | AIO、checksums、VACUUM 与统计 | 属于运行基线，在运维和环境验收中落实 |
 
-Native-First 不等于功能堆砌。每项能力仍必须有业务不变量、查询或运行证据，但“兼容其他数据库”
+Native-First 不等于功能堆砌。每项能力仍必须有业务不变量、查询需求或运行验证，但“兼容其他数据库”
 不能成为拒绝 PostgreSQL 18 正确表达的理由。
 
 ## 3. 命名规范
@@ -263,7 +263,7 @@ ainer_identity_access_event
 2. 最大字节数和拒绝策略；
 3. 允许/禁止的敏感字段；
 4. 读取者、保留期和兼容策略；
-5. 是否查询内部字段；若查询，给出具体 SQL 和索引证据。
+5. 是否查询内部字段；若查询，给出具体 SQL 和索引设计。
 
 以下情况必须使用普通列或从属表，而不是 JSON：
 
@@ -276,7 +276,7 @@ ainer_identity_access_event
 
 #### Domain Snapshot 模式
 
-非标业务观察、模型输入和外部事实在某个时间点的**不可变证据**可以使用版本化 `jsonb` 快照，
+非标业务观察、模型输入和外部事实在某个时间点的**不可变来源快照**可以使用版本化 `jsonb`，
 但快照不是可变属性袋。采用时必须同时保存：
 
 - `snapshot_type`、`schema_version`、`captured_at`；
@@ -284,7 +284,7 @@ ainer_identity_access_event
 - `content_hash` 和受大小限制的 `snapshot_payload`；
 - 数据分级、保留和删除规则。
 
-快照写入前必须通过对应 schema 校验，修订时追加新版本，不原地改写历史证据。tenant、授权、
+快照写入前必须通过对应 schema 校验，修订时追加新版本，不原地改写历史来源快照。tenant、授权、
 状态、关系、金额、计量单位以及参与核心过滤/约束的字段仍必须结构化；未经验证的快照内容不得
 直接成为授权或最终价格事实。反复参与查询、约束或计算的属性必须提升为普通列或从属实体，不得
 通过默认 GIN 索引把快照变成隐式主模型。
@@ -444,7 +444,7 @@ CHECK 应用于：
 - `INCLUDE` 只放覆盖查询所需、变化频率低的小字段；
 - 部分索引谓词必须与稳定查询谓词一致；
 - 表达式索引要求所有查询使用相同表达式；
-- GIN、GiST、BRIN 和向量索引必须有数据规模与查询计划证据；
+- GIN、GiST、BRIN 和向量索引必须有数据规模与查询计划结果；
 - 高频写表要评估每个索引的写放大、存储、VACUUM 和更新成本。
 
 ### 9.2 查询计划门禁
@@ -464,7 +464,7 @@ SELECT ...;
 - 锁范围、执行时间和写入 WAL；
 - 冷热数据、tenant 倾斜和最坏分页位置。
 
-不得把小型 Testcontainers 空库计划当作生产容量证据。生产排查优先 `EXPLAIN`，执行 `ANALYZE` 前必须确认不会造成不可接受负载。
+不得根据小型 Testcontainers 空库计划推断生产容量。生产排查优先 `EXPLAIN`，执行 `ANALYZE` 前必须确认不会造成不可接受负载。
 
 ### 9.3 大表与分区
 
@@ -500,9 +500,9 @@ SELECT ...;
 - embedding 必须绑定模型、版本和维度。换模型视为新版本和可重建流程，不能静默覆盖；
 - RAG 文档和 chunk 必须继承来源资源的 tenant/ACL，检索前过滤不能只依赖模型相似度；
 - 用量与费用汇总必须可从不可变调用事实重新计算，并区分供应商实际值与估算值。
-- AI execution 只拥有运行、模型调用、检索证据和平台产物；订单、商品、客户、估价结论等业务事实
+- AI execution 只拥有运行、模型调用、检索轨迹和平台产物；订单、商品、客户、估价结论等业务事实
   仍由业务 bounded context 拥有，不能因为“由 AI 生成”就迁入 AI 表；
-- Knowledge 只拥有摄取、修订、切分、embedding、索引代际和检索证据。来源业务事实及其授权策略
+- Knowledge 只拥有摄取、修订、切分、embedding、索引代际和检索轨迹。来源业务事实及其授权策略
   仍由来源 bounded context 拥有，Knowledge 保存的是可重建投影而不是新的事实权威；
 - `Run`、`Invocation`、`Artifact` 和 Knowledge 的候选模型分别见
   [`design/ai-runtime-data-model.md`](design/ai-runtime-data-model.md) 与
@@ -523,7 +523,7 @@ SELECT ...;
 - DDL 和依赖代码必须具备向前兼容窗口；应用回滚不等于 schema 回滚；
 - 每次变更都要说明失败点、锁范围、升级耗时、备份/恢复和向前修复方案。
 
-## 12. MyBatis 与 Java 映射
+## 12. MyBatis、MyBatis-Plus 与 Java 映射
 
 | PostgreSQL | Java |
 |---|---|
@@ -541,12 +541,26 @@ SELECT ...;
 
 - `uuid` 通过项目显式 TypeHandler 以 `Types.OTHER` 绑定；
 - 金额计算和比较使用 `BigDecimal`，禁止转 `double`；
-- 持久化 Row/Mapper/Repository adapter 位于模块 infrastructure，领域层不依赖 MyBatis；
+- 持久化 Row/Mapper/Repository adapter 位于模块 infrastructure，领域、应用和 API 不依赖
+  MyBatis/MyBatis-Plus 类型；
+- `BaseMapper`、Wrapper、Page 和 MyBatis-Plus 注解只用于简单、单表且权限条件明确的
+  infrastructure 实现；Repository 端口继续返回 Ainer 应用或领域类型；
+- CTE、锁、`RETURNING`、advisory lock、outbox、审计归档、稳定游标等复杂或安全敏感路径使用
+  显式 Mapper 方法和 XML；
+- 全局 `IdType.AUTO` 只用于让 PostgreSQL `DEFAULT uuidv7()` 生成并通过 JDBC generated keys
+  回填 ID；多返回列或显式变更语义仍使用 `RETURNING`。不得使用 `ASSIGN_ID` /
+  `ASSIGN_UUID`；必须预分配 ID 的用例遵守 ADR-0020；
+- tenant interceptor 当前不启用；所有租户查询仍显式绑定 tenant，不能依赖 ORM 插件替代授权；
+- 不默认使用逻辑删除或 MetaObject 自动填充表达状态、actor、tenant、时间和审计事实；
+- 分页使用 PostgreSQL 方言，最大单页 100；若存在其他 inner interceptor，分页放在链尾；
 - SQL 必须参数绑定，tenant、排序字段和用户输入不得字符串拼接；
 - 动态排序只能从服务端白名单映射为固定 SQL 片段；
 - Repository 签名必须暴露 tenant 与并发条件；
 - 乐观更新使用 `WHERE id = ? AND version = ?` 并原子增加版本，0 行更新映射为明确冲突；
 - 大批量操作要限制 batch size，不把无限集合展开为单条 `IN (...)`。
+
+MyBatis-Plus 的版本、依赖和架构边界见
+[ADR-0028](decisions/0028-mybatis-plus-infrastructure-baseline.md)。
 
 ## 13. 设计交付与评审清单
 
@@ -629,9 +643,9 @@ AI 在输出 migration 前必须先输出第 13.1 节的设计说明。AI 不得
 - [DML `RETURNING`](https://www.postgresql.org/docs/18/dml-returning.html)
 - [`COPY`](https://www.postgresql.org/docs/18/sql-copy.html)
 
-规范中的业务选择仍以 Ainer 的边界、安全和运行证据为准；PostgreSQL 支持某种类型或索引不代表项目必须采用。
+规范中的业务选择仍以 Ainer 的边界、安全和运行验证结果为准；PostgreSQL 支持某种类型或索引不代表项目必须采用。
 
 截至 2026-07-26，PostgreSQL 19 仍处于 Beta 2。Ainer 应建立非阻塞前向测试，关注 temporal
 `FOR PORTION OF`、`REPACK CONCURRENTLY`、`WAIT FOR LSN`、logical replication sequence 和
-锁/恢复统计；PG19 GA 且驱动、Testcontainers、备份恢复与真实 workload 证据完成前，不作为生产
+锁/恢复统计；PG19 GA 且驱动、Testcontainers、备份恢复与真实 workload 验证完成前，不作为生产
 基线。[PostgreSQL 19 Beta 2 公告](https://www.postgresql.org/about/news/postgresql-19-beta-2-released-3350/)

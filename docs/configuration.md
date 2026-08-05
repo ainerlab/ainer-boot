@@ -1,6 +1,6 @@
 # Ainer 配置与秘密管理
 
-> 文档类型：开发与运维规范 · 状态：生效 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
+> 文档类型：开发与运维规范 · 状态：生效 · 最近核对：2026-07-30 · 适用版本：`0.1.x`
 
 ## 1. 原则
 
@@ -20,6 +20,12 @@ Spring Boot 标准配置仍可通过属性、环境变量或启动参数提供�
 | `SPRING_DATASOURCE_PASSWORD` | 是 | secret 注入 | 数据库密码 |
 
 业务应用与 Authorization Server 应使用不同数据库和最小权限账号。
+
+Mapper XML 位置使用 MyBatis-Plus 的 `mybatis-plus.mapper-locations`；旧的
+`mybatis.mapper-locations` 不再是 Ainer 支持的配置键。Ainer persistence starter 固定
+PostgreSQL 分页 `maxLimit=100`、全局 `IdType.AUTO` 和显式 UUID TypeHandler；这些默认值的
+架构边界见
+[ADR-0028](decisions/0028-mybatis-plus-infrastructure-baseline.md)。
 
 ## 3. `ainer-server`
 

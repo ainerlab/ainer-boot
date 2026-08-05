@@ -5,31 +5,25 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("ainer.admin.browser-client")
 public final class AinerAdminBrowserClientProperties {
 
-    private boolean enabled;
-    private String redirectUri;
-    private String postLogoutRedirectUri;
+    private final boolean enabled;
+    private final String redirectUri;
+    private final String postLogoutRedirectUri;
+
+    public AinerAdminBrowserClientProperties(boolean enabled, String redirectUri, String postLogoutRedirectUri) {
+        this.enabled = enabled;
+        this.redirectUri = redirectUri;
+        this.postLogoutRedirectUri = postLogoutRedirectUri;
+    }
 
     public boolean isEnabled() {
         return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
     }
 
     public String getRedirectUri() {
         return redirectUri;
     }
 
-    public void setRedirectUri(String redirectUri) {
-        this.redirectUri = redirectUri;
-    }
-
     public String getPostLogoutRedirectUri() {
         return postLogoutRedirectUri;
-    }
-
-    public void setPostLogoutRedirectUri(String postLogoutRedirectUri) {
-        this.postLogoutRedirectUri = postLogoutRedirectUri;
     }
 }

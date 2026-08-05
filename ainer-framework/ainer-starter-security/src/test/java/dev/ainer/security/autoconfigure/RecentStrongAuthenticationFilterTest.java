@@ -116,35 +116,26 @@ class RecentStrongAuthenticationFilterTest {
 
     @Test
     void stepUpPropertiesValidateRejectsInvalidConfiguration() {
-        AinerResourceServerProperties.StepUp empty = new AinerResourceServerProperties.StepUp();
-        empty.setEnabled(true);
+        AinerResourceServerProperties.StepUp empty =
+                new AinerResourceServerProperties.StepUp(true, null, null, null, null, null, null);
         assertThatThrownBy(empty::validate).isInstanceOf(IllegalStateException.class);
 
-        AinerResourceServerProperties.StepUp noAmr = new AinerResourceServerProperties.StepUp();
-        noAmr.setEnabled(true);
-        noAmr.setAlwaysProtectedPaths(List.of("/api/x"));
-        noAmr.setRequiredAmr(List.of());
+        AinerResourceServerProperties.StepUp noAmr =
+                new AinerResourceServerProperties.StepUp(true, null, null, List.of(), List.of("/api/x"), null, null);
         assertThatThrownBy(noAmr::validate).isInstanceOf(IllegalStateException.class);
 
-        AinerResourceServerProperties.StepUp excessiveSkew = new AinerResourceServerProperties.StepUp();
-        excessiveSkew.setEnabled(true);
-        excessiveSkew.setAlwaysProtectedPaths(List.of("/api/x"));
-        excessiveSkew.setClockSkew(Duration.ofMinutes(6));
+        AinerResourceServerProperties.StepUp excessiveSkew =
+                new AinerResourceServerProperties.StepUp(true, null, Duration.ofMinutes(6), null, List.of("/api/x"), null, null);
         assertThatThrownBy(excessiveSkew::validate).isInstanceOf(IllegalStateException.class);
 
-        AinerResourceServerProperties.StepUp tooOld = new AinerResourceServerProperties.StepUp();
-        tooOld.setEnabled(true);
-        tooOld.setAlwaysProtectedPaths(List.of("/api/x"));
-        tooOld.setMaxAuthAge(Duration.ofHours(25));
+        AinerResourceServerProperties.StepUp tooOld =
+                new AinerResourceServerProperties.StepUp(true, Duration.ofHours(25), null, null, List.of("/api/x"), null, null);
         assertThatThrownBy(tooOld::validate).isInstanceOf(IllegalStateException.class);
     }
 
     private RecentStrongAuthenticationFilter filter(Duration maxAuthAge, List<String> requiredAmr) {
-        AinerResourceServerProperties.StepUp properties = new AinerResourceServerProperties.StepUp();
-        properties.setEnabled(true);
-        properties.setMaxAuthAge(maxAuthAge);
-        properties.setRequiredAmr(requiredAmr);
-        properties.setAlwaysProtectedPaths(List.of("/api/sensitive/**"));
+        AinerResourceServerProperties.StepUp properties = new AinerResourceServerProperties.StepUp(
+                true, maxAuthAge, null, requiredAmr, List.of("/api/sensitive/**"), null, null);
         return new RecentStrongAuthenticationFilter(properties, failureWriter, null, CLOCK);
     }
 

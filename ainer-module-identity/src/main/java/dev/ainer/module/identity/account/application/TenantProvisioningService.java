@@ -17,6 +17,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
@@ -69,7 +70,7 @@ public class TenantProvisioningService {
         requireActor(actor);
         Objects.requireNonNull(policy, "policy");
         String fingerprint = fingerprint(normalized);
-        Instant now = clock.instant();
+        Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
 
         repository.acquireLocks(
                 actor.serviceId(),

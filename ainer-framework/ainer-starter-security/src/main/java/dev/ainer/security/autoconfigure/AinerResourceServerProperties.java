@@ -11,38 +11,42 @@ import java.util.List;
 @ConfigurationProperties("ainer.security.resource-server")
 public class AinerResourceServerProperties {
 
-    private boolean enabled;
-    private String subjectClaim = "sub";
-    private String tenantClaim = "tenant_id";
-    private final OnlineValidation onlineValidation = new OnlineValidation();
-    private final StepUp stepUp = new StepUp();
-    private List<String> publicPaths = new ArrayList<>(List.of(
-            "/api/platform/info",
-            "/actuator/health/**",
-            "/actuator/info"));
+    private final boolean enabled;
+    private final String subjectClaim;
+    private final String tenantClaim;
+    private final OnlineValidation onlineValidation;
+    private final StepUp stepUp;
+    private final List<String> publicPaths;
+
+    public AinerResourceServerProperties(
+            boolean enabled,
+            String subjectClaim,
+            String tenantClaim,
+            OnlineValidation onlineValidation,
+            StepUp stepUp,
+            List<String> publicPaths) {
+        this.enabled = enabled;
+        this.subjectClaim = subjectClaim != null ? subjectClaim : "sub";
+        this.tenantClaim = tenantClaim != null ? tenantClaim : "tenant_id";
+        this.onlineValidation = onlineValidation != null
+                ? onlineValidation
+                : new OnlineValidation(false, null, null, null, null, null, false, null, null, null);
+        this.stepUp = stepUp != null ? stepUp : new StepUp(false, null, null, null, null, null, null);
+        this.publicPaths = publicPaths != null
+                ? new ArrayList<>(publicPaths)
+                : new ArrayList<>(List.of("/api/platform/info", "/actuator/health/**", "/actuator/info"));
+    }
 
     public boolean isEnabled() {
         return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
     }
 
     public String getSubjectClaim() {
         return subjectClaim;
     }
 
-    public void setSubjectClaim(String subjectClaim) {
-        this.subjectClaim = subjectClaim;
-    }
-
     public String getTenantClaim() {
         return tenantClaim;
-    }
-
-    public void setTenantClaim(String tenantClaim) {
-        this.tenantClaim = tenantClaim;
     }
 
     public OnlineValidation getOnlineValidation() {
@@ -54,112 +58,90 @@ public class AinerResourceServerProperties {
     }
 
     public List<String> getPublicPaths() {
-        return publicPaths;
-    }
-
-    public void setPublicPaths(List<String> publicPaths) {
-        this.publicPaths = new ArrayList<>(publicPaths);
+        return List.copyOf(publicPaths);
     }
 
     public static final class OnlineValidation {
 
-        private boolean enabled;
-        private String introspectionUri;
-        private String clientId;
-        private String clientSecret;
-        private Duration connectTimeout = Duration.ofSeconds(2);
-        private Duration readTimeout = Duration.ofSeconds(2);
-        private boolean allowInsecureHttp;
-        private List<String> alwaysProtectedPaths = new ArrayList<>(List.of(
-                "/internal/**",
-                "/api/workspaces/*/authorization-audits"));
-        private List<String> mutatingProtectedPaths = new ArrayList<>(List.of(
-                "/api/workspaces/**",
-                "/api/ai/**"));
-        private List<HttpMethod> mutatingMethods = new ArrayList<>(List.of(
-                HttpMethod.POST,
-                HttpMethod.PUT,
-                HttpMethod.PATCH,
-                HttpMethod.DELETE));
+        private final boolean enabled;
+        private final String introspectionUri;
+        private final String clientId;
+        private final String clientSecret;
+        private final Duration connectTimeout;
+        private final Duration readTimeout;
+        private final boolean allowInsecureHttp;
+        private final List<String> alwaysProtectedPaths;
+        private final List<String> mutatingProtectedPaths;
+        private final List<HttpMethod> mutatingMethods;
+
+        public OnlineValidation(
+                boolean enabled,
+                String introspectionUri,
+                String clientId,
+                String clientSecret,
+                Duration connectTimeout,
+                Duration readTimeout,
+                boolean allowInsecureHttp,
+                List<String> alwaysProtectedPaths,
+                List<String> mutatingProtectedPaths,
+                List<HttpMethod> mutatingMethods) {
+            this.enabled = enabled;
+            this.introspectionUri = introspectionUri;
+            this.clientId = clientId;
+            this.clientSecret = clientSecret;
+            this.connectTimeout = connectTimeout != null ? connectTimeout : Duration.ofSeconds(2);
+            this.readTimeout = readTimeout != null ? readTimeout : Duration.ofSeconds(2);
+            this.allowInsecureHttp = allowInsecureHttp;
+            this.alwaysProtectedPaths = alwaysProtectedPaths != null
+                    ? new ArrayList<>(alwaysProtectedPaths)
+                    : new ArrayList<>(List.of("/internal/**", "/api/workspaces/*/authorization-audits"));
+            this.mutatingProtectedPaths = mutatingProtectedPaths != null
+                    ? new ArrayList<>(mutatingProtectedPaths)
+                    : new ArrayList<>(List.of("/api/workspaces/**", "/api/ai/**"));
+            this.mutatingMethods = mutatingMethods != null
+                    ? new ArrayList<>(mutatingMethods)
+                    : new ArrayList<>(List.of(
+                            HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE));
+        }
 
         public boolean isEnabled() {
             return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
         }
 
         public String getIntrospectionUri() {
             return introspectionUri;
         }
 
-        public void setIntrospectionUri(String introspectionUri) {
-            this.introspectionUri = introspectionUri;
-        }
-
         public String getClientId() {
             return clientId;
-        }
-
-        public void setClientId(String clientId) {
-            this.clientId = clientId;
         }
 
         public String getClientSecret() {
             return clientSecret;
         }
 
-        public void setClientSecret(String clientSecret) {
-            this.clientSecret = clientSecret;
-        }
-
         public Duration getConnectTimeout() {
             return connectTimeout;
-        }
-
-        public void setConnectTimeout(Duration connectTimeout) {
-            this.connectTimeout = connectTimeout;
         }
 
         public Duration getReadTimeout() {
             return readTimeout;
         }
 
-        public void setReadTimeout(Duration readTimeout) {
-            this.readTimeout = readTimeout;
-        }
-
         public boolean isAllowInsecureHttp() {
             return allowInsecureHttp;
         }
 
-        public void setAllowInsecureHttp(boolean allowInsecureHttp) {
-            this.allowInsecureHttp = allowInsecureHttp;
-        }
-
         public List<String> getAlwaysProtectedPaths() {
-            return alwaysProtectedPaths;
-        }
-
-        public void setAlwaysProtectedPaths(List<String> alwaysProtectedPaths) {
-            this.alwaysProtectedPaths = mutableCopy(alwaysProtectedPaths);
+            return List.copyOf(alwaysProtectedPaths);
         }
 
         public List<String> getMutatingProtectedPaths() {
-            return mutatingProtectedPaths;
-        }
-
-        public void setMutatingProtectedPaths(List<String> mutatingProtectedPaths) {
-            this.mutatingProtectedPaths = mutableCopy(mutatingProtectedPaths);
+            return List.copyOf(mutatingProtectedPaths);
         }
 
         public List<HttpMethod> getMutatingMethods() {
-            return mutatingMethods;
-        }
-
-        public void setMutatingMethods(List<HttpMethod> mutatingMethods) {
-            this.mutatingMethods = mutableCopy(mutatingMethods);
+            return List.copyOf(mutatingMethods);
         }
 
         URI validateAndGetIntrospectionUri() {
@@ -218,80 +200,69 @@ public class AinerResourceServerProperties {
                 throw new IllegalStateException("Ainer online token validation " + name + " must be positive");
             }
         }
-
-        private static <T> List<T> mutableCopy(List<T> values) {
-            return values == null ? new ArrayList<>() : new ArrayList<>(values);
-        }
     }
 
     public static final class StepUp {
 
-        private boolean enabled;
-        private Duration maxAuthAge = Duration.ofMinutes(15);
-        private Duration clockSkew = Duration.ofSeconds(60);
-        private List<String> requiredAmr = new ArrayList<>(List.of("mfa"));
-        private List<String> alwaysProtectedPaths = new ArrayList<>();
-        private List<String> mutatingProtectedPaths = new ArrayList<>();
-        private List<HttpMethod> mutatingMethods = new ArrayList<>(List.of(
-                HttpMethod.POST,
-                HttpMethod.PUT,
-                HttpMethod.PATCH,
-                HttpMethod.DELETE));
+        private final boolean enabled;
+        private final Duration maxAuthAge;
+        private final Duration clockSkew;
+        private final List<String> requiredAmr;
+        private final List<String> alwaysProtectedPaths;
+        private final List<String> mutatingProtectedPaths;
+        private final List<HttpMethod> mutatingMethods;
+
+        public StepUp(
+                boolean enabled,
+                Duration maxAuthAge,
+                Duration clockSkew,
+                List<String> requiredAmr,
+                List<String> alwaysProtectedPaths,
+                List<String> mutatingProtectedPaths,
+                List<HttpMethod> mutatingMethods) {
+            this.enabled = enabled;
+            this.maxAuthAge = maxAuthAge != null ? maxAuthAge : Duration.ofMinutes(15);
+            this.clockSkew = clockSkew != null ? clockSkew : Duration.ofSeconds(60);
+            this.requiredAmr = requiredAmr != null ? new ArrayList<>(requiredAmr)
+                    : new ArrayList<>(List.of("mfa"));
+            this.alwaysProtectedPaths = alwaysProtectedPaths != null
+                    ? new ArrayList<>(alwaysProtectedPaths)
+                    : new ArrayList<>();
+            this.mutatingProtectedPaths = mutatingProtectedPaths != null
+                    ? new ArrayList<>(mutatingProtectedPaths)
+                    : new ArrayList<>();
+            this.mutatingMethods = mutatingMethods != null
+                    ? new ArrayList<>(mutatingMethods)
+                    : new ArrayList<>(List.of(
+                            HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE));
+        }
 
         public boolean isEnabled() {
             return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
         }
 
         public Duration getMaxAuthAge() {
             return maxAuthAge;
         }
 
-        public void setMaxAuthAge(Duration maxAuthAge) {
-            this.maxAuthAge = maxAuthAge;
-        }
-
         public Duration getClockSkew() {
             return clockSkew;
         }
 
-        public void setClockSkew(Duration clockSkew) {
-            this.clockSkew = clockSkew;
-        }
-
         public List<String> getRequiredAmr() {
-            return requiredAmr;
-        }
-
-        public void setRequiredAmr(List<String> requiredAmr) {
-            this.requiredAmr = mutableCopy(requiredAmr);
+            return List.copyOf(requiredAmr);
         }
 
         public List<String> getAlwaysProtectedPaths() {
-            return alwaysProtectedPaths;
-        }
-
-        public void setAlwaysProtectedPaths(List<String> alwaysProtectedPaths) {
-            this.alwaysProtectedPaths = mutableCopy(alwaysProtectedPaths);
+            return List.copyOf(alwaysProtectedPaths);
         }
 
         public List<String> getMutatingProtectedPaths() {
-            return mutatingProtectedPaths;
-        }
-
-        public void setMutatingProtectedPaths(List<String> mutatingProtectedPaths) {
-            this.mutatingProtectedPaths = mutableCopy(mutatingProtectedPaths);
+            return List.copyOf(mutatingProtectedPaths);
         }
 
         public List<HttpMethod> getMutatingMethods() {
-            return mutatingMethods;
-        }
-
-        public void setMutatingMethods(List<HttpMethod> mutatingMethods) {
-            this.mutatingMethods = mutableCopy(mutatingMethods);
+            return List.copyOf(mutatingMethods);
         }
 
         void validate() {
@@ -327,10 +298,6 @@ public class AinerResourceServerProperties {
             if (value == null || value.isZero() || value.isNegative()) {
                 throw new IllegalStateException("Ainer step-up " + name + " must be positive");
             }
-        }
-
-        private static <T> List<T> mutableCopy(List<T> values) {
-            return values == null ? new ArrayList<>() : new ArrayList<>(values);
         }
     }
 }

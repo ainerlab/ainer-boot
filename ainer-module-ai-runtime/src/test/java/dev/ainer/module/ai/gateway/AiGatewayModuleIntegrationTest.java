@@ -68,7 +68,7 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "ainer.ai.pricing.input-per-million-tokens=1.00",
                 "ainer.ai.pricing.output-per-million-tokens=2.00",
                 "ainer.security.resource-server.enabled=true",
-                "mybatis.mapper-locations=classpath*:/mapper/**/*.xml",
+                "mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml",
                 "spring.main.banner-mode=off"
         })
 class AiGatewayModuleIntegrationTest {

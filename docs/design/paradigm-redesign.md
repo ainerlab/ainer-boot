@@ -88,7 +88,9 @@ Ainer：
 
 ## 8. 演进方式
 
-Ainer 不追求一次性推翻并重写全部 xiaoqu。采用渐进切片：
+Ainer 采用
+[演进式模块化平台架构](../decisions/0024-evolutionary-modular-platform-architecture.md)，不追求
+一次性推翻并重写全部 xiaoqu。迁移采用渐进切片：
 
 1. 用 characterization tests 固化旧行为；
 2. 在 Ainer 重建设计清晰的垂直能力；

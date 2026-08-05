@@ -16,7 +16,9 @@ Ainer Boot 的 AI/人协作规则。新会话先读本文件，再按顺序阅�
 
 ## 工程定位
 
-Ainer 是 JDK 25 + Spring Boot 4.1 的 AI 原生企业应用平台底座。当前已经具备 framework、可信租户化 `workspace`、AI Model Gateway、Identity、JWT Resource Server 与独立 OAuth 2.1/OIDC Authorization Server 基线。
+Ainer Boot 是 JDK 25 + Spring Boot 4.1 的 AI-native、但不局限于 AI 的通用企业 Java 脚手架与
+运行基线。当前已经具备 framework、可信租户化 `workspace`、AI Model Gateway、Identity、JWT
+Resource Server 与独立 OAuth 2.1/OIDC Authorization Server 基线。
 
 模块化单体是默认交付形态。服务化演进通过独立应用装配、稳定契约和基础设施适配器完成，不承诺同一个应用修改一行 YAML 就自动变成微服务。
 
@@ -33,10 +35,15 @@ Ainer 是 JDK 25 + Spring Boot 4.1 的 AI 原生企业应用平台底座。当�
 ```bash
 git status --short --branch
 git log --oneline --decorate -12
-mvn test
+./mvnw --version
+./mvnw clean verify
 ```
 
 保持用户已有改动，不回滚、不覆盖、不把无关文件混入提交。
+
+生产者构建固定使用仓库内 Maven Wrapper：JDK 25 + Maven 4.0.0-rc-6 preview。系统
+Maven 3.9+ 只用于 `scripts/verify-maven-consumers.sh` 的下游兼容门禁，不得用于构建、安装或
+发布 Ainer reactor。
 
 ## 最高优先级规则
 
@@ -122,7 +129,7 @@ ainer-core <- ainer-spring <- starter <- application/module
 每个改动至少执行与风险匹配的测试。合并前必须通过：
 
 ```bash
-mvn test
+./mvnw clean verify
 ```
 
 新增 Starter 时至少包含自动装配测试；新增 HTTP 错误时验证真实状态码和响应体；新增数据模块时包含 PostgreSQL 集成测试和 migration 重放测试；新增 AI provider 时包含非流式、SSE、usage、超时/限流和错误脱敏合约测试。
@@ -137,14 +144,18 @@ mvn test
 - 动态测试数量、当前缺口和下一里程碑只维护在 `docs/project-status.md`，发布变化维护在 `CHANGELOG.md`。
 - 文档示例禁止使用真实密码、Token、私钥、API key、客户数据、prompt 或供应商正文。
 - 文档也要通过 `git diff --check`；命令、链接与版本必须对照当前代码核实。
+- 架构表述统一使用“按需服务化”或“满足拆分条件后服务化”；工程结论使用“验证结果/验证记录”，
+  AI 上下文使用“来源/引用/检索轨迹”，不创造带取证意味的工程口号。
 
 ## 当前优先级
 
-1. 把 M4.3 选择性在线撤销接入生产 Authorization Server 高可用、容量、专用凭据轮换、指标 exporter/dashboard/告警和多节点故障验证。
-2. 把 M4.2 控制面接入生产 IAM 职责分离、外部不可变审计副本和正式 SLO/错误预算。
-3. 为 M3 补齐 tenant ownership transfer、人员账号/Client 控制面、Authorization Code + PKCE 端到端测试、MFA 与密钥轮换。
-4. 建立 AI 集群级限流、凭据托管、指标追踪、输出策略与评测基线。
-5. 再进入代码生成器、其他业务资源的数据权限和服务化发行物。
+动态优先级、当前缺口与下一里程碑只以 `docs/project-status.md` 为准，不在本文件复制一份会过期的
+任务清单。Ainer Boot 的产品定位、多标杆能力矩阵、P0–P5 顺序与退出门禁以
+`docs/design/ainer-scaffold-design.md` 为准。
+
+执行任务时不得用尚未闭环的企业纵深能力无限推迟 Scaffold Ready、Project Initializer 和首个
+外部消费者，也不得为了赶产品化阶段绕过 P0 的真实 PostgreSQL、授权、数据治理、许可证与
+供应链门禁。服务化仍只在 ADR-0024 的触发条件和工程准备条件同时满足后开展。
 
 ## Git
 

@@ -5,13 +5,19 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("ainer.workspace.authorization-audit-export")
 public class WorkspaceAuthorizationAuditExportProperties {
 
-    private boolean enabled;
-    private String trustedExporterSubject;
+    private final boolean enabled;
+    private final String trustedExporterSubject;
 
-    public boolean isEnabled() { return enabled; }
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
-    public String getTrustedExporterSubject() { return trustedExporterSubject; }
-    public void setTrustedExporterSubject(String trustedExporterSubject) {
+    public WorkspaceAuthorizationAuditExportProperties(boolean enabled, String trustedExporterSubject) {
+        this.enabled = enabled;
         this.trustedExporterSubject = trustedExporterSubject;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public String getTrustedExporterSubject() {
+        return trustedExporterSubject;
     }
 }

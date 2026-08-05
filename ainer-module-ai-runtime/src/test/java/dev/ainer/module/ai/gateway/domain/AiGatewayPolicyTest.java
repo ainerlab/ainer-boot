@@ -26,10 +26,8 @@ class AiGatewayPolicyTest {
 
     @Test
     void calculatesTokenCostWithoutFloatingPointLoss() {
-        AiRuntimeProperties.Pricing pricing = new AiRuntimeProperties.Pricing();
-        pricing.setCurrency("USD");
-        pricing.setInputPerMillionTokens(new BigDecimal("2.50"));
-        pricing.setOutputPerMillionTokens(new BigDecimal("10.00"));
+        AiRuntimeProperties.Pricing pricing = new AiRuntimeProperties.Pricing(
+                "USD", new BigDecimal("2.50"), new BigDecimal("10.00"));
 
         CostBreakdown cost = new CostCalculator(pricing).calculate(new TokenUsage(1_000, 2_000, false));
 
@@ -79,11 +77,10 @@ class AiGatewayPolicyTest {
 
     @Test
     void reportsNullAllowedModelAsConfigurationErrorInsteadOfBindingFailure() {
-        AiRuntimeProperties properties = new AiRuntimeProperties();
-        properties.getProvider().setBaseUrl("https://provider.example");
-        properties.getProvider().setApiKey("test-secret");
-        properties.getProvider().setDefaultModel("test/model");
-        properties.getProvider().setAllowedModels(Arrays.asList("test/model", null));
+        AiRuntimeProperties.Provider provider = new AiRuntimeProperties.Provider(
+                null, "https://provider.example", "test-secret", "test/model",
+                Arrays.asList("test/model", null), null, null, false);
+        AiRuntimeProperties properties = new AiRuntimeProperties(false, provider, null, null);
 
         assertThatThrownBy(properties::validate)
                 .isInstanceOf(IllegalStateException.class)

@@ -57,9 +57,9 @@ class AinerPlatformIdentityOperatorBootstrapRunnerTest {
 
     @Test
     void weakSecretFailsClosed() {
-        AinerAuthorizationServerProperties properties = properties();
-        properties.getPlatformIdentityOperatorBootstrap()
-                .setClientSecret("too-short");
+        AinerAuthorizationServerProperties properties = withPlatformIdentityOperatorBootstrap(
+                new AinerAuthorizationServerProperties.PlatformIdentityOperatorBootstrap(
+                        true, "platform-identity-operator", "too-short"));
 
         assertThatThrownBy(() ->
                 new AinerPlatformIdentityOperatorBootstrapRunner(
@@ -100,14 +100,15 @@ class AinerPlatformIdentityOperatorBootstrapRunnerTest {
     }
 
     private AinerAuthorizationServerProperties properties() {
-        AinerAuthorizationServerProperties properties =
-                new AinerAuthorizationServerProperties();
-        AinerAuthorizationServerProperties.PlatformIdentityOperatorBootstrap bootstrap =
-                properties.getPlatformIdentityOperatorBootstrap();
-        bootstrap.setEnabled(true);
-        bootstrap.setClientId("platform-identity-operator");
-        bootstrap.setClientSecret("platform-identity-secret-2026");
-        return properties;
+        return withPlatformIdentityOperatorBootstrap(
+                new AinerAuthorizationServerProperties.PlatformIdentityOperatorBootstrap(
+                        true, "platform-identity-operator", "platform-identity-secret-2026"));
+    }
+
+    private static AinerAuthorizationServerProperties withPlatformIdentityOperatorBootstrap(
+            AinerAuthorizationServerProperties.PlatformIdentityOperatorBootstrap bootstrap) {
+        return new AinerAuthorizationServerProperties(
+                null, null, null, null, null, null, null, null, null, bootstrap, null, null);
     }
 
     private static final class InMemoryRepository

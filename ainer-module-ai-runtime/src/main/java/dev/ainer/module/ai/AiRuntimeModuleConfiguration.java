@@ -44,6 +44,9 @@ public class AiRuntimeModuleConfiguration {
         return () -> List.of(AiGatewayErrorCode.values());
     }
 
+    // P0-2 出站 HTTP 例外（ADR-0029 第 2 项）：AI provider 使用 JDK HttpClient 而非 Boot 管理的
+    // RestClient.Builder，因为 SSE 流式响应需要逐帧解析与可中断的流控制，RestClient 的缓冲式请求
+    // 模型无法满足。此例外为刻意设计，不得为“统一出站 HTTP”将其改回 RestClient。
     @Bean
     HttpClient aiProviderHttpClient(AiRuntimeProperties properties) {
         properties.validate();
@@ -80,7 +83,9 @@ public class AiRuntimeModuleConfiguration {
         return new TenantRateLimiter(properties.getLimits().getRequestsPerMinute(), clock);
     }
 
-    @Bean(destroyMethod = "close")
+    // 仅用于 AI SSE 流式任务，按名显式注入；标记 defaultCandidate=false 避免被当作 Boot 通用
+    // TaskExecutor/ExecutorService 默认候选，从而不影响 MVC 异步、@Async 与虚拟线程自动配置（ADR-0029 第 5 项）。
+    @Bean(defaultCandidate = false, destroyMethod = "close")
     ExecutorService aiStreamExecutor() {
         return Executors.newThreadPerTaskExecutor(
                 Thread.ofVirtual().name("ainer-ai-stream-", 0).factory());

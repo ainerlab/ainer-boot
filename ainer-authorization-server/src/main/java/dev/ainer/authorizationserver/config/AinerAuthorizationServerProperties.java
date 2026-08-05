@@ -9,41 +9,70 @@ import java.util.List;
 @ConfigurationProperties("ainer.security.authorization-server")
 public class AinerAuthorizationServerProperties {
 
-    private String issuer;
-    private String audience = "ainer-api";
-    private final SigningKey signingKey = new SigningKey();
-    private final Passkey passkey = new Passkey();
-    private final MachineClientBootstrap machineClientBootstrap = new MachineClientBootstrap();
-    private final IntrospectionClientBootstrap introspectionClientBootstrap =
-            new IntrospectionClientBootstrap();
-    private final MetricsClientBootstrap metricsClientBootstrap = new MetricsClientBootstrap();
-    private final ClientControlOperatorBootstrap clientControlOperatorBootstrap =
-            new ClientControlOperatorBootstrap();
-    private final BrowserClientControlOperatorBootstrap browserClientControlOperatorBootstrap =
-            new BrowserClientControlOperatorBootstrap();
-    private final PlatformIdentityOperatorBootstrap platformIdentityOperatorBootstrap =
-            new PlatformIdentityOperatorBootstrap();
+    private final String issuer;
+    private final String audience;
+    private final SigningKey signingKey;
+    private final Passkey passkey;
+    private final MachineClientBootstrap machineClientBootstrap;
+    private final IntrospectionClientBootstrap introspectionClientBootstrap;
+    private final MetricsClientBootstrap metricsClientBootstrap;
+    private final ClientControlOperatorBootstrap clientControlOperatorBootstrap;
+    private final BrowserClientControlOperatorBootstrap browserClientControlOperatorBootstrap;
+    private final PlatformIdentityOperatorBootstrap platformIdentityOperatorBootstrap;
     private final ProvisioningNotificationRelayClientBootstrap
-            provisioningNotificationRelayClientBootstrap =
-                    new ProvisioningNotificationRelayClientBootstrap();
+            provisioningNotificationRelayClientBootstrap;
     private final ProvisioningNotificationReceiptClientBootstrap
-            provisioningNotificationReceiptClientBootstrap =
-                    new ProvisioningNotificationReceiptClientBootstrap();
+            provisioningNotificationReceiptClientBootstrap;
+
+    public AinerAuthorizationServerProperties(
+            String issuer,
+            String audience,
+            SigningKey signingKey,
+            Passkey passkey,
+            MachineClientBootstrap machineClientBootstrap,
+            IntrospectionClientBootstrap introspectionClientBootstrap,
+            MetricsClientBootstrap metricsClientBootstrap,
+            ClientControlOperatorBootstrap clientControlOperatorBootstrap,
+            BrowserClientControlOperatorBootstrap browserClientControlOperatorBootstrap,
+            PlatformIdentityOperatorBootstrap platformIdentityOperatorBootstrap,
+            ProvisioningNotificationRelayClientBootstrap provisioningNotificationRelayClientBootstrap,
+            ProvisioningNotificationReceiptClientBootstrap provisioningNotificationReceiptClientBootstrap) {
+        this.issuer = issuer;
+        this.audience = audience != null ? audience : "ainer-api";
+        this.signingKey = signingKey != null ? signingKey : new SigningKey(null, null, null);
+        this.passkey = passkey != null ? passkey : new Passkey(false, null, null, null, false, null);
+        this.machineClientBootstrap = machineClientBootstrap != null
+                ? machineClientBootstrap
+                : new MachineClientBootstrap(false, null, null, null, null);
+        this.introspectionClientBootstrap = introspectionClientBootstrap != null
+                ? introspectionClientBootstrap
+                : new IntrospectionClientBootstrap(false, null, null);
+        this.metricsClientBootstrap = metricsClientBootstrap != null
+                ? metricsClientBootstrap
+                : new MetricsClientBootstrap(false, null, null);
+        this.clientControlOperatorBootstrap = clientControlOperatorBootstrap != null
+                ? clientControlOperatorBootstrap
+                : new ClientControlOperatorBootstrap(false, null, null);
+        this.browserClientControlOperatorBootstrap = browserClientControlOperatorBootstrap != null
+                ? browserClientControlOperatorBootstrap
+                : new BrowserClientControlOperatorBootstrap(false, null, null);
+        this.platformIdentityOperatorBootstrap = platformIdentityOperatorBootstrap != null
+                ? platformIdentityOperatorBootstrap
+                : new PlatformIdentityOperatorBootstrap(false, null, null);
+        this.provisioningNotificationRelayClientBootstrap = provisioningNotificationRelayClientBootstrap != null
+                ? provisioningNotificationRelayClientBootstrap
+                : new ProvisioningNotificationRelayClientBootstrap(false, null, null);
+        this.provisioningNotificationReceiptClientBootstrap = provisioningNotificationReceiptClientBootstrap != null
+                ? provisioningNotificationReceiptClientBootstrap
+                : new ProvisioningNotificationReceiptClientBootstrap(false, null, null);
+    }
 
     public String getIssuer() {
         return issuer;
     }
 
-    public void setIssuer(String issuer) {
-        this.issuer = issuer;
-    }
-
     public String getAudience() {
         return audience;
-    }
-
-    public void setAudience(String audience) {
-        this.audience = audience;
     }
 
     public SigningKey getSigningKey() {
@@ -90,341 +119,288 @@ public class AinerAuthorizationServerProperties {
 
     public static final class SigningKey {
 
-        private String keyId;
-        private String privateKeyLocation;
-        private String publicKeyLocation;
+        private final String keyId;
+        private final String privateKeyLocation;
+        private final String publicKeyLocation;
+
+        public SigningKey(String keyId, String privateKeyLocation, String publicKeyLocation) {
+            this.keyId = keyId;
+            this.privateKeyLocation = privateKeyLocation;
+            this.publicKeyLocation = publicKeyLocation;
+        }
 
         public String getKeyId() {
             return keyId;
-        }
-
-        public void setKeyId(String keyId) {
-            this.keyId = keyId;
         }
 
         public String getPrivateKeyLocation() {
             return privateKeyLocation;
         }
 
-        public void setPrivateKeyLocation(String privateKeyLocation) {
-            this.privateKeyLocation = privateKeyLocation;
-        }
-
         public String getPublicKeyLocation() {
             return publicKeyLocation;
-        }
-
-        public void setPublicKeyLocation(String publicKeyLocation) {
-            this.publicKeyLocation = publicKeyLocation;
         }
     }
 
     public static final class Passkey {
 
-        private boolean enabled;
-        private String rpId;
-        private String rpName = "Ainer";
-        private List<String> allowedOrigins = new ArrayList<>();
-        private boolean allowInsecureHttp;
-        private Duration ceremonyTimeout = Duration.ofMinutes(5);
+        private final boolean enabled;
+        private final String rpId;
+        private final String rpName;
+        private final List<String> allowedOrigins;
+        private final boolean allowInsecureHttp;
+        private final Duration ceremonyTimeout;
+
+        public Passkey(
+                boolean enabled,
+                String rpId,
+                String rpName,
+                List<String> allowedOrigins,
+                boolean allowInsecureHttp,
+                Duration ceremonyTimeout) {
+            this.enabled = enabled;
+            this.rpId = rpId;
+            this.rpName = rpName != null ? rpName : "Ainer";
+            this.allowedOrigins = allowedOrigins != null ? new ArrayList<>(allowedOrigins) : new ArrayList<>();
+            this.allowInsecureHttp = allowInsecureHttp;
+            this.ceremonyTimeout = ceremonyTimeout != null ? ceremonyTimeout : Duration.ofMinutes(5);
+        }
 
         public boolean isEnabled() {
             return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
         }
 
         public String getRpId() {
             return rpId;
         }
 
-        public void setRpId(String rpId) {
-            this.rpId = rpId;
-        }
-
         public String getRpName() {
             return rpName;
-        }
-
-        public void setRpName(String rpName) {
-            this.rpName = rpName;
         }
 
         public List<String> getAllowedOrigins() {
             return new ArrayList<>(allowedOrigins);
         }
 
-        public void setAllowedOrigins(List<String> allowedOrigins) {
-            this.allowedOrigins = allowedOrigins == null
-                    ? new ArrayList<>()
-                    : new ArrayList<>(allowedOrigins);
-        }
-
         public boolean isAllowInsecureHttp() {
             return allowInsecureHttp;
-        }
-
-        public void setAllowInsecureHttp(boolean allowInsecureHttp) {
-            this.allowInsecureHttp = allowInsecureHttp;
         }
 
         public Duration getCeremonyTimeout() {
             return ceremonyTimeout;
         }
-
-        public void setCeremonyTimeout(Duration ceremonyTimeout) {
-            this.ceremonyTimeout = ceremonyTimeout;
-        }
     }
 
     public static final class MachineClientBootstrap {
 
-        private boolean enabled;
-        private String clientId;
-        private String clientSecret;
-        private String tenantId;
-        private List<String> scopes = new ArrayList<>(List.of("ai.invoke"));
+        private final boolean enabled;
+        private final String clientId;
+        private final String clientSecret;
+        private final String tenantId;
+        private final List<String> scopes;
+
+        public MachineClientBootstrap(
+                boolean enabled, String clientId, String clientSecret, String tenantId, List<String> scopes) {
+            this.enabled = enabled;
+            this.clientId = clientId;
+            this.clientSecret = clientSecret;
+            this.tenantId = tenantId;
+            this.scopes = scopes != null ? new ArrayList<>(scopes) : new ArrayList<>(List.of("ai.invoke"));
+        }
 
         public boolean isEnabled() {
             return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
         }
 
         public String getClientId() {
             return clientId;
         }
 
-        public void setClientId(String clientId) {
-            this.clientId = clientId;
-        }
-
         public String getClientSecret() {
             return clientSecret;
-        }
-
-        public void setClientSecret(String clientSecret) {
-            this.clientSecret = clientSecret;
         }
 
         public String getTenantId() {
             return tenantId;
         }
 
-        public void setTenantId(String tenantId) {
-            this.tenantId = tenantId;
-        }
-
         public List<String> getScopes() {
-            return scopes;
-        }
-
-        public void setScopes(List<String> scopes) {
-            this.scopes = new ArrayList<>(scopes);
+            return List.copyOf(scopes);
         }
     }
 
     public static final class IntrospectionClientBootstrap {
 
-        private boolean enabled;
-        private String clientId;
-        private String clientSecret;
+        private final boolean enabled;
+        private final String clientId;
+        private final String clientSecret;
+
+        public IntrospectionClientBootstrap(boolean enabled, String clientId, String clientSecret) {
+            this.enabled = enabled;
+            this.clientId = clientId;
+            this.clientSecret = clientSecret;
+        }
 
         public boolean isEnabled() {
             return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
         }
 
         public String getClientId() {
             return clientId;
         }
 
-        public void setClientId(String clientId) {
-            this.clientId = clientId;
-        }
-
         public String getClientSecret() {
             return clientSecret;
-        }
-
-        public void setClientSecret(String clientSecret) {
-            this.clientSecret = clientSecret;
         }
     }
 
     public static final class MetricsClientBootstrap {
 
-        private boolean enabled;
-        private String clientId;
-        private String clientSecret;
+        private final boolean enabled;
+        private final String clientId;
+        private final String clientSecret;
+
+        public MetricsClientBootstrap(boolean enabled, String clientId, String clientSecret) {
+            this.enabled = enabled;
+            this.clientId = clientId;
+            this.clientSecret = clientSecret;
+        }
 
         public boolean isEnabled() {
             return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
         }
 
         public String getClientId() {
             return clientId;
         }
 
-        public void setClientId(String clientId) {
-            this.clientId = clientId;
-        }
-
         public String getClientSecret() {
             return clientSecret;
-        }
-
-        public void setClientSecret(String clientSecret) {
-            this.clientSecret = clientSecret;
         }
     }
 
     public static final class ClientControlOperatorBootstrap {
 
-        private boolean enabled;
-        private String clientId;
-        private String clientSecret;
+        private final boolean enabled;
+        private final String clientId;
+        private final String clientSecret;
+
+        public ClientControlOperatorBootstrap(boolean enabled, String clientId, String clientSecret) {
+            this.enabled = enabled;
+            this.clientId = clientId;
+            this.clientSecret = clientSecret;
+        }
 
         public boolean isEnabled() {
             return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
         }
 
         public String getClientId() {
             return clientId;
         }
 
-        public void setClientId(String clientId) {
-            this.clientId = clientId;
-        }
-
         public String getClientSecret() {
             return clientSecret;
-        }
-
-        public void setClientSecret(String clientSecret) {
-            this.clientSecret = clientSecret;
         }
     }
 
     public static final class BrowserClientControlOperatorBootstrap {
 
-        private boolean enabled;
-        private String clientId;
-        private String clientSecret;
+        private final boolean enabled;
+        private final String clientId;
+        private final String clientSecret;
 
-        public boolean isEnabled() { return enabled; }
-        public void setEnabled(boolean enabled) { this.enabled = enabled; }
-        public String getClientId() { return clientId; }
-        public void setClientId(String clientId) { this.clientId = clientId; }
-        public String getClientSecret() { return clientSecret; }
-        public void setClientSecret(String clientSecret) { this.clientSecret = clientSecret; }
-    }
-
-    public static final class PlatformIdentityOperatorBootstrap {
-
-        private boolean enabled;
-        private String clientId;
-        private String clientSecret;
+        public BrowserClientControlOperatorBootstrap(boolean enabled, String clientId, String clientSecret) {
+            this.enabled = enabled;
+            this.clientId = clientId;
+            this.clientSecret = clientSecret;
+        }
 
         public boolean isEnabled() {
             return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
         }
 
         public String getClientId() {
             return clientId;
         }
 
-        public void setClientId(String clientId) {
+        public String getClientSecret() {
+            return clientSecret;
+        }
+    }
+
+    public static final class PlatformIdentityOperatorBootstrap {
+
+        private final boolean enabled;
+        private final String clientId;
+        private final String clientSecret;
+
+        public PlatformIdentityOperatorBootstrap(boolean enabled, String clientId, String clientSecret) {
+            this.enabled = enabled;
             this.clientId = clientId;
+            this.clientSecret = clientSecret;
+        }
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public String getClientId() {
+            return clientId;
         }
 
         public String getClientSecret() {
             return clientSecret;
-        }
-
-        public void setClientSecret(String clientSecret) {
-            this.clientSecret = clientSecret;
         }
     }
 
     public static final class ProvisioningNotificationRelayClientBootstrap {
 
-        private boolean enabled;
-        private String clientId;
-        private String clientSecret;
+        private final boolean enabled;
+        private final String clientId;
+        private final String clientSecret;
+
+        public ProvisioningNotificationRelayClientBootstrap(boolean enabled, String clientId, String clientSecret) {
+            this.enabled = enabled;
+            this.clientId = clientId;
+            this.clientSecret = clientSecret;
+        }
 
         public boolean isEnabled() {
             return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
         }
 
         public String getClientId() {
             return clientId;
         }
 
-        public void setClientId(String clientId) {
-            this.clientId = clientId;
-        }
-
         public String getClientSecret() {
             return clientSecret;
-        }
-
-        public void setClientSecret(String clientSecret) {
-            this.clientSecret = clientSecret;
         }
     }
 
     public static final class ProvisioningNotificationReceiptClientBootstrap {
 
-        private boolean enabled;
-        private String clientId;
-        private String clientSecret;
+        private final boolean enabled;
+        private final String clientId;
+        private final String clientSecret;
+
+        public ProvisioningNotificationReceiptClientBootstrap(boolean enabled, String clientId, String clientSecret) {
+            this.enabled = enabled;
+            this.clientId = clientId;
+            this.clientSecret = clientSecret;
+        }
 
         public boolean isEnabled() {
             return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
         }
 
         public String getClientId() {
             return clientId;
         }
 
-        public void setClientId(String clientId) {
-            this.clientId = clientId;
-        }
-
         public String getClientSecret() {
             return clientSecret;
-        }
-
-        public void setClientSecret(String clientSecret) {
-            this.clientSecret = clientSecret;
         }
     }
 }

@@ -1,6 +1,6 @@
 # Ainer 测试与质量门禁
 
-> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
+> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-07-31 · 适用版本：`0.1.x`
 
 ## 1. 目标
 
@@ -14,7 +14,7 @@
 | Application | 用例、授权、幂等、端口交互 | `WorkspaceApplicationServiceAuthorizationTest`、`IdentitySecurityLifecycleTest` |
 | Architecture | 包依赖、层间方向、循环依赖 | 各业务模块 `*ArchitectureTest` |
 | Adapter contract | HTTP、JWT、Client Credentials、provider、序列化和错误脱敏 | Web/Security starter、Identity HTTP transport 与 OpenAI-compatible provider 测试 |
-| PostgreSQL integration | Flyway、MyBatis、约束、锁和事务回滚 | 各模块 `*IntegrationTest` |
+| PostgreSQL integration | Flyway、MyBatis-Plus/MyBatis、约束、锁和事务回滚 | 各模块 `*IntegrationTest` |
 | Executable smoke | 发行物启动、健康端点和自动装配 | `AinerServerApplicationTest`、Authorization Server 集成测试 |
 
 新增能力至少覆盖正常路径、边界输入、权限拒绝和基础设施失败。并发所有权、预算扣减、outbox 等事务敏感行为必须在真实 PostgreSQL 上验证。
@@ -24,33 +24,40 @@
 完整验证：
 
 ```bash
-mvn clean test
+./mvnw clean verify
 ```
 
 模块验证：
 
 ```bash
-mvn -pl ainer-module-workspace -am test
-mvn -pl ainer-module-identity -am test
-mvn -pl ainer-module-ai-runtime -am test
-mvn -pl ainer-authorization-server -am test
+./mvnw -pl ainer-module-workspace -am test
+./mvnw -pl ainer-module-identity -am test
+./mvnw -pl ainer-module-ai-runtime -am test
+./mvnw -pl ainer-authorization-server -am test
 ```
 
 单个测试：
 
 ```bash
-mvn -pl ainer-module-workspace -am \
+./mvnw -pl ainer-module-workspace -am \
   -Dtest=WorkspaceTest \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
 Surefire XML 报告位于各模块 `target/surefire-reports/`。`target/` 是构建产物，不提交。
+生产者验证必须使用锁定 Maven 4.0.0-rc-6 preview 的 Wrapper；系统 Maven 3.9+ 只由
+`scripts/verify-maven-consumers.sh` 用于下游兼容门禁。
+发布质量检查还必须执行 `./scripts/check-surefire-results.sh`；该脚本在没有报告、没有执行测试、
+存在 failure/error 或任何 skipped 测试时失败。
 
 ## 4. PostgreSQL 与 Testcontainers
 
 当前集成测试固定使用 `postgres:18.3-alpine`。没有 Docker-compatible runtime 时，`@Testcontainers(disabledWithoutDocker = true)` 会明确跳过数据库测试，不会降级为 H2。
 
-本地迭代允许跳过，但必须在结果中说明。发布候选必须在 Docker 可用环境运行，确认 PostgreSQL 集成测试实际执行；在 CI 尚未自动阻止跳过前，这是人工发布门禁。
+本地迭代允许跳过，但必须在结果中说明。发布候选必须在 Docker 可用环境运行，确认 PostgreSQL
+集成测试实际执行。候选 GitHub Actions 工作流会运行
+`scripts/check-surefire-results.sh` 强制 `skipped=0`；在该工作流首次成功并被设为分支必需检查前，
+它仍是尚未闭环的自动化门禁。
 
 macOS 使用 Colima 时，Docker CLI context 本身不会自动成为 Testcontainers 的 socket 配置。先启动运行时，再把实际 Colima socket 和容器内 Docker socket 显式传给 Maven；将示例中的 `your-name` 替换为本机短用户名：
 
@@ -59,10 +66,18 @@ colima start --cpu 4 --memory 8 --runtime docker
 
 DOCKER_HOST=unix:///Users/your-name/.colima/default/docker.sock \
 TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock \
-mvn clean test
+./mvnw clean verify
 ```
 
-启动后可用 `colima status` 与 `docker context inspect colima` 核对 runtime 和 socket。最终仍以 Surefire 报告中的 `skipped=0` 为准，不能仅根据 Docker daemon 可访问就宣称数据库测试已执行。
+`TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 不可省略：否则 Testcontainers 的 Ryuk 容器会尝试 bind-mount 裸 Colima
+socket 路径，virtiofs 报 `operation not supported`，Ryuk 启动失败使 `DockerAvailableDetector` 误判无 Docker，
+`disabledWithoutDocker` 会跳过全部集成测试。启动后可用 `colima status` 与 `docker context inspect colima` 核对
+runtime 和 socket。最终仍以 Surefire 报告中的 `skipped=0` 为准，不能仅根据 Docker daemon 可访问就宣称数据库测试已执行。
+
+修改 `ainer-starter-persistence`、MyBatis-Plus 或 JSqlParser 时，除完整 Reactor 外还必须执行
+starter 的真实 PostgreSQL 兼容测试，覆盖 `BaseMapper`、数据库 UUIDv7 生成键回填、自定义 XML、
+显式 tenant 条件和分页；既有锁、CTE、`RETURNING`、outbox 与审计 XML 也必须由所属模块集成
+测试回归。tenant interceptor、H2 或只检查应用上下文都不能替代这些门禁。
 
 出现 Testcontainers 失败时依次检查：
 
@@ -181,6 +196,25 @@ mvn clean test
 
 ## 7. 质量门禁
 
-合并前：受影响模块测试、完整 `mvn clean test`、`git diff --check`。
+合并前：受影响模块测试、完整 `./mvnw clean verify`、`git diff --check`。
 
-发布前还必须确认：数据库测试未因 Docker 缺失而跳过、两个可执行发行物均能启动、Flyway 从空库成功、升级 migration 在备份副本成功、关键鉴权与健康检查通过。M4.2 还要在可运行 Testcontainers 的环境执行双人审批、锁定重检、归档回滚和游标边界集成测试。M4.3 还要在真实 PostgreSQL 上执行 Authorization Server 协议 smoke，证明专用/普通 introspection client 隔离、active、RFC 7009 撤销和 Identity epoch，并用接近真实规模数据检查 epoch 查询计划；M4.5 还要执行真实浏览器 HTTP 会话的 PKCE S256 正反门禁，并检查 JDBC authorization 不落凭证。M4.6 当前还必须执行 Passkey options、条件门禁、虚拟 authenticator 签名 ceremony、恢复/enrollment、登录限流和 step-up 门禁；M6 品牌登录发布候选还必须用真实 Chromium 验证四种合同状态的桌面/移动布局、axe-core、CSRF/SavedRequest、通用错误语义和精确静态代理。在宣称生产 MFA 前，必须另补主流真实设备的 registration/authentication、丢失/被盗/同步凭证、恢复通知和多节点 session 证据。M4.7 还要执行 tenant 成员管理的真实 PostgreSQL + Bearer HTTP 正反门禁，并确认 API 与 migration 只存在于 Identity 权威运行时。M4.8A 必须执行平台预配与激活的真实 PostgreSQL 并发、Bearer HTTP 正反门禁、默认关闭/错误配置、operator bootstrap、通知重试、终态回执幂等/冲突、过期/回放和无孤儿 ACTIVE tenant 测试；本机临时 schema smoke 只能补充 DDL/事务证据，不能替代发布候选环境中 0 skipped 的完整 Testcontainers 门禁。真实送达声明还必须使用真实外部网关与供应商沙箱或正式通道，覆盖 credential、供应商事件映射、重放和失败演练；本地 stub、数据库回执或合成 `DELIVERED` 都不能替代。生产可观测性切片还要用独立 metrics client 抓取两个真实 exporter，并验证多节点、Token endpoint/数据库故障和告警路由。当前验证快照见 [`project-status.md`](project-status.md)。
+发布前还必须执行 Maven Artifact Plugin 的构建计划与两次构建比较，并运行独立消费者门禁：
+
+```bash
+./mvnw artifact:check-buildplan
+AINER_REPRO_REPOSITORY="$(mktemp -d)"
+./mvnw -Dmaven.repo.local="$AINER_REPRO_REPOSITORY" clean install
+./mvnw -Dmaven.repo.local="$AINER_REPRO_REPOSITORY" clean verify artifact:compare
+./scripts/verify-maven-consumers.sh
+```
+
+两次构建使用同一个隔离本地仓库，避免既有缓存成为参考。consumer 脚本必须证明 Maven 4 与
+系统 Maven 3.9+ 外部项目都能只通过 BOM 和公开坐标完成构建；同时检查 14 个标准 Consumer
+POM 中的 `${revision}` 都有当前安装版本属性可解析，并检查 `ainer-spring` JAR 含
+`META-INF/spring-configuration-metadata.json`。这些门禁是发布前本地/自动化要求，不表示当前已经
+存在正式制品仓库发布流程。候选 CI 已编排上述命令，但在 Maven 4 RC6 官方持久发行包可下载并首次
+完整成功前，不能称为生效的正式 CI。脚本默认读取根 POM 的 `revision`；发布过程通过
+`AINER_VERSION=<目标版本>` 覆盖时，该值也会作为 `-Drevision` 传给两次生产者构建和两个
+consumer。
+
+此外还必须确认：数据库测试未因 Docker 缺失而跳过、两个可执行发行物均能启动、Flyway 从空库成功、升级 migration 在备份副本成功、关键鉴权与健康检查通过。M4.2 还要在可运行 Testcontainers 的环境执行双人审批、锁定重检、归档回滚和游标边界集成测试。M4.3 还要在真实 PostgreSQL 上执行 Authorization Server 协议 smoke，证明专用/普通 introspection client 隔离、active、RFC 7009 撤销和 Identity epoch，并用接近真实规模数据检查 epoch 查询计划；M4.5 还要执行真实浏览器 HTTP 会话的 PKCE S256 正反门禁，并检查 JDBC authorization 不落凭证。M4.6 当前还必须执行 Passkey options、条件门禁、虚拟 authenticator 签名 ceremony、恢复/enrollment、登录限流和 step-up 门禁；M6 品牌登录发布候选还必须用真实 Chromium 验证四种合同状态的桌面/移动布局、axe-core、CSRF/SavedRequest、通用错误语义和精确静态代理。在宣称生产 MFA 前，必须另补主流真实设备的 registration/authentication、丢失/被盗/同步凭证、恢复通知和多节点 session 验证。M4.7 还要执行 tenant 成员管理的真实 PostgreSQL + Bearer HTTP 正反门禁，并确认 API 与 migration 只存在于 Identity 权威运行时。M4.8A 必须执行平台预配与激活的真实 PostgreSQL 并发、Bearer HTTP 正反门禁、默认关闭/错误配置、operator bootstrap、通知重试、终态回执幂等/冲突、过期/回放和无孤儿 ACTIVE tenant 测试；本机临时 schema smoke 只能补充 DDL/事务验证，不能替代发布候选环境中 0 skipped 的完整 Testcontainers 门禁。真实送达声明还必须使用真实外部网关与供应商沙箱或正式通道，覆盖 credential、供应商事件映射、重放和失败演练；本地 stub、数据库回执或合成 `DELIVERED` 都不能替代。生产可观测性切片还要用独立 metrics client 抓取两个真实 exporter，并验证多节点、Token endpoint/数据库故障和告警路由。当前验证快照见 [`project-status.md`](project-status.md)。

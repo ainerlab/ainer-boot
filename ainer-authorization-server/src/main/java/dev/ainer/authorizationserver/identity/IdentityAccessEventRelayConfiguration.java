@@ -11,6 +11,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.web.client.RestClient;
 
 import java.net.URI;
 import java.time.Clock;
@@ -40,13 +41,16 @@ public class IdentityAccessEventRelayConfiguration {
     IdentityAccessEventPublisher identityAccessEventPublisher(
             IdentityAccessEventRelayProperties properties,
             @Qualifier("identityAccessEventServiceTokenProvider")
-                    ClientCredentialsServiceTokenProvider tokenProvider) {
-        return new HttpIdentityAccessEventPublisher(
-                requireUri(
-                        properties.getWorkspaceBaseUrl(),
-                        properties.isAllowInsecureHttp(),
-                        "workspace-base-url"),
-                tokenProvider);
+                    ClientCredentialsServiceTokenProvider tokenProvider,
+            RestClient.Builder restClientBuilder) {
+        URI workspaceBaseUrl = requireUri(
+                properties.getWorkspaceBaseUrl(),
+                properties.isAllowInsecureHttp(),
+                "workspace-base-url");
+        RestClient restClient = restClientBuilder
+                .baseUrl(withoutTrailingSlash(workspaceBaseUrl.toString()))
+                .build();
+        return new HttpIdentityAccessEventPublisher(restClient, tokenProvider);
     }
 
     @Bean
@@ -101,5 +105,9 @@ public class IdentityAccessEventRelayConfiguration {
                     "Ainer identity access event relay " + name + " is required");
         }
         return value.trim();
+    }
+
+    private static String withoutTrailingSlash(String value) {
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 }

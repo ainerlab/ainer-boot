@@ -15,9 +15,13 @@ class OAuthClientControlConfigurationTest {
 
     @Test
     void acceptsBoundedTenantServiceClientPolicy() {
-        OAuthClientControlProperties properties = new OAuthClientControlProperties();
-        properties.setOperatorClientIds(List.of("ainer-client-operator"));
-        properties.setAllowedScopes(List.of("ai.invoke", "identity.directory.read"));
+        OAuthClientControlProperties properties = new OAuthClientControlProperties(
+                false,
+                List.of("ainer-client-operator"),
+                List.of("ai.invoke", "identity.directory.read"),
+                null,
+                null,
+                null);
 
         OAuthClientControlSettings settings =
                 configuration.oauthClientControlSettings(properties);
@@ -32,7 +36,8 @@ class OAuthClientControlConfigurationTest {
 
     @Test
     void rejectsMissingExactOperatorAllowlist() {
-        OAuthClientControlProperties properties = new OAuthClientControlProperties();
+        OAuthClientControlProperties properties = new OAuthClientControlProperties(
+                false, null, null, null, null, null);
 
         assertThatThrownBy(() -> configuration.oauthClientControlSettings(properties))
                 .isInstanceOf(IllegalStateException.class)
@@ -41,9 +46,13 @@ class OAuthClientControlConfigurationTest {
 
     @Test
     void rejectsPlatformAndCrossTenantScopes() {
-        OAuthClientControlProperties properties = new OAuthClientControlProperties();
-        properties.setOperatorClientIds(List.of("ainer-client-operator"));
-        properties.setAllowedScopes(List.of("platform.metrics.read", "identity.directory.read.all"));
+        OAuthClientControlProperties properties = new OAuthClientControlProperties(
+                false,
+                List.of("ainer-client-operator"),
+                List.of("platform.metrics.read", "identity.directory.read.all"),
+                null,
+                null,
+                null);
 
         assertThatThrownBy(() -> configuration.oauthClientControlSettings(properties))
                 .isInstanceOf(IllegalStateException.class)
@@ -52,9 +61,13 @@ class OAuthClientControlConfigurationTest {
 
     @Test
     void rejectsLongLivedAccessTokens() {
-        OAuthClientControlProperties properties = new OAuthClientControlProperties();
-        properties.setOperatorClientIds(List.of("ainer-client-operator"));
-        properties.setAccessTokenTtl(Duration.ofHours(1));
+        OAuthClientControlProperties properties = new OAuthClientControlProperties(
+                false,
+                List.of("ainer-client-operator"),
+                null,
+                Duration.ofHours(1),
+                null,
+                null);
 
         assertThatThrownBy(() -> configuration.oauthClientControlSettings(properties))
                 .isInstanceOf(IllegalStateException.class)
@@ -63,9 +76,13 @@ class OAuthClientControlConfigurationTest {
 
     @Test
     void rejectsWeakGeneratedSecrets() {
-        OAuthClientControlProperties properties = new OAuthClientControlProperties();
-        properties.setOperatorClientIds(List.of("ainer-client-operator"));
-        properties.setSecretBytes(16);
+        OAuthClientControlProperties properties = new OAuthClientControlProperties(
+                false,
+                List.of("ainer-client-operator"),
+                null,
+                null,
+                null,
+                16);
 
         assertThatThrownBy(() -> configuration.oauthClientControlSettings(properties))
                 .isInstanceOf(IllegalStateException.class)

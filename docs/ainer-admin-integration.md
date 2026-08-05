@@ -161,7 +161,7 @@ MVP 使用以下 JSON API：
 从 Ainer Boot 根目录生成 TypeScript SDK：
 
 ```bash
-mvn -pl ainer-authorization-server -Painer-admin-sdk generate-resources
+./mvnw -pl ainer-authorization-server -Painer-admin-sdk generate-resources
 ```
 
 输出位于：
@@ -247,12 +247,12 @@ fixture 严格幂等：完整状态匹配时不覆盖密码，部分占用或状
 关闭 fixture 开关并从进程环境移除明文密码。该 fixture、client ID 和账号不得用于生产开户。
 全部配置键与失败条件见 [`configuration.md`](configuration.md)。
 
-## 7. 验收与测试证据
+## 7. 验收与测试记录
 
 关键端到端门禁：
 
 ```bash
-mvn -pl ainer-authorization-server -am \
+./mvnw -pl ainer-authorization-server -am \
   -Dtest=AinerAdminBrowserIntegrationTest \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
@@ -262,7 +262,7 @@ Docker-compatible runtime 不能被 Maven 自动发现时，显式指定本机 s
 ```bash
 DOCKER_HOST=unix:///absolute/path/to/docker.sock \
 TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock \
-mvn -pl ainer-authorization-server -am \
+./mvnw -pl ainer-authorization-server -am \
   -Dtest=AinerAdminBrowserIntegrationTest \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
@@ -276,8 +276,8 @@ mvn -pl ainer-authorization-server -am \
 - ID token 保持可用于 `/connect/logout`，精确回到
   `/ainer-admin/auth/logged-out`，并清除登录 session。
 
-形成发布候选前还必须运行 `mvn test`，并确认 Testcontainers 用例实际启动、`skipped=0`。本地
-缺少 Docker 而产生的自动跳过不能作为 Ainer Admin 后端基线的验收证据。
+形成发布候选前还必须运行 `./mvnw clean verify`，并确认 Testcontainers 用例实际启动、`skipped=0`。本地
+缺少 Docker 而产生的自动跳过不能作为 Ainer Admin 后端基线的验收结果。
 
 ## 8. 当前风险与后续边界
 

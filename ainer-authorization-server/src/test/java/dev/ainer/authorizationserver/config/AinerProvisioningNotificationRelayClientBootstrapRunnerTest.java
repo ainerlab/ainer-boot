@@ -55,9 +55,11 @@ class AinerProvisioningNotificationRelayClientBootstrapRunnerTest {
 
     @Test
     void weakSecretAndIncompatibleExistingClientFailClosed() {
-        AinerAuthorizationServerProperties weak = properties();
-        weak.getProvisioningNotificationRelayClientBootstrap()
-                .setClientSecret("too-short");
+        AinerAuthorizationServerProperties weak =
+                withProvisioningNotificationRelayClientBootstrap(
+                        new AinerAuthorizationServerProperties
+                                .ProvisioningNotificationRelayClientBootstrap(
+                                true, "provisioning-notification-relay", "too-short"));
         assertThatThrownBy(() ->
                 new AinerProvisioningNotificationRelayClientBootstrapRunner(
                         weak,
@@ -94,16 +96,16 @@ class AinerProvisioningNotificationRelayClientBootstrapRunnerTest {
     }
 
     private AinerAuthorizationServerProperties properties() {
-        AinerAuthorizationServerProperties properties =
-                new AinerAuthorizationServerProperties();
-        AinerAuthorizationServerProperties
-                .ProvisioningNotificationRelayClientBootstrap bootstrap =
-                        properties
-                                .getProvisioningNotificationRelayClientBootstrap();
-        bootstrap.setEnabled(true);
-        bootstrap.setClientId("provisioning-notification-relay");
-        bootstrap.setClientSecret("notification-relay-secret-2026");
-        return properties;
+        return withProvisioningNotificationRelayClientBootstrap(
+                new AinerAuthorizationServerProperties
+                        .ProvisioningNotificationRelayClientBootstrap(
+                        true, "provisioning-notification-relay", "notification-relay-secret-2026"));
+    }
+
+    private static AinerAuthorizationServerProperties withProvisioningNotificationRelayClientBootstrap(
+            AinerAuthorizationServerProperties.ProvisioningNotificationRelayClientBootstrap bootstrap) {
+        return new AinerAuthorizationServerProperties(
+                null, null, null, null, null, null, null, null, null, null, bootstrap, null);
     }
 
     private static final class InMemoryRepository

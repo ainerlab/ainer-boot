@@ -149,8 +149,8 @@ Authorization: Bearer <access-token-with-ai.invoke-scope>
 ## 7. 验证
 
 ```bash
-mvn -pl ainer-module-ai-runtime -am test
-mvn test
+./mvnw -pl ainer-module-ai-runtime -am test
+./mvnw clean verify
 ```
 
 Provider 合约测试使用本地 JDK HTTP server；数据库集成测试使用 PostgreSQL Testcontainers。本机无 Docker 时数据库测试明确跳过，不会改用 H2。上线前还应对实际供应商沙箱执行合约验证，但不能把真实 key 或响应录入仓库。

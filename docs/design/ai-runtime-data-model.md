@@ -11,7 +11,7 @@
 [`database-design-standard.md`](../database-design-standard.md) 约束；实现前仍需以首个真实
 纵向切片接受 ADR 和 migration 评审。
 
-## 2. 证据与结论
+## 2. 现状与结论
 
 ### 2.1 Ainer 当前已经证明的模型
 
@@ -24,7 +24,7 @@
 
 这已经证明 `Invocation` 必要，但尚未证明每次调用都需要工作流、步骤、产物和反馈表。
 
-### 2.2 xq 现状提供的反向证据
+### 2.2 xq 现状暴露的问题
 
 xq 当前同时存在知识库、工作流 JSON、聊天内容、商品识别、客户画像和销售事实。它说明真实产品
 确实需要多阶段 AI 任务和可引用结果，也暴露了必须避免的边界问题：
@@ -168,7 +168,7 @@ Run 是执行事实，不是工作流定义。没有可版本化、可发布、�
 
 ### 8.4 Run 聚合成本表
 
-成本以 Invocation 为不可变账本，通过查询或经过证明的投影汇总。没有性能证据前不复制金额。
+成本以 Invocation 为不可变账本，通过查询或经过验证的投影汇总。没有性能测试结果前不复制金额。
 
 ## 9. xq-platform 参考接入
 
@@ -181,7 +181,7 @@ xq 业务模块
   3. 以 purpose + idempotency key 请求 Ainer Run
 
 Ainer AI Runtime
-  4. 拥有 Run、Invocation、检索证据和 Artifact
+  4. 拥有 Run、Invocation、检索轨迹和 Artifact
   5. 执行模型调用与平台策略，不直接写 xq 业务表
 
 xq 业务模块

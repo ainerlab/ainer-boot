@@ -1,6 +1,7 @@
 package dev.ainer.core.error;
 
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Expected business failure. The web adapter maps it to the error's real HTTP status.
@@ -13,7 +14,7 @@ public final class BusinessException extends RuntimeException {
         this(errorCode, errorCode.defaultMessage());
     }
 
-    public BusinessException(ErrorCode errorCode, String message) {
+    public BusinessException(ErrorCode errorCode, @Nullable String message) {
         super(message);
         this.errorCode = Objects.requireNonNull(errorCode, "errorCode");
     }

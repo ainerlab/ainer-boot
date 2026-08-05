@@ -2,7 +2,6 @@
 .vscode/
 .DS_Store
 target/
-.flattened-pom.xml
 *.iml
 *.log
 
