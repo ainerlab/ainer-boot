@@ -143,7 +143,9 @@ Foundation Roadmap 仍是 Proposed；其 mdpress-first 是有条件的路线建�
    [对抗性审查](architecture/adr-0033-adversarial-review.md) 为决策历史。Reset 完成前，当前运行行为仍以
    既有 Accepted ADR 为准
    Greenfield 替换脊柱的施工顺序与验收见
-   [`architecture/identity-foundation-v1-implementation-plan.md`](architecture/identity-foundation-v1-implementation-plan.md)
+   [`architecture/identity-foundation-v1-implementation-plan.md`](architecture/identity-foundation-v1-implementation-plan.md)；
+   原子清零（C1–C4 合并）的完整施工序列、隐藏缺口与依赖图见
+   [`architecture/0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)
 4. [`decisions/README.md`](decisions/README.md) 中相关安全 ADR；平台 Identity 供应与通知回执
    重点阅读 [ADR-0019](decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)
    和 [ADR-0021](decisions/0021-provisioning-notification-delivery-receipts.md)
