@@ -14,6 +14,8 @@ public final class AinerUserDetails implements UserDetails, CredentialsContainer
 
     private final UUID subjectId;
     private final UUID tenantId;
+    private final UUID accountId;
+    private final long securityEpoch;
     private final String username;
     private String password;
     private final boolean enabled;
@@ -28,8 +30,23 @@ public final class AinerUserDetails implements UserDetails, CredentialsContainer
             boolean enabled,
             boolean accountNonLocked,
             Collection<? extends GrantedAuthority> authorities) {
+        this(subjectId, tenantId, null, 0L, username, password, enabled, accountNonLocked, authorities);
+    }
+
+    public AinerUserDetails(
+            UUID subjectId,
+            UUID tenantId,
+            UUID accountId,
+            long securityEpoch,
+            String username,
+            String password,
+            boolean enabled,
+            boolean accountNonLocked,
+            Collection<? extends GrantedAuthority> authorities) {
         this.subjectId = Objects.requireNonNull(subjectId, "subjectId");
         this.tenantId = Objects.requireNonNull(tenantId, "tenantId");
+        this.accountId = accountId;
+        this.securityEpoch = securityEpoch;
         this.username = Objects.requireNonNull(username, "username");
         this.password = password;
         this.enabled = enabled;
@@ -43,6 +60,14 @@ public final class AinerUserDetails implements UserDetails, CredentialsContainer
 
     public UUID tenantId() {
         return tenantId;
+    }
+
+    public UUID accountId() {
+        return accountId;
+    }
+
+    public long securityEpoch() {
+        return securityEpoch;
     }
 
     @Override

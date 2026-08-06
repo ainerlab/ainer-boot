@@ -77,7 +77,9 @@ C1–S5 阶段只实现 USER_NEUTRAL_V1 + SERVICE_V1。
 
 每个序列（S）完成后必须 `./mvnw clean verify` 跑绿。S2–S7 是加法/共存，S8 是破坏性删除（原子点）。
 当前进度：C1 地基（ServicePrincipal）已完成（`db71351`）；S2 foundation 能力补全已完成
-（password credential store + HumanProfile + securityEpoch 无关的 profile 读写，全 reactor 388/0/0/0）。
+（password credential store + HumanProfile + securityEpoch 无关的 profile 读写，全 reactor 388/0/0/0）；
+S3 customizer 新 profile 签发已完成（SERVICE_V1 + USER_NEUTRAL_V1 轨道，fail-closed，
+全 reactor 401/0/0/0）。
 
 ### S2 — Foundation 能力补全（password credential store + Profile + securityEpoch 查询）
 
@@ -261,15 +263,15 @@ S6/S7 改的是 workspace/ai-runtime 模块，与 S3–S5（identity/security �
 |---|---|---|---|
 | 1 | 错误类型 | BusinessException(IdentityErrorCode) | ✅ C1 地基完成 |
 | 2 | ServicePrincipal 领域 | principal 表 + 独立 binding 表 | ✅ C1 地基完成 |
-| 3 | WorkspaceRef/ceiling | USER_NEUTRAL_V1 先落地；USER_WORKSPACE_V1 待 S6 后定义 | 📋 S3/S6 |
+| 3 | WorkspaceRef/ceiling | USER_NEUTRAL_V1 先落地；USER_WORKSPACE_V1 待 S6 后定义 | ✅ USER_NEUTRAL_V1 S3 完成；USER_WORKSPACE_V1 📋 S6 |
 | 4 | foundation 包位置 | S8 后提升为 identity 主体 | 📋 S8 |
 | 5 | migration squash | S8 重建 baseline，旧库不可原地升级 | 📋 S8 |
 | 6 | id-source | Configuration 显式 @Bean 绑 repo::nextUuidV7 | ✅ C1 地基完成 |
-| 7 | resolver 边界 | customizer 直接构造 claim；starter 用 ReferenceTokenProfileResolver 解析 | 📋 S3/S5 |
+| 7 | resolver 边界 | customizer 直接构造 claim；starter 用 ReferenceTokenProfileResolver 解析 | ✅ customizer 签发 S3 完成；starter 解析 📋 S5 |
 | 8 | selectByTypeAndIdentifier | ACTIVE-only | ✅ C1 地基完成 |
 | 9 | 测试计数 | S8 重校 | 📋 S8 |
 | **A** | **password credential store**（新缺口） | 新建 ainer_identity_credential 表，S2 落地 | ✅ S2 完成 |
-| **B** | **securityEpoch claim 基线**（新缺口） | customizer 写 sec_epoch claim，S3 落地 | 📋 S3 |
+| **B** | **securityEpoch claim 基线**（新缺口） | customizer 写 sec_epoch claim，S3 落地 | ✅ S3 完成 |
 | **C** | **workspace 去 tenant**（新缺口） | S6 整体重写持久化层，纯 membership 访问控制 | 📋 S6 |
 
 ---

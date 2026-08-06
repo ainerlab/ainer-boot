@@ -11,6 +11,10 @@ import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.module.identity.account.application.IdentityAccessLifecycleService;
 import dev.ainer.module.identity.account.application.ProvisionTenantOwnerCommand;
 import dev.ainer.module.identity.account.application.ProvisionedIdentity;
+import dev.ainer.module.identity.foundation.ServicePrincipal;
+import dev.ainer.module.identity.foundation.ServicePrincipalFoundationService;
+import dev.ainer.security.principal.IdentityAuthorityRef;
+import dev.ainer.security.token.TokenProfile;
 import dev.ainer.web.request.RequestIds;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
@@ -152,6 +156,9 @@ class AinerAuthorizationServerIntegrationTest {
 
     @Autowired
     private IdentityApplicationService identityService;
+
+    @Autowired
+    private ServicePrincipalFoundationService servicePrincipalFoundationService;
 
     @Autowired
     private IdentityAccessLifecycleService identityAccessLifecycleService;
@@ -768,6 +775,45 @@ class AinerAuthorizationServerIntegrationTest {
     }
 
     @Test
+    void serviceProfileClientCredentialsIssuesStablePrincipalJwt() throws Exception {
+        String clientId = "ainer-service-v1-test";
+        ServicePrincipal principal = servicePrincipalFoundationService.registerServicePrincipal(
+                new IdentityAuthorityRef("https://auth.ainer.test"));
+        servicePrincipalFoundationService.bindClient(principal.principalId(), clientId);
+        registeredClientRepository.save(machineClient(
+                clientId, null, TokenProfile.SERVICE_V1.claimValue(), false, "ai.invoke"));
+
+        HttpResponse<String> response = token(clientId, CLIENT_SECRET, "ai.invoke");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        Jwt jwt = jwtDecoder.decode(
+                objectMapper.readTree(response.body()).path("access_token").stringValue());
+        assertThat(jwt.getSubject()).isEqualTo(principal.principalId().toString());
+        assertThat(jwt.getSubject()).isNotEqualTo(clientId);
+        assertThat(jwt.getClaimAsString("token_profile")).isEqualTo(TokenProfile.SERVICE_V1.claimValue());
+        assertThat(jwt.getClaimAsString("claim_contract_version"))
+                .isEqualTo(TokenProfile.CURRENT_CONTRACT_VERSION);
+        assertThat(jwt.getClaimAsString("actor_type")).isEqualTo("SERVICE");
+        assertThat(((Number) jwt.getClaim("sec_epoch")).longValue()).isEqualTo(0L);
+        assertThat(jwt.getClaims()).doesNotContainKey("tenant_id");
+    }
+
+    @Test
+    void serviceProfileClientWithoutBindingFailsClosed() throws Exception {
+        String clientId = "ainer-service-v1-unbound";
+        registeredClientRepository.save(machineClient(
+                clientId, null, TokenProfile.SERVICE_V1.claimValue(), false, "ai.invoke"));
+
+        HttpResponse<String> response = token(clientId, CLIENT_SECRET, "ai.invoke");
+
+        assertThat(response.statusCode()).isEqualTo(400);
+        JsonNode body = objectMapper.readTree(response.body());
+        assertThat(body.path("error").stringValue()).isEqualTo("access_denied");
+        assertThat(body.path("error_description").stringValue())
+                .isEqualTo("No ACTIVE ServicePrincipal bound to client " + clientId);
+    }
+
+    @Test
     void browserClientControlCreatesRotatesAndRetiresPublicPkceClients() throws Exception {
         String operatorToken = accessToken(BROWSER_OPERATOR_ID, "oauth.browser-clients.manage");
         String redirectUri = "https://app.ainer.test/auth/callback";
@@ -1197,6 +1243,12 @@ class AinerAuthorizationServerIntegrationTest {
 
     private RegisteredClient machineClient(
             String clientId, String tenantId, boolean introspectionAllowed, String... scopes) {
+        return machineClient(clientId, tenantId, null, introspectionAllowed, scopes);
+    }
+
+    private RegisteredClient machineClient(
+            String clientId, String tenantId, String tokenProfile,
+            boolean introspectionAllowed, String... scopes) {
         RegisteredClient.Builder builder = RegisteredClient.withId(UUID.randomUUID().toString())
                 .clientId(clientId)
                 .clientSecret(passwordEncoder.encode(CLIENT_SECRET))
@@ -1213,6 +1265,9 @@ class AinerAuthorizationServerIntegrationTest {
         ClientSettings.Builder settings = ClientSettings.builder();
         if (tenantId != null) {
             settings.setting(AinerAuthorizationServerConfiguration.CLIENT_TENANT_SETTING, tenantId);
+        }
+        if (tokenProfile != null) {
+            settings.setting(AinerAuthorizationServerConfiguration.TOKEN_PROFILE_SETTING, tokenProfile);
         }
         settings.setting(
                 AinerAuthorizationServerConfiguration.CLIENT_INTROSPECTION_ALLOWED_SETTING,
