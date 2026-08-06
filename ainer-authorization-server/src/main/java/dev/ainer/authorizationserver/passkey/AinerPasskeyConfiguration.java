@@ -101,8 +101,10 @@ public class AinerPasskeyConfiguration {
     }
 
     @Bean
-    AinerPasskeyTenantSubjectGuard ainerPasskeyTenantSubjectGuard(JdbcTemplate jdbcTemplate) {
-        return new AinerPasskeyTenantSubjectGuard(jdbcTemplate);
+    AinerPasskeyTenantSubjectGuard ainerPasskeyTenantSubjectGuard(
+            JdbcTemplate jdbcTemplate,
+            HumanAccountRepository humanAccountRepository) {
+        return new AinerPasskeyTenantSubjectGuard(jdbcTemplate, humanAccountRepository);
     }
 
     @Bean

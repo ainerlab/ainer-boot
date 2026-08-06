@@ -79,7 +79,8 @@ C1–S5 阶段只实现 USER_NEUTRAL_V1 + SERVICE_V1。
 当前进度：C1 地基（ServicePrincipal）已完成（`db71351`）；S2 foundation 能力补全已完成
 （password credential store + HumanProfile + securityEpoch 无关的 profile 读写，全 reactor 388/0/0/0）；
 S3 customizer 新 profile 签发已完成（SERVICE_V1 + USER_NEUTRAL_V1 轨道，fail-closed，
-全 reactor 401/0/0/0）。
+全 reactor 401/0/0/0）；S4 登录链路与 Passkey foundation 接线已完成，
+全 reactor 407/0/0/0。
 
 ### S2 — Foundation 能力补全（password credential store + Profile + securityEpoch 查询）
 

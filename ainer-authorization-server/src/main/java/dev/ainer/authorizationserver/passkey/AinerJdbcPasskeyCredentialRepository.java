@@ -254,6 +254,8 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
         Instant now = clock.instant();
         if (owner.subjectId() != null) {
             requireEnrollmentGrantIfFirstEnrollment(owner.subjectId(), now);
+        } else if (owner.accountId() != null) {
+            requireEnrollmentGrantIfFirstEnrollmentForAccount(owner.accountId(), now);
         }
         delegate.save(credentialRecord);
         jdbcTemplate.update(
@@ -359,7 +361,7 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
                 now);
     }
 
-        private void requireEnrollmentGrantIfFirstEnrollment(UUID subjectId, Instant now) {
+    private void requireEnrollmentGrantIfFirstEnrollment(UUID subjectId, Instant now) {
         if (!requireEnrollmentGrant) {
             return;
         }
@@ -380,6 +382,32 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
                 WHERE subject_id = ? AND status = 'ACTIVE'
                 """,
                 Timestamp.from(now), subjectId);
+        if (consumed != 1) {
+            throw new BusinessException(PasskeyErrorCode.ENROLLMENT_GRANT_REQUIRED);
+        }
+    }
+
+    private void requireEnrollmentGrantIfFirstEnrollmentForAccount(UUID accountId, Instant now) {
+        if (!requireEnrollmentGrant) {
+            return;
+        }
+        Integer activeCount = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM ainer_passkey_credential
+                WHERE account_id = ? AND status = 'ACTIVE'
+                """,
+                Integer.class, accountId);
+        if (activeCount != null && activeCount > 0) {
+            return;
+        }
+        int consumed = jdbcTemplate.update(
+                """
+                UPDATE ainer_passkey_enrollment_grant
+                SET status = 'CONSUMED', consumed_at = ?
+                WHERE account_id = ? AND status = 'ACTIVE'
+                """,
+                Timestamp.from(now), accountId);
         if (consumed != 1) {
             throw new BusinessException(PasskeyErrorCode.ENROLLMENT_GRANT_REQUIRED);
         }

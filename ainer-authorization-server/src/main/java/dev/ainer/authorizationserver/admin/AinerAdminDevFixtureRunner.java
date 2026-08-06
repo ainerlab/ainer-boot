@@ -1,6 +1,8 @@
 package dev.ainer.authorizationserver.admin;
 
 import dev.ainer.authorizationserver.config.AinerAuthorizationServerProperties;
+import dev.ainer.module.identity.account.application.IdentityApplicationService;
+import dev.ainer.module.identity.account.application.ProvisionTenantOwnerCommand;
 import dev.ainer.module.identity.foundation.IdentityFoundationService;
 import dev.ainer.module.identity.foundation.LoginIdentityType;
 import dev.ainer.security.principal.IdentityAuthorityRef;
@@ -14,24 +16,34 @@ import java.util.Locale;
 
 class AinerAdminDevFixtureRunner implements ApplicationRunner {
 
-    static final String ADMIN_TENANT_CODE = "ainer-admin-dev";
-    static final String ADMIN_TENANT_NAME = "Ainer Admin Development";
-    static final String MEMBER_HOME_TENANT_CODE = "ainer-admin-member-home";
-    static final String MEMBER_HOME_TENANT_NAME = "Ainer Admin Member Home";
+    private static final String ADMIN_TENANT_CODE = "ainer-admin-dev";
+    private static final String ADMIN_TENANT_NAME = "Ainer Admin Development";
+    private static final String MEMBER_HOME_TENANT_CODE = "ainer-admin-member-home";
+    private static final String MEMBER_HOME_TENANT_NAME = "Ainer Admin Member Home";
 
     private static final Logger log = LoggerFactory.getLogger(AinerAdminDevFixtureRunner.class);
 
     private final AinerAdminDevBootstrapProperties properties;
     private final AinerAuthorizationServerProperties authorizationProperties;
     private final IdentityFoundationService foundationService;
+    private final IdentityApplicationService legacyIdentityService;
 
     AinerAdminDevFixtureRunner(
             AinerAdminDevBootstrapProperties properties,
             AinerAuthorizationServerProperties authorizationProperties,
             IdentityFoundationService foundationService) {
+        this(properties, authorizationProperties, foundationService, null);
+    }
+
+    AinerAdminDevFixtureRunner(
+            AinerAdminDevBootstrapProperties properties,
+            AinerAuthorizationServerProperties authorizationProperties,
+            IdentityFoundationService foundationService,
+            IdentityApplicationService legacyIdentityService) {
         this.properties = properties;
         this.authorizationProperties = authorizationProperties;
         this.foundationService = foundationService;
+        this.legacyIdentityService = legacyIdentityService;
     }
 
     @Override
@@ -62,6 +74,20 @@ class AinerAdminDevFixtureRunner implements ApplicationRunner {
         IdentityFoundationService.RegisteredAccount member = ensureAccount(
                 authority, issuer, properties.getMemberUsername(), properties.getMemberPassword(),
                 properties.getMemberDisplayName());
+        if (legacyIdentityService != null) {
+            legacyIdentityService.ensureTenantOwner(new ProvisionTenantOwnerCommand(
+                    ADMIN_TENANT_CODE,
+                    ADMIN_TENANT_NAME,
+                    properties.getOwnerUsername(),
+                    properties.getOwnerPassword(),
+                    properties.getOwnerDisplayName()));
+            legacyIdentityService.ensureTenantOwner(new ProvisionTenantOwnerCommand(
+                    MEMBER_HOME_TENANT_CODE,
+                    MEMBER_HOME_TENANT_NAME,
+                    properties.getMemberUsername(),
+                    properties.getMemberPassword(),
+                    properties.getMemberDisplayName()));
+        }
         log.info(
                 "Ainer Admin dev foundation fixture ready (owner account={}, member account={})",
                 owner.account().accountId(), member.account().accountId());

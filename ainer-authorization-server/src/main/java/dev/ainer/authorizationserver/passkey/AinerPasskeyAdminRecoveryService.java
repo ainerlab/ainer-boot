@@ -134,6 +134,102 @@ public final class AinerPasskeyAdminRecoveryService {
         });
     }
 
+    public AccountRecoveryRequest requestRecoveryForAccount(
+            String requesterServiceId, UUID accountId,
+            String incidentReference, Duration approvalTtl) {
+        requireSafe(requesterServiceId, "requesterServiceId");
+        requireSafe(incidentReference, "incidentReference");
+        requireTtl(approvalTtl);
+        Assert.notNull(accountId, "accountId cannot be null");
+        return transactionTemplate.execute(status -> {
+            tenantSubjectGuard.requireActiveAccount(accountId);
+            Instant now = clock.instant();
+            expireOpenAccountRequests(accountId, now);
+            requireAccountHasActivePasskey(accountId);
+            UUID requestId = UUID.randomUUID();
+            Instant expiresAt = now.plus(approvalTtl);
+            jdbcTemplate.update(
+                    """
+                    INSERT INTO ainer_passkey_recovery_request(
+                        id, tenant_id, subject_id, account_id, requested_by, approved_by,
+                        incident_reference, status, requested_at, expires_at, executed_at
+                    ) VALUES (?, NULL, NULL, ?, ?, NULL, ?, ?, ?, ?, NULL)
+                    """,
+                    requestId, accountId, requesterServiceId,
+                    incidentReference, REQUESTED, Timestamp.from(now), Timestamp.from(expiresAt));
+            securityAuditForAccount(requestId, accountId,
+                    "ADMIN_RECOVERY", REQUESTED, "SERVICE", requesterServiceId, incidentReference, now);
+            return new AccountRecoveryRequest(
+                    requestId, accountId, requesterServiceId, null, incidentReference,
+                    REQUESTED, now, expiresAt, null);
+        });
+    }
+
+    public AccountRecoveryRequest approveAndExecuteForAccount(
+            String approverServiceId, UUID accountId, UUID requestId) {
+        requireSafe(approverServiceId, "approverServiceId");
+        Assert.notNull(accountId, "accountId cannot be null");
+        Assert.notNull(requestId, "requestId cannot be null");
+        return transactionTemplate.execute(status -> {
+            Instant now = clock.instant();
+            List<AccountRecoveryRequest> requests = jdbcTemplate.query(
+                    """
+                    SELECT id, account_id, requested_by, approved_by, incident_reference,
+                           status, requested_at, expires_at, executed_at
+                    FROM ainer_passkey_recovery_request
+                    WHERE account_id = ? AND id = ?
+                    FOR UPDATE
+                    """,
+                    (resultSet, rowNumber) -> new AccountRecoveryRequest(
+                            UUID.fromString(resultSet.getString("id")),
+                            resultSet.getObject("account_id", UUID.class),
+                            resultSet.getString("requested_by"),
+                            resultSet.getString("approved_by"),
+                            resultSet.getString("incident_reference"),
+                            resultSet.getString("status"),
+                            resultSet.getTimestamp("requested_at").toInstant(),
+                            resultSet.getTimestamp("expires_at").toInstant(),
+                            resultSet.getTimestamp("executed_at") == null
+                                    ? null : resultSet.getTimestamp("executed_at").toInstant()),
+                    accountId, requestId);
+            if (requests.isEmpty()) {
+                throw new BusinessException(PasskeyErrorCode.RECOVERY_REQUEST_NOT_FOUND);
+            }
+            AccountRecoveryRequest request = requests.getFirst();
+            if (!REQUESTED.equals(request.status())) {
+                throw new BusinessException(PasskeyErrorCode.RECOVERY_REQUEST_CONFLICT);
+            }
+            if (request.requestedBy().equals(approverServiceId)) {
+                throw new BusinessException(PasskeyErrorCode.RECOVERY_APPROVER_MUST_DIFFER);
+            }
+            if (!now.isBefore(request.expiresAt())) {
+                throw new BusinessException(PasskeyErrorCode.RECOVERY_REQUEST_EXPIRED);
+            }
+            tenantSubjectGuard.requireActiveAccount(accountId);
+            requireAccountHasActivePasskey(accountId);
+            credentialRepository.revokeAllActiveForAccount(accountId);
+            int changed = jdbcTemplate.update(
+                    """
+                    UPDATE ainer_passkey_recovery_request
+                    SET status = ?, approved_by = ?, executed_at = ?
+                    WHERE id = ? AND account_id = ? AND status = 'REQUESTED' AND expires_at > ?
+                      AND requested_by <> ?
+                    """,
+                    EXECUTED, approverServiceId, Timestamp.from(now),
+                    requestId, accountId, Timestamp.from(now), approverServiceId);
+            if (changed != 1) {
+                throw new BusinessException(PasskeyErrorCode.RECOVERY_REQUEST_CONFLICT);
+            }
+            securityAuditForAccount(requestId, accountId,
+                    "ADMIN_RECOVERY", EXECUTED, "SERVICE", approverServiceId,
+                    request.incidentReference(), now);
+            return new AccountRecoveryRequest(
+                    requestId, accountId, request.requestedBy(), approverServiceId,
+                    request.incidentReference(), EXECUTED, request.requestedAt(),
+                    request.expiresAt(), now);
+        });
+    }
+
     private void expireOpenRequests(UUID tenantId, UUID subjectId, Instant now) {
         jdbcTemplate.update(
                 """
@@ -144,6 +240,16 @@ public final class AinerPasskeyAdminRecoveryService {
                 EXPIRED, tenantId, subjectId, Timestamp.from(now));
     }
 
+    private void expireOpenAccountRequests(UUID accountId, Instant now) {
+        jdbcTemplate.update(
+                """
+                UPDATE ainer_passkey_recovery_request
+                SET status = ?
+                WHERE account_id = ? AND status = 'REQUESTED' AND expires_at <= ?
+                """,
+                EXPIRED, accountId, Timestamp.from(now));
+    }
+
     private void requireSubjectHasActivePasskey(UUID subjectId) {
         Integer activeCount = jdbcTemplate.queryForObject(
                 """
@@ -152,6 +258,19 @@ public final class AinerPasskeyAdminRecoveryService {
                 WHERE subject_id = ? AND status = 'ACTIVE'
                 """,
                 Integer.class, subjectId);
+        if (activeCount == null || activeCount == 0) {
+            throw new BusinessException(PasskeyErrorCode.RECOVERY_NOT_REQUIRED);
+        }
+    }
+
+    private void requireAccountHasActivePasskey(UUID accountId) {
+        Integer activeCount = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM ainer_passkey_credential
+                WHERE account_id = ? AND status = 'ACTIVE'
+                """,
+                Integer.class, accountId);
         if (activeCount == null || activeCount == 0) {
             throw new BusinessException(PasskeyErrorCode.RECOVERY_NOT_REQUIRED);
         }
@@ -188,6 +307,21 @@ public final class AinerPasskeyAdminRecoveryService {
                 Timestamp.from(occurredAt));
     }
 
+    private void securityAuditForAccount(
+            UUID operationId, UUID accountId, String operationType, String phase,
+            String actorType, String actorId, String incidentReference, Instant occurredAt) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO ainer_passkey_security_operation_audit(
+                    id, operation_id, tenant_id, subject_id, account_id, operation_type, phase,
+                    actor_type, actor_id, incident_reference, request_id, occurred_at
+                ) VALUES (?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                UUID.randomUUID(), operationId, accountId, operationType, phase,
+                actorType, actorId, incidentReference, MDC.get(RequestIdFilter.MDC_KEY),
+                Timestamp.from(occurredAt));
+    }
+
     private static void requireSafe(String value, String name) {
         if (value == null || !SAFE_REFERENCE.matcher(value).matches()) {
             throw new BusinessException(PasskeyErrorCode.INVALID_RECOVERY_REQUEST);
@@ -202,6 +336,12 @@ public final class AinerPasskeyAdminRecoveryService {
 
     public record RecoveryRequest(
             UUID id, UUID tenantId, UUID subjectId, String requestedBy, String approvedBy,
+            String incidentReference, String status,
+            Instant requestedAt, Instant expiresAt, Instant executedAt) {
+    }
+
+    public record AccountRecoveryRequest(
+            UUID id, UUID accountId, String requestedBy, String approvedBy,
             String incidentReference, String status,
             Instant requestedAt, Instant expiresAt, Instant executedAt) {
     }

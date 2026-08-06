@@ -137,7 +137,17 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
   保留 amr/auth_time，无 tenant_id/roles）均 fail-closed（缺 principal/account、非 ACTIVE、未知
   profile → OAuth2 400 access_denied，不回退 legacy）；无 setting 的 client 走原 legacy claims 零回归。
   常量 `TOKEN_PROFILE_SETTING`/`SEC_EPOCH_CLAIM` 收口于配置类；JSON mixin 同步 accountId/securityEpoch
-  往返。全 reactor 401 tests / 0 failure / 0 error / 0 skipped（Colima）。
+   往返。全 reactor 401 tests / 0 failure / 0 error / 0 skipped（Colima）。
+   施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
+- Greenfield S4 登录链路与 Passkey foundation 接线已在 `reset/0033-greenfield` 分支完成：
+  `AinerUserDetailsService` foundation-first 读取 `HumanAccount + PASSWORD credential`，旧 tenant
+  账号保留 fallback/legacy context enrichment；foundation-only 账号可在无 Workspace 下完成密码+PKCE，
+  token 使用 `USER_NEUTRAL_V1`。平台 bootstrap 改为创建 foundation account/profile，dev fixture 在共存期
+  同时保留 legacy tenant 投影；Passkey credential、recovery code、enrollment grant、双人 recovery
+  增加 `account_id` 绑定与 account 控制面 API，legacy `(tenant_id, subject_id)` API 保留。新增两条
+  PostgreSQL migration，Authorization Server 从 23 增至 25 migrations；真实密码、WebAuthn ceremony、
+  account recovery/enrollment/admin recovery 均通过。全 reactor 407 tests / 0 failure / 0 error / 0 skipped
+  （Colima）。
   施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
 - M4.8B 租户上下文选择代码基线：`GET /api/me/tenants` 返回当前 USER 的 ACTIVE membership
   安全投影（tenant ID/code/name/role/is_default），LOCKED/DISABLED tenant/user/membership

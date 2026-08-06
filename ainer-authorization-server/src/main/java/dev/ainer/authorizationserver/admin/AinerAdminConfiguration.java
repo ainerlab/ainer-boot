@@ -1,6 +1,7 @@
 package dev.ainer.authorizationserver.admin;
 
 import dev.ainer.authorizationserver.config.AinerAuthorizationServerProperties;
+import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.module.identity.foundation.IdentityFoundationService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -36,8 +37,9 @@ public class AinerAdminConfiguration {
     AinerAdminDevFixtureRunner ainerAdminDevFixtureRunner(
             AinerAdminDevBootstrapProperties properties,
             AinerAuthorizationServerProperties authorizationProperties,
-            IdentityFoundationService foundationService) {
+            IdentityFoundationService foundationService,
+            IdentityApplicationService legacyIdentityService) {
         return new AinerAdminDevFixtureRunner(
-                properties, authorizationProperties, foundationService);
+                properties, authorizationProperties, foundationService, legacyIdentityService);
     }
 }

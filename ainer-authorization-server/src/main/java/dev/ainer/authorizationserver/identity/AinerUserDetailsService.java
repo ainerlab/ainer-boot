@@ -41,6 +41,23 @@ public final class AinerUserDetailsService implements UserDetailsService {
                             normalizedUsername)
                     .orElse(null);
             if (credential != null) {
+                IdentityAccount legacyContext = identityService == null
+                        ? null
+                        : identityService.findAccountByUsername(normalizedUsername).orElse(null);
+                if (legacyContext != null) {
+                    return new AinerUserDetails(
+                            legacyContext.subjectId(),
+                            legacyContext.tenantId(),
+                            credential.account().accountId(),
+                            credential.account().securityEpoch(),
+                            normalizedUsername,
+                            credential.credential().credentialData(),
+                            true,
+                            true,
+                            legacyContext.roles().stream()
+                                    .map(org.springframework.security.core.authority.SimpleGrantedAuthority::new)
+                                    .toList());
+                }
                 return new AinerUserDetails(
                         credential.account().accountId(),
                         credential.account().securityEpoch(),

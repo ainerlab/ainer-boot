@@ -29,7 +29,7 @@ import java.util.UUID;
  */
 @Validated
 @RestController
-@RequestMapping("/internal/passkey-recovery/tenants/{tenantId}")
+@RequestMapping("/internal/passkey-recovery")
 @ConditionalOnProperty(
         prefix = "ainer.security.authorization-server.passkey.recovery",
         name = "enabled",
@@ -56,7 +56,7 @@ public class AinerPasskeyRecoveryController {
         this.executedCounter = meterRegistry.counter("ainer.passkey.recovery.executed");
     }
 
-    @PostMapping("/recovery-requests")
+    @PostMapping("/tenants/{tenantId}/recovery-requests")
     public ApiResponse<RecoveryRequestResponse> requestRecovery(
             @PathVariable UUID tenantId,
             @Valid @RequestBody RecoveryRequestBody body,
@@ -71,7 +71,7 @@ public class AinerPasskeyRecoveryController {
         return ApiResponse.success(response, RequestIds.currentOrCreate(request));
     }
 
-    @PostMapping("/recovery-requests/{requestId}/approvals")
+    @PostMapping("/tenants/{tenantId}/recovery-requests/{requestId}/approvals")
     public ApiResponse<RecoveryRequestResponse> approve(
             @PathVariable UUID tenantId,
             @PathVariable UUID requestId,
@@ -80,6 +80,33 @@ public class AinerPasskeyRecoveryController {
         AuthenticatedService service = requireTenantAccess(authentication, tenantId, APPROVE, APPROVE_ALL);
         RecoveryRequestResponse response = RecoveryRequestResponse.from(
                 recoveryService.approveAndExecute(service.serviceId(), tenantId, requestId));
+        executedCounter.increment();
+        return ApiResponse.success(response, RequestIds.currentOrCreate(request));
+    }
+
+    @PostMapping("/accounts/{accountId}/recovery-requests")
+    public ApiResponse<AccountRecoveryRequestResponse> requestAccountRecovery(
+            @PathVariable UUID accountId,
+            @Valid @RequestBody AccountRecoveryRequestBody body,
+            Authentication authentication,
+            HttpServletRequest request) {
+        AuthenticatedService service = requireAllAccess(authentication, REQUEST_ALL);
+        AccountRecoveryRequestResponse response = AccountRecoveryRequestResponse.from(
+                recoveryService.requestRecoveryForAccount(
+                        service.serviceId(), accountId, body.incidentReference(), settings.getApprovalTtl()));
+        requestedCounter.increment();
+        return ApiResponse.success(response, RequestIds.currentOrCreate(request));
+    }
+
+    @PostMapping("/accounts/{accountId}/recovery-requests/{requestId}/approvals")
+    public ApiResponse<AccountRecoveryRequestResponse> approveAccountRecovery(
+            @PathVariable UUID accountId,
+            @PathVariable UUID requestId,
+            Authentication authentication,
+            HttpServletRequest request) {
+        AuthenticatedService service = requireAllAccess(authentication, APPROVE_ALL);
+        AccountRecoveryRequestResponse response = AccountRecoveryRequestResponse.from(
+                recoveryService.approveAndExecuteForAccount(service.serviceId(), accountId, requestId));
         executedCounter.increment();
         return ApiResponse.success(response, RequestIds.currentOrCreate(request));
     }
@@ -104,7 +131,16 @@ public class AinerPasskeyRecoveryController {
         return service;
     }
 
+    private AuthenticatedService requireAllAccess(Authentication authentication, String authority) {
+        AuthenticatedService service = JwtAuthenticatedServiceFactory.from(authentication);
+        service.requireAuthority(authority);
+        return service;
+    }
+
     public record RecoveryRequestBody(@NotNull UUID subjectId, @NotNull String incidentReference) {
+    }
+
+    public record AccountRecoveryRequestBody(@NotNull String incidentReference) {
     }
 
     public record RecoveryRequestResponse(
@@ -114,6 +150,17 @@ public class AinerPasskeyRecoveryController {
             return new RecoveryRequestResponse(
                     request.id(), request.tenantId(), request.subjectId(),
                     request.requestedBy(), request.approvedBy(),
+                    request.incidentReference(), request.status());
+        }
+    }
+
+    public record AccountRecoveryRequestResponse(
+            UUID id, UUID accountId, String requestedBy, String approvedBy,
+            String incidentReference, String status) {
+        static AccountRecoveryRequestResponse from(
+                AinerPasskeyAdminRecoveryService.AccountRecoveryRequest request) {
+            return new AccountRecoveryRequestResponse(
+                    request.id(), request.accountId(), request.requestedBy(), request.approvedBy(),
                     request.incidentReference(), request.status());
         }
     }

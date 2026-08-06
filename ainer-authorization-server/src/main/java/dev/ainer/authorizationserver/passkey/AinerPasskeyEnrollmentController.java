@@ -28,7 +28,7 @@ import java.util.UUID;
  */
 @Validated
 @RestController
-@RequestMapping("/internal/passkey-enrollment/tenants/{tenantId}/grants")
+@RequestMapping("/internal/passkey-enrollment")
 @ConditionalOnProperty(
         prefix = "ainer.security.authorization-server.passkey",
         name = "enabled",
@@ -44,7 +44,7 @@ public class AinerPasskeyEnrollmentController {
         this.grantService = grantService;
     }
 
-    @PostMapping
+    @PostMapping("/tenants/{tenantId}/grants")
     public ApiResponse<EnrollmentGrantResponse> grant(
             @PathVariable UUID tenantId,
             @Valid @RequestBody EnrollmentGrantRequestBody body,
@@ -56,7 +56,7 @@ public class AinerPasskeyEnrollmentController {
         return ApiResponse.success(response, RequestIds.currentOrCreate(request));
     }
 
-    @GetMapping
+    @GetMapping("/tenants/{tenantId}/grants")
     public ApiResponse<List<EnrollmentGrantResponse>> list(
             @PathVariable UUID tenantId,
             Authentication authentication,
@@ -68,7 +68,7 @@ public class AinerPasskeyEnrollmentController {
         return ApiResponse.success(grants, RequestIds.currentOrCreate(request));
     }
 
-    @DeleteMapping("/{subjectId}")
+    @DeleteMapping("/tenants/{tenantId}/grants/{subjectId}")
     public ApiResponse<EnrollmentGrantResponse> revoke(
             @PathVariable UUID tenantId,
             @PathVariable UUID subjectId,
@@ -77,6 +77,41 @@ public class AinerPasskeyEnrollmentController {
         AuthenticatedService service = requireTenantAccess(authentication, tenantId);
         EnrollmentGrantResponse response = EnrollmentGrantResponse.from(
                 grantService.revoke(service.serviceId(), tenantId, subjectId));
+        return ApiResponse.success(response, RequestIds.currentOrCreate(request));
+    }
+
+    @PostMapping("/accounts/{accountId}/grants")
+    public ApiResponse<AccountEnrollmentGrantResponse> grantAccount(
+            @PathVariable UUID accountId,
+            @Valid @RequestBody AccountEnrollmentGrantRequestBody body,
+            Authentication authentication,
+            HttpServletRequest request) {
+        AuthenticatedService service = requireAllAccess(authentication);
+        AccountEnrollmentGrantResponse response = AccountEnrollmentGrantResponse.from(
+                grantService.grantForAccount(service.serviceId(), accountId, body.incidentReference()));
+        return ApiResponse.success(response, RequestIds.currentOrCreate(request));
+    }
+
+    @GetMapping("/accounts/{accountId}/grants")
+    public ApiResponse<List<AccountEnrollmentGrantResponse>> listAccount(
+            @PathVariable UUID accountId,
+            Authentication authentication,
+            HttpServletRequest request) {
+        requireAllAccess(authentication);
+        List<AccountEnrollmentGrantResponse> grants = grantService.findGrantsForAccount(accountId).stream()
+                .map(AccountEnrollmentGrantResponse::from)
+                .toList();
+        return ApiResponse.success(grants, RequestIds.currentOrCreate(request));
+    }
+
+    @DeleteMapping("/accounts/{accountId}/grants")
+    public ApiResponse<AccountEnrollmentGrantResponse> revokeAccount(
+            @PathVariable UUID accountId,
+            Authentication authentication,
+            HttpServletRequest request) {
+        AuthenticatedService service = requireAllAccess(authentication);
+        AccountEnrollmentGrantResponse response = AccountEnrollmentGrantResponse.from(
+                grantService.revokeForAccount(service.serviceId(), accountId));
         return ApiResponse.success(response, RequestIds.currentOrCreate(request));
     }
 
@@ -96,6 +131,12 @@ public class AinerPasskeyEnrollmentController {
         return service;
     }
 
+    private AuthenticatedService requireAllAccess(Authentication authentication) {
+        AuthenticatedService service = JwtAuthenticatedServiceFactory.from(authentication);
+        service.requireAuthority(MANAGE_ALL);
+        return service;
+    }
+
     public record EnrollmentGrantRequestBody(@NotNull UUID subjectId, @NotNull String incidentReference) {
     }
 
@@ -106,6 +147,21 @@ public class AinerPasskeyEnrollmentController {
             return new EnrollmentGrantResponse(
                     grant.subjectId(), grant.tenantId(), grant.grantedBy(),
                     grant.incidentReference(), grant.status(),
+                    grant.grantedAt().toString(),
+                    grant.consumedAt() == null ? null : grant.consumedAt().toString());
+        }
+    }
+
+    public record AccountEnrollmentGrantRequestBody(@NotNull String incidentReference) {
+    }
+
+    public record AccountEnrollmentGrantResponse(
+            UUID accountId, String grantedBy, String incidentReference,
+            String status, String grantedAt, String consumedAt) {
+        static AccountEnrollmentGrantResponse from(
+                AinerPasskeyEnrollmentGrantService.AccountEnrollmentGrant grant) {
+            return new AccountEnrollmentGrantResponse(
+                    grant.accountId(), grant.grantedBy(), grant.incidentReference(), grant.status(),
                     grant.grantedAt().toString(),
                     grant.consumedAt() == null ? null : grant.consumedAt().toString());
         }

@@ -140,11 +140,100 @@ public final class AinerPasskeyRecoveryCodeService {
         });
     }
 
+    public RecoveryCodeIssuance issueForAccount(UUID accountId) {
+        Assert.notNull(accountId, "accountId cannot be null");
+        return transactionTemplate.execute(status -> {
+            Instant now = clock.instant();
+            UUID operationId = UUID.randomUUID();
+            jdbcTemplate.update(
+                    """
+                    UPDATE ainer_passkey_recovery_code
+                    SET status = 'SUPERSEDED', used_at = ?
+                    WHERE account_id = ? AND status = 'ACTIVE'
+                    """,
+                    Timestamp.from(now), accountId);
+            List<String> plaintextCodes = new ArrayList<>(CODE_COUNT);
+            for (int i = 0; i < CODE_COUNT; i++) {
+                String plaintext = generateCode();
+                plaintextCodes.add(plaintext);
+                jdbcTemplate.update(
+                        """
+                        INSERT INTO ainer_passkey_recovery_code(
+                            id, subject_id, account_id, tenant_id, code_hash, status, issued_at, used_at
+                        ) VALUES (?, NULL, ?, NULL, ?, 'ACTIVE', ?, NULL)
+                        """,
+                        UUID.randomUUID(), accountId,
+                        passwordEncoder.encode(plaintext), Timestamp.from(now));
+            }
+            securityAuditForAccount(
+                    operationId, accountId, "RECOVERY_CODE_ISSUED", "ISSUED", "USER",
+                    accountId.toString(), null, now);
+            return new RecoveryCodeIssuance(operationId, List.copyOf(plaintextCodes));
+        });
+    }
+
+    public boolean redeemForAccount(UUID accountId, String plaintextCode) {
+        Assert.notNull(accountId, "accountId cannot be null");
+        Assert.hasText(plaintextCode, "plaintextCode cannot be empty");
+        return transactionTemplate.execute(status -> {
+            Instant now = clock.instant();
+            if (isLockedForAccount(accountId, now)) {
+                throw new BusinessException(PasskeyErrorCode.RECOVERY_LOCKED_OUT);
+            }
+            List<RecoveryCodeRow> activeCodes = jdbcTemplate.query(
+                    """
+                    SELECT id, code_hash
+                    FROM ainer_passkey_recovery_code
+                    WHERE account_id = ? AND status = 'ACTIVE'
+                    FOR UPDATE
+                    """,
+                    (resultSet, rowNumber) -> new RecoveryCodeRow(
+                            resultSet.getString("id"), resultSet.getString("code_hash")),
+                    accountId);
+            UUID matchedId = null;
+            for (RecoveryCodeRow code : activeCodes) {
+                if (passwordEncoder.matches(plaintextCode, code.codeHash())) {
+                    matchedId = UUID.fromString(code.id());
+                    break;
+                }
+            }
+            if (matchedId == null) {
+                registerFailedAttemptForAccount(accountId, now);
+                return false;
+            }
+            jdbcTemplate.update(
+                    """
+                    UPDATE ainer_passkey_recovery_code
+                    SET status = 'USED', used_at = ?
+                    WHERE id = ? AND status = 'ACTIVE'
+                    """,
+                    Timestamp.from(now), matchedId);
+            jdbcTemplate.update(
+                    "DELETE FROM ainer_passkey_recovery_lockout WHERE account_id = ?", accountId);
+            int revoked = credentialRepository.revokeAllActiveForAccount(accountId);
+            UUID operationId = UUID.randomUUID();
+            securityAuditForAccount(
+                    operationId, accountId, "SELF_RECOVERY", "REDEEMED", "USER",
+                    accountId.toString(), null, now);
+            return true;
+        });
+    }
+
     private boolean isLocked(UUID subjectId, Instant now) {
         List<Timestamp> lockedUntil = jdbcTemplate.query(
                 "SELECT locked_until FROM ainer_passkey_recovery_lockout WHERE subject_id = ?",
                 (resultSet, rowNumber) -> resultSet.getTimestamp("locked_until"),
                 subjectId);
+        return !lockedUntil.isEmpty()
+                && lockedUntil.getFirst() != null
+                && lockedUntil.getFirst().toInstant().isAfter(now);
+    }
+
+    private boolean isLockedForAccount(UUID accountId, Instant now) {
+        List<Timestamp> lockedUntil = jdbcTemplate.query(
+                "SELECT locked_until FROM ainer_passkey_recovery_lockout WHERE account_id = ?",
+                (resultSet, rowNumber) -> resultSet.getTimestamp("locked_until"),
+                accountId);
         return !lockedUntil.isEmpty()
                 && lockedUntil.getFirst() != null
                 && lockedUntil.getFirst().toInstant().isAfter(now);
@@ -156,7 +245,7 @@ public final class AinerPasskeyRecoveryCodeService {
                 INSERT INTO ainer_passkey_recovery_lockout(
                     subject_id, tenant_id, failed_attempts, locked_until, updated_at
                 ) VALUES (?, ?, 1, NULL, ?)
-                ON CONFLICT (subject_id) DO UPDATE
+                ON CONFLICT (subject_id) WHERE subject_id IS NOT NULL DO UPDATE
                     SET failed_attempts = ainer_passkey_recovery_lockout.failed_attempts + 1,
                         updated_at = EXCLUDED.updated_at
                 RETURNING failed_attempts
@@ -173,6 +262,29 @@ public final class AinerPasskeyRecoveryCodeService {
         }
     }
 
+    private void registerFailedAttemptForAccount(UUID accountId, Instant now) {
+        Integer attempts = jdbcTemplate.queryForObject(
+                """
+                INSERT INTO ainer_passkey_recovery_lockout(
+                    subject_id, account_id, tenant_id, failed_attempts, locked_until, updated_at
+                ) VALUES (NULL, ?, NULL, 1, NULL, ?)
+                ON CONFLICT (account_id) WHERE account_id IS NOT NULL DO UPDATE
+                    SET failed_attempts = ainer_passkey_recovery_lockout.failed_attempts + 1,
+                        updated_at = EXCLUDED.updated_at
+                RETURNING failed_attempts
+                """,
+                Integer.class, accountId, Timestamp.from(now));
+        if (attempts != null && attempts >= MAX_FAILED_ATTEMPTS) {
+            jdbcTemplate.update(
+                    """
+                    UPDATE ainer_passkey_recovery_lockout
+                    SET locked_until = ?, updated_at = ?
+                    WHERE account_id = ? AND locked_until IS NULL
+                    """,
+                    Timestamp.from(now.plus(LOCKOUT_DURATION)), Timestamp.from(now), accountId);
+        }
+    }
+
     private void securityAudit(
             UUID operationId, UUID tenantId, UUID subjectId,
             String operationType, String phase,
@@ -185,6 +297,21 @@ public final class AinerPasskeyRecoveryCodeService {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 UUID.randomUUID(), operationId, tenantId, subjectId, operationType, phase,
+                actorType, actorId, incidentReference, MDC.get(RequestIdFilter.MDC_KEY),
+                Timestamp.from(occurredAt));
+    }
+
+    private void securityAuditForAccount(
+            UUID operationId, UUID accountId, String operationType, String phase,
+            String actorType, String actorId, String incidentReference, Instant occurredAt) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO ainer_passkey_security_operation_audit(
+                    id, operation_id, tenant_id, subject_id, account_id, operation_type, phase,
+                    actor_type, actor_id, incident_reference, request_id, occurred_at
+                ) VALUES (?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                UUID.randomUUID(), operationId, accountId, operationType, phase,
                 actorType, actorId, incidentReference, MDC.get(RequestIdFilter.MDC_KEY),
                 Timestamp.from(occurredAt));
     }

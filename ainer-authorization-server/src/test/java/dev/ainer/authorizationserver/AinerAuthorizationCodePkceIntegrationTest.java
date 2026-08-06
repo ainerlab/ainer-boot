@@ -17,6 +17,7 @@ import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.module.identity.account.application.ProvisionTenantOwnerCommand;
 import dev.ainer.module.identity.account.application.ProvisionedIdentity;
 import dev.ainer.module.identity.foundation.IdentityFoundationService;
+import dev.ainer.module.identity.foundation.HumanAccountRepository;
 import dev.ainer.security.principal.IdentityAuthorityRef;
 import dev.ainer.security.token.TokenProfile;
 import org.junit.jupiter.api.BeforeEach;
@@ -111,6 +112,8 @@ class AinerAuthorizationCodePkceIntegrationTest {
     private static final String REDIRECT_URI = "https://client.ainer.test/callback";
     private static final String USERNAME = "pkce-user@example.com";
     private static final String PASSWORD = "strong-password-2026";
+    private static final String FOUNDATION_USERNAME = "foundation-only@example.com";
+    private static final String FOUNDATION_PASSWORD = "foundation-password-2026";
     private static final String VERIFIER =
             "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-._~";
     private static final String WRONG_VERIFIER =
@@ -143,6 +146,9 @@ class AinerAuthorizationCodePkceIntegrationTest {
 
     @Autowired
     private IdentityFoundationService identityFoundationService;
+
+    @Autowired
+    private HumanAccountRepository humanAccountRepository;
 
     @Autowired
     private JwtDecoder jwtDecoder;
@@ -244,13 +250,14 @@ class AinerAuthorizationCodePkceIntegrationTest {
                         new IdentityAuthorityRef("https://auth.ainer.test"),
                         dev.ainer.module.identity.foundation.LoginIdentityType.USERNAME,
                         "https://auth.ainer.test",
-                        USERNAME,
-                        PASSWORD);
+                        FOUNDATION_USERNAME,
+                        FOUNDATION_PASSWORD);
         jdbcTemplate.update("DELETE FROM oauth2_registered_client WHERE client_id = ?", CLIENT_ID);
         registeredClientRepository.save(foundationBrowserClient());
 
         BrowserSession browser = newBrowser();
-        String code = authorize(browser, VERIFIER, REDIRECT_URI);
+        String code = authorize(
+                browser, VERIFIER, REDIRECT_URI, FOUNDATION_USERNAME, FOUNDATION_PASSWORD);
         HttpResponse<String> tokenResponse = exchange(code, VERIFIER, REDIRECT_URI);
 
         assertThat(tokenResponse.statusCode()).isEqualTo(200);
@@ -594,6 +601,42 @@ class AinerAuthorizationCodePkceIntegrationTest {
     }
 
     @Test
+    void foundationWebAuthnCeremonyIssuesNeutralAccountToken() throws Exception {
+        IdentityFoundationService.RegisteredAccount registered = foundationAccount();
+        jdbcTemplate.update("DELETE FROM oauth2_registered_client WHERE client_id = ?", CLIENT_ID);
+        registeredClientRepository.save(foundationBrowserClient());
+
+        WebAuthnCeremony ceremony = new WebAuthnCeremony(objectMapper);
+        BrowserSession browser = newBrowser();
+        String csrf = login(browser, FOUNDATION_USERNAME, FOUNDATION_PASSWORD);
+        WebAuthnCeremony.Registration registration = ceremony.register(
+                webAuthnOptions(browser, csrf, "/webauthn/register/options"));
+        postWebAuthnJson(browser, csrf, "/webauthn/register", registration.payload());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT account_id FROM ainer_passkey_credential WHERE credential_id = ?",
+                UUID.class,
+                Base64.getUrlEncoder().withoutPadding().encodeToString(registration.credentialId())))
+                .isEqualTo(registered.account().accountId());
+
+        String requestOptions = webAuthnOptions(browser, csrf, "/webauthn/authenticate/options");
+        HttpResponse<String> webAuthnLogin = postWebAuthnJson(
+                browser, csrf, "/login/webauthn",
+                ceremony.authenticate(requestOptions, registration.credentialId()));
+        assertThat(webAuthnLogin.statusCode()).isIn(200, 302);
+
+        String code = authorizeWithExistingSession(browser, VERIFIER);
+        HttpResponse<String> tokenResponse = exchange(code, VERIFIER, REDIRECT_URI);
+        assertThat(tokenResponse.statusCode()).isEqualTo(200);
+        Jwt accessToken = jwtDecoder.decode(
+                objectMapper.readTree(tokenResponse.body()).path("access_token").stringValue());
+        assertThat(accessToken.getSubject()).isEqualTo(registered.account().accountId().toString());
+        assertThat(accessToken.getClaimAsString("token_profile"))
+                .isEqualTo(TokenProfile.USER_NEUTRAL_V1.claimValue());
+        assertThat(accessToken.getClaimAsStringList("amr")).containsExactly("pwd", "mfa", "pop");
+        assertThat(accessToken.getClaims()).doesNotContainKey("tenant_id").doesNotContainKey("roles");
+    }
+
+    @Test
     void recoveryCodesRedeemRevokesAllPasskeysAndWritesAudit() throws Exception {
         WebAuthnCeremony ceremony = new WebAuthnCeremony(objectMapper);
         BrowserSession browser = newBrowser();
@@ -633,6 +676,25 @@ class AinerAuthorizationCodePkceIntegrationTest {
     }
 
     @Test
+    void foundationRecoveryCodesRevokePasskeysByAccountId() {
+        IdentityFoundationService.RegisteredAccount registered = foundationAccount();
+        userCredentialRepository.save(foundationCredential());
+
+        AinerPasskeyRecoveryCodeService.RecoveryCodeIssuance issuance =
+                recoveryCodeService.issueForAccount(registered.account().accountId());
+        assertThat(issuance.plaintextCodes()).hasSize(8);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_passkey_recovery_code WHERE account_id = ?",
+                Integer.class, registered.account().accountId())).isEqualTo(8);
+
+        assertThat(recoveryCodeService.redeemForAccount(
+                registered.account().accountId(), issuance.plaintextCodes().getFirst())).isTrue();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_passkey_credential WHERE account_id = ? AND status = 'ACTIVE'",
+                Integer.class, registered.account().accountId())).isZero();
+    }
+
+    @Test
     void adminRecoveryRequiresTwoServicesAndRevokesAllPasskeys() throws Exception {
         WebAuthnCeremony ceremony = new WebAuthnCeremony(objectMapper);
         BrowserSession browser = newBrowser();
@@ -665,6 +727,27 @@ class AinerAuthorizationCodePkceIntegrationTest {
     }
 
     @Test
+    void foundationAdminRecoveryRequiresTwoServicesAndUsesAccountId() {
+        IdentityFoundationService.RegisteredAccount registered = foundationAccount();
+        userCredentialRepository.save(foundationCredential());
+        UUID accountId = registered.account().accountId();
+
+        AinerPasskeyAdminRecoveryService.AccountRecoveryRequest request =
+                adminRecoveryService.requestRecoveryForAccount(
+                        "service-a", accountId, "incident-foundation-001", Duration.ofMinutes(15));
+        assertThat(request.status()).isEqualTo("REQUESTED");
+        assertThatThrownBy(() -> adminRecoveryService.approveAndExecuteForAccount(
+                "service-a", accountId, request.id())).isInstanceOf(BusinessException.class);
+
+        AinerPasskeyAdminRecoveryService.AccountRecoveryRequest executed =
+                adminRecoveryService.approveAndExecuteForAccount("service-b", accountId, request.id());
+        assertThat(executed.status()).isEqualTo("EXECUTED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_passkey_credential WHERE account_id = ? AND status = 'ACTIVE'",
+                Integer.class, accountId)).isZero();
+    }
+
+    @Test
     void requireInviteEnrollmentGateBlocksFirstEnrollmentUntilGranted() {
         AinerJdbcPasskeyCredentialRepository gatedRepo = new AinerJdbcPasskeyCredentialRepository(
                 jdbcTemplate, userEntityRepository, identityService, transactionManager, clock, true);
@@ -686,6 +769,32 @@ class AinerAuthorizationCodePkceIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ainer_passkey_credential WHERE subject_id = ? AND status = 'ACTIVE'",
                 Integer.class, subjectId)).isEqualTo(2);
+    }
+
+    @Test
+    void foundationEnrollmentGrantGatesFirstPasskey() {
+        IdentityFoundationService.RegisteredAccount registered = foundationAccount();
+        AinerJdbcPasskeyCredentialRepository gatedRepo = new AinerJdbcPasskeyCredentialRepository(
+                jdbcTemplate,
+                userEntityRepository,
+                identityService,
+                identityFoundationService,
+                humanAccountRepository,
+                "https://auth.ainer.test",
+                transactionManager,
+                clock,
+                true);
+
+        assertThatThrownBy(() -> gatedRepo.save(foundationCredential()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("enrollment");
+        enrollmentGrantService.grantForAccount(
+                "operator-foundation", registered.account().accountId(), "invite-foundation-001");
+        gatedRepo.save(foundationCredential());
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM ainer_passkey_enrollment_grant WHERE account_id = ?",
+                String.class, registered.account().accountId())).isEqualTo("CONSUMED");
     }
 
     @Test
@@ -800,11 +909,15 @@ class AinerAuthorizationCodePkceIntegrationTest {
     }
 
     private String login(BrowserSession browser) throws Exception {
+        return login(browser, USERNAME, PASSWORD);
+    }
+
+    private String login(BrowserSession browser, String username, String password) throws Exception {
         HttpResponse<String> loginPage = sendGet(browser.client(), localUri("/login"));
         assertThat(loginPage.statusCode()).isEqualTo(200);
         Matcher csrf = CSRF_INPUT.matcher(loginPage.body());
         assertThat(csrf.find()).isTrue();
-        HttpResponse<String> loggedIn = postLogin(browser, csrf.group(1));
+        HttpResponse<String> loggedIn = postLogin(browser, csrf.group(1), username, password);
         assertThat(loggedIn.statusCode()).isEqualTo(302);
         HttpResponse<String> authenticatedPage =
                 sendGet(browser.client(), localUri("/login"));
@@ -815,9 +928,14 @@ class AinerAuthorizationCodePkceIntegrationTest {
 
     private HttpResponse<String> postLogin(BrowserSession browser, String csrf)
             throws Exception {
+        return postLogin(browser, csrf, USERNAME, PASSWORD);
+    }
+
+    private HttpResponse<String> postLogin(
+            BrowserSession browser, String csrf, String username, String password) throws Exception {
         String loginForm = form(Map.of(
-                "username", USERNAME,
-                "password", PASSWORD,
+                "username", username,
+                "password", password,
                 "_csrf", csrf));
         return browser.client().send(
                 HttpRequest.newBuilder()
@@ -863,6 +981,15 @@ class AinerAuthorizationCodePkceIntegrationTest {
 
     private String authorize(BrowserSession browser, String verifier, String redirectUri)
             throws Exception {
+        return authorize(browser, verifier, redirectUri, USERNAME, PASSWORD);
+    }
+
+    private String authorize(
+            BrowserSession browser,
+            String verifier,
+            String redirectUri,
+            String username,
+            String password) throws Exception {
         String state = UUID.randomUUID().toString();
         URI requestUri = authorizationUri(
                 redirectUri, challenge(verifier), "S256", state);
@@ -877,7 +1004,7 @@ class AinerAuthorizationCodePkceIntegrationTest {
         Matcher csrf = CSRF_INPUT.matcher(loginPage.body());
         assertThat(csrf.find()).isTrue();
 
-        HttpResponse<String> loggedIn = postLogin(browser, csrf.group(1));
+        HttpResponse<String> loggedIn = postLogin(browser, csrf.group(1), username, password);
         assertThat(loggedIn.statusCode()).isEqualTo(302);
 
         URI resumedAuthorization = resolve(loginUri, loggedIn.headers()
@@ -1005,15 +1132,32 @@ class AinerAuthorizationCodePkceIntegrationTest {
         return parameters;
     }
 
+    private IdentityFoundationService.RegisteredAccount foundationAccount() {
+        return identityFoundationService.registerHumanAccountWithPassword(
+                new IdentityAuthorityRef("https://auth.ainer.test"),
+                dev.ainer.module.identity.foundation.LoginIdentityType.USERNAME,
+                "https://auth.ainer.test",
+                FOUNDATION_USERNAME,
+                FOUNDATION_PASSWORD);
+    }
+
     private CredentialRecord credential() {
-        var existingUserEntity = userEntityRepository.findByUsername(USERNAME);
+        return credential(USERNAME, "PKCE User");
+    }
+
+    private CredentialRecord foundationCredential() {
+        return credential(FOUNDATION_USERNAME, "Foundation User");
+    }
+
+    private CredentialRecord credential(String username, String displayName) {
+        var existingUserEntity = userEntityRepository.findByUsername(username);
         Bytes userEntityId;
         if (existingUserEntity == null) {
             userEntityId = Bytes.random();
             userEntityRepository.save(ImmutablePublicKeyCredentialUserEntity.builder()
                     .id(userEntityId)
-                    .name(USERNAME)
-                    .displayName("PKCE User")
+                    .name(username)
+                    .displayName(displayName)
                     .build());
         } else {
             userEntityId = existingUserEntity.getId();

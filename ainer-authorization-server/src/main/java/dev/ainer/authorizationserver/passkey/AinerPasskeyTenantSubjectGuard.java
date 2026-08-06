@@ -1,6 +1,7 @@
 package dev.ainer.authorizationserver.passkey;
 
 import dev.ainer.core.error.BusinessException;
+import dev.ainer.module.identity.foundation.HumanAccountRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.util.Assert;
 
@@ -15,9 +16,16 @@ import java.util.UUID;
 final class AinerPasskeyTenantSubjectGuard {
 
     private final JdbcTemplate jdbcTemplate;
+    private final HumanAccountRepository humanAccountRepository;
 
     AinerPasskeyTenantSubjectGuard(JdbcTemplate jdbcTemplate) {
+        this(jdbcTemplate, null);
+    }
+
+    AinerPasskeyTenantSubjectGuard(
+            JdbcTemplate jdbcTemplate, HumanAccountRepository humanAccountRepository) {
         this.jdbcTemplate = jdbcTemplate;
+        this.humanAccountRepository = humanAccountRepository;
     }
 
     void requireActiveHomeTenantSubject(UUID tenantId, UUID subjectId) {
@@ -43,6 +51,16 @@ final class AinerPasskeyTenantSubjectGuard {
                 subjectId);
         if (matches == null || matches != 1) {
             throw new BusinessException(PasskeyErrorCode.TENANT_SUBJECT_NOT_FOUND);
+        }
+    }
+
+    void requireActiveAccount(UUID accountId) {
+        Assert.notNull(accountId, "accountId cannot be null");
+        if (humanAccountRepository == null
+                || humanAccountRepository.findByAccountId(accountId)
+                        .filter(account -> account.status().canAuthenticate())
+                        .isEmpty()) {
+            throw new BusinessException(PasskeyErrorCode.ACCOUNT_NOT_FOUND);
         }
     }
 }

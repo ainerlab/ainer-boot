@@ -88,14 +88,16 @@ M4.6 Passkey 切片新增：
 |---|---|---|
 | `user_entities` | Spring Security WebAuthn adapter | username 与 WebAuthn opaque user handle |
 | `user_credentials` | Spring Security WebAuthn adapter | credential 公钥、计数器、transport、backup/attestation 协议材料 |
-| `ainer_passkey_credential` | Authorization Server | credential 与稳定 Identity subject 的 ACTIVE/REVOKED 生命周期 |
+| `ainer_passkey_credential` | Authorization Server | credential 与稳定 Identity subject/account 的 ACTIVE/REVOKED 生命周期 |
 | `ainer_passkey_credential_audit` | Authorization Server | REGISTERED/REVOKED、request ID 与发生时间 |
-| `ainer_passkey_recovery_code` / `_lockout` | Authorization Server | 恢复码 bcrypt hash 与按 subject 的失败锁定 |
+| `ainer_passkey_recovery_code` / `_lockout` | Authorization Server | 恢复码 bcrypt hash 与按 subject/account 的失败锁定 |
 | `ainer_passkey_recovery_request` | Authorization Server | 管理员双人恢复申请 |
 | `ainer_passkey_security_operation_audit` | Authorization Server | 恢复申请与执行审计 |
 | `ainer_passkey_enrollment_grant` | Authorization Server | `require-invite` 首枚 Passkey 的短时授权 |
 
-`user_credentials` 不保存 authenticator 私钥或生物识别模板。Ainer 生命周期登记与官方协议记录在
+`user_credentials` 不保存 authenticator 私钥或生物识别模板。S4 共存迁移后，Passkey 生命周期与安全
+记录的 foundation 行使用 `account_id`，legacy 行继续使用 `(tenant_id, subject_id)`；foundation recovery/
+enrollment 行不携带 tenant。Ainer 生命周期登记与官方协议记录在
 同一事务提交；认证更新时间不重复写生命周期审计。撤销不物理删除官方记录，读取只返回 ACTIVE
 credential。最后一个 ACTIVE credential 的自助撤销被拒绝；replacement 与旧 credential 通过
 同一 user entity 串行保护，避免并发删除把账号降级到零因子。

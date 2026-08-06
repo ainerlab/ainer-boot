@@ -131,8 +131,9 @@ starter 的真实 PostgreSQL 兼容测试，覆盖 `BaseMapper`、数据库 UUID
   ACTIVE Passkey 时仅密码不得取得 authorization code；
 - Passkey 协议记录、ACTIVE 生命周期和 REGISTERED 审计同事务；计数器/last-used 更新不产生
   重复登记审计；replacement 后旧凭证软撤销，并发撤销不能移除最后一个 ACTIVE 凭证。
-- 恢复/enrollment 管理端必须把目标 `(tenant_id, subject_id)` 绑定到 ACTIVE default Identity membership，
-  跨 tenant 目标即使 subject 存在也必须拒绝；登录限流 HTTP 429 使用统一 envelope、`Retry-After`
+- legacy 恢复/enrollment 管理端必须把目标 `(tenant_id, subject_id)` 绑定到 ACTIVE default Identity membership；
+  foundation recovery/enrollment 必须把目标 `account_id` 绑定到当前 ACTIVE HumanAccount，不能借 tenant
+  或外部 subject 头推断归属；登录限流 HTTP 429 使用统一 envelope、`Retry-After`
   与 no-store，并且只匹配配置的 POST 路径。
 - step-up 对匿名请求保留 Resource Server 401，对 SERVICE、缺/旧 `auth_time`、缺强因子和超出
   clock skew 的未来时间返回稳定 403；边界时间使用可注入 `Clock`。
