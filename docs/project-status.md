@@ -149,6 +149,14 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
   account recovery/enrollment/admin recovery 均通过。全 reactor 407 tests / 0 failure / 0 error / 0 skipped
   （Colima）。
   施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
+- Greenfield S5 Resource Server typed profile resolver 已在 `reset/0033-greenfield` 分支完成：新增
+  `AuthenticatedPrincipalResolver` core port、Spring `Jwt` 到 `VerifiedJwtClaims` adapter，以及 starter
+  的 SecurityContext resolver；`USER_NEUTRAL_V1`/`SERVICE_V1` 分别解析为 Human/Service subject，
+  `sec_epoch` 解析为 optional typed epoch，SERVICE 无 `amr` 时使用 `client_credentials` assurance。
+  缺失、未知、版本不支持或 actor/profile 矛盾统一 fail-closed 为 401；legacy
+  `AuthenticatedActorResolver` 保持独立零回归。全 reactor 411 tests / 0 failure / 0 error / 0 skipped
+  （Colima）。
+  施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
 - M4.8B 租户上下文选择代码基线：`GET /api/me/tenants` 返回当前 USER 的 ACTIVE membership
   安全投影（tenant ID/code/name/role/is_default），LOCKED/DISABLED tenant/user/membership
   不返回；`AinerTenantSelectionFilter` 在 Authorization Code + PKCE 流程的 authorization

@@ -63,6 +63,25 @@ class ReferenceTokenProfileResolverTest {
     }
 
     @Test
+    void resolvesOptionalSecurityEpochAndUsesServiceAssuranceWithoutAmr() {
+        AuthenticatedPrincipal human = resolver.resolve(
+                claims("USER_NEUTRAL_V1", "USER", "acc-epoch", Map.of("sec_epoch", 7L)));
+        assertThat(human.securityEpoch()).isEqualTo(7L);
+
+        Map<String, Object> serviceClaims = new HashMap<>();
+        serviceClaims.put(TokenProfile.PROFILE_CLAIM, "SERVICE_V1");
+        serviceClaims.put(TokenProfile.CONTRACT_VERSION_CLAIM, TokenProfile.CURRENT_CONTRACT_VERSION);
+        serviceClaims.put("actor_type", "SERVICE");
+        serviceClaims.put("scope", "account.read");
+        serviceClaims.put("sec_epoch", 3L);
+        AuthenticatedPrincipal service = resolver.resolve(new VerifiedJwtClaims(
+                "https://ainer.example/auth", "svc-epoch", Set.of("ainer-api"),
+                Instant.parse("2026-08-05T12:00:00Z"), serviceClaims));
+        assertThat(service.securityEpoch()).isEqualTo(3L);
+        assertThat(service.assurance()).isEqualTo("client_credentials");
+    }
+
+    @Test
     void rejectsUnknownProfile() {
         assertThatThrownBy(() -> resolver.resolve(
                 claims("LEGACY_TENANT_V1", "USER", "acc-1", Map.of())))

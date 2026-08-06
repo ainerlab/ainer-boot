@@ -3,6 +3,9 @@ package dev.ainer.security.autoconfigure;
 import dev.ainer.core.web.ApiResponse;
 import dev.ainer.security.actor.AuthenticatedActor;
 import dev.ainer.security.actor.AuthenticatedActorResolver;
+import dev.ainer.security.token.AuthenticatedPrincipal;
+import dev.ainer.security.token.AuthenticatedPrincipalResolver;
+import dev.ainer.security.token.TokenProfile;
 import dev.ainer.web.request.RequestIds;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
@@ -23,6 +26,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -79,6 +83,45 @@ class AinerResourceServerIntegrationTest {
         assertThat(response.body()).contains("AINER.COMMON.FORBIDDEN");
     }
 
+    @Test
+    void newHumanProfileResolvesToTypedPrincipalWithEpoch() throws Exception {
+        HttpResponse<String> response = get(
+                "/api/security/principal", "new-human", null, null);
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body())
+                .contains("\"profile\":\"USER_NEUTRAL_V1\"")
+                .contains("\"human\":true")
+                .contains("\"service\":false")
+                .contains("\"subjectId\":\"account-1\"")
+                .contains("\"securityEpoch\":7");
+    }
+
+    @Test
+    void newServiceProfileResolvesToTypedServicePrincipal() throws Exception {
+        HttpResponse<String> response = get(
+                "/api/security/principal", "new-service", null, null);
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body())
+                .contains("\"profile\":\"SERVICE_V1\"")
+                .contains("\"human\":false")
+                .contains("\"service\":true")
+                .contains("\"subjectId\":\"service-1\"")
+                .contains("\"securityEpoch\":3");
+    }
+
+    @Test
+    void malformedNewProfileClaimsFailClosedWith401() throws Exception {
+        for (String token : List.of("valid", "unknown-profile", "mismatched-profile")) {
+            HttpResponse<String> response = get(
+                    "/api/security/principal", token, null, null);
+
+            assertThat(response.statusCode()).isEqualTo(401);
+            assertThat(response.body()).contains("AINER.COMMON.UNAUTHENTICATED");
+        }
+    }
+
     private HttpResponse<String> get(String token, String tenantHeader, String subjectHeader) throws Exception {
         return get("/api/security/me", token, tenantHeader, subjectHeader);
     }
@@ -113,9 +156,13 @@ class AinerResourceServerIntegrationTest {
     static class TestEndpoint {
 
         private final AuthenticatedActorResolver actorResolver;
+        private final AuthenticatedPrincipalResolver principalResolver;
 
-        TestEndpoint(AuthenticatedActorResolver actorResolver) {
+        TestEndpoint(
+                AuthenticatedActorResolver actorResolver,
+                AuthenticatedPrincipalResolver principalResolver) {
             this.actorResolver = actorResolver;
+            this.principalResolver = principalResolver;
         }
 
         @GetMapping("/api/security/me")
@@ -123,6 +170,27 @@ class AinerResourceServerIntegrationTest {
             AuthenticatedActor actor = actorResolver.requireCurrent();
             actor.requireAuthority("SCOPE_ai.invoke");
             return ApiResponse.success(actor, RequestIds.currentOrCreate(request));
+        }
+
+        @GetMapping("/api/security/principal")
+        ApiResponse<PrincipalView> principal(HttpServletRequest request) {
+            AuthenticatedPrincipal principal = principalResolver.requireCurrent();
+            return ApiResponse.success(
+                    new PrincipalView(
+                            principal.tokenProfile().claimValue(),
+                            principal.isHuman(),
+                            principal.isService(),
+                            principal.principalSubjectRef().subjectId(),
+                            principal.securityEpoch()),
+                    RequestIds.currentOrCreate(request));
+        }
+
+        record PrincipalView(
+                String profile,
+                boolean human,
+                boolean service,
+                String subjectId,
+                Long securityEpoch) {
         }
 
     }
@@ -139,6 +207,47 @@ class AinerResourceServerIntegrationTest {
                         .issuedAt(Instant.now().minusSeconds(5))
                         .expiresAt(Instant.now().plusSeconds(300))
                         .claim("actor_type", "USER");
+                if ("new-human".equals(token)) {
+                    return jwt.issuer("https://ainer.example/auth")
+                            .audience(List.of("ainer-api"))
+                            .subject("account-1")
+                            .claim(TokenProfile.PROFILE_CLAIM, TokenProfile.USER_NEUTRAL_V1.claimValue())
+                            .claim(TokenProfile.CONTRACT_VERSION_CLAIM, TokenProfile.CURRENT_CONTRACT_VERSION)
+                            .claim("actor_type", "USER")
+                            .claim("scope", "account.read")
+                            .claim("amr", "pwd")
+                            .claim("sec_epoch", 7L)
+                            .build();
+                }
+                if ("new-service".equals(token)) {
+                    return jwt.issuer("https://ainer.example/auth")
+                            .audience(List.of("ainer-api"))
+                            .subject("service-1")
+                            .claim(TokenProfile.PROFILE_CLAIM, TokenProfile.SERVICE_V1.claimValue())
+                            .claim(TokenProfile.CONTRACT_VERSION_CLAIM, TokenProfile.CURRENT_CONTRACT_VERSION)
+                            .claim("actor_type", "SERVICE")
+                            .claim("scope", "account.read")
+                            .claim("sec_epoch", 3L)
+                            .build();
+                }
+                if ("unknown-profile".equals(token)) {
+                    return jwt.issuer("https://ainer.example/auth")
+                            .audience(List.of("ainer-api"))
+                            .claim(TokenProfile.PROFILE_CLAIM, "UNKNOWN_V1")
+                            .claim(TokenProfile.CONTRACT_VERSION_CLAIM, TokenProfile.CURRENT_CONTRACT_VERSION)
+                            .claim("actor_type", "USER")
+                            .claim("amr", "pwd")
+                            .build();
+                }
+                if ("mismatched-profile".equals(token)) {
+                    return jwt.issuer("https://ainer.example/auth")
+                            .audience(List.of("ainer-api"))
+                            .claim(TokenProfile.PROFILE_CLAIM, TokenProfile.SERVICE_V1.claimValue())
+                            .claim(TokenProfile.CONTRACT_VERSION_CLAIM, TokenProfile.CURRENT_CONTRACT_VERSION)
+                            .claim("actor_type", "USER")
+                            .claim("amr", "pwd")
+                            .build();
+                }
                 if (!"missing-scope".equals(token)) {
                     jwt.claim("scope", "ai.invoke");
                 }

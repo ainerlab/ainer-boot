@@ -25,6 +25,7 @@ public class ReferenceTokenProfileResolver implements TokenProfileResolver {
     private static final String SCOPE_CLAIM = "scope";
     private static final String AMR_CLAIM = "amr";
     private static final String CLIENT_ID_CLAIM = "client_id";
+    private static final String SECURITY_EPOCH_CLAIM = "sec_epoch";
 
     private static final String USER_ACTOR = "USER";
     private static final String SERVICE_ACTOR = "SERVICE";
@@ -44,6 +45,13 @@ public class ReferenceTokenProfileResolver implements TokenProfileResolver {
         PrincipalSubjectRef principal = buildPrincipal(profile, authority, claims.subject(), actorType);
 
         Set<String> scopes = splitScopes(claims.claim(SCOPE_CLAIM));
+        String assurance = optionalString(claims, AMR_CLAIM);
+        if (assurance == null && profile == TokenProfile.SERVICE_V1) {
+            assurance = "client_credentials";
+        }
+        if (assurance == null) {
+            throw new IllegalArgumentException("Missing or blank claim: " + AMR_CLAIM);
+        }
         return new AuthenticatedPrincipal(
                 principal,
                 authority,
@@ -51,8 +59,9 @@ public class ReferenceTokenProfileResolver implements TokenProfileResolver {
                 contractVersion,
                 claims.audiences(),
                 scopes,
-                stringClaim(claims, AMR_CLAIM),
-                optionalString(claims, CLIENT_ID_CLAIM));
+                assurance,
+                optionalString(claims, CLIENT_ID_CLAIM),
+                optionalSecurityEpoch(claims));
     }
 
     private static PrincipalSubjectRef buildPrincipal(
@@ -90,5 +99,20 @@ public class ReferenceTokenProfileResolver implements TokenProfileResolver {
     private static String optionalString(VerifiedJwtClaims claims, String name) {
         Object value = claims.claim(name);
         return value instanceof String text && !text.isBlank() ? text : null;
+    }
+
+    private static Long optionalSecurityEpoch(VerifiedJwtClaims claims) {
+        Object value = claims.claim(SECURITY_EPOCH_CLAIM);
+        if (value == null) {
+            return null;
+        }
+        if (!(value instanceof Number number)) {
+            throw new IllegalArgumentException("Invalid sec_epoch claim");
+        }
+        long epoch = number.longValue();
+        if (epoch < 0 || Double.compare(number.doubleValue(), epoch) != 0) {
+            throw new IllegalArgumentException("Invalid sec_epoch claim");
+        }
+        return epoch;
     }
 }

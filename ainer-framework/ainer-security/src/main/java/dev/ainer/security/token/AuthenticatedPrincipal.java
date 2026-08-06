@@ -4,6 +4,7 @@ import dev.ainer.security.principal.HumanSubjectRef;
 import dev.ainer.security.principal.IdentityAuthorityRef;
 import dev.ainer.security.principal.PrincipalSubjectRef;
 import dev.ainer.security.principal.ServiceSubjectRef;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.Set;
@@ -30,7 +31,21 @@ public record AuthenticatedPrincipal(
         Set<String> audiences,
         Set<String> scopes,
         String assurance,
-        String clientId) {
+        String clientId,
+        @Nullable Long securityEpoch) {
+
+    public AuthenticatedPrincipal(
+            PrincipalSubjectRef principalSubjectRef,
+            IdentityAuthorityRef authority,
+            TokenProfile tokenProfile,
+            String claimContractVersion,
+            Set<String> audiences,
+            Set<String> scopes,
+            String assurance,
+            String clientId) {
+        this(principalSubjectRef, authority, tokenProfile, claimContractVersion,
+                audiences, scopes, assurance, clientId, null);
+    }
 
     public AuthenticatedPrincipal {
         Objects.requireNonNull(principalSubjectRef, "principalSubjectRef");
@@ -42,6 +57,9 @@ public record AuthenticatedPrincipal(
         Objects.requireNonNull(assurance, "assurance");
         if (claimContractVersion.isBlank() || assurance.isBlank()) {
             throw new IllegalArgumentException("claimContractVersion and assurance must be non-blank");
+        }
+        if (securityEpoch != null && securityEpoch < 0) {
+            throw new IllegalArgumentException("securityEpoch must be non-negative");
         }
         requireProfileConsistency(tokenProfile, principalSubjectRef);
         audiences = Set.copyOf(audiences);

@@ -7,6 +7,9 @@ import dev.ainer.security.actor.AuthenticatedActorResolver;
 import dev.ainer.security.authorization.PrometheusEndpointRequestMatcher;
 import dev.ainer.security.authorization.TenantlessServiceScopeAuthorizationManager;
 import dev.ainer.security.error.AinerSecurityErrorCode;
+import dev.ainer.security.token.AuthenticatedPrincipalResolver;
+import dev.ainer.security.token.ReferenceTokenProfileResolver;
+import dev.ainer.security.token.TokenProfileResolver;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -46,6 +49,19 @@ public class AinerResourceServerAutoConfiguration {
     @ConditionalOnMissingBean
     public AuthenticatedActorResolver authenticatedActorResolver(AinerResourceServerProperties properties) {
         return new SecurityContextAuthenticatedActorResolver(properties);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(TokenProfileResolver.class)
+    public TokenProfileResolver tokenProfileResolver() {
+        return new ReferenceTokenProfileResolver();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(AuthenticatedPrincipalResolver.class)
+    public AuthenticatedPrincipalResolver authenticatedPrincipalResolver(
+            TokenProfileResolver tokenProfileResolver) {
+        return new SecurityContextAuthenticatedPrincipalResolver(tokenProfileResolver);
     }
 
     @Bean

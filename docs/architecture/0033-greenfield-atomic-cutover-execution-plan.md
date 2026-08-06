@@ -80,7 +80,8 @@ C1–S5 阶段只实现 USER_NEUTRAL_V1 + SERVICE_V1。
 （password credential store + HumanProfile + securityEpoch 无关的 profile 读写，全 reactor 388/0/0/0）；
 S3 customizer 新 profile 签发已完成（SERVICE_V1 + USER_NEUTRAL_V1 轨道，fail-closed，
 全 reactor 401/0/0/0）；S4 登录链路与 Passkey foundation 接线已完成，
-全 reactor 407/0/0/0。
+全 reactor 407/0/0/0）；S5 Resource Server typed profile resolver 已完成，
+全 reactor 411/0/0/0。
 
 ### S2 — Foundation 能力补全（password credential store + Profile + securityEpoch 查询）
 
@@ -268,7 +269,7 @@ S6/S7 改的是 workspace/ai-runtime 模块，与 S3–S5（identity/security �
 | 4 | foundation 包位置 | S8 后提升为 identity 主体 | 📋 S8 |
 | 5 | migration squash | S8 重建 baseline，旧库不可原地升级 | 📋 S8 |
 | 6 | id-source | Configuration 显式 @Bean 绑 repo::nextUuidV7 | ✅ C1 地基完成 |
-| 7 | resolver 边界 | customizer 直接构造 claim；starter 用 ReferenceTokenProfileResolver 解析 | ✅ customizer 签发 S3 完成；starter 解析 📋 S5 |
+| 7 | resolver 边界 | customizer 直接构造 claim；starter 用 ReferenceTokenProfileResolver 解析 | ✅ S3/S5 完成 |
 | 8 | selectByTypeAndIdentifier | ACTIVE-only | ✅ C1 地基完成 |
 | 9 | 测试计数 | S8 重校 | 📋 S8 |
 | **A** | **password credential store**（新缺口） | 新建 ainer_identity_credential 表，S2 落地 | ✅ S2 完成 |
