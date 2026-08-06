@@ -1,5 +1,7 @@
 package dev.ainer.module.identity.foundation;
 
+import dev.ainer.core.error.BusinessException;
+import dev.ainer.module.identity.account.application.IdentityErrorCode;
 import dev.ainer.security.principal.IdentityAuthorityRef;
 import org.junit.jupiter.api.Test;
 
@@ -59,7 +61,9 @@ class IdentityFoundationServiceTest {
 
         assertThatThrownBy(() ->
                 service.registerHumanAccount(AINER, LoginIdentityType.EMAIL, AINER.issuer(), "dup@example.com"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(IdentityErrorCode.LOGIN_IDENTITY_ALREADY_EXISTS);
         assertThat(accounts.count()).isEqualTo(1);
     }
 
@@ -92,7 +96,9 @@ class IdentityFoundationServiceTest {
     void linkRejectsUnknownAccount() {
         assertThatThrownBy(() -> service.linkLoginIdentity(
                 UUID.randomUUID(), LoginIdentityType.PHONE, AINER.issuer(), "+86-20000000000"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(IdentityErrorCode.HUMAN_ACCOUNT_NOT_FOUND);
     }
 
     @Test
@@ -103,7 +109,9 @@ class IdentityFoundationServiceTest {
         assertThatThrownBy(() -> service.linkLoginIdentity(
                 registered.account().accountId(),
                 LoginIdentityType.EMAIL, AINER.issuer(), "owner@example.com"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(IdentityErrorCode.LOGIN_IDENTITY_ALREADY_EXISTS);
     }
 
     private static Supplier<UUID> sequentialIds() {

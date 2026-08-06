@@ -57,10 +57,18 @@ class IdentityFoundationPersistenceTest {
     private LoginIdentityRepository loginIdentityRepository;
 
     @Autowired
+    private ServicePrincipalRepository servicePrincipalRepository;
+
+    @Autowired
+    private OAuthClientBindingRepository oauthClientBindingRepository;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void cleanFoundationTables() {
+        jdbcTemplate.update("DELETE FROM ainer_identity_oauth_client_binding");
+        jdbcTemplate.update("DELETE FROM ainer_identity_service_principal");
         jdbcTemplate.update("DELETE FROM ainer_identity_login_identity");
         jdbcTemplate.update("DELETE FROM ainer_identity_human_account");
     }
@@ -108,10 +116,51 @@ class IdentityFoundationPersistenceTest {
                 LoginIdentityType.EMAIL, authority.issuer(), "revoked@example.com")).isEmpty();
     }
 
+    @Test
+    void persistsServicePrincipalAndResolvesByActiveClientId() {
+        IdentityAuthorityRef authority = new IdentityAuthorityRef("https://ainer.example/auth");
+        UUID principalId = servicePrincipalRepository.nextUuidV7();
+        servicePrincipalRepository.save(new ServicePrincipal(principalId, authority,
+                ServicePrincipalStatus.ACTIVE, 0L, Instant.parse("2026-08-06T10:00:00Z")));
+
+        UUID bindingId = oauthClientBindingRepository.nextUuidV7();
+        oauthClientBindingRepository.save(new OAuthClientBinding(bindingId, principalId,
+                "machine-client-1", OAuthClientBindingStatus.ACTIVE,
+                Instant.parse("2026-08-06T10:00:00Z"), null));
+
+        assertThat(servicePrincipalRepository.findByPrincipalId(principalId))
+                .hasValueSatisfying(p -> assertThat(p.status()).isEqualTo(ServicePrincipalStatus.ACTIVE));
+        assertThat(servicePrincipalRepository.findByActiveClientId("machine-client-1"))
+                .hasValueSatisfying(p -> assertThat(p.principalId()).isEqualTo(principalId));
+        assertThat(oauthClientBindingRepository.findActiveByClientId("machine-client-1"))
+                .hasValueSatisfying(b -> assertThat(b.principalId()).isEqualTo(principalId));
+    }
+
+    @Test
+    void doesNotResolveRetiredClientBindingAsActive() {
+        IdentityAuthorityRef authority = new IdentityAuthorityRef("https://ainer.example/auth");
+        UUID principalId = servicePrincipalRepository.nextUuidV7();
+        servicePrincipalRepository.save(new ServicePrincipal(principalId, authority,
+                ServicePrincipalStatus.ACTIVE, 0L, Instant.parse("2026-08-06T10:00:00Z")));
+
+        UUID bindingId = oauthClientBindingRepository.nextUuidV7();
+        oauthClientBindingRepository.save(new OAuthClientBinding(bindingId, principalId,
+                "retired-client", OAuthClientBindingStatus.RETIRED,
+                Instant.parse("2026-08-06T10:00:00Z"), Instant.parse("2026-08-06T11:00:00Z")));
+
+        assertThat(servicePrincipalRepository.findByActiveClientId("retired-client")).isEmpty();
+        assertThat(oauthClientBindingRepository.findActiveByClientId("retired-client")).isEmpty();
+    }
+
     @SpringBootConfiguration
     @EnableAutoConfiguration
     @ComponentScan(basePackageClasses = IdentityFoundationMarker.class)
     @MapperScan(basePackageClasses = IdentityFoundationMarker.class, annotationClass = Mapper.class)
     static class TestApp {
+
+        @org.springframework.context.annotation.Bean
+        java.time.Clock clock() {
+            return java.time.Clock.systemUTC();
+        }
     }
 }

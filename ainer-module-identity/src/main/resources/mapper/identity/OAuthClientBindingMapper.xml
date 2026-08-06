@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.identity.foundation.OAuthClientBindingMapper">
+
+    <resultMap id="oauthClientBindingRow" type="dev.ainer.module.identity.foundation.OAuthClientBindingRow">
+        <id property="id" column="id"/>
+        <result property="principalId" column="principal_id"/>
+        <result property="clientId" column="client_id"/>
+        <result property="status" column="status"/>
+        <result property="boundAt" column="bound_at"/>
+        <result property="unboundAt" column="unbound_at"/>
+    </resultMap>
+
+    <select id="selectUuidV7" resultType="java.util.UUID">
+        SELECT uuidv7()
+    </select>
+
+    <insert id="insertBinding"
+            parameterType="dev.ainer.module.identity.foundation.OAuthClientBindingRow">
+        INSERT INTO ainer_identity_oauth_client_binding
+            (id, principal_id, client_id, status, bound_at, unbound_at)
+        VALUES
+            (#{id}, #{principalId}, #{clientId}, #{status}, #{boundAt}, #{unboundAt})
+    </insert>
+
+    <select id="selectActiveByClientId" resultMap="oauthClientBindingRow">
+        SELECT id, principal_id, client_id, status, bound_at, unbound_at
+        FROM ainer_identity_oauth_client_binding
+        WHERE client_id = #{clientId}
+          AND status = 'ACTIVE'
+    </select>
+
+    <select id="selectByPrincipalId" resultMap="oauthClientBindingRow">
+        SELECT id, principal_id, client_id, status, bound_at, unbound_at
+        FROM ainer_identity_oauth_client_binding
+        WHERE principal_id = #{principalId}
+        ORDER BY bound_at DESC
+        LIMIT 1
+    </select>
+</mapper>

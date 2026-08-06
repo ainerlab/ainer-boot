@@ -87,7 +87,22 @@ public enum IdentityErrorCode implements ErrorCode {
             "AINER.IDENTITY.OWNERSHIP_RECOVERY_APPROVER_MUST_DIFFER", "恢复批准者必须与申请者不同", 409),
     OWNERSHIP_RECOVERY_TARGET_INELIGIBLE(
             "AINER.IDENTITY.OWNERSHIP_RECOVERY_TARGET_INELIGIBLE",
-            "恢复目标必须是同租户 ACTIVE ADMIN", 409);
+            "恢复目标必须是同租户 ACTIVE ADMIN", 409),
+    // Greenfield foundation (ADR-0033 §3-§4, §2.6) — additive during the S1.1/S1.2 spine.
+    HUMAN_ACCOUNT_NOT_FOUND(
+            "AINER.IDENTITY.HUMAN_ACCOUNT_NOT_FOUND", "人类安全账号不存在", 404),
+    HUMAN_ACCOUNT_NOT_ACTIVE(
+            "AINER.IDENTITY.HUMAN_ACCOUNT_NOT_ACTIVE", "人类安全账号不可认证", 409),
+    LOGIN_IDENTITY_ALREADY_EXISTS(
+            "AINER.IDENTITY.LOGIN_IDENTITY_ALREADY_EXISTS", "登录标识已经被绑定", 409),
+    SERVICE_PRINCIPAL_NOT_FOUND(
+            "AINER.IDENTITY.SERVICE_PRINCIPAL_NOT_FOUND", "服务主体不存在", 404),
+    SERVICE_PRINCIPAL_NOT_ACTIVE(
+            "AINER.IDENTITY.SERVICE_PRINCIPAL_NOT_ACTIVE", "服务主体不可认证", 409),
+    OAUTH_CLIENT_BINDING_NOT_FOUND(
+            "AINER.IDENTITY.OAUTH_CLIENT_BINDING_NOT_FOUND", "OAuth 客户端绑定不存在", 404),
+    OAUTH_CLIENT_BINDING_ALREADY_EXISTS(
+            "AINER.IDENTITY.OAUTH_CLIENT_BINDING_ALREADY_EXISTS", "OAuth 客户端已经绑定活动凭据", 409);
 
     private final String code;
     private final String defaultMessage;
