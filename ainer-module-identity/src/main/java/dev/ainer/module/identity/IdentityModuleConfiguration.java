@@ -4,7 +4,9 @@ import dev.ainer.core.error.ErrorCodeContributor;
 import dev.ainer.module.identity.account.IdentityFeatureMarker;
 import dev.ainer.module.identity.account.application.IdentityErrorCode;
 import dev.ainer.module.identity.account.infrastructure.mybatis.IdentityMapper;
+import dev.ainer.module.identity.foundation.CredentialRepository;
 import dev.ainer.module.identity.foundation.HumanAccountRepository;
+import dev.ainer.module.identity.foundation.HumanProfileRepository;
 import dev.ainer.module.identity.foundation.IdentityFoundationMarker;
 import dev.ainer.module.identity.foundation.IdentityFoundationService;
 import dev.ainer.module.identity.foundation.LoginIdentityRepository;
@@ -61,9 +63,19 @@ public class IdentityModuleConfiguration {
     IdentityFoundationService identityFoundationService(
             HumanAccountRepository accountRepository,
             LoginIdentityRepository loginIdentityRepository,
+            CredentialRepository credentialRepository,
+            HumanProfileRepository humanProfileRepository,
+            PasswordEncoder passwordEncoder,
             Clock clock) {
         Supplier<java.util.UUID> idSource = accountRepository::nextUuidV7;
-        return new IdentityFoundationService(accountRepository, loginIdentityRepository, clock, idSource);
+        return new IdentityFoundationService(
+                accountRepository,
+                loginIdentityRepository,
+                credentialRepository,
+                humanProfileRepository,
+                passwordEncoder,
+                clock,
+                idSource);
     }
 
     /**

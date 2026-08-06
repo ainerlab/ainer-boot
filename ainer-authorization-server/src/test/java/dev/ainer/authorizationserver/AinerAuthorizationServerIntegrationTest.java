@@ -227,7 +227,7 @@ class AinerAuthorizationServerIntegrationTest {
 
     @Test
     void migratesIdentityAndOfficialJdbcProtocolStores() {
-        assertThat(flyway.info().applied()).hasSize(22);
+        assertThat(flyway.info().applied()).hasSize(23);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_name IN ('oauth2_registered_client','oauth2_authorization',"
@@ -245,8 +245,10 @@ class AinerAuthorizationServerIntegrationTest {
                         + "'ainer_identity_human_account',"
                         + "'ainer_identity_login_identity',"
                         + "'ainer_identity_service_principal',"
-                        + "'ainer_identity_oauth_client_binding')",
-                Integer.class)).isEqualTo(24);
+                        + "'ainer_identity_oauth_client_binding',"
+                        + "'ainer_identity_credential',"
+                        + "'ainer_identity_human_profile')",
+                Integer.class)).isEqualTo(26);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
     }
 

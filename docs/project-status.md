@@ -121,6 +121,14 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
 - Greenfield S1.2 加法脊柱在 `reset/0033-greenfield` 分支成型且已验证（principal/token-profile/Identity 领域+
   服务+PostgreSQL 持久化+resolver 参考实现，共 identity 74 + security 26 tests / 0 fail），与 legacy 共存、
   未接 runtime；破坏性 cutover 待执行，有序施工清单见 [`0033-greenfield-cutover-plan.md`](architecture/0033-greenfield-cutover-plan.md)。
+- Greenfield S2 foundation 能力补全（执行规划 缺口 A）已在 `reset/0033-greenfield` 分支完成：新建
+  `ainer_identity_credential`（PASSWORD/WEBAUTHN_PUBLIC_KEY/OIDC_SUBJECT，ACTIVE/REVOKED，部分唯一索引
+  `(account_id, type) WHERE status='ACTIVE'`）与 `ainer_identity_human_profile`（0:1 account）两张表；
+  `IdentityFoundationService` 扩展 `registerHumanAccountWithPassword` / `findPasswordCredentialForLogin` /
+  `rotatePassword` / `updateProfile`，密码经 Delegating PasswordEncoder 编码后入库、rotatedAt 标记轮换、
+  未知账号/缺 ACTIVE 凭据 fail-closed；identity 错误码补 CREDENTIAL_NOT_FOUND/CREDENTIAL_REVOKED/
+  INVALID_CREDENTIAL/PROFILE_NOT_FOUND。全 reactor 388 tests / 0 failure / 0 error / 0 skipped（Colima）。
+  施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
 - M4.8B 租户上下文选择代码基线：`GET /api/me/tenants` 返回当前 USER 的 ACTIVE membership
   安全投影（tenant ID/code/name/role/is_default），LOCKED/DISABLED tenant/user/membership
   不返回；`AinerTenantSelectionFilter` 在 Authorization Code + PKCE 流程的 authorization

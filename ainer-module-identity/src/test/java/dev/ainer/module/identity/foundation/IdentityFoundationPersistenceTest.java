@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Greenfield Identity foundation persistence (S1.2 wiring). Verifies the {@code ainer_identity_human_account}
@@ -63,12 +64,20 @@ class IdentityFoundationPersistenceTest {
     private OAuthClientBindingRepository oauthClientBindingRepository;
 
     @Autowired
+    private CredentialRepository credentialRepository;
+
+    @Autowired
+    private HumanProfileRepository humanProfileRepository;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void cleanFoundationTables() {
         jdbcTemplate.update("DELETE FROM ainer_identity_oauth_client_binding");
         jdbcTemplate.update("DELETE FROM ainer_identity_service_principal");
+        jdbcTemplate.update("DELETE FROM ainer_identity_credential");
+        jdbcTemplate.update("DELETE FROM ainer_identity_human_profile");
         jdbcTemplate.update("DELETE FROM ainer_identity_login_identity");
         jdbcTemplate.update("DELETE FROM ainer_identity_human_account");
     }
@@ -150,6 +159,100 @@ class IdentityFoundationPersistenceTest {
 
         assertThat(servicePrincipalRepository.findByActiveClientId("retired-client")).isEmpty();
         assertThat(oauthClientBindingRepository.findActiveByClientId("retired-client")).isEmpty();
+    }
+
+    @Test
+    void persistsActiveCredentialAndResolvesByAccountAndType() {
+        UUID accountId = accountRepository.nextUuidV7();
+        IdentityAuthorityRef authority = new IdentityAuthorityRef("https://ainer.example/auth");
+        accountRepository.save(new HumanAccount(accountId, authority, AccountStatus.ACTIVE, 0L,
+                Instant.parse("2026-08-06T10:00:00Z")));
+
+        UUID credentialId = credentialRepository.nextUuidV7();
+        credentialRepository.insert(new Credential(credentialId, accountId, CredentialType.PASSWORD,
+                "{bcrypt}encoded-hash-material", CredentialStatus.ACTIVE,
+                Instant.parse("2026-08-06T10:00:00Z"), null));
+
+        assertThat(credentialRepository.findActive(accountId, CredentialType.PASSWORD))
+                .hasValueSatisfying(c -> {
+                    assertThat(c.credentialId()).isEqualTo(credentialId);
+                    assertThat(c.isActive()).isTrue();
+                    assertThat(c.rotatedAt()).isNull();
+                });
+        assertThat(credentialRepository.findActive(accountId, CredentialType.WEBAUTHN_PUBLIC_KEY)).isEmpty();
+    }
+
+    @Test
+    void revokingActiveCredentialMarksRotatedAtAndStopsResolving() {
+        UUID accountId = accountRepository.nextUuidV7();
+        IdentityAuthorityRef authority = new IdentityAuthorityRef("https://ainer.example/auth");
+        accountRepository.save(new HumanAccount(accountId, authority, AccountStatus.ACTIVE, 0L,
+                Instant.parse("2026-08-06T10:00:00Z")));
+
+        UUID credentialId = credentialRepository.nextUuidV7();
+        credentialRepository.insert(new Credential(credentialId, accountId, CredentialType.PASSWORD,
+                "{bcrypt}first-hash", CredentialStatus.ACTIVE,
+                Instant.parse("2026-08-06T10:00:00Z"), null));
+
+        Instant rotatedAt = Instant.parse("2026-08-06T11:00:00Z");
+        assertThat(credentialRepository.revokeActive(accountId, CredentialType.PASSWORD, rotatedAt)).isEqualTo(1);
+        assertThat(credentialRepository.findActive(accountId, CredentialType.PASSWORD)).isEmpty();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT rotated_at FROM ainer_identity_credential WHERE id = ?",
+                java.sql.Timestamp.class, credentialId)).isEqualTo(java.sql.Timestamp.from(rotatedAt));
+        assertThat(credentialRepository.revokeActive(accountId, CredentialType.PASSWORD, rotatedAt)).isZero();
+    }
+
+    @Test
+    void rejectsSecondActiveCredentialForSameAccountAndType() {
+        UUID accountId = accountRepository.nextUuidV7();
+        IdentityAuthorityRef authority = new IdentityAuthorityRef("https://ainer.example/auth");
+        accountRepository.save(new HumanAccount(accountId, authority, AccountStatus.ACTIVE, 0L,
+                Instant.parse("2026-08-06T10:00:00Z")));
+
+        UUID first = credentialRepository.nextUuidV7();
+        credentialRepository.insert(new Credential(first, accountId, CredentialType.PASSWORD,
+                "{bcrypt}first-hash", CredentialStatus.ACTIVE,
+                Instant.parse("2026-08-06T10:00:00Z"), null));
+
+        UUID second = credentialRepository.nextUuidV7();
+        assertThatThrownBy(() -> credentialRepository.insert(new Credential(
+                second, accountId, CredentialType.PASSWORD, "{bcrypt}second-hash",
+                CredentialStatus.ACTIVE, Instant.parse("2026-08-06T10:01:00Z"), null)))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void persistsAndUpsertsHumanProfile() {
+        UUID accountId = accountRepository.nextUuidV7();
+        IdentityAuthorityRef authority = new IdentityAuthorityRef("https://ainer.example/auth");
+        accountRepository.save(new HumanAccount(accountId, authority, AccountStatus.ACTIVE, 0L,
+                Instant.parse("2026-08-06T10:00:00Z")));
+
+        humanProfileRepository.upsert(new HumanProfile(accountId, "Ainer User",
+                "https://cdn.example/avatar.png", Instant.parse("2026-08-06T10:00:00Z")));
+        assertThat(humanProfileRepository.findByAccountId(accountId))
+                .hasValueSatisfying(p -> {
+                    assertThat(p.displayName()).isEqualTo("Ainer User");
+                    assertThat(p.avatarUrl()).isEqualTo("https://cdn.example/avatar.png");
+                });
+
+        humanProfileRepository.upsert(new HumanProfile(accountId, "Renamed", null,
+                Instant.parse("2026-08-06T10:05:00Z")));
+        assertThat(humanProfileRepository.findByAccountId(accountId))
+                .hasValueSatisfying(p -> {
+                    assertThat(p.displayName()).isEqualTo("Renamed");
+                    assertThat(p.avatarUrl()).isNull();
+                    assertThat(p.updatedAt()).isEqualTo(Instant.parse("2026-08-06T10:05:00Z"));
+                });
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_identity_human_profile WHERE account_id = ?",
+                Integer.class, accountId)).isEqualTo(1);
+    }
+
+    @Test
+    void doesNotResolveProfileForUnknownAccount() {
+        assertThat(humanProfileRepository.findByAccountId(UUID.randomUUID())).isEmpty();
     }
 
     @SpringBootConfiguration

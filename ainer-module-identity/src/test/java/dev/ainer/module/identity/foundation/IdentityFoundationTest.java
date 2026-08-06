@@ -96,4 +96,58 @@ class IdentityFoundationTest {
 
         assertThat(revoked.isActive()).isFalse();
     }
+
+    @Test
+    void activeCredentialCannotCarryRotatedAt() {
+        assertThatThrownBy(() -> new Credential(
+                UUID.randomUUID(), UUID.randomUUID(), CredentialType.PASSWORD,
+                "{bcrypt}hash", CredentialStatus.ACTIVE, LINKED_AT, LINKED_AT))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void credentialRejectsBlankMaterial() {
+        assertThatThrownBy(() -> new Credential(
+                UUID.randomUUID(), UUID.randomUUID(), CredentialType.PASSWORD,
+                "  ", CredentialStatus.ACTIVE, LINKED_AT, null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void credentialMaterialIsActiveOnlyWhenStatusActive() {
+        Credential active = new Credential(
+                UUID.randomUUID(), UUID.randomUUID(), CredentialType.WEBAUTHN_PUBLIC_KEY,
+                "public-key-material", CredentialStatus.ACTIVE, LINKED_AT, null);
+        Credential revoked = new Credential(
+                UUID.randomUUID(), UUID.randomUUID(), CredentialType.PASSWORD,
+                "{bcrypt}hash", CredentialStatus.REVOKED, LINKED_AT, LINKED_AT.plusSeconds(60));
+
+        assertThat(active.isActive()).isTrue();
+        assertThat(revoked.isActive()).isFalse();
+        assertThat(revoked.rotatedAt()).isEqualTo(LINKED_AT.plusSeconds(60));
+    }
+
+    @Test
+    void revokedCredentialKeepsMaterialForAudit() {
+        Credential revoked = new Credential(
+                UUID.randomUUID(), UUID.randomUUID(), CredentialType.PASSWORD,
+                "{bcrypt}hash", CredentialStatus.REVOKED, LINKED_AT, LINKED_AT.plusSeconds(60));
+
+        assertThat(revoked.isActive()).isFalse();
+        assertThat(revoked.credentialData()).isEqualTo("{bcrypt}hash");
+        assertThat(revoked.rotatedAt()).isEqualTo(LINKED_AT.plusSeconds(60));
+    }
+
+    @Test
+    void humanProfileExposesNullablePresentationFields() {
+        HumanProfile full = new HumanProfile(
+                UUID.randomUUID(), "Ainer User", "https://cdn.example/avatar.png", LINKED_AT);
+        HumanProfile minimal = new HumanProfile(UUID.randomUUID(), null, null, LINKED_AT);
+
+        assertThat(full.displayName()).isEqualTo("Ainer User");
+        assertThat(full.avatarUrl()).isEqualTo("https://cdn.example/avatar.png");
+        assertThat(minimal.displayName()).isNull();
+        assertThat(minimal.avatarUrl()).isNull();
+        assertThat(minimal.updatedAt()).isEqualTo(LINKED_AT);
+    }
 }

@@ -102,7 +102,16 @@ public enum IdentityErrorCode implements ErrorCode {
     OAUTH_CLIENT_BINDING_NOT_FOUND(
             "AINER.IDENTITY.OAUTH_CLIENT_BINDING_NOT_FOUND", "OAuth 客户端绑定不存在", 404),
     OAUTH_CLIENT_BINDING_ALREADY_EXISTS(
-            "AINER.IDENTITY.OAUTH_CLIENT_BINDING_ALREADY_EXISTS", "OAuth 客户端已经绑定活动凭据", 409);
+            "AINER.IDENTITY.OAUTH_CLIENT_BINDING_ALREADY_EXISTS", "OAuth 客户端已经绑定活动凭据", 409),
+    // Greenfield foundation credential store (execution plan 缺口 A, S2) — additive.
+    CREDENTIAL_NOT_FOUND(
+            "AINER.IDENTITY.CREDENTIAL_NOT_FOUND", "身份凭据不存在", 404),
+    CREDENTIAL_REVOKED(
+            "AINER.IDENTITY.CREDENTIAL_REVOKED", "身份凭据已被撤销", 409),
+    INVALID_CREDENTIAL(
+            "AINER.IDENTITY.INVALID_CREDENTIAL", "身份凭据校验失败", 401),
+    PROFILE_NOT_FOUND(
+            "AINER.IDENTITY.PROFILE_NOT_FOUND", "身份资料不存在", 404);
 
     private final String code;
     private final String defaultMessage;
