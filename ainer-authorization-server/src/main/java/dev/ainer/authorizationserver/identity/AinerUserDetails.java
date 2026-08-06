@@ -30,7 +30,9 @@ public final class AinerUserDetails implements UserDetails, CredentialsContainer
             boolean enabled,
             boolean accountNonLocked,
             Collection<? extends GrantedAuthority> authorities) {
-        this(subjectId, tenantId, null, 0L, username, password, enabled, accountNonLocked, authorities);
+        this(requireLegacyIdentity(subjectId, "subjectId"),
+                requireLegacyIdentity(tenantId, "tenantId"),
+                null, 0L, username, password, enabled, accountNonLocked, authorities);
     }
 
     public AinerUserDetails(
@@ -43,8 +45,8 @@ public final class AinerUserDetails implements UserDetails, CredentialsContainer
             boolean enabled,
             boolean accountNonLocked,
             Collection<? extends GrantedAuthority> authorities) {
-        this.subjectId = Objects.requireNonNull(subjectId, "subjectId");
-        this.tenantId = Objects.requireNonNull(tenantId, "tenantId");
+        this.subjectId = subjectId;
+        this.tenantId = tenantId;
         this.accountId = accountId;
         this.securityEpoch = securityEpoch;
         this.username = Objects.requireNonNull(username, "username");
@@ -52,6 +54,18 @@ public final class AinerUserDetails implements UserDetails, CredentialsContainer
         this.enabled = enabled;
         this.accountNonLocked = accountNonLocked;
         this.authorities = List.copyOf(authorities);
+    }
+
+    public AinerUserDetails(
+            UUID accountId,
+            long securityEpoch,
+            String username,
+            String password,
+            boolean enabled,
+            boolean accountNonLocked,
+            Collection<? extends GrantedAuthority> authorities) {
+        this(null, null, accountId, securityEpoch, username, password,
+                enabled, accountNonLocked, authorities);
     }
 
     public UUID subjectId() {
@@ -68,6 +82,14 @@ public final class AinerUserDetails implements UserDetails, CredentialsContainer
 
     public long securityEpoch() {
         return securityEpoch;
+    }
+
+    public boolean hasLegacyTenantContext() {
+        return subjectId != null && tenantId != null;
+    }
+
+    private static UUID requireLegacyIdentity(UUID value, String name) {
+        return Objects.requireNonNull(value, name);
     }
 
     @Override

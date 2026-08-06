@@ -9,6 +9,7 @@ import dev.ainer.authorizationserver.identity.AinerUserDetailsService;
 import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.module.identity.account.application.IdentityTokenStatusService;
 import dev.ainer.module.identity.foundation.HumanAccountRepository;
+import dev.ainer.module.identity.foundation.IdentityFoundationService;
 import dev.ainer.module.identity.foundation.ServicePrincipalFoundationService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -139,8 +140,12 @@ public class AinerAuthorizationServerConfiguration {
     }
 
     @Bean
-    AinerUserDetailsService ainerUserDetailsService(IdentityApplicationService identityService) {
-        return new AinerUserDetailsService(identityService);
+    AinerUserDetailsService ainerUserDetailsService(
+            AinerAuthorizationServerProperties properties,
+            IdentityFoundationService foundationService,
+            IdentityApplicationService identityService) {
+        return new AinerUserDetailsService(
+                foundationService, identityService, properties.getIssuer());
     }
 
     @Bean

@@ -57,6 +57,10 @@ public final class AinerTenantSelectionFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
             return;
         }
+        if (!user.hasLegacyTenantContext()) {
+            chain.doFilter(request, response);
+            return;
+        }
         HttpSession session = request.getSession(false);
         if (hasCompletedSelection(session, user)) {
             chain.doFilter(request, response);

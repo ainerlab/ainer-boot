@@ -11,10 +11,14 @@ import dev.ainer.authorizationserver.passkey.AinerPasskeyEnrollmentGrantService;
 import dev.ainer.authorizationserver.passkey.AinerPasskeyRecoveryCodeService;
 import dev.ainer.authorizationserver.passkey.PasskeyErrorCode;
 import dev.ainer.authorizationserver.passkey.WebAuthnCeremony;
+import dev.ainer.authorizationserver.config.AinerAuthorizationServerConfiguration;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.module.identity.account.application.ProvisionTenantOwnerCommand;
 import dev.ainer.module.identity.account.application.ProvisionedIdentity;
+import dev.ainer.module.identity.foundation.IdentityFoundationService;
+import dev.ainer.security.principal.IdentityAuthorityRef;
+import dev.ainer.security.token.TokenProfile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -138,6 +142,9 @@ class AinerAuthorizationCodePkceIntegrationTest {
     private IdentityApplicationService identityService;
 
     @Autowired
+    private IdentityFoundationService identityFoundationService;
+
+    @Autowired
     private JwtDecoder jwtDecoder;
 
     @Autowired
@@ -186,6 +193,10 @@ class AinerAuthorizationCodePkceIntegrationTest {
         jdbcTemplate.update("DELETE FROM oauth2_authorization");
         jdbcTemplate.update("DELETE FROM oauth2_registered_client");
         jdbcTemplate.update("DELETE FROM ainer_identity_access_event");
+        jdbcTemplate.update("DELETE FROM ainer_identity_credential");
+        jdbcTemplate.update("DELETE FROM ainer_identity_login_identity");
+        jdbcTemplate.update("DELETE FROM ainer_identity_human_profile");
+        jdbcTemplate.update("DELETE FROM ainer_identity_human_account");
         jdbcTemplate.update("DELETE FROM ainer_identity_tenant");
         jdbcTemplate.update("DELETE FROM ainer_identity_user");
         identity = identityService.provisionTenantOwner(new ProvisionTenantOwnerCommand(
@@ -224,6 +235,36 @@ class AinerAuthorizationCodePkceIntegrationTest {
         assertThat(replay.statusCode()).isEqualTo(400);
         assertThat(objectMapper.readTree(replay.body()).path("error").stringValue())
                 .isEqualTo("invalid_grant");
+    }
+
+    @Test
+    void foundationPasswordLoginIssuesNeutralTokenForAccountWithoutWorkspace() throws Exception {
+        IdentityFoundationService.RegisteredAccount registered =
+                identityFoundationService.registerHumanAccountWithPassword(
+                        new IdentityAuthorityRef("https://auth.ainer.test"),
+                        dev.ainer.module.identity.foundation.LoginIdentityType.USERNAME,
+                        "https://auth.ainer.test",
+                        USERNAME,
+                        PASSWORD);
+        jdbcTemplate.update("DELETE FROM oauth2_registered_client WHERE client_id = ?", CLIENT_ID);
+        registeredClientRepository.save(foundationBrowserClient());
+
+        BrowserSession browser = newBrowser();
+        String code = authorize(browser, VERIFIER, REDIRECT_URI);
+        HttpResponse<String> tokenResponse = exchange(code, VERIFIER, REDIRECT_URI);
+
+        assertThat(tokenResponse.statusCode()).isEqualTo(200);
+        Jwt accessToken = jwtDecoder.decode(
+                objectMapper.readTree(tokenResponse.body()).path("access_token").stringValue());
+        assertThat(accessToken.getSubject()).isEqualTo(registered.account().accountId().toString());
+        assertThat(accessToken.getClaimAsString("actor_type")).isEqualTo("USER");
+        assertThat(accessToken.getClaimAsString("token_profile"))
+                .isEqualTo(TokenProfile.USER_NEUTRAL_V1.claimValue());
+        assertThat(accessToken.getClaimAsString("claim_contract_version"))
+                .isEqualTo(TokenProfile.CURRENT_CONTRACT_VERSION);
+        assertThat(((Number) accessToken.getClaim("sec_epoch")).longValue()).isEqualTo(0L);
+        assertThat(accessToken.getClaims()).doesNotContainKey("tenant_id").doesNotContainKey("roles");
+        assertThat(accessToken.getClaimAsStringList("amr")).containsExactly("pwd");
     }
 
     @Test
@@ -693,6 +734,21 @@ class AinerAuthorizationCodePkceIntegrationTest {
     }
 
     private RegisteredClient browserClient() {
+        return browserClient(null);
+    }
+
+    private RegisteredClient foundationBrowserClient() {
+        return browserClient(TokenProfile.USER_NEUTRAL_V1.claimValue());
+    }
+
+    private RegisteredClient browserClient(String tokenProfile) {
+        ClientSettings.Builder clientSettings = ClientSettings.builder()
+                .requireProofKey(true)
+                .requireAuthorizationConsent(false);
+        if (tokenProfile != null) {
+            clientSettings.setting(
+                    AinerAuthorizationServerConfiguration.TOKEN_PROFILE_SETTING, tokenProfile);
+        }
         return RegisteredClient.withId(UUID.randomUUID().toString())
                 .clientId(CLIENT_ID)
                 .clientName("Ainer browser PKCE integration test")
@@ -702,10 +758,7 @@ class AinerAuthorizationCodePkceIntegrationTest {
                 .scope("openid")
                 .scope("profile")
                 .scope("workspace.read")
-                .clientSettings(ClientSettings.builder()
-                        .requireProofKey(true)
-                        .requireAuthorizationConsent(false)
-                        .build())
+                .clientSettings(clientSettings.build())
                 .tokenSettings(TokenSettings.builder()
                         .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED)
                         .accessTokenTimeToLive(Duration.ofMinutes(5))

@@ -153,6 +153,9 @@ public class AinerJwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodin
         Authentication authentication = context.getPrincipal();
         AinerUserDetails user = ainerUserDetails(authentication);
         if (user != null) {
+            if (!user.hasLegacyTenantContext()) {
+                throw failedClosed("Legacy token profile requires a tenant-bound user principal");
+            }
             // M4.8B：tenant claim 来自 Identity 实时关系，不直接信任登录时缓存的 principal。
             // principal 中的 tenantId 可能是默认落点，也可能是租户选择后更新过的值；customizer
             // 再次读取 membership 校验该关系仍然 ACTIVE 并取得当前角色。
