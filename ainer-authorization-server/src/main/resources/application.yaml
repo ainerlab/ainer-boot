@@ -72,8 +72,6 @@ ainer:
   platform:
     tenant-bootstrap:
       enabled: ${AINER_PLATFORM_TENANT_BOOTSTRAP_ENABLED:false}
-      tenant-code: ${AINER_PLATFORM_TENANT_BOOTSTRAP_TENANT_CODE:}
-      tenant-name: ${AINER_PLATFORM_TENANT_BOOTSTRAP_TENANT_NAME:}
       username: ${AINER_PLATFORM_TENANT_BOOTSTRAP_USERNAME:}
       password: ${AINER_PLATFORM_TENANT_BOOTSTRAP_PASSWORD:}
       display-name: ${AINER_PLATFORM_TENANT_BOOTSTRAP_DISPLAY_NAME:}

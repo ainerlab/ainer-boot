@@ -468,6 +468,30 @@ class AinerAuthorizationCodePkceIntegrationTest {
     }
 
     @Test
+    void foundationPasskeyCredentialBindsHumanAccountInsteadOfLegacySubject() {
+        IdentityFoundationService.RegisteredAccount registered =
+                identityFoundationService.registerHumanAccountWithPassword(
+                        new IdentityAuthorityRef("https://auth.ainer.test"),
+                        dev.ainer.module.identity.foundation.LoginIdentityType.USERNAME,
+                        "https://auth.ainer.test",
+                        USERNAME,
+                        PASSWORD);
+
+        CredentialRecord credential = credential();
+        userCredentialRepository.save(credential);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT account_id FROM ainer_passkey_credential WHERE credential_id = ?",
+                UUID.class,
+                credential.getCredentialId().toBase64UrlString()))
+                .isEqualTo(registered.account().accountId());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT subject_id FROM ainer_passkey_credential WHERE credential_id = ?",
+                UUID.class,
+                credential.getCredentialId().toBase64UrlString())).isNull();
+    }
+
+    @Test
     void registeredCredentialRequiresPasskeyBeforeIssuingAuthorizationCode()
             throws Exception {
         userCredentialRepository.save(credential());

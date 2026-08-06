@@ -2,6 +2,8 @@ package dev.ainer.authorizationserver.passkey;
 
 import dev.ainer.authorizationserver.config.AinerAuthorizationServerProperties;
 import dev.ainer.module.identity.account.application.IdentityApplicationService;
+import dev.ainer.module.identity.foundation.HumanAccountRepository;
+import dev.ainer.module.identity.foundation.IdentityFoundationService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -46,14 +48,20 @@ public class AinerPasskeyConfiguration {
             JdbcTemplate jdbcTemplate,
             PublicKeyCredentialUserEntityRepository userEntities,
             IdentityApplicationService identityService,
+            IdentityFoundationService foundationService,
+            HumanAccountRepository humanAccountRepository,
+            AinerAuthorizationServerProperties authorizationProperties,
             PlatformTransactionManager transactionManager,
             Clock clock,
             AinerPasskeyEnrollmentProperties enrollmentProperties) {
         return new AinerJdbcPasskeyCredentialRepository(
-                jdbcTemplate,
-                userEntities,
-                identityService,
-                transactionManager,
+                        jdbcTemplate,
+                        userEntities,
+                        identityService,
+                        foundationService,
+                        humanAccountRepository,
+                        authorizationProperties.getIssuer(),
+                        transactionManager,
                 clock,
                 enrollmentProperties.isRequireInvite());
     }

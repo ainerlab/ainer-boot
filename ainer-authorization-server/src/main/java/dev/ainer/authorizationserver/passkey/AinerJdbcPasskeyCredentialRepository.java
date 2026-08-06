@@ -3,6 +3,11 @@ package dev.ainer.authorizationserver.passkey;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.module.identity.account.application.IdentityAccount;
 import dev.ainer.module.identity.account.application.IdentityApplicationService;
+import dev.ainer.module.identity.foundation.HumanAccount;
+import dev.ainer.module.identity.foundation.HumanAccountRepository;
+import dev.ainer.module.identity.foundation.IdentityFoundationService;
+import dev.ainer.module.identity.foundation.LoginIdentity;
+import dev.ainer.module.identity.foundation.LoginIdentityType;
 import dev.ainer.web.request.RequestIdFilter;
 import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -22,6 +27,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -34,6 +40,9 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
     private final JdbcUserCredentialRepository delegate;
     private final PublicKeyCredentialUserEntityRepository userEntities;
     private final IdentityApplicationService identityService;
+    private final IdentityFoundationService foundationService;
+    private final HumanAccountRepository humanAccountRepository;
+    private final String foundationIssuer;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
     private final boolean requireEnrollmentGrant;
@@ -44,7 +53,8 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
             IdentityApplicationService identityService,
             PlatformTransactionManager transactionManager,
             Clock clock) {
-        this(jdbcTemplate, userEntities, identityService, transactionManager, clock, false);
+        this(jdbcTemplate, userEntities, identityService, null, null, null,
+                transactionManager, clock, false);
     }
 
     public AinerJdbcPasskeyCredentialRepository(
@@ -54,10 +64,27 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
             PlatformTransactionManager transactionManager,
             Clock clock,
             boolean requireEnrollmentGrant) {
+        this(jdbcTemplate, userEntities, identityService, null, null, null,
+                transactionManager, clock, requireEnrollmentGrant);
+    }
+
+    public AinerJdbcPasskeyCredentialRepository(
+            JdbcTemplate jdbcTemplate,
+            PublicKeyCredentialUserEntityRepository userEntities,
+            IdentityApplicationService identityService,
+            IdentityFoundationService foundationService,
+            HumanAccountRepository humanAccountRepository,
+            String foundationIssuer,
+            PlatformTransactionManager transactionManager,
+            Clock clock,
+            boolean requireEnrollmentGrant) {
         this.jdbcTemplate = jdbcTemplate;
         this.delegate = new JdbcUserCredentialRepository(jdbcTemplate);
         this.userEntities = userEntities;
         this.identityService = identityService;
+        this.foundationService = foundationService;
+        this.humanAccountRepository = humanAccountRepository;
+        this.foundationIssuer = foundationIssuer;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.clock = clock;
         this.requireEnrollmentGrant = requireEnrollmentGrant;
@@ -103,7 +130,42 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
                     Timestamp.from(now),
                     subjectId);
             for (ActiveCredential credential : active) {
-                audit(credential.credentialId(), credential.userEntityUserId(), subjectId, REVOKED, now);
+                audit(credential.credentialId(), credential.userEntityUserId(), subjectId, null, REVOKED, now);
+            }
+            return changed;
+        });
+    }
+
+    public int revokeAllActiveForAccount(UUID accountId) {
+        Assert.notNull(accountId, "accountId cannot be null");
+        return transactionTemplate.execute(status -> {
+            List<ActiveCredential> active = jdbcTemplate.query(
+                    """
+                    SELECT credential_id, user_entity_user_id
+                    FROM ainer_passkey_credential
+                    WHERE account_id = ? AND status = 'ACTIVE'
+                    FOR UPDATE
+                    """,
+                    (resultSet, rowNumber) -> new ActiveCredential(
+                            resultSet.getString("credential_id"),
+                            resultSet.getString("user_entity_user_id")),
+                    accountId);
+            if (active.isEmpty()) {
+                return 0;
+            }
+            Instant now = clock.instant();
+            int changed = jdbcTemplate.update(
+                    """
+                    UPDATE ainer_passkey_credential
+                    SET status = ?, revoked_at = ?, updated_at = ?, version = version + 1
+                    WHERE account_id = ? AND status = 'ACTIVE'
+                    """,
+                    REVOKED,
+                    Timestamp.from(now),
+                    Timestamp.from(now),
+                    accountId);
+            for (ActiveCredential credential : active) {
+                audit(credential.credentialId(), credential.userEntityUserId(), null, accountId, REVOKED, now);
             }
             return changed;
         });
@@ -188,46 +250,70 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
             throw new IllegalStateException(
                     "Ainer passkey user entity does not exist");
         }
-        IdentityAccount account = identityService.findAccountByUsername(userEntity.getName())
-                .filter(IdentityAccount::enabled)
-                .filter(IdentityAccount::accountNonLocked)
-                .orElseThrow(() -> new IllegalStateException(
-                        "Ainer passkey registration requires an active identity account"));
+        ResolvedOwner owner = resolveOwner(userEntity.getName());
         Instant now = clock.instant();
-        requireEnrollmentGrantIfFirstEnrollment(account.subjectId(), now);
+        if (owner.subjectId() != null) {
+            requireEnrollmentGrantIfFirstEnrollment(owner.subjectId(), now);
+        }
         delegate.save(credentialRecord);
         jdbcTemplate.update(
                 """
                 INSERT INTO ainer_passkey_credential(
-                    credential_id, user_entity_user_id, subject_id, status,
+                    credential_id, user_entity_user_id, subject_id, account_id, status,
                     registered_at, updated_at, revoked_at, version
-                ) VALUES (?, ?, ?, 'ACTIVE', ?, ?, NULL, 0)
+                ) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, NULL, 0)
                 """,
                 credentialId,
                 credentialRecord.getUserEntityUserId().toBase64UrlString(),
-                account.subjectId(),
+                owner.subjectId(),
+                owner.accountId(),
                 Timestamp.from(now),
                 Timestamp.from(now));
         audit(
                 credentialId,
                 credentialRecord.getUserEntityUserId().toBase64UrlString(),
-                account.subjectId(),
+                owner.subjectId(),
+                owner.accountId(),
                 "REGISTERED",
                 now);
+    }
+
+    private ResolvedOwner resolveOwner(String username) {
+        if (foundationService != null && humanAccountRepository != null && foundationIssuer != null) {
+            String normalized = username.trim().toLowerCase(Locale.ROOT);
+            LoginIdentity login = foundationService.findLogin(
+                            LoginIdentityType.USERNAME, foundationIssuer, normalized)
+                    .filter(LoginIdentity::isActive)
+                    .orElse(null);
+            if (login != null) {
+                HumanAccount account = humanAccountRepository.findByAccountId(login.accountId())
+                        .filter(candidate -> candidate.status().canAuthenticate())
+                        .orElseThrow(() -> new IllegalStateException(
+                                "Ainer passkey registration requires an active foundation account"));
+                return new ResolvedOwner(null, account.accountId());
+            }
+        }
+        IdentityAccount account = identityService.findAccountByUsername(username)
+                .filter(IdentityAccount::enabled)
+                .filter(IdentityAccount::accountNonLocked)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Ainer passkey registration requires an active identity account"));
+        return new ResolvedOwner(account.subjectId(), null);
     }
 
     private void revoke(Bytes credentialId) {
         String encodedId = credentialId.toBase64UrlString();
         List<CredentialLifecycle> lifecycle = jdbcTemplate.query(
                 """
-                SELECT user_entity_user_id, subject_id
+                SELECT user_entity_user_id, subject_id, account_id
                 FROM ainer_passkey_credential
                 WHERE credential_id = ? AND status = 'ACTIVE'
                 FOR UPDATE
                 """,
-                (resultSet, rowNumber) -> new CredentialLifecycle(
-                        resultSet.getString("user_entity_user_id"),
-                        resultSet.getObject("subject_id", UUID.class)),
+                    (resultSet, rowNumber) -> new CredentialLifecycle(
+                            resultSet.getString("user_entity_user_id"),
+                            resultSet.getObject("subject_id", UUID.class),
+                            resultSet.getObject("account_id", UUID.class)),
                 encodedId);
         if (lifecycle.isEmpty()) {
             return;
@@ -268,6 +354,7 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
                 encodedId,
                 record.userEntityUserId(),
                 record.subjectId(),
+                record.accountId(),
                 "REVOKED",
                 now);
     }
@@ -318,27 +405,32 @@ public final class AinerJdbcPasskeyCredentialRepository implements UserCredentia
             String credentialId,
             String userEntityUserId,
             UUID subjectId,
+            UUID accountId,
             String operation,
             Instant occurredAt) {
         jdbcTemplate.update(
                 """
                 INSERT INTO ainer_passkey_credential_audit(
-                    id, credential_id, user_entity_user_id, subject_id,
+                    id, credential_id, user_entity_user_id, subject_id, account_id,
                     operation, request_id, occurred_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 UUID.randomUUID(),
                 credentialId,
                 userEntityUserId,
                 subjectId,
+                accountId,
                 operation,
                 MDC.get(RequestIdFilter.MDC_KEY),
                 Timestamp.from(occurredAt));
     }
 
-    private record CredentialLifecycle(String userEntityUserId, UUID subjectId) {
+    private record CredentialLifecycle(String userEntityUserId, UUID subjectId, UUID accountId) {
     }
 
     private record ActiveCredential(String credentialId, String userEntityUserId) {
+    }
+
+    private record ResolvedOwner(UUID subjectId, UUID accountId) {
     }
 }

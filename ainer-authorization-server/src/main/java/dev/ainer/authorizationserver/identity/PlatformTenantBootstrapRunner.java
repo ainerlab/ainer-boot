@@ -1,8 +1,9 @@
 package dev.ainer.authorizationserver.identity;
 
-import dev.ainer.module.identity.account.application.IdentityApplicationService;
-import dev.ainer.module.identity.account.application.ProvisionTenantOwnerCommand;
-import dev.ainer.module.identity.account.application.TenantOwnerBootstrapResult;
+import dev.ainer.authorizationserver.config.AinerAuthorizationServerProperties;
+import dev.ainer.module.identity.foundation.IdentityFoundationService;
+import dev.ainer.module.identity.foundation.LoginIdentityType;
+import dev.ainer.security.principal.IdentityAuthorityRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -11,9 +12,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.Locale;
+
 /**
- * 生产首个平台租户与管理员的一次性引导（默认关闭）。见 ADR-0018。镜像既有 bootstrap runner：
- * 启用时按配置创建首个租户及其 OWNER；仅当租户、用户和默认 OWNER 关系完全匹配时幂等跳过。
+ * 生产首个 foundation 人员账号的一次性引导（默认关闭）。启用时按配置创建
+ * {@code HumanAccount + USERNAME + PASSWORD}；已有 ACTIVE credential 时幂等跳过。
  * 成功后应立即从运行环境移除开关与明文密码。
  */
 @Component
@@ -27,13 +30,16 @@ public class PlatformTenantBootstrapRunner implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(PlatformTenantBootstrapRunner.class);
 
     private final PlatformTenantBootstrapProperties properties;
-    private final IdentityApplicationService identityService;
+    private final AinerAuthorizationServerProperties authorizationProperties;
+    private final IdentityFoundationService foundationService;
 
     public PlatformTenantBootstrapRunner(
             PlatformTenantBootstrapProperties properties,
-            IdentityApplicationService identityService) {
+            AinerAuthorizationServerProperties authorizationProperties,
+            IdentityFoundationService foundationService) {
         this.properties = properties;
-        this.identityService = identityService;
+        this.authorizationProperties = authorizationProperties;
+        this.foundationService = foundationService;
     }
 
     @Override
@@ -41,8 +47,6 @@ public class PlatformTenantBootstrapRunner implements ApplicationRunner {
         if (!properties.isEnabled()) {
             return;
         }
-        requireText(properties.getTenantCode(), "tenant code");
-        requireText(properties.getTenantName(), "tenant name");
         requireText(properties.getUsername(), "username");
         requireText(properties.getDisplayName(), "display name");
         if (properties.getPassword() == null || properties.getPassword().length() < 12
@@ -50,27 +54,42 @@ public class PlatformTenantBootstrapRunner implements ApplicationRunner {
             throw new IllegalStateException(
                     "Ainer platform tenant bootstrap password must contain 12 to 128 characters");
         }
-        TenantOwnerBootstrapResult result = identityService.ensureTenantOwner(new ProvisionTenantOwnerCommand(
-                properties.getTenantCode(),
-                properties.getTenantName(),
-                properties.getUsername(),
-                properties.getPassword(),
-                properties.getDisplayName()));
-        if (result.created()) {
+        String issuer = requireText(authorizationProperties.getIssuer(), "authorization server issuer");
+        String username = normalize(properties.getUsername());
+        IdentityAuthorityRef authority = new IdentityAuthorityRef(issuer);
+        IdentityFoundationService.CredentialLookup existing = foundationService
+                .findPasswordCredentialForLogin(LoginIdentityType.USERNAME, issuer, username)
+                .orElse(null);
+        IdentityFoundationService.RegisteredAccount registered;
+        if (existing != null) {
+            foundationService.updateProfile(existing.account().accountId(), properties.getDisplayName(), null);
             log.info(
-                    "Ainer platform tenant bootstrap created tenant '{}' (owner subject={}) "
-                            + "— remove the bootstrap credentials now",
-                    properties.getTenantCode(), result.identity().subjectId());
-        } else {
-            log.info(
-                    "Ainer platform tenant bootstrap already complete for tenant '{}' (owner subject={})",
-                    properties.getTenantCode(), result.identity().subjectId());
+                    "Ainer platform foundation bootstrap already complete (account={})",
+                    existing.account().accountId());
+            return;
         }
+        if (foundationService.findLogin(LoginIdentityType.USERNAME, issuer, username).isPresent()) {
+            throw new IllegalStateException(
+                    "Ainer platform foundation bootstrap found an incomplete username binding");
+        }
+        registered = foundationService.registerHumanAccountWithPassword(
+                authority, LoginIdentityType.USERNAME, issuer, username, properties.getPassword());
+        foundationService.updateProfile(
+                registered.account().accountId(), properties.getDisplayName(), null);
+        log.info(
+                "Ainer platform foundation bootstrap created account '{}' "
+                        + "— remove the bootstrap credentials now",
+                registered.account().accountId());
     }
 
-    private static void requireText(String value, String name) {
+    private static String requireText(String value, String name) {
         if (value == null || value.isBlank()) {
             throw new IllegalStateException("Ainer platform tenant bootstrap " + name + " is required");
         }
+        return value;
+    }
+
+    private static String normalize(String value) {
+        return value.trim().toLowerCase(Locale.ROOT);
     }
 }
