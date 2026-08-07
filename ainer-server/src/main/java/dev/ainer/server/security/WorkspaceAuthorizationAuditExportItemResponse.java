@@ -7,7 +7,6 @@ import java.util.UUID;
 
 public record WorkspaceAuthorizationAuditExportItemResponse(
         UUID id,
-        String tenantId,
         UUID workspaceId,
         String actorSubjectId,
         String targetSubjectId,
@@ -18,7 +17,7 @@ public record WorkspaceAuthorizationAuditExportItemResponse(
 
     static WorkspaceAuthorizationAuditExportItemResponse from(WorkspaceAuthorizationAudit audit) {
         return new WorkspaceAuthorizationAuditExportItemResponse(
-                audit.id(), audit.tenantId(), audit.workspaceId(), audit.actorSubjectId(),
+                audit.id(), audit.workspaceId(), audit.actorSubjectId(),
                 audit.targetSubjectId(), audit.action().name(), audit.decision().name(),
                 audit.reasonCode(), audit.occurredAt());
     }

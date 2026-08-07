@@ -6,7 +6,6 @@ import java.util.UUID;
 public class WorkspaceAuthorizationAuditRow {
 
     private UUID id;
-    private String tenantId;
     private UUID workspaceId;
     private String actorSubjectId;
     private String targetSubjectId;
@@ -21,14 +20,6 @@ public class WorkspaceAuthorizationAuditRow {
 
     public void setId(UUID id) {
         this.id = id;
-    }
-
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
     }
 
     public UUID getWorkspaceId() {

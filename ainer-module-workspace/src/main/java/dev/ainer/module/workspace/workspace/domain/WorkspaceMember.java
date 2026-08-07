@@ -5,7 +5,6 @@ import java.util.Objects;
 import java.util.UUID;
 
 public record WorkspaceMember(
-        TenantId tenantId,
         UUID workspaceId,
         SubjectId subjectId,
         WorkspaceRole role,
@@ -16,7 +15,6 @@ public record WorkspaceMember(
         Instant updatedAt) {
 
     public WorkspaceMember {
-        Objects.requireNonNull(tenantId, "tenantId");
         Objects.requireNonNull(workspaceId, "workspaceId");
         Objects.requireNonNull(subjectId, "subjectId");
         Objects.requireNonNull(role, "role");
@@ -39,14 +37,13 @@ public record WorkspaceMember(
     }
 
     public static WorkspaceMember owner(
-            TenantId tenantId, UUID workspaceId, SubjectId subjectId, Instant now) {
+            UUID workspaceId, SubjectId subjectId, Instant now) {
         return new WorkspaceMember(
-                tenantId, workspaceId, subjectId, WorkspaceRole.OWNER, WorkspaceMemberStatus.ACTIVE,
+                workspaceId, subjectId, WorkspaceRole.OWNER, WorkspaceMemberStatus.ACTIVE,
                 subjectId, now, now, now);
     }
 
     public static WorkspaceMember invitation(
-            TenantId tenantId,
             UUID workspaceId,
             SubjectId subjectId,
             WorkspaceRole role,
@@ -56,7 +53,7 @@ public record WorkspaceMember(
             throw new IllegalArgumentException("Owner cannot be invited through the member endpoint");
         }
         return new WorkspaceMember(
-                tenantId, workspaceId, subjectId, role, WorkspaceMemberStatus.PENDING,
+                workspaceId, subjectId, role, WorkspaceMemberStatus.PENDING,
                 invitedBy, now, null, now);
     }
 

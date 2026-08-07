@@ -22,20 +22,10 @@ public class MybatisWorkspaceIdentityAccessEventRepository
         return mapper.insertReceipt(
                 event.eventId(),
                 event.eventType(),
-                event.tenantId(),
                 event.subjectId(),
                 event.payloadVersion(),
                 event.occurredAt(),
                 receivedAt) == 1;
-    }
-
-    @Override
-    public int revokeExistingMemberships(WorkspaceIdentityAccessEvent event, Instant receivedAt) {
-        return mapper.revokeExistingMemberships(
-                event.tenantId().toString(),
-                event.subjectId().toString(),
-                event.occurredAt(),
-                receivedAt);
     }
 
     @Override

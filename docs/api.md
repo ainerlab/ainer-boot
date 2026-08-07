@@ -162,7 +162,8 @@ Authorization Code + PKCE 当前由自动化测试专用 registered client 证�
 |---|---|---|---|---|
 | Authorization Server | GET | `/internal/identity/directory/tenants/{tenantId}/members/{subjectId}` | `actor_type=SERVICE` + `identity.directory.read` 或 `.read.all` | 精确查询 ACTIVE 安全投影 |
 | Authorization Server | GET | `/internal/identity/directory/tenants/{tenantId}/members?query=&limit=20` | 同上 | 搜索 ACTIVE 成员，`limit=1..50` |
-| `ainer-server` | POST | `/internal/identity/access-events` | `actor_type=SERVICE` + `identity.access-events.publish` + 可信 publisher `sub` | 幂等收敛 Workspace membership |
+| Authorization Server | GET | `/internal/identity/directory/accounts/{accountId}` | `actor_type=SERVICE` + `identity.directory.read.all` | 查询 ACTIVE HumanAccount 安全投影，供 Workspace membership eligibility 使用 |
+| `ainer-server` | POST | `/internal/identity/access-events` | `actor_type=SERVICE` + `identity.access-events.publish` + 可信 publisher `sub` | 幂等记录 account event；不按 subject 全局撤销 Workspace membership |
 | Authorization Server | GET | `/internal/identity/access-event-recovery/tenants/{tenantId}/exhausted?page=1&size=20` | `actor_type=SERVICE` + `identity.access-events.replay.read` 或 `.read.all` | 查询无有效 lease 的真正耗尽事件 |
 | Authorization Server | POST | `/internal/identity/access-event-recovery/tenants/{tenantId}/replay-requests` | `actor_type=SERVICE` + `identity.access-events.replay.request` 或 `.request.all` | 创建 15 分钟默认有效的重放申请 |
 | Authorization Server | POST | `/internal/identity/access-event-recovery/tenants/{tenantId}/replay-requests/{requestId}/approvals` | `actor_type=SERVICE` + `identity.access-events.replay.approve` 或 `.approve.all` | 由不同服务批准并重置原事件 |
@@ -182,9 +183,9 @@ Authorization Code + PKCE 当前由自动化测试专用 registered client 证�
 | Authorization Server | POST | `/internal/identity/tenant-provisioning-notification-receipts` | tenantless `actor_type=SERVICE` + `identity.provisioning-notifications.receipts.write` + gateway client ID 白名单 | 为已 `PUBLISHED` 通知登记唯一 `DELIVERED|FAILED` 终态 |
 | Authorization Server | POST | `/api/identity/tenant-activations/{grantId}/consumptions` | 一次性激活 secret；无需既有登录 | 新用户设置首个长期密码，原子创建 ACTIVE tenant/user/OWNER |
 | Authorization Server | POST | `/api/me/tenant-provisioning-requests/{id}/acceptances` | `actor_type=USER` + `identity.provisioning.accept` + 目标 subject 本人 | 已有 ACTIVE 用户接受新 tenant，原子创建 tenant/OWNER，不生成新密码 |
-| `ainer-server` | POST | `/internal/workspace-owner-recovery/tenants/{tenantId}/requests` | `actor_type=SERVICE` + `workspace.owner-recovery.request` 或 `.request.all` | 为无 ACTIVE OWNER 的 Workspace 申请恢复 |
-| `ainer-server` | POST | `/internal/workspace-owner-recovery/tenants/{tenantId}/requests/{requestId}/approvals` | `actor_type=SERVICE` + `workspace.owner-recovery.approve` 或 `.approve.all` | 不同服务批准并提升现有 ACTIVE 成员 |
-| `ainer-server` | GET | `/internal/workspace-authorization-audits/tenants/{tenantId}/exports` | `actor_type=SERVICE` + `workspace.audit.export` 或 `.export.all` + 可信 exporter `sub` | SIEM 按稳定游标拉取热/冷审计并集 |
+| `ainer-server` | POST | `/internal/workspace-owner-recovery/workspaces/{workspaceId}/requests` | `actor_type=SERVICE` + `workspace.owner-recovery.request.all` | 为无 ACTIVE OWNER 的 Workspace 申请恢复 |
+| `ainer-server` | POST | `/internal/workspace-owner-recovery/workspaces/{workspaceId}/requests/{requestId}/approvals` | `actor_type=SERVICE` + `workspace.owner-recovery.approve.all` | 不同服务批准并提升现有 ACTIVE 成员 |
+| `ainer-server` | GET | `/internal/workspace-authorization-audits/workspaces/{workspaceId}/exports` | `actor_type=SERVICE` + `workspace.audit.export.all` + 可信 exporter `sub` | SIEM 按 Workspace 稳定游标拉取热/冷审计并集 |
 
 Authorization Server 还会向配置的通知网关 URI 发起出站 POST。该网关不是 Identity 私有表的读取者，
 而是独立通知域；请求使用无 tenant 的 Client Credentials Token，唯一 scope 为

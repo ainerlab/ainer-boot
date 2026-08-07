@@ -5,7 +5,6 @@ import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.core.web.ApiResponse;
 import dev.ainer.module.workspace.workspace.application.WorkspaceOwnerRecoveryService;
 import dev.ainer.module.workspace.workspace.domain.SubjectId;
-import dev.ainer.module.workspace.workspace.domain.TenantId;
 import dev.ainer.security.service.AuthenticatedService;
 import dev.ainer.security.service.JwtAuthenticatedServiceFactory;
 import dev.ainer.web.request.RequestIds;
@@ -24,16 +23,14 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/internal/workspace-owner-recovery/tenants/{tenantId}")
+@RequestMapping("/internal/workspace-owner-recovery/workspaces/{workspaceId}")
 @ConditionalOnProperty(
         prefix = "ainer.workspace.owner-recovery",
         name = "enabled",
         havingValue = "true")
 public class WorkspaceOwnerRecoveryController {
 
-    private static final String REQUEST = "SCOPE_workspace.owner-recovery.request";
     private static final String REQUEST_ALL = "SCOPE_workspace.owner-recovery.request.all";
-    private static final String APPROVE = "SCOPE_workspace.owner-recovery.approve";
     private static final String APPROVE_ALL = "SCOPE_workspace.owner-recovery.approve.all";
 
     private final WorkspaceOwnerRecoveryService recoveryService;
@@ -53,15 +50,14 @@ public class WorkspaceOwnerRecoveryController {
 
     @PostMapping("/requests")
     public ApiResponse<WorkspaceOwnerRecoveryResponse> requestRecovery(
-            @PathVariable String tenantId,
+            @PathVariable UUID workspaceId,
             @Valid @RequestBody WorkspaceOwnerRecoveryRequestBody body,
             Authentication authentication,
             HttpServletRequest request) {
-        AuthenticatedService service = requireTenantAccess(
-                authentication, tenantId, REQUEST, REQUEST_ALL);
+        AuthenticatedService service = requireWorkspaceAccess(authentication, REQUEST_ALL);
         WorkspaceOwnerRecoveryResponse response = WorkspaceOwnerRecoveryResponse.from(
                 recoveryService.requestRecovery(
-                        service.serviceId(), new TenantId(tenantId), body.workspaceId(),
+                        service.serviceId(), workspaceId,
                         new SubjectId(body.newOwnerSubjectId()), body.incidentReference(),
                         settings.approvalTtl()));
         requestedCounter.increment();
@@ -70,32 +66,23 @@ public class WorkspaceOwnerRecoveryController {
 
     @PostMapping("/requests/{requestId}/approvals")
     public ApiResponse<WorkspaceOwnerRecoveryResponse> approve(
-            @PathVariable String tenantId,
+            @PathVariable UUID workspaceId,
             @PathVariable UUID requestId,
             Authentication authentication,
             HttpServletRequest request) {
-        AuthenticatedService service = requireTenantAccess(
-                authentication, tenantId, APPROVE, APPROVE_ALL);
+        AuthenticatedService service = requireWorkspaceAccess(authentication, APPROVE_ALL);
         WorkspaceOwnerRecoveryResponse response = WorkspaceOwnerRecoveryResponse.from(
                 recoveryService.approveAndExecute(
-                        service.serviceId(), new TenantId(tenantId), requestId));
+                        service.serviceId(), requestId));
         executedCounter.increment();
         return ApiResponse.success(response, RequestIds.currentOrCreate(request));
     }
 
-    private AuthenticatedService requireTenantAccess(
+    private AuthenticatedService requireWorkspaceAccess(
             Authentication authentication,
-            String tenantId,
-            String tenantAuthority,
             String allAuthority) {
         AuthenticatedService service = JwtAuthenticatedServiceFactory.from(authentication);
-        if (service.hasAuthority(allAuthority)) {
-            return service;
-        }
-        service.requireAuthority(tenantAuthority);
-        if (!tenantId.equals(service.requireTenantId())) {
-            throw new BusinessException(StandardErrorCode.FORBIDDEN);
-        }
+        service.requireAuthority(allAuthority);
         return service;
     }
 }

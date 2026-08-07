@@ -29,7 +29,9 @@ public class WorkspaceIdentityAccessEventConsumer {
                     true, repository.findAffectedMemberships(event.eventId()));
         }
 
-        int affectedMemberships = repository.revokeExistingMemberships(event, receivedAt);
+        // Account disable/revocation is checked by the current Identity/Workspace authorization facts.
+        // A subject-only event must not revoke memberships across every Workspace.
+        int affectedMemberships = 0;
         repository.recordAffectedMemberships(event.eventId(), affectedMemberships);
         return new WorkspaceIdentityAccessEventResult(false, affectedMemberships);
     }

@@ -56,14 +56,14 @@ class WorkspaceIdentityAccessEventControllerTest {
         ApiResponse<WorkspaceIdentityAccessEventResponse> duplicate = controller.consume(
                 request, publisher, new MockHttpServletRequest());
 
-        assertThat(first.data()).isEqualTo(new WorkspaceIdentityAccessEventResponse(eventId, false, 2));
-        assertThat(duplicate.data()).isEqualTo(new WorkspaceIdentityAccessEventResponse(eventId, true, 2));
+        assertThat(first.data()).isEqualTo(new WorkspaceIdentityAccessEventResponse(eventId, false, 0));
+        assertThat(duplicate.data()).isEqualTo(new WorkspaceIdentityAccessEventResponse(eventId, true, 0));
         assertThat(meterRegistry.counter("ainer.workspace.identity.access.events.received").count())
                 .isEqualTo(2);
         assertThat(meterRegistry.counter("ainer.workspace.identity.access.events.duplicates").count())
                 .isEqualTo(1);
         assertThat(meterRegistry.counter(
-                "ainer.workspace.identity.access.memberships.revoked").count()).isEqualTo(2);
+                "ainer.workspace.identity.access.memberships.revoked").count()).isZero();
         assertThat(meterRegistry.timer(
                 "ainer.workspace.identity.access.events.propagation").count()).isEqualTo(1);
     }
@@ -109,7 +109,6 @@ class WorkspaceIdentityAccessEventControllerTest {
                 eventId,
                 WorkspaceIdentityAccessEventType.IDENTITY_USER_DISABLED,
                 UUID.randomUUID(),
-                UUID.randomUUID(),
                 1,
                 occurredAt);
     }
@@ -140,18 +139,12 @@ class WorkspaceIdentityAccessEventControllerTest {
         }
 
         @Override
-        public int revokeExistingMemberships(
-                WorkspaceIdentityAccessEvent event, Instant receivedAt) {
-            return 2;
-        }
-
-        @Override
         public void recordAffectedMemberships(UUID eventId, int affectedMemberships) {
         }
 
         @Override
         public int findAffectedMemberships(UUID eventId) {
-            return 2;
+            return 0;
         }
     }
 }

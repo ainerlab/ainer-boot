@@ -11,15 +11,8 @@ public interface WorkspaceIdentityAccessEventMapper {
     int insertReceipt(
             @Param("eventId") UUID eventId,
             @Param("eventType") WorkspaceIdentityAccessEventType eventType,
-            @Param("tenantId") UUID tenantId,
             @Param("subjectId") UUID subjectId,
             @Param("payloadVersion") int payloadVersion,
-            @Param("occurredAt") Instant occurredAt,
-            @Param("receivedAt") Instant receivedAt);
-
-    int revokeExistingMemberships(
-            @Param("tenantId") String tenantId,
-            @Param("subjectId") String subjectId,
             @Param("occurredAt") Instant occurredAt,
             @Param("receivedAt") Instant receivedAt);
 

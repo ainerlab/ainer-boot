@@ -7,8 +7,7 @@ import dev.ainer.module.workspace.workspace.domain.WorkspaceMemberStatus;
 import java.time.Instant;
 import java.util.UUID;
 
-public record WorkspaceMemberResponse(
-        String tenantId,
+    public record WorkspaceMemberResponse(
         UUID workspaceId,
         String subjectId,
         WorkspaceRole role,
@@ -20,7 +19,6 @@ public record WorkspaceMemberResponse(
 
     static WorkspaceMemberResponse from(WorkspaceMember member) {
         return new WorkspaceMemberResponse(
-                member.tenantId().value(),
                 member.workspaceId(),
                 member.subjectId().value(),
                 member.role(),

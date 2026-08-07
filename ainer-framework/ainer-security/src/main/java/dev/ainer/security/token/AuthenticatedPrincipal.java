@@ -74,6 +74,14 @@ public record AuthenticatedPrincipal(
         return principalSubjectRef instanceof ServiceSubjectRef;
     }
 
+    public String subjectId() {
+        return principalSubjectRef.subjectId();
+    }
+
+    public boolean hasScope(String scope) {
+        return scopes.contains(scope);
+    }
+
     private static void requireProfileConsistency(
             TokenProfile profile, PrincipalSubjectRef principal) {
         boolean userProfile = profile == TokenProfile.USER_NEUTRAL_V1

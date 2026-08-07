@@ -12,13 +12,12 @@ import java.util.UUID;
 public record WorkspaceIdentityAccessEventRequest(
         @NotNull UUID eventId,
         @NotNull WorkspaceIdentityAccessEventType eventType,
-        @NotNull UUID tenantId,
         @NotNull UUID subjectId,
         @Min(1) @Max(1) int payloadVersion,
         @NotNull Instant occurredAt) {
 
     WorkspaceIdentityAccessEvent toEvent() {
         return new WorkspaceIdentityAccessEvent(
-                eventId, eventType, tenantId, subjectId, payloadVersion, occurredAt);
+                eventId, eventType, subjectId, payloadVersion, occurredAt);
     }
 }

@@ -11,18 +11,15 @@ public interface WorkspaceMemberMapper {
     int insert(WorkspaceMemberRow row);
 
     WorkspaceMemberRow selectByWorkspaceAndSubject(
-            @Param("tenantId") String tenantId,
             @Param("workspaceId") UUID workspaceId,
             @Param("subjectId") String subjectId);
 
     int activatePending(
-            @Param("tenantId") String tenantId,
             @Param("workspaceId") UUID workspaceId,
             @Param("subjectId") String subjectId,
             @Param("activatedAt") Instant activatedAt);
 
     int updateRole(
-            @Param("tenantId") String tenantId,
             @Param("workspaceId") UUID workspaceId,
             @Param("subjectId") String subjectId,
             @Param("expectedRole") WorkspaceRole expectedRole,
@@ -30,28 +27,23 @@ public interface WorkspaceMemberMapper {
             @Param("updatedAt") Instant updatedAt);
 
     int deleteNonOwner(
-            @Param("tenantId") String tenantId,
             @Param("workspaceId") UUID workspaceId,
             @Param("subjectId") String subjectId);
 
     int demoteOwner(
-            @Param("tenantId") String tenantId,
             @Param("workspaceId") UUID workspaceId,
             @Param("ownerSubjectId") String ownerSubjectId,
             @Param("updatedAt") Instant updatedAt);
 
     int promoteActiveMemberToOwner(
-            @Param("tenantId") String tenantId,
             @Param("workspaceId") UUID workspaceId,
             @Param("subjectId") String subjectId,
             @Param("expectedRole") WorkspaceRole expectedRole,
             @Param("updatedAt") Instant updatedAt);
 
     boolean hasActiveOwner(
-            @Param("tenantId") String tenantId,
             @Param("workspaceId") UUID workspaceId);
 
     boolean hasRevokedOwner(
-            @Param("tenantId") String tenantId,
             @Param("workspaceId") UUID workspaceId);
 }

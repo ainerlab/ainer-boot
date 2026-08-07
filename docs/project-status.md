@@ -129,6 +129,15 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
   未知账号/缺 ACTIVE 凭据 fail-closed；identity 错误码补 CREDENTIAL_NOT_FOUND/CREDENTIAL_REVOKED/
   INVALID_CREDENTIAL/PROFILE_NOT_FOUND。全 reactor 388 tests / 0 failure / 0 error / 0 skipped（Colima）。
    施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
+- Greenfield S6 canonical Workspace 去 tenant 已在 `reset/0033-greenfield` 分支完成：当前
+  `Workspace`/`WorkspaceMember`/审计/recovery 使用 `workspace_id + ACTIVE membership` 边界，
+  业务 API 使用 S5 typed `AuthenticatedPrincipal` 并拒绝 Service principal 进入 Human membership；
+  MyBatis 查询与 owner 唯一约束已去 tenant，新增 `V202608070100` 从空库重放后删除 Workspace
+  schema 的 tenant 列。Identity Directory 改为 ACTIVE HumanAccount 查询，subject-only access event
+  只记录 receipt、不跨所有 Workspace 全局撤销 membership；owner recovery、审计导出改为 Workspace
+  scope。旧 tenant-first Workspace 测试已重写为 canonical membership/跨 Workspace DENY 门禁。
+  全 reactor 387 tests / 0 failure / 0 error / 0 skipped（Colima）。
+  施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
 - Greenfield S3 customizer 新 profile 签发（执行规划 缺口 B）已在 `reset/0033-greenfield` 分支完成：
   `AinerUserDetails` 加性重设计（新增 nullable `accountId` + `securityEpoch`，legacy 字段保留），
   customizer 抽为可测的 `AinerJwtTokenCustomizer`：client setting `ainer.token-profile` 选择轨道，

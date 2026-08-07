@@ -6,7 +6,6 @@ import java.util.UUID;
 public class WorkspaceMemberRow {
 
     private UUID workspaceId;
-    private String tenantId;
     private String subjectId;
     private String role;
     private String status;
@@ -21,14 +20,6 @@ public class WorkspaceMemberRow {
 
     public void setWorkspaceId(UUID workspaceId) {
         this.workspaceId = workspaceId;
-    }
-
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
     }
 
     public String getSubjectId() {

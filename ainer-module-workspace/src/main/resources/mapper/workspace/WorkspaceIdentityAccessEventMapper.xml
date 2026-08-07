@@ -6,24 +6,14 @@
 
     <insert id="insertReceipt">
         INSERT INTO ainer_workspace_identity_event_receipt (
-            event_id, event_type, tenant_id, subject_id, payload_version,
+            event_id, event_type, subject_id, payload_version,
             occurred_at, received_at, affected_memberships
         ) VALUES (
-            #{eventId}, #{eventType}, #{tenantId}, #{subjectId}, #{payloadVersion},
+            #{eventId}, #{eventType}, #{subjectId}, #{payloadVersion},
             #{occurredAt}, #{receivedAt}, 0
         )
         ON CONFLICT (event_id) DO NOTHING
     </insert>
-
-    <update id="revokeExistingMemberships">
-        UPDATE ainer_workspace_member
-        SET status = 'REVOKED',
-            updated_at = GREATEST(updated_at, #{receivedAt})
-        WHERE tenant_id = #{tenantId}
-          AND subject_id = #{subjectId}
-          AND status IN ('PENDING', 'ACTIVE')
-          AND created_at &lt;= #{occurredAt}
-    </update>
 
     <update id="updateAffectedMemberships">
         UPDATE ainer_workspace_identity_event_receipt

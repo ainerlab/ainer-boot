@@ -7,7 +7,6 @@ import java.util.UUID;
 
 public record WorkspaceOwnerRecoveryResponse(
         UUID requestId,
-        String tenantId,
         UUID workspaceId,
         String newOwnerSubjectId,
         String requestedBy,
@@ -20,7 +19,7 @@ public record WorkspaceOwnerRecoveryResponse(
 
     static WorkspaceOwnerRecoveryResponse from(WorkspaceOwnerRecoveryRequest request) {
         return new WorkspaceOwnerRecoveryResponse(
-                request.id(), request.tenantId().value(), request.workspaceId(),
+                request.id(), request.workspaceId(),
                 request.newOwnerSubjectId().value(), request.requestedBy(), request.approvedBy(),
                 request.incidentReference(), request.status(), request.requestedAt(),
                 request.expiresAt(), request.executedAt());

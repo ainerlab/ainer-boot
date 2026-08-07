@@ -6,7 +6,6 @@ import dev.ainer.core.web.ApiResponse;
 import dev.ainer.module.workspace.workspace.application.WorkspaceAuthorizationAuditCursor;
 import dev.ainer.module.workspace.workspace.application.WorkspaceAuthorizationAuditLifecycleService;
 import dev.ainer.module.workspace.workspace.application.WorkspaceErrorCode;
-import dev.ainer.module.workspace.workspace.domain.TenantId;
 import dev.ainer.security.service.AuthenticatedService;
 import dev.ainer.security.service.JwtAuthenticatedServiceFactory;
 import dev.ainer.web.request.RequestIds;
@@ -30,14 +29,13 @@ import java.util.UUID;
 
 @Validated
 @RestController
-@RequestMapping("/internal/workspace-authorization-audits/tenants/{tenantId}/exports")
+@RequestMapping("/internal/workspace-authorization-audits/workspaces/{workspaceId}/exports")
 @ConditionalOnProperty(
         prefix = "ainer.workspace.authorization-audit-export",
         name = "enabled",
         havingValue = "true")
 public class WorkspaceAuthorizationAuditExportController {
 
-    private static final String EXPORT = "SCOPE_workspace.audit.export";
     private static final String EXPORT_ALL = "SCOPE_workspace.audit.export.all";
 
     private final WorkspaceAuthorizationAuditLifecycleService lifecycleService;
@@ -55,14 +53,14 @@ public class WorkspaceAuthorizationAuditExportController {
 
     @GetMapping
     public ApiResponse<WorkspaceAuthorizationAuditExportResponse> export(
-            @PathVariable String tenantId,
+            @PathVariable UUID workspaceId,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant afterOccurredAt,
             @RequestParam(required = false) UUID afterId,
             @RequestParam(defaultValue = "200") @Min(1) @Max(1000) int limit,
             Authentication authentication,
             HttpServletRequest request) {
-        AuthenticatedService service = requireExporter(authentication, tenantId);
+        AuthenticatedService service = requireExporter(authentication);
         if ((afterOccurredAt == null) != (afterId == null)) {
             throw new BusinessException(WorkspaceErrorCode.INVALID_AUDIT_EXPORT_REQUEST);
         }
@@ -70,25 +68,19 @@ public class WorkspaceAuthorizationAuditExportController {
                 ? null
                 : new WorkspaceAuthorizationAuditCursor(afterOccurredAt, afterId);
         var batch = lifecycleService.export(
-                service.serviceId(), new TenantId(tenantId), cursor, limit);
+                service.serviceId(), workspaceId, cursor, limit);
         exportCounter.increment(batch.items().size());
         return ApiResponse.success(
                 WorkspaceAuthorizationAuditExportResponse.from(batch),
                 RequestIds.currentOrCreate(request));
     }
 
-    private AuthenticatedService requireExporter(Authentication authentication, String tenantId) {
+    private AuthenticatedService requireExporter(Authentication authentication) {
         AuthenticatedService service = JwtAuthenticatedServiceFactory.from(authentication);
         if (!settings.trustedExporterSubject().equals(service.serviceId())) {
             throw new BusinessException(StandardErrorCode.FORBIDDEN);
         }
-        if (service.hasAuthority(EXPORT_ALL)) {
-            return service;
-        }
-        service.requireAuthority(EXPORT);
-        if (!tenantId.equals(service.requireTenantId())) {
-            throw new BusinessException(StandardErrorCode.FORBIDDEN);
-        }
+        service.requireAuthority(EXPORT_ALL);
         return service;
     }
 }

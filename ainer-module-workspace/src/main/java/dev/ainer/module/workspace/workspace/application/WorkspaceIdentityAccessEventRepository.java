@@ -7,8 +7,6 @@ public interface WorkspaceIdentityAccessEventRepository {
 
     boolean insertReceipt(WorkspaceIdentityAccessEvent event, Instant receivedAt);
 
-    int revokeExistingMemberships(WorkspaceIdentityAccessEvent event, Instant receivedAt);
-
     void recordAffectedMemberships(UUID eventId, int affectedMemberships);
 
     int findAffectedMemberships(UUID eventId);

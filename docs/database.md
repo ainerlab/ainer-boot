@@ -55,7 +55,7 @@ UUID、时间、金额、约束和锁语义必须按 PostgreSQL 设计。SQL 参
 | `user_entities` / `user_credentials` | Spring Security WebAuthn 官方 JDBC 协议存储 |
 | `ainer_passkey_*` | Authorization Server 的 Passkey 生命周期与操作审计 |
 
-Identity Directory 是安全查询契约，不授权 Workspace 直接查询 `ainer_identity_*`。access-event outbox 的事实归 Identity 所有，下游消费状态不能反写 Identity 业务表。Workspace 只拥有 `ainer_workspace_identity_event_receipt` 与本地 membership 的 `REVOKED` 状态。
+Identity Directory 是安全查询契约，不授权 Workspace 直接查询 `ainer_identity_*`。access-event outbox 的事实归 Identity 所有，下游消费状态不能反写 Identity 业务表。S6 后 canonical Workspace 只拥有 `workspace_id`、Human membership 与本地 receipt；subject-only account disable event 不再跨所有 Workspace 全局撤销 membership。
 
 M4.2 新增表仍归各模块独立所有：
 
@@ -217,9 +217,9 @@ Identity relay 使用以下状态机：
 - 网络调用发生在领取事务提交之后；成功按 event ID + lease owner 置为 `PUBLISHED`，失败置为 `FAILED` 并推进 `available_at`；
 - lease 到期后其他实例可以重新领取；达到 `max-attempts` 后 PENDING/FAILED 都归入 exhausted 指标，不再自动领取，数据仍保留供告警和人工处置。
 
-Workspace 消费事务执行：`INSERT receipt ... ON CONFLICT DO NOTHING`，新事件才批量更新 membership，最后记录实际影响数。更新必须同时绑定 tenant、subject、`status IN ('PENDING','ACTIVE')` 与 `created_at <= occurred_at`。`REVOKED` 永不参与资源授权；重复、旧事件和跨 tenant 事件不能扩大影响范围。
+Workspace 消费事务执行：`INSERT receipt ... ON CONFLICT DO NOTHING`，当前 account event 只记录事实 receipt；明确 Workspace event 才能在 workspace、subject、`status IN ('PENDING','ACTIVE')` 与 `created_at <= occurred_at` 条件下更新 membership。`REVOKED` 永不参与资源授权；重复、旧事件和跨 Workspace 事件不能扩大影响范围。
 
-耗尽事件重放审批事务会锁定申请与原事件，重新验证 tenant、耗尽状态、lease 和过期时间后，只重置事件的投递状态，不更换 event ID 或事件内容。OWNER 恢复审批事务锁定 Workspace，重新验证无 ACTIVE OWNER、存在 REVOKED OWNER 和目标 ACTIVE 成员，然后仅提升目标成员。两类请求都由部分唯一索引阻止同一目标存在多个开放申请。
+耗尽事件重放审批事务会锁定申请与原事件，重新验证 tenant、耗尽状态、lease 和过期时间后，只重置事件的投递状态，不更换 event ID 或事件内容。Workspace OWNER 恢复审批事务按 workspace 锁定并重新验证无 ACTIVE OWNER、存在 REVOKED OWNER 和目标 ACTIVE 成员，然后仅提升目标成员。两类请求都由部分唯一索引阻止同一目标存在多个开放申请。
 
 Workspace 授权审计归档使用小批量 CTE：以 `FOR UPDATE SKIP LOCKED` 选择过期热记录，`INSERT ... ON CONFLICT` 写入归档，仅在同 ID 归档已存在时删除热记录。统一查询和 SIEM 导出读取热/归档并集。归档表本身不自动删除；最终删除、法律保留和外部不可变存储需要另立策略。
 

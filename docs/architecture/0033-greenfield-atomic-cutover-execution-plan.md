@@ -81,7 +81,8 @@ C1–S5 阶段只实现 USER_NEUTRAL_V1 + SERVICE_V1。
 S3 customizer 新 profile 签发已完成（SERVICE_V1 + USER_NEUTRAL_V1 轨道，fail-closed，
 全 reactor 401/0/0/0）；S4 登录链路与 Passkey foundation 接线已完成，
 全 reactor 407/0/0/0）；S5 Resource Server typed profile resolver 已完成，
-全 reactor 411/0/0/0。
+全 reactor 411/0/0/0）；S6 canonical Workspace 去 tenant 已完成，
+全 reactor 387/0/0/0。
 
 ### S2 — Foundation 能力补全（password credential store + Profile + securityEpoch 查询）
 
@@ -274,7 +275,7 @@ S6/S7 改的是 workspace/ai-runtime 模块，与 S3–S5（identity/security �
 | 9 | 测试计数 | S8 重校 | 📋 S8 |
 | **A** | **password credential store**（新缺口） | 新建 ainer_identity_credential 表，S2 落地 | ✅ S2 完成 |
 | **B** | **securityEpoch claim 基线**（新缺口） | customizer 写 sec_epoch claim，S3 落地 | ✅ S3 完成 |
-| **C** | **workspace 去 tenant**（新缺口） | S6 整体重写持久化层，纯 membership 访问控制 | 📋 S6 |
+| **C** | **workspace 去 tenant**（新缺口） | S6 整体重写持久化层，纯 membership 访问控制 | ✅ S6 完成 |
 
 ---
 

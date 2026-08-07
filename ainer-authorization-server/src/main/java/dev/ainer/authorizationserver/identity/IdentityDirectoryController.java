@@ -5,6 +5,7 @@ import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.core.web.ApiResponse;
 import dev.ainer.module.identity.account.application.IdentityDirectoryService;
 import dev.ainer.module.identity.account.application.IdentityErrorCode;
+import dev.ainer.module.identity.foundation.HumanAccount;
 import dev.ainer.security.service.AuthenticatedService;
 import dev.ainer.security.service.JwtAuthenticatedServiceFactory;
 import dev.ainer.web.request.RequestIds;
@@ -54,6 +55,20 @@ public class IdentityDirectoryController {
         return ApiResponse.success(member, RequestIds.currentOrCreate(request));
     }
 
+    @GetMapping("/accounts/{accountId}")
+    public ApiResponse<HumanAccountDirectoryResponse> findAccount(
+            @PathVariable UUID accountId,
+            Authentication authentication,
+            HttpServletRequest request) {
+        AuthenticatedService service = JwtAuthenticatedServiceFactory.from(authentication);
+        service.requireAuthority(DIRECTORY_READ_ALL);
+        HumanAccount account = directoryService.findActiveHumanAccount(accountId)
+                .orElseThrow(() -> new BusinessException(IdentityErrorCode.DIRECTORY_MEMBER_NOT_FOUND));
+        return ApiResponse.success(
+                new HumanAccountDirectoryResponse(account.accountId(), account.status().name()),
+                RequestIds.currentOrCreate(request));
+    }
+
     @GetMapping("/tenants/{tenantId}/members")
     public ApiResponse<List<IdentityDirectoryMemberResponse>> searchMembers(
             @PathVariable UUID tenantId,
@@ -83,5 +98,8 @@ public class IdentityDirectoryController {
         } catch (IllegalArgumentException exception) {
             throw new BusinessException(StandardErrorCode.FORBIDDEN);
         }
+    }
+
+    public record HumanAccountDirectoryResponse(UUID accountId, String status) {
     }
 }

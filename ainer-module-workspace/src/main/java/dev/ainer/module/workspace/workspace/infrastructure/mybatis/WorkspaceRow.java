@@ -6,7 +6,6 @@ import java.util.UUID;
 public class WorkspaceRow {
 
     private UUID id;
-    private String tenantId;
     private String name;
     private long version;
     private Instant createdAt;
@@ -18,14 +17,6 @@ public class WorkspaceRow {
 
     public void setId(UUID id) {
         this.id = id;
-    }
-
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
     }
 
     public String getName() {

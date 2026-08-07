@@ -6,7 +6,6 @@ import java.util.UUID;
 
 public record Workspace(
         UUID id,
-        TenantId tenantId,
         WorkspaceName name,
         long version,
         Instant createdAt,
@@ -14,7 +13,6 @@ public record Workspace(
 
     public Workspace {
         Objects.requireNonNull(id, "id");
-        Objects.requireNonNull(tenantId, "tenantId");
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(createdAt, "createdAt");
         Objects.requireNonNull(updatedAt, "updatedAt");
@@ -26,8 +24,8 @@ public record Workspace(
         }
     }
 
-    public static Workspace create(UUID id, TenantId tenantId, WorkspaceName name, Instant now) {
-        return new Workspace(id, tenantId, name, 0, now, now);
+    public static Workspace create(UUID id, WorkspaceName name, Instant now) {
+        return new Workspace(id, name, 0, now, now);
     }
 
     public Workspace rename(WorkspaceName newName, Instant now) {
@@ -39,6 +37,6 @@ public record Workspace(
         if (now.isBefore(updatedAt)) {
             throw new IllegalArgumentException("Workspace update time cannot move backwards");
         }
-        return new Workspace(id, tenantId, newName, version + 1, createdAt, now);
+        return new Workspace(id, newName, version + 1, createdAt, now);
     }
 }

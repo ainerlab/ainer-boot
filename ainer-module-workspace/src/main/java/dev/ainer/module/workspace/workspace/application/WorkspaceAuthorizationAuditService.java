@@ -1,8 +1,7 @@
 package dev.ainer.module.workspace.workspace.application;
 
 import dev.ainer.core.error.ErrorCode;
-import dev.ainer.module.workspace.workspace.domain.TenantId;
-import dev.ainer.security.actor.AuthenticatedActor;
+import dev.ainer.security.token.AuthenticatedPrincipal;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +23,7 @@ public class WorkspaceAuthorizationAuditService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(
-            AuthenticatedActor actor,
+            AuthenticatedPrincipal principal,
             UUID workspaceId,
             String targetSubjectId,
             WorkspaceAuthorizationAction action,
@@ -32,9 +31,8 @@ public class WorkspaceAuthorizationAuditService {
             ErrorCode reason) {
         repository.insert(new WorkspaceAuthorizationAudit(
                 UUID.randomUUID(),
-                actor.tenantId(),
                 workspaceId,
-                actor.subjectId(),
+                principal.subjectId(),
                 targetSubjectId,
                 action,
                 decision,
@@ -44,7 +42,7 @@ public class WorkspaceAuthorizationAuditService {
 
     @Transactional(readOnly = true)
     public WorkspaceAuthorizationAuditPage findPage(
-            TenantId tenantId, UUID workspaceId, int page, int size, long offset) {
-        return repository.findPage(tenantId, workspaceId, page, size, offset);
+            UUID workspaceId, int page, int size, long offset) {
+        return repository.findPage(workspaceId, page, size, offset);
     }
 }

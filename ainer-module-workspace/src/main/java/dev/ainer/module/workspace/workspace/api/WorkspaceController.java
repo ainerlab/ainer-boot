@@ -7,8 +7,8 @@ import dev.ainer.module.workspace.workspace.application.ChangeWorkspaceMemberRol
 import dev.ainer.module.workspace.workspace.application.RemoveWorkspaceMemberCommand;
 import dev.ainer.module.workspace.workspace.application.TransferWorkspaceOwnershipCommand;
 import dev.ainer.module.workspace.workspace.application.WorkspaceApplicationService;
-import dev.ainer.security.actor.AuthenticatedActor;
-import dev.ainer.security.actor.AuthenticatedActorResolver;
+import dev.ainer.security.token.AuthenticatedPrincipal;
+import dev.ainer.security.token.AuthenticatedPrincipalResolver;
 import dev.ainer.web.request.RequestIds;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -34,20 +34,20 @@ import java.util.UUID;
 public class WorkspaceController {
 
     private final WorkspaceApplicationService service;
-    private final AuthenticatedActorResolver actorResolver;
+    private final AuthenticatedPrincipalResolver principalResolver;
 
     public WorkspaceController(
             WorkspaceApplicationService service,
-            AuthenticatedActorResolver actorResolver) {
+            AuthenticatedPrincipalResolver principalResolver) {
         this.service = service;
-        this.actorResolver = actorResolver;
+        this.principalResolver = principalResolver;
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<WorkspaceResponse>> create(
             @Valid @RequestBody CreateWorkspaceRequest request,
             HttpServletRequest servletRequest) {
-        AuthenticatedActor actor = actorResolver.requireCurrent();
+        AuthenticatedPrincipal actor = principalResolver.requireCurrent();
         WorkspaceResponse response = WorkspaceResponse.from(service.create(
                 actor, new CreateWorkspaceCommand(request.name())));
         return ResponseEntity.created(URI.create("/api/workspaces/" + response.id()))
@@ -57,7 +57,7 @@ public class WorkspaceController {
     @GetMapping("/{id}")
     public ApiResponse<WorkspaceResponse> get(@PathVariable UUID id, HttpServletRequest servletRequest) {
         return ApiResponse.success(
-                WorkspaceResponse.from(service.get(actorResolver.requireCurrent(), id)),
+                WorkspaceResponse.from(service.get(principalResolver.requireCurrent(), id)),
                 RequestIds.currentOrCreate(servletRequest));
     }
 
@@ -67,7 +67,7 @@ public class WorkspaceController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
             HttpServletRequest servletRequest) {
         return ApiResponse.success(
-                WorkspacePageResponse.from(service.page(actorResolver.requireCurrent(), page, size)),
+                WorkspacePageResponse.from(service.page(principalResolver.requireCurrent(), page, size)),
                 RequestIds.currentOrCreate(servletRequest));
     }
 
@@ -79,7 +79,7 @@ public class WorkspaceController {
             HttpServletRequest servletRequest) {
         return ApiResponse.success(
                 WorkspaceAuthorizationAuditPageResponse.from(service.authorizationAudits(
-                        actorResolver.requireCurrent(), id, page, size)),
+                        principalResolver.requireCurrent(), id, page, size)),
                 RequestIds.currentOrCreate(servletRequest));
     }
 
@@ -89,7 +89,7 @@ public class WorkspaceController {
             @Valid @RequestBody RenameWorkspaceRequest request,
             HttpServletRequest servletRequest) {
         return ApiResponse.success(
-                WorkspaceResponse.from(service.rename(actorResolver.requireCurrent(), id, request.name())),
+                WorkspaceResponse.from(service.rename(principalResolver.requireCurrent(), id, request.name())),
                 RequestIds.currentOrCreate(servletRequest));
     }
 
@@ -99,7 +99,7 @@ public class WorkspaceController {
             @Valid @RequestBody AddWorkspaceMemberRequest request,
             HttpServletRequest servletRequest) {
         WorkspaceMemberResponse response = WorkspaceMemberResponse.from(service.addMember(
-                actorResolver.requireCurrent(),
+                principalResolver.requireCurrent(),
                 id,
                 new AddWorkspaceMemberCommand(request.subjectId(), request.role())));
         return ResponseEntity.status(201)
@@ -112,7 +112,7 @@ public class WorkspaceController {
             HttpServletRequest servletRequest) {
         return ApiResponse.success(
                 WorkspaceMemberResponse.from(service.acceptInvitation(
-                        actorResolver.requireCurrent(), id)),
+                        principalResolver.requireCurrent(), id)),
                 RequestIds.currentOrCreate(servletRequest));
     }
 
@@ -123,7 +123,7 @@ public class WorkspaceController {
             HttpServletRequest servletRequest) {
         return ApiResponse.success(
                 WorkspaceMemberResponse.from(service.changeMemberRole(
-                        actorResolver.requireCurrent(),
+                        principalResolver.requireCurrent(),
                         id,
                         new ChangeWorkspaceMemberRoleCommand(request.subjectId(), request.role()))),
                 RequestIds.currentOrCreate(servletRequest));
@@ -135,7 +135,7 @@ public class WorkspaceController {
             @Valid @RequestBody RemoveWorkspaceMemberRequest request,
             HttpServletRequest servletRequest) {
         service.removeMember(
-                actorResolver.requireCurrent(),
+                principalResolver.requireCurrent(),
                 id,
                 new RemoveWorkspaceMemberCommand(request.subjectId()));
         return ApiResponse.success(null, RequestIds.currentOrCreate(servletRequest));
@@ -148,7 +148,7 @@ public class WorkspaceController {
             HttpServletRequest servletRequest) {
         return ApiResponse.success(
                 WorkspaceMemberResponse.from(service.transferOwnership(
-                        actorResolver.requireCurrent(),
+                        principalResolver.requireCurrent(),
                         id,
                         new TransferWorkspaceOwnershipCommand(request.newOwnerSubjectId()))),
                 RequestIds.currentOrCreate(servletRequest));

@@ -4,13 +4,12 @@ import dev.ainer.core.error.BusinessException;
 import dev.ainer.core.error.ErrorCode;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.module.workspace.workspace.domain.SubjectId;
-import dev.ainer.module.workspace.workspace.domain.TenantId;
 import dev.ainer.module.workspace.workspace.domain.Workspace;
 import dev.ainer.module.workspace.workspace.domain.WorkspaceMember;
 import dev.ainer.module.workspace.workspace.domain.WorkspaceMemberStatus;
 import dev.ainer.module.workspace.workspace.domain.WorkspaceName;
 import dev.ainer.module.workspace.workspace.domain.WorkspaceRole;
-import dev.ainer.security.actor.AuthenticatedActor;
+import dev.ainer.security.token.AuthenticatedPrincipal;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,20 +42,18 @@ public class WorkspaceApplicationService {
     }
 
     @Transactional
-    public Workspace create(AuthenticatedActor actor, CreateWorkspaceCommand command) {
-        actor = requireActor(actor);
-        requireAuthority(actor, WorkspaceAuthorities.WRITE,
-                WorkspaceAuthorizationAction.WORKSPACE_CREATE, null, actor.subjectId());
+    public Workspace create(AuthenticatedPrincipal principal, CreateWorkspaceCommand command) {
+        principal = requireHuman(principal);
+        requireScope(principal, WorkspaceAuthorities.WRITE,
+                WorkspaceAuthorizationAction.WORKSPACE_CREATE, null, principalSubject(principal));
         Objects.requireNonNull(command, "command");
         Instant now = clock.instant();
-        TenantId tenantId = tenantId(actor.tenantId());
-        SubjectId ownerSubjectId = subjectId(actor.subjectId());
+        SubjectId ownerSubjectId = subjectId(principal.subjectId());
         Workspace workspace = Workspace.create(
-                UUID.randomUUID(), tenantId, workspaceName(command.name()), now);
-        WorkspaceMember owner = WorkspaceMember.owner(
-                tenantId, workspace.id(), ownerSubjectId, now);
+                UUID.randomUUID(), workspaceName(command.name()), now);
+        WorkspaceMember owner = WorkspaceMember.owner(workspace.id(), ownerSubjectId, now);
 
-        auditAllowed(actor, workspace.id(), actor.subjectId(),
+        auditAllowed(principal, workspace.id(), principal.subjectId(),
                 WorkspaceAuthorizationAction.WORKSPACE_CREATE);
         workspaceRepository.insert(workspace);
         memberRepository.insert(owner);
@@ -64,38 +61,37 @@ public class WorkspaceApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public Workspace get(AuthenticatedActor actor, UUID id) {
-        actor = requireActor(actor);
-        requireAuthority(actor, WorkspaceAuthorities.READ,
+    public Workspace get(AuthenticatedPrincipal principal, UUID id) {
+        principal = requireHuman(principal);
+        requireScope(principal, WorkspaceAuthorities.READ,
                 WorkspaceAuthorizationAction.WORKSPACE_READ, id, null);
-        return requireAccess(actor, id, WorkspaceAuthorizationAction.WORKSPACE_READ, null).workspace();
+        return requireAccess(principal, id, WorkspaceAuthorizationAction.WORKSPACE_READ, null).workspace();
     }
 
     @Transactional(readOnly = true)
-    public WorkspacePage page(AuthenticatedActor actor, int page, int size) {
-        actor = requireActor(actor);
-        requireAuthority(actor, WorkspaceAuthorities.READ,
+    public WorkspacePage page(AuthenticatedPrincipal principal, int page, int size) {
+        principal = requireHuman(principal);
+        requireScope(principal, WorkspaceAuthorities.READ,
                 WorkspaceAuthorizationAction.WORKSPACE_PAGE, null, null);
         if (page < 1 || size < 1 || size > 100) {
             throw new BusinessException(WorkspaceErrorCode.INVALID_PAGE);
         }
         long offset = Math.multiplyExact((long) page - 1, size);
-        return workspaceRepository.findPage(
-                tenantId(actor.tenantId()), subjectId(actor.subjectId()), page, size, offset);
+        return workspaceRepository.findPage(subjectId(principal.subjectId()), page, size, offset);
     }
 
     @Transactional
-    public Workspace rename(AuthenticatedActor actor, UUID id, String name) {
-        actor = requireActor(actor);
-        requireAuthority(actor, WorkspaceAuthorities.WRITE,
+    public Workspace rename(AuthenticatedPrincipal principal, UUID id, String name) {
+        principal = requireHuman(principal);
+        requireScope(principal, WorkspaceAuthorities.WRITE,
                 WorkspaceAuthorizationAction.WORKSPACE_RENAME, id, null);
         WorkspaceAccess access = requireAccess(
-                actor, id, WorkspaceAuthorizationAction.WORKSPACE_RENAME, null);
-        requireManager(actor, access.member(), id,
+                principal, id, WorkspaceAuthorizationAction.WORKSPACE_RENAME, null);
+        requireManager(principal, access.member(), id,
                 WorkspaceAuthorizationAction.WORKSPACE_RENAME, null);
         Workspace current = access.workspace();
         Workspace renamed = current.rename(workspaceName(name), clock.instant());
-        auditAllowed(actor, id, null, WorkspaceAuthorizationAction.WORKSPACE_RENAME);
+        auditAllowed(principal, id, null, WorkspaceAuthorizationAction.WORKSPACE_RENAME);
         if (renamed == current) {
             return current;
         }
@@ -107,285 +103,279 @@ public class WorkspaceApplicationService {
 
     @Transactional
     public WorkspaceMember addMember(
-            AuthenticatedActor actor, UUID id, AddWorkspaceMemberCommand command) {
-        actor = requireActor(actor);
+            AuthenticatedPrincipal principal, UUID id, AddWorkspaceMemberCommand command) {
+        principal = requireHuman(principal);
         Objects.requireNonNull(command, "command");
         SubjectId targetSubjectId = subjectId(command.subjectId());
         WorkspaceRole role = requireAssignableRole(command.role());
-        requireAuthority(actor, WorkspaceAuthorities.WRITE,
+        requireScope(principal, WorkspaceAuthorities.WRITE,
                 WorkspaceAuthorizationAction.MEMBER_INVITE, id, targetSubjectId.value());
         WorkspaceAccess access = requireAccess(
-                actor, id, WorkspaceAuthorizationAction.MEMBER_INVITE, targetSubjectId.value());
-        requireManager(actor, access.member(), id,
+                principal, id, WorkspaceAuthorizationAction.MEMBER_INVITE, targetSubjectId.value());
+        requireManager(principal, access.member(), id,
                 WorkspaceAuthorizationAction.MEMBER_INVITE, targetSubjectId.value());
         if (identityDirectory.isPresent()
-                && !identityDirectory.get().isActiveMember(access.workspace().tenantId(), targetSubjectId)) {
+                && !identityDirectory.get().isActiveHumanAccount(targetSubjectId)) {
             throw new BusinessException(WorkspaceErrorCode.IDENTITY_DIRECTORY_MEMBER_NOT_FOUND);
         }
         Instant now = clock.instant();
         WorkspaceMember invitation = WorkspaceMember.invitation(
-                access.workspace().tenantId(),
                 access.workspace().id(),
                 targetSubjectId,
                 role,
-                subjectId(actor.subjectId()),
+                subjectId(principal.subjectId()),
                 now);
 
-        auditAllowed(actor, id, targetSubjectId.value(), WorkspaceAuthorizationAction.MEMBER_INVITE);
+        auditAllowed(principal, id, targetSubjectId.value(), WorkspaceAuthorizationAction.MEMBER_INVITE);
         memberRepository.insert(invitation);
         return invitation;
     }
 
     @Transactional
-    public WorkspaceMember acceptInvitation(AuthenticatedActor actor, UUID id) {
-        actor = requireActor(actor);
-        requireAuthority(actor, WorkspaceAuthorities.READ,
-                WorkspaceAuthorizationAction.MEMBERSHIP_ACCEPT, id, actor.subjectId());
-        TenantId tenantId = tenantId(actor.tenantId());
-        SubjectId subjectId = subjectId(actor.subjectId());
-        AuthenticatedActor authenticatedActor = actor;
-        requireWorkspace(actor, tenantId, id,
-                WorkspaceAuthorizationAction.MEMBERSHIP_ACCEPT, subjectId.value(), false);
-        WorkspaceMember invitation = memberRepository.findByWorkspaceAndSubject(tenantId, id, subjectId)
-                .orElseThrow(() -> denied(authenticatedActor, id, subjectId.value(),
+    public WorkspaceMember acceptInvitation(AuthenticatedPrincipal principal, UUID id) {
+        principal = requireHuman(principal);
+        requireScope(principal, WorkspaceAuthorities.READ,
+                WorkspaceAuthorizationAction.MEMBERSHIP_ACCEPT, id, principal.subjectId());
+        SubjectId subjectId = subjectId(principal.subjectId());
+        Workspace workspace = requireWorkspace(
+                principal, id, WorkspaceAuthorizationAction.MEMBERSHIP_ACCEPT, subjectId.value(), false);
+        AuthenticatedPrincipal authenticatedPrincipal = principal;
+        WorkspaceMember invitation = memberRepository.findByWorkspaceAndSubject(id, subjectId)
+                .orElseThrow(() -> denied(authenticatedPrincipal, id, subjectId.value(),
                         WorkspaceAuthorizationAction.MEMBERSHIP_ACCEPT,
                         WorkspaceErrorCode.INVITATION_NOT_FOUND));
         if (invitation.isActive()) {
-            auditAllowed(actor, id, subjectId.value(), WorkspaceAuthorizationAction.MEMBERSHIP_ACCEPT);
+            auditAllowed(principal, id, subjectId.value(), WorkspaceAuthorizationAction.MEMBERSHIP_ACCEPT);
             return invitation;
         }
 
         Instant now = clock.instant();
-        auditAllowed(actor, id, subjectId.value(), WorkspaceAuthorizationAction.MEMBERSHIP_ACCEPT);
-        if (!memberRepository.activatePending(tenantId, id, subjectId, now)) {
+        auditAllowed(principal, id, subjectId.value(), WorkspaceAuthorizationAction.MEMBERSHIP_ACCEPT);
+        if (!memberRepository.activatePending(id, subjectId, now)) {
             throw new BusinessException(WorkspaceErrorCode.MEMBER_UPDATE_CONFLICT);
         }
         return new WorkspaceMember(
-                invitation.tenantId(), invitation.workspaceId(), invitation.subjectId(), invitation.role(),
-                WorkspaceMemberStatus.ACTIVE, invitation.invitedBy(), invitation.createdAt(), now, now);
+                workspace.id(), invitation.subjectId(), invitation.role(),
+                WorkspaceMemberStatus.ACTIVE, invitation.invitedBy(),
+                invitation.createdAt(), now, now);
     }
 
     @Transactional
     public WorkspaceMember changeMemberRole(
-            AuthenticatedActor actor, UUID id, ChangeWorkspaceMemberRoleCommand command) {
-        actor = requireActor(actor);
+            AuthenticatedPrincipal principal, UUID id, ChangeWorkspaceMemberRoleCommand command) {
+        principal = requireHuman(principal);
         Objects.requireNonNull(command, "command");
         SubjectId targetSubjectId = subjectId(command.subjectId());
         WorkspaceRole newRole = requireAssignableRole(command.role());
-        requireAuthority(actor, WorkspaceAuthorities.WRITE,
+        requireScope(principal, WorkspaceAuthorities.WRITE,
                 WorkspaceAuthorizationAction.MEMBER_ROLE_CHANGE, id, targetSubjectId.value());
         WorkspaceAccess access = requireAccess(
-                actor, id, WorkspaceAuthorizationAction.MEMBER_ROLE_CHANGE, targetSubjectId.value());
-        requireManager(actor, access.member(), id,
+                principal, id, WorkspaceAuthorizationAction.MEMBER_ROLE_CHANGE, targetSubjectId.value());
+        requireManager(principal, access.member(), id,
                 WorkspaceAuthorizationAction.MEMBER_ROLE_CHANGE, targetSubjectId.value());
         WorkspaceMember target = requireTargetMember(
-                actor, access.workspace().tenantId(), id, targetSubjectId,
-                WorkspaceAuthorizationAction.MEMBER_ROLE_CHANGE);
+                principal, id, targetSubjectId, WorkspaceAuthorizationAction.MEMBER_ROLE_CHANGE);
         if (target.role() == WorkspaceRole.OWNER) {
-            throw denied(actor, id, targetSubjectId.value(),
+            throw denied(principal, id, targetSubjectId.value(),
                     WorkspaceAuthorizationAction.MEMBER_ROLE_CHANGE,
                     WorkspaceErrorCode.ACCESS_DENIED);
         }
 
-        auditAllowed(actor, id, targetSubjectId.value(), WorkspaceAuthorizationAction.MEMBER_ROLE_CHANGE);
+        auditAllowed(principal, id, targetSubjectId.value(), WorkspaceAuthorizationAction.MEMBER_ROLE_CHANGE);
         if (target.role() == newRole) {
             return target;
         }
         Instant now = clock.instant();
         if (!memberRepository.updateRole(
-                target.tenantId(), id, targetSubjectId, target.role(), newRole, now)) {
+                id, targetSubjectId, target.role(), newRole, now)) {
             throw new BusinessException(WorkspaceErrorCode.MEMBER_UPDATE_CONFLICT);
         }
         return new WorkspaceMember(
-                target.tenantId(), target.workspaceId(), target.subjectId(), newRole, target.status(),
+                target.workspaceId(), target.subjectId(), newRole, target.status(),
                 target.invitedBy(), target.createdAt(), target.activatedAt(), now);
     }
 
     @Transactional
     public void removeMember(
-            AuthenticatedActor actor, UUID id, RemoveWorkspaceMemberCommand command) {
-        actor = requireActor(actor);
+            AuthenticatedPrincipal principal, UUID id, RemoveWorkspaceMemberCommand command) {
+        principal = requireHuman(principal);
         Objects.requireNonNull(command, "command");
         SubjectId targetSubjectId = subjectId(command.subjectId());
-        requireAuthority(actor, WorkspaceAuthorities.WRITE,
+        requireScope(principal, WorkspaceAuthorities.WRITE,
                 WorkspaceAuthorizationAction.MEMBER_REMOVE, id, targetSubjectId.value());
         WorkspaceAccess access = requireAccess(
-                actor, id, WorkspaceAuthorizationAction.MEMBER_REMOVE, targetSubjectId.value());
-        requireManager(actor, access.member(), id,
+                principal, id, WorkspaceAuthorizationAction.MEMBER_REMOVE, targetSubjectId.value());
+        requireManager(principal, access.member(), id,
                 WorkspaceAuthorizationAction.MEMBER_REMOVE, targetSubjectId.value());
         WorkspaceMember target = requireTargetMember(
-                actor, access.workspace().tenantId(), id, targetSubjectId,
-                WorkspaceAuthorizationAction.MEMBER_REMOVE);
+                principal, id, targetSubjectId, WorkspaceAuthorizationAction.MEMBER_REMOVE);
         if (target.role() == WorkspaceRole.OWNER) {
-            throw denied(actor, id, targetSubjectId.value(),
-                    WorkspaceAuthorizationAction.MEMBER_REMOVE,
-                    WorkspaceErrorCode.ACCESS_DENIED);
+            throw denied(principal, id, targetSubjectId.value(),
+                    WorkspaceAuthorizationAction.MEMBER_REMOVE, WorkspaceErrorCode.ACCESS_DENIED);
         }
 
-        auditAllowed(actor, id, targetSubjectId.value(), WorkspaceAuthorizationAction.MEMBER_REMOVE);
-        if (!memberRepository.deleteNonOwner(target.tenantId(), id, targetSubjectId)) {
+        auditAllowed(principal, id, targetSubjectId.value(), WorkspaceAuthorizationAction.MEMBER_REMOVE);
+        if (!memberRepository.deleteNonOwner(id, targetSubjectId)) {
             throw new BusinessException(WorkspaceErrorCode.MEMBER_UPDATE_CONFLICT);
         }
     }
 
     @Transactional
     public WorkspaceMember transferOwnership(
-            AuthenticatedActor actor, UUID id, TransferWorkspaceOwnershipCommand command) {
-        actor = requireActor(actor);
+            AuthenticatedPrincipal principal, UUID id, TransferWorkspaceOwnershipCommand command) {
+        principal = requireHuman(principal);
         Objects.requireNonNull(command, "command");
         SubjectId targetSubjectId = subjectId(command.newOwnerSubjectId());
-        requireAuthority(actor, WorkspaceAuthorities.WRITE,
+        requireScope(principal, WorkspaceAuthorities.WRITE,
                 WorkspaceAuthorizationAction.OWNERSHIP_TRANSFER, id, targetSubjectId.value());
-        TenantId tenantId = tenantId(actor.tenantId());
         Workspace workspace = requireWorkspace(
-                actor, tenantId, id, WorkspaceAuthorizationAction.OWNERSHIP_TRANSFER,
+                principal, id, WorkspaceAuthorizationAction.OWNERSHIP_TRANSFER,
                 targetSubjectId.value(), true);
-        SubjectId actorSubjectId = subjectId(actor.subjectId());
-        AuthenticatedActor authenticatedActor = actor;
+        SubjectId actorSubjectId = subjectId(principal.subjectId());
+        AuthenticatedPrincipal authenticatedPrincipal = principal;
         WorkspaceMember currentOwner = memberRepository.findByWorkspaceAndSubject(
-                        tenantId, id, actorSubjectId)
+                        id, actorSubjectId)
                 .filter(WorkspaceMember::isActive)
-                .orElseThrow(() -> denied(authenticatedActor, id, targetSubjectId.value(),
+                .orElseThrow(() -> denied(authenticatedPrincipal, id, targetSubjectId.value(),
                         WorkspaceAuthorizationAction.OWNERSHIP_TRANSFER,
                         WorkspaceErrorCode.NOT_FOUND));
         if (currentOwner.role() != WorkspaceRole.OWNER) {
-            throw denied(actor, id, targetSubjectId.value(),
+            throw denied(principal, id, targetSubjectId.value(),
                     WorkspaceAuthorizationAction.OWNERSHIP_TRANSFER,
                     WorkspaceErrorCode.ACCESS_DENIED);
         }
         if (actorSubjectId.equals(targetSubjectId)) {
-            auditAllowed(actor, id, targetSubjectId.value(),
+            auditAllowed(principal, id, targetSubjectId.value(),
                     WorkspaceAuthorizationAction.OWNERSHIP_TRANSFER);
             return currentOwner;
         }
         WorkspaceMember target = requireTargetMember(
-                actor, workspace.tenantId(), id, targetSubjectId,
-                WorkspaceAuthorizationAction.OWNERSHIP_TRANSFER);
+                principal, id, targetSubjectId, WorkspaceAuthorizationAction.OWNERSHIP_TRANSFER);
         if (!target.isActive()) {
-            throw denied(actor, id, targetSubjectId.value(),
+            throw denied(principal, id, targetSubjectId.value(),
                     WorkspaceAuthorizationAction.OWNERSHIP_TRANSFER,
                     WorkspaceErrorCode.MEMBER_NOT_ACTIVE);
         }
 
         Instant now = clock.instant();
-        auditAllowed(actor, id, targetSubjectId.value(),
+        auditAllowed(principal, id, targetSubjectId.value(),
                 WorkspaceAuthorizationAction.OWNERSHIP_TRANSFER);
-        if (!memberRepository.demoteOwner(tenantId, id, actorSubjectId, now)
+        if (!memberRepository.demoteOwner(id, actorSubjectId, now)
                 || !memberRepository.promoteActiveMemberToOwner(
-                        tenantId, id, targetSubjectId, target.role(), now)) {
+                        id, targetSubjectId, target.role(), now)) {
             throw new BusinessException(WorkspaceErrorCode.MEMBER_UPDATE_CONFLICT);
         }
         return new WorkspaceMember(
-                target.tenantId(), target.workspaceId(), target.subjectId(), WorkspaceRole.OWNER,
+                workspace.id(), target.subjectId(), WorkspaceRole.OWNER,
                 target.status(), target.invitedBy(), target.createdAt(), target.activatedAt(), now);
     }
 
     @Transactional(readOnly = true)
     public WorkspaceAuthorizationAuditPage authorizationAudits(
-            AuthenticatedActor actor, UUID id, int page, int size) {
-        actor = requireActor(actor);
-        requireAuthority(actor, WorkspaceAuthorities.AUDIT_READ,
+            AuthenticatedPrincipal principal, UUID id, int page, int size) {
+        principal = requireHuman(principal);
+        requireScope(principal, WorkspaceAuthorities.AUDIT_READ,
                 WorkspaceAuthorizationAction.AUTHORIZATION_AUDIT_READ, id, null);
         WorkspaceAccess access = requireAccess(
-                actor, id, WorkspaceAuthorizationAction.AUTHORIZATION_AUDIT_READ, null);
-        requireManager(actor, access.member(), id,
+                principal, id, WorkspaceAuthorizationAction.AUTHORIZATION_AUDIT_READ, null);
+        requireManager(principal, access.member(), id,
                 WorkspaceAuthorizationAction.AUTHORIZATION_AUDIT_READ, null);
         if (page < 1 || size < 1 || size > 100) {
             throw new BusinessException(WorkspaceErrorCode.INVALID_PAGE);
         }
         long offset = Math.multiplyExact((long) page - 1, size);
-        auditAllowed(actor, id, null, WorkspaceAuthorizationAction.AUTHORIZATION_AUDIT_READ);
-        return auditService.findPage(access.workspace().tenantId(), id, page, size, offset);
+        auditAllowed(principal, id, null, WorkspaceAuthorizationAction.AUTHORIZATION_AUDIT_READ);
+        return auditService.findPage(id, page, size, offset);
     }
 
     private WorkspaceAccess requireAccess(
-            AuthenticatedActor actor,
+            AuthenticatedPrincipal principal,
             UUID id,
             WorkspaceAuthorizationAction action,
             String targetSubjectId) {
         Objects.requireNonNull(id, "id");
-        TenantId tenantId = tenantId(actor.tenantId());
-        SubjectId subjectId = subjectId(actor.subjectId());
-        Workspace workspace = requireWorkspace(
-                actor, tenantId, id, action, targetSubjectId, false);
-        WorkspaceMember member = memberRepository.findByWorkspaceAndSubject(tenantId, id, subjectId)
+        SubjectId subjectId = subjectId(principal.subjectId());
+        Workspace workspace = requireWorkspace(principal, id, action, targetSubjectId, false);
+        WorkspaceMember member = memberRepository.findByWorkspaceAndSubject(id, subjectId)
                 .filter(WorkspaceMember::isActive)
                 .orElseThrow(() -> denied(
-                        actor, id, targetSubjectId, action, WorkspaceErrorCode.NOT_FOUND));
+                        principal, id, targetSubjectId, action, WorkspaceErrorCode.NOT_FOUND));
         return new WorkspaceAccess(workspace, member);
     }
 
     private Workspace requireWorkspace(
-            AuthenticatedActor actor,
-            TenantId tenantId,
+            AuthenticatedPrincipal principal,
             UUID id,
             WorkspaceAuthorizationAction action,
             String targetSubjectId,
             boolean forUpdate) {
         return (forUpdate
-                ? workspaceRepository.findByIdForUpdate(tenantId, id)
-                : workspaceRepository.findById(tenantId, id))
+                ? workspaceRepository.findByIdForUpdate(id)
+                : workspaceRepository.findById(id))
                 .orElseThrow(() -> denied(
-                        actor, id, targetSubjectId, action, WorkspaceErrorCode.NOT_FOUND));
+                        principal, id, targetSubjectId, action, WorkspaceErrorCode.NOT_FOUND));
     }
 
     private WorkspaceMember requireTargetMember(
-            AuthenticatedActor actor,
-            TenantId tenantId,
+            AuthenticatedPrincipal principal,
             UUID workspaceId,
             SubjectId targetSubjectId,
             WorkspaceAuthorizationAction action) {
-        return memberRepository.findByWorkspaceAndSubject(tenantId, workspaceId, targetSubjectId)
+        return memberRepository.findByWorkspaceAndSubject(workspaceId, targetSubjectId)
                 .orElseThrow(() -> denied(
-                        actor, workspaceId, targetSubjectId.value(), action, WorkspaceErrorCode.NOT_FOUND));
+                        principal, workspaceId, targetSubjectId.value(), action, WorkspaceErrorCode.NOT_FOUND));
     }
 
     private void requireManager(
-            AuthenticatedActor actor,
+            AuthenticatedPrincipal principal,
             WorkspaceMember member,
             UUID workspaceId,
             WorkspaceAuthorizationAction action,
             String targetSubjectId) {
         if (!member.role().canManageWorkspace()) {
-            throw denied(actor, workspaceId, targetSubjectId, action, WorkspaceErrorCode.ACCESS_DENIED);
+            throw denied(principal, workspaceId, targetSubjectId, action, WorkspaceErrorCode.ACCESS_DENIED);
         }
     }
 
-    private void requireAuthority(
-            AuthenticatedActor actor,
+    private void requireScope(
+            AuthenticatedPrincipal principal,
             String authority,
             WorkspaceAuthorizationAction action,
             UUID workspaceId,
             String targetSubjectId) {
-        if (!actor.hasAuthority(authority)) {
-            throw denied(actor, workspaceId, targetSubjectId, action, StandardErrorCode.FORBIDDEN);
+        String scope = authority.startsWith("SCOPE_") ? authority.substring("SCOPE_".length()) : authority;
+        if (!principal.scopes().contains(scope)) {
+            throw denied(principal, workspaceId, targetSubjectId, action, StandardErrorCode.FORBIDDEN);
         }
     }
 
     private BusinessException denied(
-            AuthenticatedActor actor,
+            AuthenticatedPrincipal principal,
             UUID workspaceId,
             String targetSubjectId,
             WorkspaceAuthorizationAction action,
             ErrorCode reason) {
         auditService.record(
-                actor, workspaceId, targetSubjectId, action,
+                principal, workspaceId, targetSubjectId, action,
                 WorkspaceAuthorizationDecision.DENIED, reason);
         return new BusinessException(reason);
     }
 
     private void auditAllowed(
-            AuthenticatedActor actor,
+            AuthenticatedPrincipal principal,
             UUID workspaceId,
             String targetSubjectId,
             WorkspaceAuthorizationAction action) {
         auditService.record(
-                actor, workspaceId, targetSubjectId, action,
+                principal, workspaceId, targetSubjectId, action,
                 WorkspaceAuthorizationDecision.ALLOWED, StandardErrorCode.OK);
     }
 
-    private AuthenticatedActor requireActor(AuthenticatedActor actor) {
-        return Objects.requireNonNull(actor, "actor");
+    private AuthenticatedPrincipal requireHuman(AuthenticatedPrincipal principal) {
+        if (principal == null || !principal.isHuman()) {
+            throw new BusinessException(StandardErrorCode.FORBIDDEN);
+        }
+        return principal;
     }
 
     private WorkspaceRole requireAssignableRole(WorkspaceRole role) {
@@ -412,12 +402,8 @@ public class WorkspaceApplicationService {
         }
     }
 
-    private TenantId tenantId(String value) {
-        try {
-            return new TenantId(value);
-        } catch (IllegalArgumentException | NullPointerException exception) {
-            throw new BusinessException(WorkspaceErrorCode.ACCESS_DENIED);
-        }
+    private String principalSubject(AuthenticatedPrincipal principal) {
+        return principal.subjectId();
     }
 
     private record WorkspaceAccess(Workspace workspace, WorkspaceMember member) {
