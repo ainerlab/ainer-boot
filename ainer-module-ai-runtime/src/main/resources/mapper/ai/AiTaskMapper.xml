@@ -6,15 +6,15 @@
 
     <insert id="insertTask">
         INSERT INTO ainer_ai_task
-            (id, tenant_id, workspace_id, task_type, target_identity_id,
+            (id, workspace_id, task_type, target_identity_id,
              status, trigger, triggered_by, policy_version, created_at, updated_at)
         VALUES
-            (#{id}, #{tenantId}, #{workspaceId}, #{taskType}, #{targetIdentityId},
+            (#{id}, #{workspaceId}, #{taskType}, #{targetIdentityId},
              #{status}, #{trigger}, #{triggeredBy}, #{policyVersion}, #{createdAt}, #{updatedAt})
     </insert>
 
     <select id="selectTaskById" resultType="dev.ainer.module.ai.gateway.infrastructure.mybatis.AiTaskRow">
-        SELECT id, tenant_id AS tenantId, workspace_id AS workspaceId,
+        SELECT id, workspace_id AS workspaceId,
                task_type AS taskType, target_identity_id AS targetIdentityId,
                status, trigger, triggered_by AS triggeredBy,
                policy_version AS policyVersion,
@@ -31,10 +31,10 @@
 
     <insert id="insertContextSnapshot">
         INSERT INTO ainer_ai_context_snapshot
-            (id, tenant_id, identity_id, identity_version_id,
+            (id, identity_id, identity_version_id,
              evidence_refs, memory_refs, as_of, schema_version, created_at)
         VALUES
-            (#{id}, #{tenantId}, #{identityId}, #{identityVersionId},
+            (#{id}, #{identityId}, #{identityVersionId},
              #{evidenceRefs}::jsonb, #{memoryRefs}::jsonb, #{asOf}, #{schemaVersion}, #{createdAt})
     </insert>
 
@@ -86,5 +86,4 @@
             (#{id}, #{resultId}, #{decision}, #{editedContent}, #{feedbackReason},
              #{memoryProposal}::jsonb, #{reviewerId}, #{reviewedAt})
     </insert>
-
 </mapper>

@@ -23,13 +23,13 @@ public class MybatisAiInvocationRepository implements AiInvocationRepository {
     }
 
     @Override
-    public void lockTenantBudget(String tenantId) {
-        mapper.lockTenantBudget(tenantId);
+    public void lockSubjectBudget(String subjectId) {
+        mapper.lockSubjectBudget(subjectId);
     }
 
     @Override
-    public BigDecimal sumDailyExposure(String tenantId, Instant fromInclusive, Instant toExclusive) {
-        return mapper.sumDailyExposure(tenantId, fromInclusive, toExclusive);
+    public BigDecimal sumDailyExposure(String subjectId, Instant fromInclusive, Instant toExclusive) {
+        return mapper.sumDailyExposure(subjectId, fromInclusive, toExclusive);
     }
 
     @Override
@@ -59,14 +59,13 @@ public class MybatisAiInvocationRepository implements AiInvocationRepository {
     }
 
     @Override
-    public Optional<AiInvocation> findByTenantAndId(String tenantId, UUID id) {
-        return Optional.ofNullable(mapper.selectByTenantAndId(tenantId, id)).map(this::toDomain);
+    public Optional<AiInvocation> findBySubjectAndId(String subjectId, UUID id) {
+        return Optional.ofNullable(mapper.selectBySubjectAndId(subjectId, id)).map(this::toDomain);
     }
 
     private AiInvocationRow toRow(AiInvocation invocation) {
         AiInvocationRow row = new AiInvocationRow();
         row.setId(invocation.id());
-        row.setTenantId(invocation.tenantId());
         row.setSubjectId(invocation.subjectId());
         row.setRequestId(invocation.requestId());
         row.setProvider(invocation.provider());
@@ -92,7 +91,7 @@ public class MybatisAiInvocationRepository implements AiInvocationRepository {
 
     private AiInvocation toDomain(AiInvocationRow row) {
         return new AiInvocation(
-                row.getId(), row.getTenantId(), row.getSubjectId(), row.getRequestId(), row.getProvider(),
+                row.getId(), row.getSubjectId(), row.getRequestId(), row.getProvider(),
                 row.getRequestedModel(), row.getResolvedModel(), row.isStreaming(),
                 InvocationStatus.valueOf(row.getStatus()), PolicyDecision.valueOf(row.getPolicyDecision()),
                 row.getPromptFingerprint(), row.getInputTokens(), row.getOutputTokens(), row.isUsageEstimated(),

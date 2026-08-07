@@ -11,9 +11,9 @@ import java.util.UUID;
 
 public interface AiInvocationRepository {
 
-    void lockTenantBudget(String tenantId);
+    void lockSubjectBudget(String subjectId);
 
-    BigDecimal sumDailyExposure(String tenantId, Instant fromInclusive, Instant toExclusive);
+    BigDecimal sumDailyExposure(String subjectId, Instant fromInclusive, Instant toExclusive);
 
     void insert(AiInvocation invocation);
 
@@ -28,5 +28,5 @@ public interface AiInvocationRepository {
 
     boolean markFailed(UUID id, String errorCode, long latencyMillis, Instant completedAt);
 
-    Optional<AiInvocation> findByTenantAndId(String tenantId, UUID id);
+    Optional<AiInvocation> findBySubjectAndId(String subjectId, UUID id);
 }

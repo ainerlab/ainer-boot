@@ -63,7 +63,7 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "ainer.ai.provider.allow-insecure-http=true",
                 "ainer.ai.provider.request-timeout=5s",
                 "ainer.ai.limits.requests-per-minute=10000",
-                "ainer.ai.limits.tenant-daily-budget=0.01",
+                "ainer.ai.limits.subject-daily-budget=0.01",
                 "ainer.ai.pricing.currency=USD",
                 "ainer.ai.pricing.input-per-million-tokens=1.00",
                 "ainer.ai.pricing.output-per-million-tokens=2.00",
@@ -129,7 +129,7 @@ class AiGatewayModuleIntegrationTest {
 
     @Test
     void migrationCreatesAuditSchemaWithoutPromptOrResponseColumns() {
-        assertThat(flyway.info().applied()).hasSize(2);
+        assertThat(flyway.info().applied()).hasSize(3);
         List<String> columns = jdbcTemplate.queryForList(
                 "SELECT column_name FROM information_schema.columns "
                         + "WHERE table_schema = 'public' AND table_name = 'ainer_ai_invocation'",
@@ -258,7 +258,7 @@ class AiGatewayModuleIntegrationTest {
 
     private AiInvocation invocation(String tenantId, CostBreakdown reservation) {
         return AiInvocation.started(
-                UUID.randomUUID(), tenantId, "subject:test", "request:test", provider.name(),
+                UUID.randomUUID(), "subject:test", "request:test", provider.name(),
                 "test/model", "test/model", false, "a".repeat(64), reservation, clock.instant());
     }
 
@@ -290,12 +290,18 @@ class AiGatewayModuleIntegrationTest {
 
     @Test
     void governedAiTaskProducesCompleteAuditableLoopWithFeedback() {
-        UUID tenantId = UUID.randomUUID();
         UUID identityId = UUID.randomUUID();
-        dev.ainer.security.actor.AuthenticatedActor actor =
-                new dev.ainer.security.actor.AuthenticatedActor(
-                        "actor-test-001", tenantId.toString(), "USER",
-                        java.util.Set.of("SCOPE_ai.invoke"));
+        dev.ainer.security.token.AuthenticatedPrincipal actor =
+                new dev.ainer.security.token.AuthenticatedPrincipal(
+                        new dev.ainer.security.principal.HumanSubjectRef(
+                                new dev.ainer.security.principal.IdentityAuthorityRef(
+                                        "https://auth.ainer.test"),
+                                "actor-test-001"),
+                        new dev.ainer.security.principal.IdentityAuthorityRef(
+                                "https://auth.ainer.test"),
+                        dev.ainer.security.token.TokenProfile.USER_NEUTRAL_V1,
+                        "1", java.util.Set.of("ainer-api"), java.util.Set.of("ai.invoke"),
+                        "pwd", null, 0L);
 
         dev.ainer.module.ai.gateway.application.AiTaskRunService.AiTaskCreateCommand command =
                 new dev.ainer.module.ai.gateway.application.AiTaskRunService.AiTaskCreateCommand(
@@ -324,7 +330,7 @@ class AiGatewayModuleIntegrationTest {
         java.util.Map<String, Object> taskRow = jdbcTemplate.queryForMap(
                 "SELECT * FROM ainer_ai_task WHERE id = ?", taskId);
         assertThat(taskRow.get("triggered_by")).isEqualTo("actor-test-001");       // Q1
-        assertThat(taskRow.get("tenant_id")).isEqualTo(tenantId);                   // Q2
+        assertThat(taskRow).doesNotContainKey("tenant_id");                         // Q2
         assertThat(taskRow.get("task_type")).isEqualTo("identity-weekly-report");
         assertThat(taskRow.get("status")).isEqualTo("COMPLETED");
 
@@ -408,10 +414,15 @@ class AiGatewayModuleIntegrationTest {
         JwtDecoder testJwtDecoder() {
             return token -> Jwt.withTokenValue(token)
                     .header("alg", "RS256")
-                    .subject("subject:test")
-                    .claim("tenant_id", token)
+                    .issuer("https://auth.ainer.test")
+                    .audience(List.of("ainer-api"))
+                    .subject("subject:" + token)
+                    .claim("token_profile", "USER_NEUTRAL_V1")
+                    .claim("claim_contract_version", "1")
                     .claim("actor_type", "USER")
                     .claim("scope", "ai.invoke")
+                    .claim("amr", "pwd")
+                    .claim("sec_epoch", 0L)
                     .issuedAt(Instant.now().minusSeconds(5))
                     .expiresAt(Instant.now().plusSeconds(300))
                     .build();

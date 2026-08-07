@@ -159,12 +159,12 @@ public class AiRuntimeProperties {
     public static final class Limits {
 
         private final int requestsPerMinute;
-        private final BigDecimal tenantDailyBudget;
+        private final BigDecimal subjectDailyBudget;
         private final int maxPromptCharacters;
 
-        public Limits(Integer requestsPerMinute, BigDecimal tenantDailyBudget, Integer maxPromptCharacters) {
+        public Limits(Integer requestsPerMinute, BigDecimal subjectDailyBudget, Integer maxPromptCharacters) {
             this.requestsPerMinute = requestsPerMinute != null ? requestsPerMinute : 60;
-            this.tenantDailyBudget = tenantDailyBudget != null ? tenantDailyBudget : new BigDecimal("10.00");
+            this.subjectDailyBudget = subjectDailyBudget != null ? subjectDailyBudget : new BigDecimal("10.00");
             this.maxPromptCharacters = maxPromptCharacters != null ? maxPromptCharacters : 100_000;
         }
 
@@ -172,8 +172,8 @@ public class AiRuntimeProperties {
             return requestsPerMinute;
         }
 
-        public BigDecimal getTenantDailyBudget() {
-            return tenantDailyBudget;
+        public BigDecimal getSubjectDailyBudget() {
+            return subjectDailyBudget;
         }
 
         public int getMaxPromptCharacters() {
@@ -183,8 +183,8 @@ public class AiRuntimeProperties {
         private void validate() {
             require(requestsPerMinute > 0 && requestsPerMinute <= 100_000,
                     "ainer.ai.limits.requests-per-minute is invalid");
-            require(tenantDailyBudget != null && tenantDailyBudget.signum() > 0,
-                    "ainer.ai.limits.tenant-daily-budget must be positive");
+            require(subjectDailyBudget != null && subjectDailyBudget.signum() > 0,
+                    "ainer.ai.limits.subject-daily-budget must be positive");
             require(maxPromptCharacters >= 1_000 && maxPromptCharacters <= 10_000_000,
                     "ainer.ai.limits.max-prompt-characters is invalid");
         }

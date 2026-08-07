@@ -8,7 +8,6 @@ import java.util.UUID;
 
 public record AiInvocationResponse(
         UUID id,
-        String tenantId,
         String subjectId,
         String requestId,
         String provider,
@@ -31,7 +30,7 @@ public record AiInvocationResponse(
 
     static AiInvocationResponse from(AiInvocation invocation) {
         return new AiInvocationResponse(
-                invocation.id(), invocation.tenantId(), invocation.subjectId(), invocation.requestId(),
+                invocation.id(), invocation.subjectId(), invocation.requestId(),
                 invocation.provider(), invocation.requestedModel(), invocation.resolvedModel(),
                 invocation.streaming(), invocation.status().name(), invocation.policyDecision().name(),
                 invocation.inputTokens(), invocation.outputTokens(), invocation.usageEstimated(),

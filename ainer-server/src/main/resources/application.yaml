@@ -80,7 +80,7 @@ ainer:
       allow-insecure-http: ${AINER_AI_ALLOW_INSECURE_HTTP:false}
     limits:
       requests-per-minute: ${AINER_AI_REQUESTS_PER_MINUTE:60}
-      tenant-daily-budget: ${AINER_AI_TENANT_DAILY_BUDGET:10.00}
+      subject-daily-budget: ${AINER_AI_SUBJECT_DAILY_BUDGET:10.00}
       max-prompt-characters: ${AINER_AI_MAX_PROMPT_CHARACTERS:100000}
     pricing:
       currency: ${AINER_AI_CURRENCY:USD}

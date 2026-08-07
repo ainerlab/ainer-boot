@@ -82,6 +82,7 @@ S3 customizer 新 profile 签发已完成（SERVICE_V1 + USER_NEUTRAL_V1 轨道�
 全 reactor 401/0/0/0）；S4 登录链路与 Passkey foundation 接线已完成，
 全 reactor 407/0/0/0）；S5 Resource Server typed profile resolver 已完成，
 全 reactor 411/0/0/0）；S6 canonical Workspace 去 tenant 已完成，
+全 reactor 387/0/0/0）；S7 AI Runtime 去 tenant 已完成，
 全 reactor 387/0/0/0。
 
 ### S2 — Foundation 能力补全（password credential store + Profile + securityEpoch 查询）

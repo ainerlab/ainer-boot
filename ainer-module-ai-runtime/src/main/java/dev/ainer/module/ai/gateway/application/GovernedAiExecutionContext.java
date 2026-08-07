@@ -1,7 +1,5 @@
 package dev.ainer.module.ai.gateway.application;
 
-import dev.ainer.security.actor.AuthenticatedActor;
-
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -18,7 +16,7 @@ import java.util.UUID;
  *
  * <p>当前字段分为三层：
  * <ul>
- *   <li>已落地：tenantId, actorType, actorId, requestId, traceId, scopes</li>
+ *   <li>已落地：actorType, actorId, requestId, traceId, scopes</li>
  *   <li>待接入：workspaceId, memberId（待 Workspace 域模型对接后填充）</li>
  *   <li>规划中：identityId, identityVersionId, purpose, taskType, dataScope,
  *       dataClassification, entitlementPolicyVersion, retentionPolicy（待领域模型落地后填充）</li>
@@ -26,7 +24,6 @@ import java.util.UUID;
  * 所有"待接入"和"规划中"字段为 nullable，Resolver 只填当前可解析的字段。
  */
 public record GovernedAiExecutionContext(
-        UUID tenantId,
         UUID workspaceId,
         String actorType,
         String actorId,
@@ -44,7 +41,6 @@ public record GovernedAiExecutionContext(
         String requestId) {
 
     public GovernedAiExecutionContext {
-        Objects.requireNonNull(tenantId, "tenantId");
         Objects.requireNonNull(actorType, "actorType");
         Objects.requireNonNull(actorId, "actorId");
         Objects.requireNonNull(requestId, "requestId");
@@ -52,11 +48,11 @@ public record GovernedAiExecutionContext(
     }
 
     public boolean isUser() {
-        return AuthenticatedActor.USER.equals(actorType);
+        return "USER".equals(actorType);
     }
 
     public boolean isService() {
-        return AuthenticatedActor.SERVICE.equals(actorType);
+        return "SERVICE".equals(actorType);
     }
 
     public boolean hasScope(String scope) {

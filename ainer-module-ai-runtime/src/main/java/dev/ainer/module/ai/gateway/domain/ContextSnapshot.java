@@ -6,7 +6,6 @@ import java.util.UUID;
 
 public record ContextSnapshot(
         UUID id,
-        UUID tenantId,
         UUID identityId,
         UUID identityVersionId,
         String evidenceRefsJson,
@@ -17,7 +16,6 @@ public record ContextSnapshot(
 
     public ContextSnapshot {
         Objects.requireNonNull(id, "id");
-        Objects.requireNonNull(tenantId, "tenantId");
         Objects.requireNonNull(evidenceRefsJson, "evidenceRefsJson");
         Objects.requireNonNull(memoryRefsJson, "memoryRefsJson");
         Objects.requireNonNull(asOf, "asOf");

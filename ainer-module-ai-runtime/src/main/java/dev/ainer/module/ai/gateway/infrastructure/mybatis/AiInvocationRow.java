@@ -7,7 +7,6 @@ import java.util.UUID;
 public class AiInvocationRow {
 
     private UUID id;
-    private String tenantId;
     private String subjectId;
     private String requestId;
     private String provider;
@@ -35,14 +34,6 @@ public class AiInvocationRow {
 
     public void setId(UUID id) {
         this.id = id;
-    }
-
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
     }
 
     public String getSubjectId() {

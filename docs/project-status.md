@@ -138,6 +138,14 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
   scope。旧 tenant-first Workspace 测试已重写为 canonical membership/跨 Workspace DENY 门禁。
   全 reactor 387 tests / 0 failure / 0 error / 0 skipped（Colima）。
   施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
+- Greenfield S7 AI Runtime 去 tenant 已在 `reset/0033-greenfield` 分支完成：
+  `GovernedAiExecutionContext`、Invocation/Task/ContextSnapshot、AI audit/budget repository 与 API
+  改用 typed `AuthenticatedPrincipal` 的 subject/actor context；node-local limiter 更名为
+  `SubjectRateLimiter`，PostgreSQL daily budget/advisory lock 按 subject 绑定，模型调用、Task run、
+  SSE、审计读取与 cross-subject 404 回归保持通过。新增 AI migration 移除 invocation/task/snapshot 的
+  tenant 列，配置改为 `subject-daily-budget`。全 reactor 387 tests / 0 failure / 0 error / 0 skipped
+  （Colima）。
+  施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
 - Greenfield S3 customizer 新 profile 签发（执行规划 缺口 B）已在 `reset/0033-greenfield` 分支完成：
   `AinerUserDetails` 加性重设计（新增 nullable `accountId` + `securityEpoch`，legacy 字段保留），
   customizer 抽为可测的 `AinerJwtTokenCustomizer`：client setting `ainer.token-profile` 选择轨道，
