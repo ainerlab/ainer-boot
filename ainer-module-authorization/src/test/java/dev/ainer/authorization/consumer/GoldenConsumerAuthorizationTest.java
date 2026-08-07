@@ -51,7 +51,7 @@ class GoldenConsumerAuthorizationTest {
     private static final Instant NOW = Instant.parse("2026-08-03T00:00:00Z");
     private static final String MERCHANT_SCOPE = "merchant.listings";
 
-    private final UUID tenant = UUID.fromString("019c1000-0000-7000-8000-0000000000a1");
+    private final UUID workspace = UUID.fromString("019c1000-0000-7000-8000-0000000000a1");
     private final UUID listingId = UUID.fromString("019c1000-0000-7000-8000-0000000000b1");
     private final UUID otherListingId = UUID.fromString("019c1000-0000-7000-8000-0000000000c1");
     private final SubjectRef merchantOperator = new SubjectRef("xq-platform", "operator-1", SubjectType.USER);
@@ -105,8 +105,8 @@ class GoldenConsumerAuthorizationTest {
     private AuthorizationDecision authorize(AuthorizationService svc, SubjectRef subject, String scope,
                                             PermissionCode permission, UUID resource, AuthorizationContext.Assurance assurance) {
         return svc.authorize(new AuthorizationRequest(
-                new Requester.Authenticated(subject, tenant, Set.of(scope), Set.of("xq-platform"), "xq-shop-next"),
-                AccessMode.AUTHENTICATED, permission, new ResourceRef(tenant, LISTING, resource),
+                new Requester.Authenticated(subject, Set.of(scope), Set.of("xq-platform"), "xq-shop-next"),
+                AccessMode.AUTHENTICATED, permission, new ResourceRef(workspace, LISTING, resource),
                 new AuthorizationContext(NOW, assurance, "xq-shop-next", null, null)));
     }
 
@@ -138,7 +138,7 @@ class GoldenConsumerAuthorizationTest {
         table.put(merchantOperator, Set.of(new SubjectBinding(
                 merchantOperator,
                 new Role("merchant-operator", Set.of(LISTING_PUBLISH, LISTING_READ)),
-                new Scope.Resource(tenant, LISTING, listingId),
+                new Scope.Resource(LISTING, listingId),
                 BindingStatus.ACTIVE, NOW.minusSeconds(3600), null, 1L)));
         return subject -> table.getOrDefault(subject, Set.of());
     }

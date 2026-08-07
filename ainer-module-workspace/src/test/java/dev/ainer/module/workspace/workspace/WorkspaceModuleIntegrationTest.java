@@ -77,14 +77,13 @@ class WorkspaceModuleIntegrationTest {
         jdbcTemplate.update("DELETE FROM ainer_workspace_owner_recovery_request");
         jdbcTemplate.update("DELETE FROM ainer_workspace_authorization_audit_archive");
         jdbcTemplate.update("DELETE FROM ainer_workspace_authorization_audit");
-        jdbcTemplate.update("DELETE FROM ainer_workspace_identity_event_receipt");
         jdbcTemplate.update("DELETE FROM ainer_workspace_member");
         jdbcTemplate.update("DELETE FROM ainer_workspace");
     }
 
     @Test
-    void migrationAndTablesAreTenantless() {
-        assertThat(flyway.info().applied()).hasSize(9);
+    void migrationAndTablesAreStandalone() {
+        assertThat(flyway.info().applied()).hasSize(1);
         assertThat(jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)

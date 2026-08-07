@@ -38,10 +38,9 @@ class AinerServerMetricsSecurityTest {
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Test
-    void prometheusUsesEndpointIdentityAndDedicatedTenantlessServiceAuthorization() throws Exception {
+    void prometheusUsesEndpointIdentityAndDedicatedServiceAuthorization() throws Exception {
         assertThat(metrics(null).statusCode()).isEqualTo(401);
         assertThat(metrics("metrics-user").statusCode()).isEqualTo(403);
-        assertThat(metrics("metrics-tenant-service").statusCode()).isEqualTo(403);
         assertThat(metrics("metrics-missing-scope").statusCode()).isEqualTo(403);
 
         HttpResponse<String> allowed = metrics("metrics-service");
@@ -71,12 +70,11 @@ class AinerServerMetricsSecurityTest {
                         .issuedAt(Instant.now().minusSeconds(5))
                         .expiresAt(Instant.now().plusSeconds(300))
                         .claim("actor_type", "metrics-user".equals(token) ? "USER" : "SERVICE")
+                        .claim("token_profile", "metrics-user".equals(token) ? "USER_NEUTRAL_V1" : "SERVICE_V1")
+                        .claim("claim_contract_version", "1")
                         .claim("scope", "metrics-missing-scope".equals(token)
                                 ? "ai.invoke"
                                 : "platform.metrics.read");
-                if ("metrics-tenant-service".equals(token)) {
-                    jwt.claim("tenant_id", "tenant:forbidden");
-                }
                 return jwt.build();
             };
         }

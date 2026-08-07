@@ -1,13 +1,11 @@
 package dev.ainer.module.identity;
 
 import dev.ainer.core.error.ErrorCodeContributor;
-import dev.ainer.module.identity.account.IdentityFeatureMarker;
-import dev.ainer.module.identity.account.application.IdentityErrorCode;
-import dev.ainer.module.identity.account.infrastructure.mybatis.IdentityMapper;
 import dev.ainer.module.identity.foundation.CredentialRepository;
 import dev.ainer.module.identity.foundation.HumanAccountRepository;
 import dev.ainer.module.identity.foundation.HumanProfileRepository;
 import dev.ainer.module.identity.foundation.IdentityFoundationMarker;
+import dev.ainer.module.identity.foundation.IdentityErrorCode;
 import dev.ainer.module.identity.foundation.IdentityFoundationService;
 import dev.ainer.module.identity.foundation.LoginIdentityRepository;
 import dev.ainer.module.identity.foundation.OAuthClientBindingRepository;
@@ -19,7 +17,6 @@ import org.mybatis.spring.annotation.MapperScans;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,11 +27,8 @@ import java.util.function.Supplier;
 
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "ainer.identity", name = "enabled", havingValue = "true", matchIfMissing = true)
-@ComponentScan(basePackageClasses = {IdentityFeatureMarker.class, IdentityFoundationMarker.class})
-@MapperScans({
-        @MapperScan(basePackageClasses = IdentityMapper.class),
-        @MapperScan(basePackageClasses = IdentityFoundationMarker.class, annotationClass = Mapper.class)
-})
+@org.springframework.context.annotation.ComponentScan(basePackageClasses = IdentityFoundationMarker.class)
+@MapperScans(@MapperScan(basePackageClasses = IdentityFoundationMarker.class, annotationClass = Mapper.class))
 public class IdentityModuleConfiguration {
 
     @Bean

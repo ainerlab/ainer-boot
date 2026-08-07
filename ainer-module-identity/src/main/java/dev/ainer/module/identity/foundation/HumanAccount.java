@@ -16,8 +16,7 @@ import java.util.UUID;
  * or closing it never cascades into Workspace, content or audit deletion.
  *
  * <p>{@code securityEpoch} is a monotonic account-wide revocation version: credentials, sessions and tokens
- * issued before the current epoch are invalid. It is the Greenfield replacement for the legacy
- * {@code (tenantId, subjectId)} token-status lookup.
+ * issued before the current epoch are invalid.
  */
 public record HumanAccount(
         UUID accountId,

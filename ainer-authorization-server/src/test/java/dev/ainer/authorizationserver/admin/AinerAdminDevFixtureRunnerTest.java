@@ -93,7 +93,7 @@ class AinerAdminDevFixtureRunnerTest {
 
     private static AinerAuthorizationServerProperties authorizationProperties() {
         return new AinerAuthorizationServerProperties(
-                ISSUER, null, null, null, null, null, null, null, null, null, null, null);
+                ISSUER, null, null, null, null, null, null, null);
     }
 
     private static final class Fixture {

@@ -114,12 +114,6 @@ public final class AuthorizationService {
             return deny(request, AuthorizationReasonCodes.SCOPE_CEILING);
         }
 
-        if (subject.credentialTenantId() != null
-                && request.resource().authoritativeTenantId() != null
-                && !subject.credentialTenantId().equals(request.resource().authoritativeTenantId())) {
-            return deny(request, AuthorizationReasonCodes.TENANT_CEILING);
-        }
-
         GrantPath path = domainPolicy.pathFor(request.permission());
         if (path == null) {
             return deny(request, AuthorizationReasonCodes.UNKNOWN_POLICY);

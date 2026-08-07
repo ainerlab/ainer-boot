@@ -166,7 +166,7 @@ final class ContextSnapshotJacksonAdapter {
 - 当前没有引入 `mybatis-plus-generator`、dynamic-datasource、逻辑删除或通用自动填充运行时。
   代码生成属于后续 Project Initializer 设计，不进入应用运行时依赖。
 - 全局 `IdType.AUTO` 保留 PostgreSQL `DEFAULT uuidv7()` 的数据库生成与回填语义；不使用
-  `ASSIGN_ID` / `ASSIGN_UUID`。tenant interceptor 当前不启用，显式 tenant 条件仍是必须规则。
+  `ASSIGN_ID` / `ASSIGN_UUID`。无 tenant 拦截器，显式绑定资源归属键仍是必须规则。
 
 完整边界、兼容原型与迁移方式见
 [ADR-0028](decisions/0028-mybatis-plus-infrastructure-baseline.md)。
@@ -190,20 +190,19 @@ final class ContextSnapshotJacksonAdapter {
 
 ## M4.1 取舍
 
-- 服务间 Token 获取使用 Spring Security 官方 `spring-security-oauth2-client` 的 Client Credentials provider、authorized-client service 与到期缓存，不自造 Token HTTP/缓存协议。
-- 首个撤销 transport 使用 Boot 已有 `RestClient` 与 Jackson 3，没有引入 Feign、消息中间件 SDK 或专有服务发现依赖；outbox 端口保留后续替换 transport 的能力。
-- PostgreSQL `FOR UPDATE SKIP LOCKED`、条件更新和 receipt 提供并发领取/幂等基础，没有在完成容量验证前引入 Kafka、RabbitMQ 或 Redis。
+- 服务间 Token 获取使用 Spring Security 官方 `spring-security-oauth2-client` 的 Client Credentials provider、authorized-client service 与到期缓存，不自造 Token HTTP/缓存协议；在线 introspection 复用 Spring Security 官方 `RestClientOpaqueTokenIntrospector`，没有引入 Feign、消息中间件 SDK 或专有服务发现依赖。
 
 ## M4.2 取舍
 
 - 双人审批、热/冷审计与 SIEM 稳定游标继续使用现有 PostgreSQL、MyBatis 和 Spring Security 边界，没有引入工作流引擎或 SIEM 厂商 SDK。
-- 撤销传播 SLO bucket 与归档/恢复指标使用 Actuator 已引入的 Micrometer API，没有新增生产 exporter 依赖；监控后端仍属运营缺口。
+- 撤销传播 SLO bucket 与归档/恢复指标使用 Actuator 已引入的 Micrometer API，没有新增生产 exporter 依赖；监控后端仍属运营缺口。撤销传播 Timer（access-event relay）已随 Greenfield S8 删除，不再保留该 bucket。
 
 ## M4.3 取舍
 
 - Resource Server 在线存活检查使用 Spring Security 官方 opaque-token introspector；Authorization Server 使用官方 RFC 7662/RFC 7009 端点和 JDBC authorization service，没有引入自研 Token 表或 Redis deny-list。
 - `ainer-starter-security` 直接依赖 Micrometer Core，使可复用 starter 可以在存在 `MeterRegistry` 时记录在线校验指标，不强迫消费方引入 Actuator exporter。
-- Identity revocation epoch 复用现有 access-event 表与 PostgreSQL 索引，不引入新的数据库组件；高风险请求明确接受一次在线网络与数据库查询成本。
+- Identity 撤销通过 `security_epoch`（`sec_epoch` claim 逐请求比对）实现，复用 foundation
+  表与 PostgreSQL 索引，不引入新的数据库组件；高风险请求明确接受一次在线网络与数据库查询成本。
 
 ## M4.3 生产可观测性切片取舍
 

@@ -3,14 +3,11 @@ package dev.ainer.authorizationserver.config;
 import dev.ainer.authorizationserver.login.AinerLoginAuthenticationFailureHandler;
 import dev.ainer.authorizationserver.passkey.AinerPasskeyWebSecurity;
 import dev.ainer.authorizationserver.ratelimit.AinerLoginRateLimitFilter;
-import dev.ainer.authorizationserver.tenantcontext.AinerTenantSelectionFilter;
-import dev.ainer.authorizationserver.identity.OwnershipTransferStepUpFilter;
 import dev.ainer.core.error.StandardErrorCode;
-import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.security.AinerSecurityScopes;
-import dev.ainer.security.autoconfigure.AinerSecurityFailureWriter;
 import dev.ainer.security.authorization.PrometheusEndpointRequestMatcher;
-import dev.ainer.security.authorization.TenantlessServiceScopeAuthorizationManager;
+import dev.ainer.security.authorization.ServiceScopeAuthorizationManager;
+import dev.ainer.security.autoconfigure.AinerSecurityFailureWriter;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,9 +20,9 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2ErrorAuthenticationFailureHandler;
@@ -45,24 +42,13 @@ import java.util.Set;
 public class AinerAuthorizationServerWebSecurityConfiguration {
 
     @Bean
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
-            prefix = "ainer.identity",
-            name = "enabled",
-            havingValue = "true",
-            matchIfMissing = true)
-    AinerTenantSelectionFilter ainerTenantSelectionFilter(IdentityApplicationService identityService) {
-        return new AinerTenantSelectionFilter(identityService);
-    }
-
-    @Bean
     @Order(1)
     SecurityFilterChain authorizationServerSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder jwtDecoder,
             RegisteredClientRepository registeredClientRepository,
             OAuth2AuthorizationService authorizationService,
-            ObjectProvider<AinerPasskeyWebSecurity> passkeyProvider,
-            ObjectProvider<AinerTenantSelectionFilter> tenantSelectionFilterProvider) throws Exception {
+            ObjectProvider<AinerPasskeyWebSecurity> passkeyProvider) throws Exception {
         AinerTokenIntrospectionAuthenticationProvider introspectionProvider =
                 new AinerTokenIntrospectionAuthenticationProvider(
                         registeredClientRepository, authorizationService);
@@ -82,8 +68,7 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                             response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
                             response.setHeader(HttpHeaders.PRAGMA, "no-cache");
-                            response.setHeader(
-                                    HttpHeaders.WWW_AUTHENTICATE,
+                            response.setHeader(HttpHeaders.WWW_AUTHENTICATE,
                                     "Basic realm=\"oauth2/introspection\"");
                             response.getWriter().write("{\"error\":\"invalid_client\"}");
                             return;
@@ -111,68 +96,27 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
         if (passkey != null) {
             http.webAuthn(passkey::configureProtocolChain);
         }
-        AinerTenantSelectionFilter tenantSelectionFilter = tenantSelectionFilterProvider.getIfAvailable();
-        if (tenantSelectionFilter != null) {
-            http.addFilterAfter(
-                    tenantSelectionFilter,
-                    org.springframework.security.web.context.SecurityContextHolderFilter.class);
-        }
         return http.build();
     }
 
     @Bean
     @Order(2)
-    SecurityFilterChain identityInternalApiSecurityFilterChain(
+    SecurityFilterChain internalSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder jwtDecoder,
             ObjectMapper objectMapper) throws Exception {
         AinerSecurityFailureWriter failureWriter = new AinerSecurityFailureWriter(objectMapper);
         http.securityMatcher("/internal/**")
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(
-                                "/internal/identity/"
-                                        + "tenant-provisioning-notification-receipts")
-                        .access(new TenantlessServiceScopeAuthorizationManager(
-                                AinerSecurityScopes
-                                        .IDENTITY_PROVISIONING_NOTIFICATION_RECEIPTS_WRITE))
-                        .requestMatchers("/internal/identity/directory/**")
+                        .requestMatchers("/internal/passkey-recovery/**")
                         .hasAnyAuthority(
-                                "SCOPE_identity.directory.read",
-                                "SCOPE_identity.directory.read.all")
-                        .requestMatchers("/internal/identity/access-event-recovery/**")
-                        .hasAnyAuthority(
-                                "SCOPE_identity.access-events.replay.read",
-                                "SCOPE_identity.access-events.replay.read.all",
-                                "SCOPE_identity.access-events.replay.request",
-                                "SCOPE_identity.access-events.replay.request.all",
-                                "SCOPE_identity.access-events.replay.approve",
-                                "SCOPE_identity.access-events.replay.approve.all")
-                        .requestMatchers("/internal/oauth-service-clients/**")
-                        .hasAuthority("SCOPE_" + AinerAuthorizationServerConfiguration
-                                .CLIENT_CONTROL_MANAGE_SCOPE)
+                                "SCOPE_passkey.recovery.request.all",
+                                "SCOPE_passkey.recovery.approve.all")
+                        .requestMatchers("/internal/passkey-enrollment/**")
+                        .hasAuthority("SCOPE_passkey.enrollment.manage.all")
                         .requestMatchers("/internal/oauth-browser-clients/**")
                         .hasAuthority("SCOPE_" + AinerAuthorizationServerConfiguration
                                 .BROWSER_CLIENT_CONTROL_MANAGE_SCOPE)
-                        .requestMatchers("/internal/platform/identity/**")
-                        .hasAnyAuthority(
-                                "SCOPE_" + AinerSecurityScopes.PLATFORM_TENANTS_READ,
-                                "SCOPE_" + AinerSecurityScopes.PLATFORM_TENANTS_WRITE,
-                                "SCOPE_" + AinerSecurityScopes.PLATFORM_USERS_READ,
-                                "SCOPE_" + AinerSecurityScopes.PLATFORM_USERS_WRITE)
-                        .requestMatchers("/internal/passkey-recovery/**")
-                        .hasAnyAuthority(
-                                "SCOPE_passkey.recovery.request",
-                                "SCOPE_passkey.recovery.request.all",
-                                "SCOPE_passkey.recovery.approve",
-                                "SCOPE_passkey.recovery.approve.all")
-                        .requestMatchers("/internal/passkey-enrollment/**")
-                        .hasAnyAuthority(
-                                "SCOPE_passkey.enrollment.manage",
-                                "SCOPE_passkey.enrollment.manage.all")
-                        .requestMatchers("/internal/identity/ownership-recovery/**")
-                        .hasAnyAuthority(
-                                "SCOPE_" + AinerSecurityScopes.IDENTITY_OWNERSHIP_RECOVERY_REQUEST,
-                                "SCOPE_" + AinerSecurityScopes.IDENTITY_OWNERSHIP_RECOVERY_APPROVE)
                         .anyRequest().denyAll())
                 .csrf(csrf -> csrf.disable())
                 .requestCache(cache -> cache.disable())
@@ -191,85 +135,13 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
 
     @Bean
     @Order(3)
-    SecurityFilterChain tenantProvisioningActivationSecurityFilterChain(
-            HttpSecurity http,
-            JwtDecoder jwtDecoder,
-            ObjectMapper objectMapper) throws Exception {
-        AinerSecurityFailureWriter failureWriter = new AinerSecurityFailureWriter(objectMapper);
-        http.securityMatcher(
-                        "/api/identity/tenant-activations/**",
-                        "/api/me/tenant-provisioning-requests/**")
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/identity/tenant-activations/**")
-                        .permitAll()
-                        .anyRequest()
-                        .authenticated())
-                .csrf(csrf -> csrf.disable())
-                .requestCache(cache -> cache.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(
-                        SessionCreationPolicy.STATELESS))
-                .oauth2ResourceServer(resourceServer -> resourceServer
-                        .jwt(jwt -> jwt.decoder(jwtDecoder))
-                        .authenticationEntryPoint((request, response, exception) ->
-                                failureWriter.write(
-                                        request,
-                                        response,
-                                        StandardErrorCode.UNAUTHENTICATED)))
-                .exceptionHandling(exceptions -> exceptions
-                        .authenticationEntryPoint((request, response, exception) ->
-                                failureWriter.write(
-                                        request,
-                                        response,
-                                        StandardErrorCode.UNAUTHENTICATED))
-                        .accessDeniedHandler((request, response, exception) ->
-                                failureWriter.write(
-                                        request,
-                                        response,
-                                        StandardErrorCode.FORBIDDEN)));
-        return http.build();
-    }
-
-    @Bean
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
-            prefix = "ainer.security.authorization-server.ownership-transfer.step-up",
-            name = "enabled",
-            havingValue = "true")
-    OwnershipTransferStepUpFilter ownershipTransferStepUpFilter(
-            Environment environment,
-            ObjectMapper objectMapper) {
-        java.time.Clock clock = java.time.Clock.systemUTC();
-        java.util.List<String> requiredAmr = java.util.List.of(
-                environment.getProperty(
-                        "ainer.security.authorization-server.ownership-transfer.step-up.required-amr",
-                        "mfa").split(","));
-        java.time.Duration maxAuthAge = environment.getProperty(
-                "ainer.security.authorization-server.ownership-transfer.step-up.max-auth-age",
-                java.time.Duration.class,
-                java.time.Duration.ofMinutes(15));
-        java.time.Duration clockSkew = environment.getProperty(
-                "ainer.security.authorization-server.ownership-transfer.step-up.clock-skew",
-                java.time.Duration.class,
-                java.time.Duration.ofSeconds(60));
-        return new OwnershipTransferStepUpFilter(
-                requiredAmr, maxAuthAge, clockSkew, clock, new AinerSecurityFailureWriter(objectMapper));
-    }
-
-    @Bean
-    @Order(4)
-    SecurityFilterChain tenantMemberApiSecurityFilterChain(
+    SecurityFilterChain accessTokenRevocationSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder jwtDecoder,
             OAuth2AuthorizationService authorizationService,
-            ObjectMapper objectMapper,
-            ObjectProvider<OwnershipTransferStepUpFilter> stepUpFilterProvider) throws Exception {
+            ObjectMapper objectMapper) throws Exception {
         AinerSecurityFailureWriter failureWriter = new AinerSecurityFailureWriter(objectMapper);
-        http.securityMatcher(
-                        "/api/me/access-token-revocations",
-                        "/api/me/tenants",
-                        "/api/tenants/*/members",
-                        "/api/tenants/*/members/**",
-                        "/api/tenants/*/ownership-transfers",
-                        "/api/tenants/*/ownership-transfers/**")
+        http.securityMatcher("/api/me/access-token-revocations")
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
                 .csrf(csrf -> csrf.disable())
                 .requestCache(cache -> cache.disable())
@@ -285,19 +157,13 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                                 failureWriter.write(request, response, StandardErrorCode.FORBIDDEN)));
         http.addFilterAfter(
                 new AinerAdminAccessTokenActiveFilter(
-                        new DefaultBearerTokenResolver(),
-                        authorizationService,
-                        failureWriter),
+                        new DefaultBearerTokenResolver(), authorizationService, failureWriter),
                 BearerTokenAuthenticationFilter.class);
-        OwnershipTransferStepUpFilter stepUpFilter = stepUpFilterProvider.getIfAvailable();
-        if (stepUpFilter != null) {
-            http.addFilterAfter(stepUpFilter, BearerTokenAuthenticationFilter.class);
-        }
         return http.build();
     }
 
     @Bean
-    @Order(5)
+    @Order(4)
     SecurityFilterChain authorizationServerMetricsSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder jwtDecoder,
@@ -306,8 +172,7 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
         AinerSecurityFailureWriter failureWriter = new AinerSecurityFailureWriter(objectMapper);
         http.securityMatcher(new PrometheusEndpointRequestMatcher(environment))
                 .authorizeHttpRequests(authorize -> authorize
-                        .anyRequest()
-                        .access(new TenantlessServiceScopeAuthorizationManager(
+                        .anyRequest().access(new ServiceScopeAuthorizationManager(
                                 AinerSecurityScopes.PLATFORM_METRICS_READ)))
                 .csrf(csrf -> csrf.disable())
                 .requestCache(cache -> cache.disable())
@@ -325,37 +190,30 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
     }
 
     @Bean
-    @Order(6)
+    @Order(5)
     SecurityFilterChain authorizationServerDefaultSecurityFilterChain(
             HttpSecurity http,
             ObjectProvider<AinerPasskeyWebSecurity> passkeyProvider,
             ObjectProvider<AinerLoginRateLimitFilter> rateLimitFilterProvider,
-            AinerLoginAuthenticationFailureHandler loginFailureHandler)
-            throws Exception {
+            AinerLoginAuthenticationFailureHandler loginFailureHandler) throws Exception {
         AinerPasskeyWebSecurity passkey = passkeyProvider.getIfAvailable();
         http.authorizeHttpRequests(authorize -> {
                     authorize.requestMatchers(HttpMethod.GET, "/login").permitAll();
                     authorize.requestMatchers(
-                                    "/actuator/health/**",
-                                    "/actuator/info",
-                                    "/ainer-login/tokens.css",
-                                    "/ainer-login/login.css")
+                                    "/actuator/health/**", "/actuator/info",
+                                    "/ainer-login/tokens.css", "/ainer-login/login.css")
                             .permitAll();
                     if (passkey != null) {
                         authorize.requestMatchers(
-                                        "/webauthn/authenticate/options",
-                                        "/login/webauthn")
+                                        "/webauthn/authenticate/options", "/login/webauthn")
                                 .permitAll()
-                                .requestMatchers(
-                                        "/webauthn/register",
-                                        "/webauthn/register/**")
+                                .requestMatchers("/webauthn/register", "/webauthn/register/**")
                                 .access(passkey.authorizationManager());
                     }
                     authorize.anyRequest().authenticated();
                 });
         AinerLoginRateLimitFilter rateLimitFilter = rateLimitFilterProvider.getIfAvailable();
         if (rateLimitFilter != null) {
-            // 浏览器 HTML 限流响应需要复用服务端 CSRF Token，因此必须在 CSRF 校验之后执行。
             http.addFilterAfter(rateLimitFilter, CsrfFilter.class);
         }
         http.formLogin(formLogin -> {
@@ -369,11 +227,7 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
         });
         if (passkey != null) {
             http.webAuthn(passkey::configureBrowserChain);
-            // WebAuthn 协议 filter 在授权 filter 之前短路，凭证管理端点必须显式补一道条件 MFA 门禁。
-            // 锚定 CsrfFilter 之后：CSRF 已校验、会话认证已恢复，且仍在 WebAuthn 协议 filter 之前。
-            http.addFilterAfter(
-                    passkey.credentialManagementGateFilter(),
-                    org.springframework.security.web.csrf.CsrfFilter.class);
+            http.addFilterAfter(passkey.credentialManagementGateFilter(), CsrfFilter.class);
         }
         return http.build();
     }

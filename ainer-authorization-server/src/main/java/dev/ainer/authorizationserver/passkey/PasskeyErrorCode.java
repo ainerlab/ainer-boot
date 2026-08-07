@@ -16,8 +16,6 @@ public enum PasskeyErrorCode implements ErrorCode {
             "AINER.PASSKEY.RECOVERY_REQUEST_EXPIRED", "Passkey 管理员恢复请求已过期", 409),
     RECOVERY_NOT_REQUIRED(
             "AINER.PASSKEY.RECOVERY_NOT_REQUIRED", "该账号当前没有 ACTIVE Passkey 需要恢复", 409),
-    TENANT_SUBJECT_NOT_FOUND(
-            "AINER.PASSKEY.TENANT_SUBJECT_NOT_FOUND", "目标账号或租户关系不存在", 404),
     ACCOUNT_NOT_FOUND(
             "AINER.PASSKEY.ACCOUNT_NOT_FOUND", "目标 foundation 账号不存在或不可用", 404),
     ENROLLMENT_GRANT_REQUIRED(

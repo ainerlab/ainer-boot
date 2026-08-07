@@ -1,7 +1,6 @@
 package dev.ainer.module.identity.foundation;
 
 import dev.ainer.core.error.BusinessException;
-import dev.ainer.module.identity.account.application.IdentityErrorCode;
 import dev.ainer.security.principal.IdentityAuthorityRef;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -17,9 +16,8 @@ import java.util.function.Supplier;
  * credential store).
  *
  * <p>Exercises {@link HumanAccount} + {@link LoginIdentity} + {@link Credential} + {@link HumanProfile}
- * end-to-end via the foundation repository ports. This is the working registration core that the destructive
- * cutover wires into the Authorization Server; it is deliberately decoupled from the legacy tenant-bound
- * services and does not touch them.
+ * end-to-end via the foundation repository ports. This is the registration and authentication core used by
+ * the Authorization Server. It does not create Workspace membership as a side effect.
  *
  * <p>Collision and state failures throw {@link BusinessException} with dedicated
  * {@link IdentityErrorCode foundation error codes}. Identifier equality never auto-merges accounts — a

@@ -4,7 +4,6 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 
 /**
  * The authorization requester (ADR-0030 §2.3). {@link Authenticated} carries a verified principal plus its
@@ -16,7 +15,6 @@ public sealed interface Requester permits Requester.Authenticated, Requester.Ano
     /** Authenticated principal facts resolved by the security layer (not by this module). */
     record Authenticated(
             SubjectRef subjectRef,
-            @Nullable UUID credentialTenantId,
             Set<String> scopeCeiling,
             Set<String> audiences,
             @Nullable String clientId) implements Requester {

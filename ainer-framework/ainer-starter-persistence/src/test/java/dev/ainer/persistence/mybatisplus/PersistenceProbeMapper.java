@@ -8,5 +8,5 @@ import java.util.UUID;
 
 public interface PersistenceProbeMapper extends BaseMapper<PersistenceProbeRow> {
 
-    List<String> selectNamesByTenant(@Param("tenantId") UUID tenantId);
+    List<String> selectNamesByScope(@Param("scopeId") UUID scopeId);
 }

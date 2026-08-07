@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -25,19 +24,16 @@ public class WorkspaceApplicationService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository memberRepository;
     private final WorkspaceAuthorizationAuditService auditService;
-    private final Optional<WorkspaceIdentityDirectory> identityDirectory;
     private final Clock clock;
 
     public WorkspaceApplicationService(
             WorkspaceRepository workspaceRepository,
             WorkspaceMemberRepository memberRepository,
             WorkspaceAuthorizationAuditService auditService,
-            Optional<WorkspaceIdentityDirectory> identityDirectory,
             Clock clock) {
         this.workspaceRepository = workspaceRepository;
         this.memberRepository = memberRepository;
         this.auditService = auditService;
-        this.identityDirectory = identityDirectory;
         this.clock = clock;
     }
 
@@ -114,10 +110,6 @@ public class WorkspaceApplicationService {
                 principal, id, WorkspaceAuthorizationAction.MEMBER_INVITE, targetSubjectId.value());
         requireManager(principal, access.member(), id,
                 WorkspaceAuthorizationAction.MEMBER_INVITE, targetSubjectId.value());
-        if (identityDirectory.isPresent()
-                && !identityDirectory.get().isActiveHumanAccount(targetSubjectId)) {
-            throw new BusinessException(WorkspaceErrorCode.IDENTITY_DIRECTORY_MEMBER_NOT_FOUND);
-        }
         Instant now = clock.instant();
         WorkspaceMember invitation = WorkspaceMember.invitation(
                 access.workspace().id(),

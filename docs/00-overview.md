@@ -55,19 +55,19 @@ ainer-framework/
 └── ainer-starter-security            JWT Resource Server 共性
 
 ainer-server                          业务 Resource Server
-├── ainer-module-workspace            tenant 资源、成员与授权审计
+├── ainer-module-workspace            membership 资源、成员与授权审计
 └── ainer-module-ai-runtime           模型网关、策略、用量与费用审计
 
 ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管理面
-└── ainer-module-identity             tenant、user、membership 与安全事件
+└── ainer-module-identity             HumanAccount、ServicePrincipal、登录身份与 Credential
 ```
 
 必须先理解的四条边界：
 
 1. `ainer-core` 不依赖 Spring，Starter 不依赖业务模块；
 2. 业务模块拥有自己的表、migration、端口和事务；
-3. Identity 与业务运行时不共享查询私有表，跨边界使用契约或可靠事件；
-4. tenant、subject 和 owner 来自可信身份上下文，不接受客户端自声明。
+3. Identity 与业务运行时不共享查询私有表，跨边界使用显式服务契约；
+4. subject 和 owner 来自可信身份上下文，不接受客户端自声明。
 
 完整依据见 [`architecture.md`](architecture.md) 和
 [ADR-0001](decisions/0001-independent-architecture-baseline.md)、
@@ -131,24 +131,21 @@ Foundation Roadmap 仍是 Proposed；其 mdpress-first 是有条件的路线建�
 4. [`testing.md`](testing.md)
 5. 所属模块的现有 migration、Mapper 和 PostgreSQL 集成测试
 
-### 4.5 身份、安全与 tenant 授权
+### 4.5 身份、安全与授权
 
 1. [`security.md`](security.md)
 2. [`architecture.md`](architecture.md) 的安全与数据边界
-3. 设计未来 Account、Workspace 与 Isolation 语义时阅读
+3. Account、Workspace 与 Isolation 语义以
    [ADR-0033 Greenfield](decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md)
    （Accepted 为目标基线，Option B：完全移除 Tenant；按 [Impact](architecture/ainer-foundation-greenfield-reset-impact.md)
-   Stage 0–8 执行）；[v2](decisions/0033-account-workspace-isolation-model-baseline-v2.md)、
+   Stage 0–8 执行）为准；[v2](decisions/0033-account-workspace-isolation-model-baseline-v2.md)、
    [v1](decisions/0033-account-workspace-isolation-model-baseline.md) 与
-   [对抗性审查](architecture/adr-0033-adversarial-review.md) 为决策历史。Reset 完成前，当前运行行为仍以
-   既有 Accepted ADR 为准
+   [对抗性审查](architecture/adr-0033-adversarial-review.md) 为决策历史。
    Greenfield 替换脊柱的施工顺序与验收见
    [`architecture/identity-foundation-v1-implementation-plan.md`](architecture/identity-foundation-v1-implementation-plan.md)；
    原子清零（C1–C4 合并）的完整施工序列、隐藏缺口与依赖图见
    [`architecture/0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)
-4. [`decisions/README.md`](decisions/README.md) 中相关安全 ADR；平台 Identity 供应与通知回执
-   重点阅读 [ADR-0019](decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)
-   和 [ADR-0021](decisions/0021-provisioning-notification-delivery-receipts.md)
+4. [`decisions/README.md`](decisions/README.md) 中相关安全 ADR
 5. 集成官方参考管理应用时阅读
    [`ainer-admin-integration.md`](ainer-admin-integration.md) 与
    [ADR-0022](decisions/0022-ainer-admin-browser-integration-baseline.md)
@@ -240,7 +237,7 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 |---|---|
 | [`database-design-standard.md`](database-design-standard.md) | PostgreSQL 18 表、字段、类型、约束与索引设计规范 |
 | [`database.md`](database.md) | 数据库归属、当前表、Flyway 和 Migration 运行手册 |
-| [`security.md`](security.md) | OAuth、Identity、tenant、Passkey 和安全边界 |
+| [`security.md`](security.md) | OAuth、Identity、撤销 epoch、Passkey 和安全边界 |
 | [`ai-gateway.md`](ai-gateway.md) | 模型网关、SSE、策略、费用和安全基线 |
 | [`design/authorization-architecture-plan.md`](design/authorization-architecture-plan.md) | 通用混合授权、集合查询、Spring Security 适配与 Agent 代行详细方案（Proposed） |
 | [`design/organization-workforce-architecture-plan.md`](design/organization-workforce-architecture-plan.md) | 部门、员工任职、岗位、团队及 SubjectSet 授权集成详细方案（Proposed） |

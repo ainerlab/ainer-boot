@@ -49,7 +49,6 @@ class WorkspaceApplicationServiceAuthorizationTest {
                 new InMemoryWorkspaceRepository(members),
                 members,
                 new WorkspaceAuthorizationAuditService(audits, clock),
-                Optional.of(subject -> subject.value().startsWith("account:")),
                 clock);
     }
 

@@ -48,25 +48,25 @@ class MybatisPlusPostgresqlIntegrationTest {
 
     @Test
     void supportsDatabaseGeneratedUuidv7BaseMapperXmlAndPagination() {
-        UUID tenantA = UUID.randomUUID();
-        UUID tenantB = UUID.randomUUID();
-        PersistenceProbeRow first = new PersistenceProbeRow(tenantA, "alpha");
-        PersistenceProbeRow second = new PersistenceProbeRow(tenantA, "beta");
-        PersistenceProbeRow otherTenant = new PersistenceProbeRow(tenantB, "gamma");
+        UUID scopeA = UUID.randomUUID();
+        UUID scopeB = UUID.randomUUID();
+        PersistenceProbeRow first = new PersistenceProbeRow(scopeA, "alpha");
+        PersistenceProbeRow second = new PersistenceProbeRow(scopeA, "beta");
+        PersistenceProbeRow otherScope = new PersistenceProbeRow(scopeB, "gamma");
 
         assertThat(mapper.insert(first)).isEqualTo(1);
         assertThat(mapper.insert(second)).isEqualTo(1);
-        assertThat(mapper.insert(otherTenant)).isEqualTo(1);
+        assertThat(mapper.insert(otherScope)).isEqualTo(1);
 
         assertThat(first.getId()).isNotNull();
         assertThat(first.getId().version()).isEqualTo(7);
         assertThat(mapper.selectById(first.getId()).getName()).isEqualTo("alpha");
-        assertThat(mapper.selectNamesByTenant(tenantA)).containsExactly("alpha", "beta");
+        assertThat(mapper.selectNamesByScope(scopeA)).containsExactly("alpha", "beta");
 
         Page<PersistenceProbeRow> page = mapper.selectPage(
                 Page.of(1, 1),
                 Wrappers.<PersistenceProbeRow>lambdaQuery()
-                        .eq(PersistenceProbeRow::getTenantId, tenantA)
+                        .eq(PersistenceProbeRow::getScopeId, scopeA)
                         .orderByAsc(PersistenceProbeRow::getName));
 
         assertThat(page.getTotal()).isEqualTo(2);

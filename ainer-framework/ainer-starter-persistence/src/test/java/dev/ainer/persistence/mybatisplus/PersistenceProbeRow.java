@@ -11,15 +11,15 @@ public class PersistenceProbeRow {
     @TableId
     private UUID id;
 
-    private UUID tenantId;
+    private UUID scopeId;
 
     private String name;
 
     public PersistenceProbeRow() {
     }
 
-    public PersistenceProbeRow(UUID tenantId, String name) {
-        this.tenantId = tenantId;
+    public PersistenceProbeRow(UUID scopeId, String name) {
+        this.scopeId = scopeId;
         this.name = name;
     }
 
@@ -31,12 +31,12 @@ public class PersistenceProbeRow {
         this.id = id;
     }
 
-    public UUID getTenantId() {
-        return tenantId;
+    public UUID getScopeId() {
+        return scopeId;
     }
 
-    public void setTenantId(UUID tenantId) {
-        this.tenantId = tenantId;
+    public void setScopeId(UUID scopeId) {
+        this.scopeId = scopeId;
     }
 
     public String getName() {

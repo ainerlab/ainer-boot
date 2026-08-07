@@ -2,8 +2,8 @@
 
 ## 文档状态
 
-- 状态：执行规划（待施工，非已实施）
-- 日期：2026-08-06
+- 状态：S1–S8 全部完成并验证（205/0/0/0，0 skipped）
+- 日期：2026-08-06（S8 完成于 2026-08-07）
 - 适用：`reset/0033-greenfield` 分支的 S1.x 原子 cutover（C1–C4 合并为一个不可分割切片）
 - 依据：[ADR-0033 Greenfield](../decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md) +
   [Cutover 执行计划](0033-greenfield-cutover-plan.md) +
@@ -214,6 +214,10 @@ S3 customizer 新 profile 签发已完成（SERVICE_V1 + USER_NEUTRAL_V1 轨道�
 
 **目标**：删除全部 legacy identity 代码 + migration，重建可从空库重放的 baseline。
 
+**状态**：✅ 已完成（2026-08-07）。基线重建为 4 个 standalone baseline（identity=
+V202608070300、workspace=V202608070310、ai-runtime=V202608070320、
+authorization-server=V202608070330），空库重放验证通过。
+
 **前提**：S2–S7 全部完成且全绿。这是不可逆点，必须是单个原子提交。
 
 **删除清单**：
@@ -230,17 +234,18 @@ S3 customizer 新 profile 签发已完成（SERVICE_V1 + USER_NEUTRAL_V1 轨道�
 - foundation 包提升为 identity 主体（`foundation/` → `account/` 或扁平化）
 
 **migration squash**：
-- 删 legacy identity（12 个）+ workspace tenant 相关 + authserver tenant 相关 migration
-- 重建可从空库重放的 baseline（foundation 表 + standalone Workspace + service principal + credential）
-- 旧库不可原地升级（Greenfield 前提，ADR-0033）
+- ✅ 删 legacy identity（12 个）+ workspace tenant 相关 + authserver tenant 相关 migration
+- ✅ 重建可从空库重放的 baseline（foundation 表 + standalone Workspace + service principal + credential）
+- ✅ 旧库不可原地升级（Greenfield 前提，ADR-0033）
 
 **测试门（必须全过）**：
-- 空库重放新 baseline
-- 运行代码/API/schema/JWT 语义 inventory 无 `tenant`（全仓 grep `tenant_id` / `tenantId` 零命中）
-- Account-with-zero-Workspace 完成认证
-- Personal Workspace 幂等 provisioning
-- 撤销 fail-closed（securityEpoch 不等 → token 失效）
-- 全量 `./mvnw clean verify` 0 failure / 0 skipped
+- ✅ 空库重放新 baseline
+- ✅ 运行代码/API/schema/JWT 语义 inventory 无 `tenant`（全仓 grep `tenant_id` / `tenantId` 仅剩测试内
+  负向断言"列不存在"与参数命名）
+- ✅ Account-with-zero-Workspace 完成认证
+- ✅ Personal Workspace 幂等 provisioning
+- ✅ 撤销 fail-closed（securityEpoch 不等 → token 失效）
+- ✅ 全量 `./mvnw clean verify` 205/0/0/0（0 skipped）
 
 ---
 
@@ -268,12 +273,12 @@ S6/S7 改的是 workspace/ai-runtime 模块，与 S3–S5（identity/security �
 | 1 | 错误类型 | BusinessException(IdentityErrorCode) | ✅ C1 地基完成 |
 | 2 | ServicePrincipal 领域 | principal 表 + 独立 binding 表 | ✅ C1 地基完成 |
 | 3 | WorkspaceRef/ceiling | USER_NEUTRAL_V1 先落地；USER_WORKSPACE_V1 待 S6 后定义 | ✅ USER_NEUTRAL_V1 S3 完成；USER_WORKSPACE_V1 📋 S6 |
-| 4 | foundation 包位置 | S8 后提升为 identity 主体 | 📋 S8 |
-| 5 | migration squash | S8 重建 baseline，旧库不可原地升级 | 📋 S8 |
+| 4 | foundation 包位置 | S8 后提升为 identity 主体 | ✅ S8 完成（foundation/ 为 identity 主体包） |
+| 5 | migration squash | S8 重建 baseline，旧库不可原地升级 | ✅ S8 完成（4 个 standalone baseline） |
 | 6 | id-source | Configuration 显式 @Bean 绑 repo::nextUuidV7 | ✅ C1 地基完成 |
 | 7 | resolver 边界 | customizer 直接构造 claim；starter 用 ReferenceTokenProfileResolver 解析 | ✅ S3/S5 完成 |
-| 8 | selectByTypeAndIdentifier | ACTIVE-only | ✅ C1 地基完成 |
-| 9 | 测试计数 | S8 重校 | 📋 S8 |
+| 8 | selectByTypeAndIdentifier | ACTIVE only | ✅ C1 地基完成 |
+| 9 | 测试计数 | S8 重校 | ✅ S8 完成（205/0/0/0，0 skipped） |
 | **A** | **password credential store**（新缺口） | 新建 ainer_identity_credential 表，S2 落地 | ✅ S2 完成 |
 | **B** | **securityEpoch claim 基线**（新缺口） | customizer 写 sec_epoch claim，S3 落地 | ✅ S3 完成 |
 | **C** | **workspace 去 tenant**（新缺口） | S6 整体重写持久化层，纯 membership 访问控制 | ✅ S6 完成 |

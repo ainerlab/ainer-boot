@@ -12,8 +12,6 @@ import java.util.UUID;
 
 public final class AinerUserDetails implements UserDetails, CredentialsContainer {
 
-    private final UUID subjectId;
-    private final UUID tenantId;
     private final UUID accountId;
     private final long securityEpoch;
     private final String username;
@@ -23,21 +21,6 @@ public final class AinerUserDetails implements UserDetails, CredentialsContainer
     private final List<GrantedAuthority> authorities;
 
     public AinerUserDetails(
-            UUID subjectId,
-            UUID tenantId,
-            String username,
-            String password,
-            boolean enabled,
-            boolean accountNonLocked,
-            Collection<? extends GrantedAuthority> authorities) {
-        this(requireLegacyIdentity(subjectId, "subjectId"),
-                requireLegacyIdentity(tenantId, "tenantId"),
-                null, 0L, username, password, enabled, accountNonLocked, authorities);
-    }
-
-    public AinerUserDetails(
-            UUID subjectId,
-            UUID tenantId,
             UUID accountId,
             long securityEpoch,
             String username,
@@ -45,9 +28,7 @@ public final class AinerUserDetails implements UserDetails, CredentialsContainer
             boolean enabled,
             boolean accountNonLocked,
             Collection<? extends GrantedAuthority> authorities) {
-        this.subjectId = subjectId;
-        this.tenantId = tenantId;
-        this.accountId = accountId;
+        this.accountId = Objects.requireNonNull(accountId, "accountId");
         this.securityEpoch = securityEpoch;
         this.username = Objects.requireNonNull(username, "username");
         this.password = password;
@@ -56,40 +37,12 @@ public final class AinerUserDetails implements UserDetails, CredentialsContainer
         this.authorities = List.copyOf(authorities);
     }
 
-    public AinerUserDetails(
-            UUID accountId,
-            long securityEpoch,
-            String username,
-            String password,
-            boolean enabled,
-            boolean accountNonLocked,
-            Collection<? extends GrantedAuthority> authorities) {
-        this(null, null, accountId, securityEpoch, username, password,
-                enabled, accountNonLocked, authorities);
-    }
-
-    public UUID subjectId() {
-        return subjectId;
-    }
-
-    public UUID tenantId() {
-        return tenantId;
-    }
-
     public UUID accountId() {
         return accountId;
     }
 
     public long securityEpoch() {
         return securityEpoch;
-    }
-
-    public boolean hasLegacyTenantContext() {
-        return subjectId != null && tenantId != null;
-    }
-
-    private static UUID requireLegacyIdentity(UUID value, String name) {
-        return Objects.requireNonNull(value, name);
     }
 
     @Override

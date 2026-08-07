@@ -1,29 +1,28 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-02 · 工程版本：`0.1.0-SNAPSHOT`
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-07 · 工程版本：`0.1.0-SNAPSHOT`
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
 ## 1. 当前阶段
 
-Foundation 已完成 M4.8A 与 Ainer Admin 后端融合，并完成 M4.8B 租户上下文选择、M4.8C OWNER
-专用转移（含正常转移与丢失恢复）的代码基线。
-M4.7 tenant 成员管理与首租户严格 bootstrap 已落地，平台
-预配申请又具备幂等摘要、并发预留、短时一次性 grant、加密 notification outbox、已有用户本人
-接受、原子创建 ACTIVE tenant/OWNER、显式取消、tenant/user 安全分页，以及默认关闭的
-OAuth2/HTTPS 通知网关 relay 和 provider-neutral `DELIVERED|FAILED` 终态回执接收基线。
-固定 Ainer Admin 开发 browser client、开发身份、Token 自助撤销、成员 API active gate、
-OpenAPI/SDK 与完整浏览器链路测试也已纳入同一分支。
-M4.8B 已实现 `GET /api/me/tenants`、Authorization Code + PKCE 多租户选择流程与 JWT token
-customizer 实时重查 membership；M4.8C 已实现双自然人确认 OWNER 转移状态机、原子角色交换、
-审计与双方 access event 撤销链路、每 tenant 最多一个 ACTIVE OWNER 数据库不变量、OWNER 丢失
-恢复双 SERVICE request/approve 与 ownership-transfer step-up 门禁；M6 已实现由 Authorization
-Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并于 2026-07-29 部署 dev
-(release `e6cb0b44bb9e-20260729053046`)、通过真实 remote 联合 E2E,Studio 合同状态已升
-`implemented`。
-`REQUESTED` 仍不是可授权身份事实；真实外部通知网关/供应商联调、供应商回执映射、最终送达验证、
-生产限速/告警尚未完成，0-skipped 仍需在正式发布候选环境重复执行。当前工程是可编译、可运行、
-可用真实 PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到生产或商业发行就绪。
+`reset/0033-greenfield` 分支已按 ADR-0033（Option B：完全移除 Tenant）完成 S1–S8 全部施工序列
+并全绿验证（205 tests / 0 failure / 0 error / 0 skipped）：Identity 换为 HumanAccount/
+ServicePrincipal/LoginIdentity/Credential foundation，Token 使用 typed `token_profile`
+（`SERVICE_V1`/`USER_NEUTRAL_V1`）与 `claim_contract_version=1`，撤销通过
+`security_epoch`/`sec_epoch` claim 在线比对；Workspace 与 AI Runtime 已去 tenant 化，改为纯
+membership/subject 边界；legacy identity、tenant 上下文、access-event outbox/relay 消费链路与
+平台预配通知均已删除，migration 重建为 4 个可空库重放的 standalone baseline
+（identity=`V202608070300`、workspace=`V202608070310`、ai-runtime=`V202608070320`、
+authorization-server=`V202608070330`）。M6 品牌 `/login`（Studio 视觉合同 1.0.0）已由
+Authorization Server 承载并于 2026-07-29 部署 dev (release `e6cb0b44bb9e-20260729053046`)，
+真实 remote 联合 E2E 通过，Studio 合同状态 `implemented`。
+
+下文 M4.x 里程碑记录中涉及 tenant、access-event、relay、Directory 与平台预配的历史描述反映
+当时代码，已被 Greenfield S8 删除取代，不作为当前部署依据。真实外部通知网关/供应商联调、供应商
+回执映射、最终送达验证、生产限速/告警尚未完成，0-skipped 仍需在正式发布候选环境重复执行。
+当前工程是可编译、可运行、可用真实 PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到
+生产或商业发行就绪。
 
 ## 2. 已完成
 
@@ -146,7 +145,18 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
   tenant 列，配置改为 `subject-daily-budget`。全 reactor 387 tests / 0 failure / 0 error / 0 skipped
   （Colima）。
   施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
-- Greenfield S3 customizer 新 profile 签发（执行规划 缺口 B）已在 `reset/0033-greenfield` 分支完成：
+- Greenfield S8 原子删除 legacy + migration squash 已在 `reset/0033-greenfield` 分支完成（不可逆点）：
+  删除 legacy identity `account/` 领域/应用/基础设施约 50 文件、AuthServer legacy controllers 约 20
+  文件、`tenantcontext/` 与 tenant selection、`RevocationAwareOAuth2AuthorizationService` 的 legacy
+  tenant/user 在线状态依赖、legacy `AuthenticatedActor` 体系（被 typed `AuthenticatedPrincipal` 取代）、
+  `AinerResourceServerProperties.tenantClaim`/`AuthenticatedService` 的 tenantId，以及 legacy workspace
+  identity access-event 消费链路（subject-only 语义已由 canonical Workspace 覆盖）。`foundation/` 包
+  提升为 identity 主体包（`IdentityErrorCode` 收口至 foundation）。migration 重建为 4 个可空库重放的
+  standalone baseline：identity=`V202608070300`、workspace=`V202608070310`、ai-runtime=`V202608070320`、
+  authorization-server=`V202608070330`，旧库不可原地升级（ADR-0033 前提）。全仓 `tenant_id`/`tenantId`
+  grep 仅剩测试内"列不存在"负向断言与参数命名。全 reactor 205 tests / 0 failure / 0 error / 0 skipped
+  （Colima），0 skipped。
+  施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
   `AinerUserDetails` 加性重设计（新增 nullable `accountId` + `securityEpoch`，legacy 字段保留），
   customizer 抽为可测的 `AinerJwtTokenCustomizer`：client setting `ainer.token-profile` 选择轨道，
   SERVICE_V1（ServicePrincipal sub + token_profile/claim_contract_version=1/actor_type=SERVICE +

@@ -1,7 +1,6 @@
 package dev.ainer.module.identity.foundation;
 
 import dev.ainer.core.error.BusinessException;
-import dev.ainer.module.identity.account.application.IdentityErrorCode;
 import dev.ainer.security.principal.IdentityAuthorityRef;
 
 import java.time.Clock;

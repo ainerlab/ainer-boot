@@ -21,14 +21,14 @@ final class AinerAdminBrowserClientBootstrapRunner implements ApplicationRunner 
     static final String CLIENT_ID = "ainer-admin-dev";
     static final String CALLBACK_PATH = "/ainer-admin/auth/callback";
     static final String LOGGED_OUT_PATH = "/ainer-admin/auth/logged-out";
-    static final String TENANT_MEMBERS_READ = "tenant.members.read";
-    static final String TENANT_MEMBERS_WRITE = "tenant.members.write";
+    static final String WORKSPACE_READ = "workspace.read";
+    static final String WORKSPACE_WRITE = "workspace.write";
     static final Duration ACCESS_TOKEN_TTL = Duration.ofMinutes(5);
     static final Set<String> SCOPES = Set.of(
             OidcScopes.OPENID,
             OidcScopes.PROFILE,
-            TENANT_MEMBERS_READ,
-            TENANT_MEMBERS_WRITE);
+            WORKSPACE_READ,
+            WORKSPACE_WRITE);
 
     private final AinerAdminBrowserClientProperties properties;
     private final RegisteredClientRepository repository;

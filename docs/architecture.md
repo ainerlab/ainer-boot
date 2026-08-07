@@ -30,13 +30,14 @@ ainer-server                         JWT Resource Server、Actuator、平台/内
 │   └── ainer-starter-web            HTTP 异常与请求追踪
 ├── ainer-module-ai-runtime          模型端口、Provider、策略、SSE、费用审计
 │   ├── ainer-starter-persistence
-│   ├── ainer-security               可信主体、租户、authority 契约
+│   ├── ainer-security               typed 主体、scope/authority 契约
 │   └── ainer-starter-web
 ├── ainer-starter-security           JWT 验证、SecurityContext 投影、401/403
 └── ainer-starter-web
 
-ainer-authorization-server           独立 OAuth 2.1/OIDC 发行物、Identity 管理面、Passkey、Directory、relay
-├── ainer-module-identity             用户、租户、成员管理、平台预配/激活、禁用/撤销与可靠 outbox
+ainer-authorization-server           独立 OAuth 2.1/OIDC 发行物、Identity 管理面、Passkey、
+                                     browser client 控制面
+├── ainer-module-identity             HumanAccount/ServicePrincipal/Credential foundation（去租户化）
 ├── Spring Security Authorization Server 7.1
 └── JDBC registered client / authorization / consent / WebAuthn credential
 
@@ -54,16 +55,17 @@ ainer-dependencies                   独立 BOM，统一依赖版本
 - Starter 不依赖业务模块。
 - `ainer-server` 只做装配，不承载业务领域逻辑。
 - `workspace` 与 AI runtime 各自拥有表、migration、端口和适配器；事务边界位于应用用例。
-- Workspace tenant/owner 来自 `AuthenticatedActor`；所有查询绑定 tenant，只有 ACTIVE 成员参与授权，所有权转移由锁与数据库唯一索引共同保护。
-- Identity Directory 和 tenant 成员列表只暴露 ACTIVE 安全投影；账号/成员状态变化与撤销 outbox
-  在同一事务，不允许 Workspace 共享查询 Identity 表。Identity 的 USER-facing HTTP adapter 位于
-  `ainer-authorization-server`，`ainer-server` 不装配 Identity migration，Identity 应用/领域层
-  不依赖 Web。
-- 跨运行时调用使用服务 JWT 和最小 scope：Directory 是同步只读端口，撤销是至少一次 outbox + Workspace receipt；网络调用不进入 Identity 数据库事务。
+- Workspace 的资源 owner 来自 `USER_NEUTRAL_V1` 的 `sub`（HumanAccount）；所有查询绑定
+  `workspace_id`，只有 ACTIVE membership 参与授权，所有权转移由锁与数据库唯一索引共同保护。
+- Identity 只暴露 ACTIVE HumanAccount 安全投影，不允许 Workspace 共享查询 Identity 表。
+  Identity 的 HTTP adapter 位于 `ainer-authorization-server`，`ainer-server` 不装配 Identity
+  migration，Identity 应用/领域层不依赖 Web。
+- 人员 Token 撤销通过 `security_epoch`/`sec_epoch` claim 在线比对，不依赖进程内异步事件或
+  跨运行时 relay；网络调用不进入 Identity 数据库事务。
 - 高风险安全运维使用短时双人审批：申请者和批准者是不同服务主体、分别持有最小 scope，批准事务锁定并重新验证目标状态。
 - Workspace 授权审计以同事务热/冷搬迁控制热表增长，在线查询和 SIEM 稳定游标读取两表并集；归档数据仍属于 Workspace 数据库。
 - persistence starter 只装配共性，不拥有任何业务表或 Repository。MyBatis-Plus 只增强
-  infrastructure 的简单 CRUD 与受控分页；复杂 XML、显式 tenant 条件和 PostgreSQL 原生 SQL
+  infrastructure 的简单 CRUD 与受控分页；复杂 XML、显式资源归属 SQL 和 PostgreSQL 原生 SQL
   保持业务模块所有。
 
 ## 3. 目标模块模型
@@ -79,10 +81,10 @@ ainer-boot/
 │   ├── ainer-starter-security/          # Resource Server 通用能力
 │   ├── ainer-starter-observability/
 │   └── ainer-starter-test/
-├── ainer-module-identity/                # 用户、tenant、成员关系与身份生命周期
+├── ainer-module-identity/                # HumanAccount/ServicePrincipal/Credential foundation（去租户化）
 ├── ainer-module-authorization/           # S0 已落地：Permission/Role/Binding/Decision 契约与纯决策器；S1-S3 待实施
 ├── ainer-module-organization/            # Proposed：可选组织、员工任职、岗位与团队目录
-├── ainer-module-workspace/               # 已租户化的资源授权参考切片
+├── ainer-module-workspace/               # 去租户化的资源授权参考切片（仅 workspace_id/成员关系）
 ├── ainer-module-ai-runtime/              # 模型网关、调用与费用审计
 ├── ainer-server/                          # 已落地的业务 Resource Server 发行物
 ├── ainer-authorization-server/            # 已落地的独立认证发行物
@@ -212,7 +214,7 @@ M3/M4 已形成以下边界：
 - 浏览器/移动端优先 Authorization Code + PKCE；机器调用使用 Client Credentials；实际 grant 由每个 registered client 白名单决定。设备可使用 Device Code，系统间委托可评估 Token Exchange。
 - M4.5 已用测试专用 public client 验证 PKCE S256、真实表单登录、授权码单次交换、错误 verifier
   与回调地址拒绝；生产 browser client 控制面、会话治理和登录 UI 仍是独立能力。
-- Ainer Admin 在 `dev` profile 下使用固定 public client、PKCE S256、default tenant 与四个最小
+- Ainer Admin 在 `dev` profile 下使用固定 public client、PKCE S256 与四个最小
   scope；成员 API 在 JWT 后继续读取官方 authorization active 状态，当前 access token 可自助
   撤销。该开发 client 与同源自动化验证不等于生产 browser client 生命周期控制面。
 - M4.6 使用 Spring Security 7.1 WebAuthn 建立默认关闭的 Passkey 主线：UV-required、真实签名
@@ -220,36 +222,22 @@ M3/M4 已形成以下边界：
   登录限速和 Resource Server step-up。最后一个 ACTIVE Passkey 不允许普通自助删除；真实设备
   矩阵、恢复通知、共享限流和多节点 session 尚未完成。
 - 短信、微信和企业身份源通过认证编排或标准扩展授权接入，不复活 password grant。
-- 业务模块从 `AuthenticatedActor` 获取 `sub`、`tenant_id`、`actor_type` 和 authorities，不读取
-  JWT，也不接受客户端身份请求头；缺失/未知 actor type 失败关闭。
-- AI API 已强制 `ai.invoke` scope。
-- Workspace API 强制 `workspace.read` / `workspace.write` scope，并以数据库 ACTIVE OWNER/ADMIN/MEMBER 关系决定具体资源权限；tenant 与 owner 不能由客户端指定。
-- Identity tenant 成员 API 强制 USER actor、`tenant.members.read|write`、可信 tenant claim 与
-  数据库 ACTIVE OWNER/ADMIN 关系；写操作同事务审计且不能通过通用接口修改 OWNER。
-- Identity 平台预配 API 强制 tenantless SERVICE、tenant/user 成对 capability 与精确 operator
-  client ID 白名单。申请事务只预留 tenant/subject，使用与首租户 bootstrap 共享的 tenant
-  code/username advisory lock，并创建只存摘要的一次性 grant 或已有用户接受通知；联系目标与激活
-  明文只进入 AES-GCM 保护的 outbox。新用户消费 grant 或已有用户本人以 USER Token 接受时，才在
-  单一事务创建核心 tenant/user（若需要）/OWNER。`REQUESTED` 始终不是可授权身份事实。
-- 平台 tenant/user 查询是独立的只读安全投影，分别要求对应 read capability，采用
-  `page/size/total` 且单页最多 100，不暴露密码、OAuth、membership 或通知数据。未完成预配通过
-  显式 `/cancellations` 子资源关闭；request、预期 grant、未发布通知 payload 与阶段审计同事务，
-  不提供通用状态 PATCH。
-- provisioning notification 通过独立应用端口和默认关闭的 OAuth2/HTTPS gateway adapter 交付；
-  Identity 不拥有邮件/短信 SDK、模板或供应商账号。notification ID 是下游幂等键，网关确认后
-  销毁本地可解密 payload；`PUBLISHED` 只表示网关持久接收，不代表最终触达。
-- 外部通知网关负责把供应商回执归一化为 `DELIVERED|FAILED`，再使用另一组 tenantless SERVICE
-  credential 回调 Identity。Identity 只保存一条与 UUIDv7 notification 关联的最小终态事实，
-  不保存供应商原始 body、联系地址或自由文本错误；该接收端代码基线不等同于真实供应商联调结果。
-- 新邀请是 PENDING，只有同 tenant 的目标 JWT 主体本人接受后才激活；启用可选 Directory client 时，邀请创建前还必须通过远程 ACTIVE member 校验。Workspace 不跨模块读取 Identity 私有表。
+- 业务模块从 typed `AuthenticatedPrincipal` 获取 `sub`、`token_profile`、`claim_contract_version`
+  和 authorities，不读取 JWT，也不接受客户端身份请求头；缺失/未知 profile/actor 组合失败关闭。
+- AI API 已强制 `ai.invoke` scope；主体必须是 `USER_NEUTRAL_V1`。
+- Workspace API 强制 `workspace.read` / `workspace.write` scope，并以数据库 ACTIVE
+  OWNER/ADMIN/MEMBER 关系决定具体资源权限；owner 不能由客户端指定。
+- 新邀请是 PENDING，只有目标 JWT 主体本人接受后才激活；被邀主体必须已是 ACTIVE HumanAccount。Workspace 不跨模块读取 Identity 私有表。
 - 通用角色变更不能触碰 OWNER；所有权转移锁定 Workspace 并由 PostgreSQL 部分唯一索引保证最多一个 ACTIVE OWNER。
-- 跨租户和非 ACTIVE 成员访问按 404 隐藏资源；成员角色不足返回 403。关键允许/拒绝授权决策持久化到独立事务审计。PENDING/ACTIVE membership 接到可信 Identity 撤销事件后单调变为 REVOKED，不再参与授权；OWNER 也可因全局安全禁用而被撤销。
-- Workspace 审计查询额外要求 `workspace.audit.read` 和 ACTIVE OWNER/ADMIN，并绑定 tenant/workspace 分页；M4.2 增加热表保留、归档、SIEM 拉取、拒绝窗口与 OWNER 缺失指标。
-- Identity 已提供 ACTIVE Directory、安全禁用/撤销事务、可恢复 outbox relay 和投递指标。Workspace 以 event ID receipt 幂等消费，旧事件不撤销事件发生后新建的 membership。
-- 内部 HTTP adapter 使用短生命周期 Client Credentials JWT、issuer/audience、`actor_type=SERVICE`、scope 与可信 publisher subject；生产仍需 TLS、受控网络，后续可叠加 mTLS 或服务网格身份。
-- 耗尽事件重放复用原 event ID；OWNER 恢复只提升现有 ACTIVE 成员，不恢复被禁用主体。两者由不同 request/approve Client 完成并写模块所属安全操作审计。
-- M4.3 在上述本地 JWT 认证后为高风险路径追加 RFC 7662 在线校验；Authorization Server 使用 Identity 当前状态与最新 access-event 作为人员 Token revocation epoch。普通低风险 JWT 请求仍有自然到期窗口，不能宣称所有 API 强实时撤销。
-- 两个发行物的 Prometheus endpoint 使用相同的 tenantless SERVICE + `platform.metrics.read` 契约；指标 client 与业务、Directory、relay、SIEM 和 introspection client 分离。共享 PostgreSQL 只是 Authorization Server 多实例前提，尚未验证的浏览器会话、容量和故障切换不能写成已完成 HA。
+- 非 ACTIVE 成员访问按 404 隐藏资源；成员角色不足返回 403。关键允许/拒绝授权决策持久化到独立事务审计。PENDING/ACTIVE membership 在账号禁用时由授权查询在线判定失效（`security_epoch` 比对），不再参与授权；OWNER 也可因全局安全禁用而失效。
+- Workspace 审计查询额外要求 `workspace.audit.read` 和 ACTIVE OWNER/ADMIN，并绑定 workspace 分页；热表保留、归档、SIEM 拉取、拒绝窗口与 OWNER 缺失指标已落地。
+- Identity 提供 ACTIVE HumanAccount 安全投影、安全禁用/撤销事务与 `security_epoch` 在线判定，不依赖 outbox、跨运行时 relay 或进程内异步事件。
+- 内部 HTTP adapter 使用短生命周期 Client Credentials JWT、issuer/audience、`token_profile=SERVICE_V1`、`claim_contract_version=1`、scope 与可信 publisher subject；生产仍需 TLS、受控网络，后续可叠加 mTLS 或服务网格身份。
+- OWNER 恢复只提升现有 ACTIVE 成员，不恢复被禁用主体。两者由不同 request/approve Client 完成并写模块所属安全操作审计。
+- M4.3 在上述本地 JWT 认证后为高风险路径追加 RFC 7662 在线校验；Authorization Server 使用 Identity 当前账号状态与 `sec_epoch` 作为人员 Token revocation epoch。普通低风险 JWT 请求仍有自然到期窗口，不能宣称所有 API 强实时撤销。
+- 两个发行物的 Prometheus endpoint 使用同一声明 `token_profile=SERVICE_V1`、`claim_contract_version=1`
+  与 `platform.metrics.read` 契约；指标 client 与业务、SIEM、introspection 和 browser client
+  控制面 client 分离。共享 PostgreSQL 只是 Authorization Server 多实例前提，尚未验证的浏览器会话、容量和故障切换不能写成已完成 HA。
 
 ## 8. AI 原生能力
 
@@ -258,7 +246,7 @@ M2 已按以下调用边界落地：
 ```text
 AI HTTP / application port
   -> Model allow-list / prompt size / sensitive pattern
-  -> Tenant node-local rate limit
+  -> Subject node-local rate limit
   -> PostgreSQL daily-budget reservation
   -> ModelProvider port
   -> OpenAI-compatible JDK HttpClient adapter
@@ -280,9 +268,9 @@ AI HTTP / application port
 当前边界说明：
 
 - 非流式和 SSE 都产生同一 `AiInvocation` 审计；SSE 最终 usage 事件是正常完成的结算点。
-- 数据库日预算依赖租户 advisory lock，能在共享 PostgreSQL 范围内防止并发穿透；每分钟限流当前是 node-local，不是集群精确配额。
+- 数据库日预算依赖 subject advisory lock，能在共享 PostgreSQL 范围内防止并发穿透；每分钟限流当前是 node-local，不是集群精确配额。
 - prompt 与模型正文不落库，只持久化不可逆 fingerprint 和治理元数据。
-- 租户与主体只从验证后的 JWT `tenant_id` / `sub` 构造；旧的 AI 身份请求头已经移除。
+- AI 主体只从验证后的 typed principal（`USER_NEUTRAL_V1` `sub`）构造；旧的 AI 身份请求头已经移除。
 - OpenAI-compatible DTO 只存在于 infrastructure；Ainer 端口不暴露供应商协议。
 
 ## 9. 验证策略

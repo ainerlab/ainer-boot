@@ -42,8 +42,6 @@ final class AinerOAuth2AuthorizationJsonMapperFactory {
 
         @JsonCreator
         AinerUserDetailsMixin(
-                @JsonProperty("subjectId") UUID subjectId,
-                @JsonProperty("tenantId") UUID tenantId,
                 @JsonProperty("accountId") UUID accountId,
                 @JsonProperty("securityEpoch") long securityEpoch,
                 @JsonProperty("username") String username,
@@ -53,12 +51,6 @@ final class AinerOAuth2AuthorizationJsonMapperFactory {
                 @JsonProperty("authorities")
                 Collection<? extends GrantedAuthority> authorities) {
         }
-
-        @JsonProperty("subjectId")
-        abstract UUID subjectId();
-
-        @JsonProperty("tenantId")
-        abstract UUID tenantId();
 
         @JsonProperty("accountId")
         abstract UUID accountId();

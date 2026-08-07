@@ -2,8 +2,6 @@ package dev.ainer.authorizationserver.config;
 
 import dev.ainer.authorizationserver.identity.AinerUserDetails;
 import dev.ainer.authorizationserver.identity.AinerUserDetailsService;
-import dev.ainer.module.identity.account.application.IdentityApplicationService;
-import dev.ainer.module.identity.account.application.IdentityDirectoryEntry;
 import dev.ainer.module.identity.foundation.HumanAccount;
 import dev.ainer.module.identity.foundation.HumanAccountRepository;
 import dev.ainer.module.identity.foundation.ServicePrincipal;
@@ -30,35 +28,31 @@ import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 /**
  * Access-token claim projection for the Ainer authorization server (S3 of the Greenfield cutover).
  *
- * <p>Clients opt into a Greenfield token profile via the {@code ainer.token-profile} client setting.
+ * <p>Clients declare a Greenfield token profile via the {@code ainer.token-profile} client setting.
  * {@code SERVICE_V1} projects a {@code ServicePrincipal} (stable audit identity behind a rotatable
  * {@code client_id}); {@code USER_NEUTRAL_V1} projects a foundation {@code HumanAccount}. Both carry
  * {@code token_profile}, {@code claim_contract_version} and the principal's live {@code sec_epoch}, and
- * fail closed when the backing principal cannot be resolved or is not active. Clients without the setting
- * keep the legacy tenant-bound claim contract untouched.
+ * fail closed when the backing principal cannot be resolved or is not active. There is no unprofiled or
+ * compatibility token path after the destructive cutover.
  */
 public class AinerJwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 
     private final AinerAuthorizationServerProperties properties;
     private final AinerUserDetailsService userDetailsService;
-    private final IdentityApplicationService identityService;
     private final ServicePrincipalFoundationService servicePrincipalFoundationService;
     private final HumanAccountRepository humanAccountRepository;
 
     public AinerJwtTokenCustomizer(
             AinerAuthorizationServerProperties properties,
             AinerUserDetailsService userDetailsService,
-            IdentityApplicationService identityService,
             ServicePrincipalFoundationService servicePrincipalFoundationService,
             HumanAccountRepository humanAccountRepository) {
         this.properties = properties;
         this.userDetailsService = userDetailsService;
-        this.identityService = identityService;
         this.servicePrincipalFoundationService = servicePrincipalFoundationService;
         this.humanAccountRepository = humanAccountRepository;
     }
@@ -79,8 +73,7 @@ public class AinerJwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodin
                         .getSetting(AinerAuthorizationServerConfiguration.TOKEN_PROFILE_SETTING);
         String tokenProfile = profileSetting == null ? null : profileSetting.toString();
         if (tokenProfile == null || tokenProfile.isBlank()) {
-            applyLegacy(context);
-            return;
+            throw failedClosed("Ainer access token requires a token profile");
         }
         if (TokenProfile.SERVICE_V1.claimValue().equals(tokenProfile)) {
             applyServiceV1(context);
@@ -117,16 +110,11 @@ public class AinerJwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodin
         if (user == null) {
             throw failedClosed("USER_NEUTRAL_V1 token profile requires a user principal");
         }
-        UUID accountId = user.accountId();
-        if (accountId == null) {
-            throw failedClosed(
-                    "USER_NEUTRAL_V1 token profile requires a foundation account");
-        }
-        HumanAccount account = humanAccountRepository.findByAccountId(accountId)
+        HumanAccount account = humanAccountRepository.findByAccountId(user.accountId())
                 .orElseThrow(() -> failedClosed(
-                        "HumanAccount not found for USER_NEUTRAL_V1 token: " + accountId));
+                        "HumanAccount not found for USER_NEUTRAL_V1 token: " + user.accountId()));
         if (!account.status().canAuthenticate()) {
-            throw failedClosed("HumanAccount " + accountId + " is not active");
+            throw failedClosed("HumanAccount " + account.accountId() + " is not active");
         }
         JwtClaimsSet.Builder claims = context.getClaims();
         claims.subject(account.accountId().toString())
@@ -149,64 +137,13 @@ public class AinerJwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodin
         }
     }
 
-    private void applyLegacy(JwtEncodingContext context) {
-        Authentication authentication = context.getPrincipal();
-        AinerUserDetails user = ainerUserDetails(authentication);
-        if (user != null) {
-            if (!user.hasLegacyTenantContext()) {
-                throw failedClosed("Legacy token profile requires a tenant-bound user principal");
-            }
-            // M4.8B：tenant claim 来自 Identity 实时关系，不直接信任登录时缓存的 principal。
-            // principal 中的 tenantId 可能是默认落点，也可能是租户选择后更新过的值；customizer
-            // 再次读取 membership 校验该关系仍然 ACTIVE 并取得当前角色。
-            IdentityDirectoryEntry membership = identityService.findActiveMembership(
-                    user.tenantId(), user.subjectId()).orElseThrow(() ->
-                    new IllegalStateException(
-                            "Active membership not found for subject " + user.subjectId()
-                                    + " in tenant " + user.tenantId()));
-            context.getClaims()
-                    .subject(user.subjectId().toString())
-                    .claim("actor_type", "USER")
-                    .claim("tenant_id", membership.tenantId().toString())
-                    .claim("roles", new ArrayList<>(List.of(membership.role().name())));
-            List<FactorGrantedAuthority> factors = authentication.getAuthorities().stream()
-                    .filter(FactorGrantedAuthority.class::isInstance)
-                    .map(FactorGrantedAuthority.class::cast)
-                    .toList();
-            List<String> authenticationMethods = authenticationMethods(factors);
-            if (!authenticationMethods.isEmpty()) {
-                context.getClaims().claim(
-                        IdTokenClaimNames.AMR,
-                        new ArrayList<>(authenticationMethods));
-                factors.stream()
-                        .map(FactorGrantedAuthority::getIssuedAt)
-                        .max(Instant::compareTo)
-                        .ifPresent(authTime -> context.getClaims().claim(
-                                IdTokenClaimNames.AUTH_TIME,
-                                Date.from(authTime)));
-            }
-            return;
-        }
-        if (AuthorizationGrantType.CLIENT_CREDENTIALS.equals(context.getAuthorizationGrantType())) {
-            RegisteredClient client = context.getRegisteredClient();
-            context.getClaims()
-                    .subject(client.getClientId())
-                    .claim("actor_type", "SERVICE");
-            String tenantId = client.getClientSettings()
-                    .getSetting(AinerAuthorizationServerConfiguration.CLIENT_TENANT_SETTING);
-            if (tenantId != null && !tenantId.isBlank()) {
-                context.getClaims().claim("tenant_id", tenantId);
-            }
-        }
-    }
-
     private AinerUserDetails ainerUserDetails(Authentication authentication) {
         Object principal = authentication.getPrincipal();
         if (principal instanceof AinerUserDetails user) {
             return user;
         }
         // Passkey 用户经 WebAuthn 认证后，主体是协议 PublicKeyCredentialUserEntity（只含 username），
-        // 需经 Identity 解析为 AinerUserDetails 才能投影稳定 sub/tenant_id/roles。
+        // 需经 foundation 解析为 AinerUserDetails 才能投影稳定 account sub。
         if (principal instanceof PublicKeyCredentialUserEntity webAuthnUser) {
             UserDetails loaded = userDetailsService.loadUserByUsername(webAuthnUser.getName());
             if (loaded instanceof AinerUserDetails ainerUser) {

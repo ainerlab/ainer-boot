@@ -11,9 +11,7 @@
  * <p>Package-level {@link org.jspecify.annotations.NullMarked} declares every type, parameter and return
  * value non-null unless explicitly annotated {@link org.jspecify.annotations.Nullable}.
  *
- * <p>This package is additive during the Greenfield reset (S1.0). The legacy tenant-bound
- * {@link dev.ainer.security.actor.AuthenticatedActor} remains the runtime authority until the
- * destructive cutover slice; the two must not be merged by simple rename.
+ * <p>These contracts are the sole request-time principal vocabulary after the Greenfield cutover.
  */
 @NullMarked
 package dev.ainer.security.principal;

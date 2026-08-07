@@ -1,6 +1,6 @@
 # Ainer Identity 与 OAuth 2.1 使用基线
 
-> 适用版本：M4.8A + Ainer Admin integration · 核对 2026-08-02
+> 适用版本：Greenfield S8（canonical Workspace/Identity）· 核对 2026-08-07
 
 ## 1. 已落地边界
 
@@ -9,15 +9,20 @@ Ainer 使用两个独立运行时：
 - `ainer-server`：OAuth 2.0 Resource Server，验证 Bearer JWT 的签名、issuer、有效期和 audience；
 - `ainer-authorization-server`：基于 Spring Security 7.1 Authorization Server 的 OAuth 2.1 / OIDC 签发服务。
 
-业务模块只依赖 `AuthenticatedActor`。`sub` 投影为主体，`tenant_id` 投影为当前租户，
-`actor_type` 是必需且只允许 `USER|SERVICE`，scope 按 Spring Security 规则成为 `SCOPE_*`
-authority。AI API 要求 `SCOPE_ai.invoke`；Workspace 读取和写入分别要求
-`SCOPE_workspace.read`、`SCOPE_workspace.write`，并继续检查数据库资源角色。外部传入的
-`X-Ainer-Tenant-Id`、`X-Ainer-Subject-Id` 不参与身份解析。
+业务模块只依赖 typed `AuthenticatedPrincipal`。`token_profile`（`SERVICE_V1` / `USER_NEUTRAL_V1`，
+`claim_contract_version=1`）决定主体类型：`USER_NEUTRAL_V1` 的 `sub` 是 HumanAccount ID，
+`SERVICE_V1` 的 `sub` 是 ServicePrincipal ID，`sec_epoch` 是可选撤销基线。scope 按 Spring
+Security 规则成为 `SCOPE_*` authority。AI API 要求 `SCOPE_ai.invoke`；Workspace 读取和写入
+分别要求 `SCOPE_workspace.read`、`SCOPE_workspace.write`，并继续检查数据库资源角色（ACTIVE
+membership）。外部传入的 `X-Ainer-Tenant-Id`、`X-Ainer-Subject-Id` 不参与身份解析。
 
-Client Credentials access token 额外携带 `actor_type=SERVICE`，人员 access token 携带 `actor_type=USER`。内部 Directory 与撤销事件端点不仅检查 scope，还强制 `SERVICE`，防止人员 Token 因误授 scope 进入服务控制面。
+Client Credentials access token 使用 `SERVICE_V1`，人员 access token 使用 `USER_NEUTRAL_V1`。
+内部 Directory 与 Passkey/Workspace 恢复端点不仅检查 scope，还强制 `SERVICE_V1`，防止人员
+Token 因误授 scope 进入服务控制面。
 
-Identity PostgreSQL 模型包含用户、租户和成员关系。OAuth registered client、authorization 与 consent 使用 Spring Security 官方 JDBC repository 和独立协议表；Ainer 不创建自研 Token 表。
+Identity PostgreSQL 模型包含 HumanAccount、LoginIdentity、Credential 与 ServicePrincipal。
+OAuth registered client、authorization 与 consent 使用 Spring Security 官方 JDBC repository
+和独立协议表；Ainer 不创建自研 Token 表。
 
 ## 2. Resource Server
 
@@ -34,7 +39,7 @@ issuer 可以是 Ainer Authorization Server，也可以是兼容 OIDC 的企业�
 export AINER_SECURITY_RESOURCE_SERVER_ENABLED=false
 ```
 
-关闭 Ainer Resource Server 后，starter 会提供明确的 permit-all 链，避免 Spring Boot 因 Security 位于 classpath 而生成随机密码和 Basic Login。生产发行配置不得关闭；依赖 `AuthenticatedActor` 的 Workspace/AI 能力也不得借此获得匿名回退身份。
+关闭 Ainer Resource Server 后，starter 会提供明确的 permit-all 链，避免 Spring Boot 因 Security 位于 classpath 而生成随机密码和 Basic Login。生产发行配置不得关闭；依赖 `AuthenticatedPrincipal` 的 Workspace/AI 能力也不得借此获得匿名回退身份。
 
 AI 请求示例：
 
@@ -45,7 +50,7 @@ curl -i -X POST http://127.0.0.1:8080/api/ai/chat/completions \
   -d '{"messages":[{"role":"USER","content":"介绍 Ainer"}]}'
 ```
 
-Token 缺失或无效返回 401；Token 已验证但缺少合法 `tenant_id` 或 `ai.invoke` scope 返回 403。两类响应都使用 Ainer `ApiResponse` 并携带 request ID。
+Token 缺失、未知 profile/actor 组合或解析失败返回 401；Token 已验证但缺少所需 scope 返回 403。两类响应都使用 Ainer `ApiResponse` 并携带 request ID。
 
 ### 2.1 高风险请求在线校验
 
@@ -64,7 +69,7 @@ export AINER_SECURITY_ONLINE_VALIDATION_CLIENT_ID=ainer-resource-introspection
 export AINER_SECURITY_ONLINE_VALIDATION_CLIENT_SECRET='use-secret-injection'
 ```
 
-每次匹配请求都在线查询，不缓存 `active=true`。inactive 统一返回 401，不暴露不存在、过期或撤销原因；连接超时、凭据错误或响应不可解析返回 503 `AINER.SECURITY.ONLINE_VALIDATION_UNAVAILABLE`，不得退回仅凭 JWT 放行。在线结果只决定当前请求是否继续，业务层仍使用原 JWT 投影的 `AuthenticatedActor`。
+每次匹配请求都在线查询，不缓存 `active=true`。inactive 统一返回 401，不暴露不存在、过期或撤销原因；连接超时、凭据错误或响应不可解析返回 503 `AINER.SECURITY.ONLINE_VALIDATION_UNAVAILABLE`，不得退回仅凭 JWT 放行。在线结果只决定当前请求是否继续，业务层仍使用原 JWT 解析出的 `AuthenticatedPrincipal`。
 
 生产 introspection URI 必须 HTTPS；HTTP 例外只允许显式开启后的 loopback 测试。路径、方法、连接与读取超时可配置，完整键见 [`configuration.md`](configuration.md)，上线顺序与回滚约束见 [`operations.md`](operations.md)。完整决策见 [ADR-0011](decisions/0011-selective-online-token-validation.md)。
 
@@ -77,18 +82,24 @@ Workspace 使用“能力 scope + 资源关系”双层授权：
 | 创建 Workspace | `workspace.write` | 创建者自动成为 OWNER |
 | 查询详情、分页 | `workspace.read` | OWNER / ADMIN / MEMBER |
 | 重命名、邀请、角色变更、移除 | `workspace.write` | OWNER / ADMIN |
-| 接受本人邀请 | `workspace.read` | 同 tenant 且 `sub` 等于受邀主体 |
+| 接受本人邀请 | `workspace.read` | `sub` 等于受邀主体 |
 | 转移所有权 | `workspace.write` | 当前 OWNER，目标必须是 ACTIVE 成员 |
 
-HTTP 创建请求只有 `name`，tenant 和 owner 由 JWT 的 `tenant_id` / `sub` 产生。通用成员接口只能邀请 ADMIN 或 MEMBER，邀请初始为 `PENDING`，不产生任何资源访问权。受邀主体必须使用同 tenant 且 `sub` 与邀请目标一致的已验证 token 接受，才会变为 `ACTIVE`。这复用可信 Identity Provider 的主体证明，同时避免 Workspace 读取 Identity 私有表。
+HTTP 创建请求只有 `name`，创建者由 `USER_NEUTRAL_V1` 的 `sub`（HumanAccount）产生。通用成员接口
+只能邀请 ADMIN 或 MEMBER，邀请初始为 `PENDING`，不产生任何资源访问权。受邀主体必须使用 `sub`
+与邀请目标一致的已验证 token 接受，才会变为 `ACTIVE`。这复用可信 Identity Provider 的主体证明，
+同时避免 Workspace 读取 Identity 私有表。SERVICE_V1 principal 不能进入 Human membership。
 
-角色变更只能在 ADMIN/MEMBER 之间进行；移除非 OWNER 成员会立即撤销后续访问。所有权只能由当前 OWNER 通过专用事务转移：事务先锁定 Workspace，把旧 OWNER 降为 ADMIN，再提升一个 ACTIVE 成员；部分唯一索引保证最多一个 ACTIVE OWNER。跨租户或非 ACTIVE 成员访问返回 404，已经是 ACTIVE 成员但角色不足返回 403。
+角色变更只能在 ADMIN/MEMBER 之间进行；移除非 OWNER 成员会立即撤销后续访问。所有权只能由当前
+OWNER 通过专用事务转移：事务先锁定 Workspace，把旧 OWNER 降为 ADMIN，再提升一个 ACTIVE 成员；
+部分唯一索引保证最多一个 ACTIVE OWNER。跨 Workspace 或非 ACTIVE 成员访问返回 404，已经是
+ACTIVE 成员但角色不足返回 403。
 
-创建、改名、邀请、接受、角色变化、移除、所有权转移的允许决策，以及资源授权拒绝，都会记录 actor、target、tenant、Workspace、action、decision、稳定 reason code 和时间。审计使用独立事务且不外键关联 Workspace；受保护写操作不能在审计失败时继续。普通成功读取不逐条审计，避免在当前阶段制造无界访问日志。
+创建、改名、邀请、接受、角色变化、移除、所有权转移的允许决策，以及资源授权拒绝，都会记录 actor、target、Workspace、action、decision、稳定 reason code 和时间。审计使用独立事务且不外键关联 Workspace；受保护写操作不能在审计失败时继续。普通成功读取不逐条审计，避免在当前阶段制造无界访问日志。
 
-审计查询使用 `workspace.audit.read` scope，并继续要求查询者是目标 Workspace 的 ACTIVE OWNER/ADMIN。查询 SQL 同时绑定 tenant 与 workspace，按时间和 UUID 稳定倒序分页；成功或拒绝读取审计的决策也进入审计。M4.2 的后台任务可将超过热保留期的记录在同一业务库内原子迁移到归档表，普通查询仍统一读取热表与归档表。默认关闭的 SIEM 拉取端点使用 `(occurredAt, id)` 游标，并为每批导出追加安全操作审计。
+审计查询使用 `workspace.audit.read` scope，并继续要求查询者是目标 Workspace 的 ACTIVE OWNER/ADMIN。查询 SQL 绑定 workspace，按时间和 UUID 稳定倒序分页；成功或拒绝读取审计的决策也进入审计。M4.2 的后台任务可将超过热保留期的记录在同一业务库内原子迁移到归档表，普通查询仍统一读取热表与归档表。默认关闭的 SIEM 拉取端点使用 `(occurredAt, id)` 游标，并为每批导出追加安全操作审计。
 
-每个 Workspace SQL 都显式绑定 tenant；成员分页同时绑定 subject 和 `ACTIVE` 状态。完整设计见 [ADR-0006](decisions/0006-workspace-tenant-authorization-baseline.md) 与 [ADR-0007](decisions/0007-workspace-membership-lifecycle-and-audit.md)。PostgreSQL RLS 仍是未来纵深防御选项，当前不能把尚未验证的连接池租户会话当作安全边界。
+每个 Workspace SQL 都显式绑定 `workspace_id`；成员分页同时绑定 subject 和 `ACTIVE` 状态。完整设计见 [ADR-0006](decisions/0006-workspace-tenant-authorization-baseline.md) 与 [ADR-0007](decisions/0007-workspace-membership-lifecycle-and-audit.md)，去 tenant 化见 Greenfield S6。PostgreSQL RLS 仍是未来纵深防御选项，当前不能把尚未验证的连接池租户会话当作安全边界。
 
 ## 4. Authorization Server
 
@@ -128,7 +139,6 @@ Flyway 会创建 Identity 表和 Spring Security JDBC 协议表。应用没有�
 export AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_ENABLED=true
 export AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_CLIENT_ID=ainer-local-agent
 export AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_CLIENT_SECRET='at-least-24-characters-secret'
-export AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_TENANT_ID=tenant:local
 export AINER_AUTHORIZATION_BOOTSTRAP_MACHINE_SCOPES=ai.invoke,workspace.read,workspace.write
 ```
 
@@ -159,7 +169,9 @@ export AINER_AUTHORIZATION_BOOTSTRAP_INTROSPECTION_CLIENT_SECRET='at-least-24-ch
 
 ### 5.3 指标抓取专用 Client
 
-两个发行物的 `/actuator/prometheus` 都是服务控制面，不是匿名健康端点。Token 必须满足 `actor_type=SERVICE`、不存在 `tenant_id`，并且只有所需的 `platform.metrics.read` scope；人员、tenant-bound 业务服务、introspection client 和普通业务 client 都不能读取指标。
+两个发行物的 `/actuator/prometheus` 都是服务控制面，不是匿名健康端点。Token 必须满足
+`SERVICE_V1`、`actor_type=SERVICE`，并且只有所需的 `platform.metrics.read` scope；人员、
+业务服务、introspection client 和普通业务 client 都不能读取指标。
 
 受控初始化窗口可以建立独立 metrics client：
 
@@ -169,135 +181,43 @@ export AINER_AUTHORIZATION_BOOTSTRAP_METRICS_CLIENT_ID=ainer-prometheus
 export AINER_AUTHORIZATION_BOOTSTRAP_METRICS_CLIENT_SECRET='at-least-24-characters-secret'
 ```
 
-它只支持 Client Credentials，access token TTL 为 1 分钟，不携带 tenant，也没有 introspection 标记。创建完成后立即移除开关和明文 secret。Prometheus 应使用 OAuth2 配置从 secret file 获取 client secret，不能保存长期静态 Bearer Token。完整边界与尚未完成的 HA/轮换验证见 [ADR-0012](decisions/0012-production-observability-and-auth-availability.md)。
+它只支持 Client Credentials，access token TTL 为 1 分钟，也没有 introspection 标记。创建完成后立即移除开关和明文 secret。Prometheus 应使用 OAuth2 配置从 secret file 获取 client secret，不能保存长期静态 Bearer Token。完整边界与尚未完成的 HA/轮换验证见 [ADR-0012](decisions/0012-production-observability-and-auth-availability.md)。
 
-### 5.4 受审计 tenant 服务 Client 控制面
+### 5.4 受审计 browser client 控制面
 
-日常 tenant-bound 机器 client 可以使用默认关闭的内部控制面，不再通过环境变量提交调用方选择的
-secret。启用前必须先在受控初始化窗口建立专用、无 tenant 的 operator client；它只持有
-`oauth.clients.manage`，并把该 client ID 加入精确白名单：
+生产 browser client 可以使用默认关闭的内部控制面创建，不再通过环境变量提交调用方选择的
+client 策略。启用前必须先在受控初始化窗口建立专用、无 tenant 的 operator client；它只持有
+`oauth.browser-clients.manage`，并把该 client ID 加入精确白名单：
 
 ```bash
-export AINER_AUTHORIZATION_BOOTSTRAP_CLIENT_CONTROL_OPERATOR_ENABLED=true
-export AINER_AUTHORIZATION_BOOTSTRAP_CLIENT_CONTROL_OPERATOR_CLIENT_ID=ainer-client-operator
-export AINER_AUTHORIZATION_BOOTSTRAP_CLIENT_CONTROL_OPERATOR_CLIENT_SECRET='at-least-24-characters-secret'
+export AINER_AUTHORIZATION_BOOTSTRAP_BROWSER_CLIENT_CONTROL_OPERATOR_ENABLED=true
+export AINER_AUTHORIZATION_BOOTSTRAP_BROWSER_CLIENT_CONTROL_OPERATOR_CLIENT_ID=ainer-browser-client-operator
+export AINER_AUTHORIZATION_BOOTSTRAP_BROWSER_CLIENT_CONTROL_OPERATOR_CLIENT_SECRET='at-least-24-characters-secret'
 
-export AINER_AUTHORIZATION_CLIENT_CONTROL_ENABLED=true
-export AINER_AUTHORIZATION_CLIENT_CONTROL_OPERATOR_CLIENT_IDS=ainer-client-operator
-export AINER_AUTHORIZATION_CLIENT_CONTROL_ALLOWED_SCOPES=ai.invoke,identity.directory.read
+export AINER_AUTHORIZATION_BROWSER_CLIENT_CONTROL_ENABLED=true
+export AINER_AUTHORIZATION_BROWSER_CLIENT_CONTROL_OPERATOR_CLIENT_IDS=ainer-browser-client-operator
+export AINER_AUTHORIZATION_BROWSER_CLIENT_CONTROL_ALLOWED_SCOPES=openid,profile,workspace.read,workspace.write
 ```
 
-首次启动成功后立即移除三个 operator bootstrap 环境变量和明文 secret；保留控制面开关与
+首次启动成功后立即移除 operator bootstrap 环境变量和明文 secret；保留控制面开关与
 operator ID 白名单。operator bootstrap 重复运行不会覆盖已有 secret。
 
-控制面同时要求已验证的 `actor_type=SERVICE`、无 `tenant_id`、`oauth.clients.manage` scope 和精确
-operator ID；人员 Token、tenant-bound 服务或仅有 scope 但不在白名单的服务均被拒绝。operator
-client 不得兼任业务、introspection、metrics 或运维审批 client。
+控制面同时要求已验证的 `SERVICE_V1`/`actor_type=SERVICE`、`oauth.browser-clients.manage` scope
+和精确 operator ID；人员 Token、tenant-bound 服务或仅有 scope 但不在白名单的服务均被拒绝。
+operator client 不得兼任业务、introspection、metrics 或运维审批 client。
 
-创建只接受 tenant UUID、client ID/name、白名单内 scopes 和受限 `changeReference`。Authorization
-Server 生成至少 32 字节随机 secret，数据库只保存哈希，明文仅在创建响应返回一次；后续 GET、
-审计、日志和错误不得返回。调用方必须在收到响应后立即写入自己的 secret store，响应丢失时创建新
-client，不能设计“找回 secret”。
+创建只接受 public Authorization Code + PKCE client：client ID/name、精确 redirect URI（同源
+pair）、白名单内 scopes 和受限 `changeReference`；不注册 client secret、不启用 Refresh Token。
+生产 redirect URI 必须 HTTPS，HTTP 只允许 loopback。数据库保存生命周期投影（无 secret），
+`CREATED`/`ROTATED`/`RETIRED` 审计同事务写入，不物理删除历史 registered client。
 
-轮换使用新 client ID：创建 replacement、部署新 secret、验证新旧 client 并行工作，再显式退役旧
-client。退役会立即阻止旧 client 获取新 Token，并让它的历史 Token 对 RFC 7662 introspection
-显示 inactive；只做离线 JWT 验证的低风险 API 仍可能在默认 5 分钟短 TTL 内接受既有 Token。
-生命周期和 `CREATED`/`ROTATED`/`RETIRED` 审计同事务写入，不物理删除历史 registered client。
+轮换使用新 client ID：创建 replacement、更新前端配置并验证，再显式退役旧 client。退役会立即
+阻止旧 client 获取新 Token，并让它的历史 Token 对 RFC 7662 introspection 显示 inactive；
+只做离线 JWT 验证的低风险 API 仍可能在默认 5 分钟短 TTL 内接受既有 Token。
 
-该控制面刻意不管理 browser/OIDC client、public client、redirect URI、metrics、introspection、
-operator、`.all` 跨 tenant scope 或既有 bootstrap client。后几类仍需要独立初始化和未来专门
-控制面，不能把本切片描述成“所有 OAuth Client 已纳管”。完整决策见
-[ADR-0013](decisions/0013-audited-oauth-service-client-lifecycle.md)。
-
-### 5.5 平台 Identity 预配 Operator
-
-M4.8A 第一实现切片使用另一组独立 credential，不能复用 tenant 服务 client-control operator。
-受控初始化窗口可以创建一个无 tenant、仅 Client Credentials、Token TTL 一分钟的 operator：
-
-```bash
-export AINER_AUTHORIZATION_BOOTSTRAP_PLATFORM_IDENTITY_OPERATOR_ENABLED=true
-export AINER_AUTHORIZATION_BOOTSTRAP_PLATFORM_IDENTITY_OPERATOR_CLIENT_ID=ainer-platform-identity
-export AINER_AUTHORIZATION_BOOTSTRAP_PLATFORM_IDENTITY_OPERATOR_CLIENT_SECRET='at-least-24-characters-secret'
-
-export AINER_IDENTITY_PLATFORM_CONTROL_ENABLED=true
-export AINER_IDENTITY_PLATFORM_CONTROL_OPERATOR_CLIENT_IDS=ainer-platform-identity
-export AINER_IDENTITY_PLATFORM_CONTROL_REQUEST_TTL=7d
-export AINER_IDENTITY_PLATFORM_CONTROL_ACTIVATION_TTL=24h
-export AINER_IDENTITY_PLATFORM_CONTROL_ACTIVATION_MAX_ATTEMPTS=5
-export AINER_IDENTITY_NOTIFICATION_ACTIVE_KEY_VERSION=2026-07
-export AINER_IDENTITY_NOTIFICATION_PROTECTION_KEYS='2026-07:<32-byte-base64url-key>'
-
-export AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RELAY_ENABLED=true
-export AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RELAY_CLIENT_ID=ainer-provisioning-notification-relay
-export AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RELAY_CLIENT_SECRET='<at-least-24-characters-secret>'
-
-export AINER_IDENTITY_PROVISIONING_NOTIFICATION_RELAY_ENABLED=true
-export AINER_IDENTITY_PROVISIONING_NOTIFICATION_GATEWAY_URI='https://notify.example/internal/identity/tenant-provisioning-notifications'
-export AINER_IDENTITY_PROVISIONING_NOTIFICATION_TOKEN_URI='https://auth.example/oauth2/token'
-export AINER_IDENTITY_PROVISIONING_NOTIFICATION_CLIENT_ID=ainer-provisioning-notification-relay
-export AINER_IDENTITY_PROVISIONING_NOTIFICATION_CLIENT_SECRET='<secret-manager-reference>'
-
-export AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RECEIPT_ENABLED=true
-export AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RECEIPT_CLIENT_ID=ainer-provisioning-notification-gateway
-export AINER_AUTHORIZATION_BOOTSTRAP_PROVISIONING_NOTIFICATION_RECEIPT_CLIENT_SECRET='<different-at-least-24-character-secret>'
-
-export AINER_IDENTITY_PROVISIONING_NOTIFICATION_RECEIPTS_ENABLED=true
-export AINER_IDENTITY_PROVISIONING_NOTIFICATION_RECEIPT_GATEWAY_CLIENT_IDS=ainer-provisioning-notification-gateway
-```
-
-operator 固定只有 `platform.tenants.read|write` 与 `platform.users.read|write`。POST 预配和显式
-取消必须同时有两个 write scope，GET 申请状态必须同时有两个 read scope；tenant/user 列表分别只
-要求对应的 read scope。所有端点此外还要满足
-`actor_type=SERVICE`、无 `tenant_id`、正确 issuer/audience 和精确 client ID 白名单。只有 scope
-但不在白名单、tenant-bound SERVICE 与 USER 全部返回 403。初始化完成后立即移除 bootstrap 开关
-和明文 operator secret；保留控制面开关、白名单、TTL 与由 secret manager 注入的通知保护 key ring。
-
-申请事务使用 operator + `Idempotency-Key` 建立稳定请求摘要，预留 tenant code、tenant ID 与
-OWNER subject/username，但不创建 ACTIVE tenant/user/membership。新用户得到 256-bit 随机激活
-secret：grant 只保存 SHA-256 摘要、TTL 与失败次数，联系目标和唯一明文只进入 AES-256-GCM
-保护的 outbox payload。key version 作为非秘密元数据保存，nonce 每条随机生成；平台 HTTP 投影、
-审计和日志都不得返回 secret、密文或联系地址。已有 ACTIVE 用户不生成认证材料，通知只按可信
-Identity subject 路由。
-
-通知 relay 使用另一组独立无 tenant client，只能持有
-`identity.provisioning-notifications.publish`。Authorization Server 以 Client Credentials 获取
-一分钟 Token，通过生产强制 HTTPS 的完整网关 URI 发送版本化 envelope，并把 UUIDv7
-notification ID 作为 `Idempotency-Key`。网关必须先持久化、去重再返回 2xx；Identity 随后将
-outbox 的 key version 标记为 `destroyed` 并覆盖密文。网关还必须校验 issuer/audience、SERVICE、
-无 tenant、最小 scope 与精确 relay subject，不能只检查任意 Bearer。取消未投递通知时也执行
-同样销毁。该机制
-降低活动数据库暴露窗口，但不能抹除此前 WAL/备份，也不能替代通知域自身的加密、保留和访问审计。
-
-relay 不记录 provider 响应正文、联系人、secret 或异常消息，只保存受限稳定错误码。401/403、
-其他 4xx、5xx/网络/Token 失败都会按受控延迟重试直至 exhausted；生产必须对 failed、exhausted
-和 oldest-ready-age 指标告警。`PUBLISHED` 仅表示网关已持久接收，不是最终触达或邮箱验证证明。
-
-终态回执使用第三组独立无 tenant gateway client，只允许
-`identity.provisioning-notifications.receipts.write`，并同时检查精确 client ID 白名单。网关把
-供应商方言归一化为 `DELIVERED|FAILED` 后调用 Identity；Identity 只保存 notification、gateway
-event/client、受限失败码与时间。相同事实回放幂等，矛盾终态失败关闭；只有已经 `PUBLISHED` 的
-outbox 可登记。回调抢先于 relay 状态提交时返回 409，网关必须稍后以同一事件重试。`DELIVERED`
-表示供应商确认交付，不表示自然人阅读或邮箱所有权验证。
-
-新用户消费 grant 的公开端点以 256-bit secret、短 TTL 和 per-grant 失败锁定为主防线；生产入口
-仍应叠加共享边缘限速、异常枚举告警和 `no-store` 日志策略。已有用户接受端点要求
-`actor_type=USER`、显式 `identity.provisioning.accept` 以及 JWT `sub` 与预留 subject 完全一致；
-SERVICE、其他用户和仅持有平台 scope 的主体均不能代办。两条成功路径都以一个数据库事务创建
-ACTIVE tenant 与唯一 OWNER；失败或过期只收口不可授权流程记录。
-
-平台取消是显式 `/cancellations` 资源，不开放任意状态 PATCH。它只允许 tenantless 白名单 SERVICE
-使用成对 write scope 调用，并在一个事务中锁定 request、失效新用户的一次性 grant、销毁仍未发布
-的通知 payload 和写入 `CANCELLED` 阶段审计。新用户 request 缺失预期 ACTIVE grant 时失败关闭；
-重复取消不重复审计，已经激活的身份不能通过该入口撤销。tenant/user 分页仅返回核心身份的受限
-字段和状态，不包含密码哈希、OAuth 协议记录、membership、通知目标或 provisioning secret。
-
-当前仓库已装配 HTTPS gateway publisher、scheduler 与 provider-neutral 最小终态回执接收端，但
-不实现真实外部通知网关、邮件/短信/站内信供应商、模板和供应商回执映射，也未实现 tenant/user
-禁用、恢复等后续账号生命周期操作。
-完成外部联调和发布门禁前，这一实现仍不能作为可达的生产开户链路；不得让运营系统直接写
-Identity 核心表或把首租户 bootstrap 当作日常开户入口。完整边界见
-[ADR-0019](decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md) 与
-[ADR-0021](decisions/0021-provisioning-notification-delivery-receipts.md)。
+该控制面刻意不管理业务机器 client、metrics、introspection、operator、`.all` 跨租户 scope 或
+既有 bootstrap client。后几类仍需要独立初始化和未来专门控制面，不能把本切片描述成"所有 OAuth
+Client 已纳管"。完整决策见 [ADR-0013](decisions/0013-audited-oauth-service-client-lifecycle.md)。
 
 ## 6. 浏览器与人员身份
 
@@ -308,7 +228,7 @@ M4.5 已用测试专用 public client 完成真实 HTTP 浏览器会话与 Postg
 - client 使用 `ClientAuthenticationMethod.NONE`、Authorization Code、精确 redirect URI 和
   `requireProofKey=true`；
 - 只接受 S256，缺失 challenge、`plain`、错误 verifier 和未注册 redirect URI 均被拒绝；
-- 表单登录包含 cookie/CSRF，会签发带稳定 `sub`、`tenant_id`、`roles` 的 access token 与 OIDC
+- 表单登录包含 cookie/CSRF，会签发带稳定 `sub`（HumanAccount UUID）、`token_profile=USER_NEUTRAL_V1`、`claim_contract_version=1` 与 `roles` 的 access token 与 OIDC
   ID token；authorization code 只能交换一次；
 - public client 不注册 Refresh Token grant，响应不得出现 refresh token。需要长期浏览器会话时应
   先明确 BFF、会话与轮换策略，不能给 SPA 注入 client secret。
@@ -335,13 +255,13 @@ M6 使用 Ainer Studio `a73f40b` 的视觉合同 1.0.0 提供纯服务端品牌�
 Ainer Admin 另提供只在 `dev` profile、显式开关下初始化的固定 public client
 `ainer-admin-dev`。它注册 `/ainer-admin/auth/callback` 与
 `/ainer-admin/auth/logged-out` 两个同源精确 URI，只允许 Authorization Code + PKCE S256，
-scopes 固定为 `openid profile tenant.members.read tenant.members.write`，不注册 Refresh Token。
+scopes 固定为 `openid profile workspace.read workspace.write`，不注册 Refresh Token。
 它用于官方参考管理应用联调，不是生产 browser client 控制面；完整边界见
 [ADR-0022](decisions/0022-ainer-admin-browser-integration-baseline.md)。
 
 同一 `dev` profile 还可以显式启用 Admin fixture。它通过 Identity 的严格幂等 bootstrap 创建
-`ainer-admin-dev` 的 default OWNER，以及以独立 `ainer-admin-member-home` 为 default tenant 的
-第二用户。第二用户初始不属于 Admin 主 tenant，因此可以验证“添加已有用户”；fixture 不提供默认
+`ainer-admin-dev` 的 default OWNER，以及一个独立 HumanAccount。第二个账户不带任何 Workspace
+access，因此可以验证"添加已有用户"；fixture 不提供默认
 用户名或密码，配置缺失、用户名相同、部分占用或状态漂移均启动失败。
 
 M4.6 增加默认关闭的 Passkey/WebAuthn 协议基础。启用时：
@@ -363,13 +283,13 @@ M4.6 增加默认关闭的 Passkey/WebAuthn 协议基础。启用时：
   replacement；
 - 密码人员 Token 写标准 `amr=pwd`；完成 UV-required WebAuthn 后实际写 IANA 已登记的
   `mfa,pop`，并以最新因子时间写 `auth_time`。Passkey 用户走授权码流程后，Token 正确携带
-  稳定 `sub`/`tenant_id`/`roles`（customizer 按 username 解析 WebAuthn principal）。
+  稳定 `sub`/`token_profile`/`roles`（customizer 按 subject 解析 WebAuthn principal）。
 
 真实签名 ceremony 已用 webauthn4j 虚拟 authenticator 在自动化测试中端到端跑通（attestation
 + assertion 闭环、`amr=pwd,mfa,pop` 与凭证管理门禁均在 HTTP 层验证）。恢复码、管理员双人恢复、
 `require-invite` 首次 enrollment、登录 POST 限速和 Resource Server step-up 也已落地并默认关闭。
-恢复与 enrollment 的目标 `(tenant,subject)` 必须对应 ACTIVE tenant/user/default membership；数据库
-复合外键再防止孤立或跨 tenant 安全记录。登录限流对 JSON/API 使用标准 Ainer 429 envelope，
+恢复与 enrollment 的目标必须是对应 ACTIVE 的 HumanAccount；数据库
+复合唯一约束再防止孤立或跨 account 密钥记录。登录限流对 JSON/API 使用标准 Ainer 429 envelope，
 对明确接受 HTML 的 `POST /login` 使用同一品牌页面，并统一保留 `Retry-After`、`no-store`；
 它只匹配配置的 POST 路径，且明确是 node-local。step-up 只处理 USER token，校验必需 `amr`、
 `auth_time` 最大年龄、未来时间和可配时钟偏差；匿名仍返回 401。
@@ -377,52 +297,37 @@ M4.6 增加默认关闭的 Passkey/WebAuthn 协议基础。启用时：
 当前仍未覆盖主流真实设备/浏览器兼容矩阵、恢复通知和多节点 session/共享限流验证。TOTP 只保留为
 后续受限恢复 fallback 的候选，不能作为抗钓鱼主因子。完整决策和威胁模型见 ADR-0014 至 ADR-0017。
 
-人员账号由 `ainer-module-identity` 保存 delegating password hash、状态和唯一默认租户。Authorization Server 的 `UserDetailsService` 从该端口加载账号，签发时把稳定 UUID 写入 `sub`，把默认租户写入 `tenant_id`，并把成员角色写入 `roles`。
-
-Identity Directory 只返回 ACTIVE tenant、ACTIVE user、ACTIVE membership 的 tenant、subject、username、display name 和 role，不返回密码哈希、账号锁定细节或 OAuth 协议数据。默认关闭的 HTTP adapter 要求服务 JWT：`identity.directory.read` 只能查询 Token `tenant_id`，`identity.directory.read.all` 才能选择路径中的任意 tenant。人员 Token 即使误含 scope 也会被拒绝。`ainer-server` 可选 Directory client 使用 OAuth 2.0 Client Credentials，在启用时于创建 Workspace 邀请前验证目标是 ACTIVE Directory member；404 拒绝邀请，身份或传输故障按 503 关闭失败。
-
-租户成员 API 只接受 USER token，并同时要求 `tenant.members.read|write` capability、路径 tenant
-等于可信 claim，以及数据库中的 ACTIVE OWNER/ADMIN 调用者关系。写操作不能授予或修改 OWNER；
-新增、重新激活、角色变更和移除都与 actor/target/tenant/reason/request ID 审计同事务提交。
-该 API 位于 Identity 权威数据库所在的 Authorization Server；业务 Resource Server 不复制
-Identity 表。Ainer Admin API 在本地 JWT 验证后逐请求查询官方 authorization repository；
-未知、过期、撤销、client 退役或 Identity 当前状态失效统一 401，查询依赖失败统一 503
-`AINER.SECURITY.ONLINE_VALIDATION_UNAVAILABLE`，不会降级为只检查 JWT。
+人员账号由 `ainer-module-identity` 保存 delegating password hash 与状态；Authorization Server
+的 `UserDetailsService` 从该端口加载账号，签发时把稳定 HumanAccount UUID 写入 `sub`，把已授角色
+写入 `roles`。没有默认租户 claim；Workspace 授权只依赖 `sub` 与成员关系。
 
 `POST /api/me/access-token-revocations` 为 USER bearer 提供当前 access token 的窄自助撤销。
 端点不接收任意 token 参数，不要求 public browser client 伪造 client authentication，也不扩大
 RFC 7009 的 client 授权边界。撤销直接失效 Spring Authorization Server 官方 JDBC
 authorization 中的当前 access token；不存在、过期或已撤销统一按 401 处理。
 
-账号禁用会阻止后续人员 token 签发；`IdentityAccessLifecycleService` 执行的账号禁用与非 OWNER
-membership revoke 会把 `ainer_identity_access_event` outbox 放在同一事务，事件只保存 tenant、
-subject、类型、版本和时间。普通 tenant 成员管理入口的角色变更/移除当前只写成员审计，没有完整
-写入 access event；已定义的 role-changed 事件也尚未与 Workspace consumer 合同对齐。这是
-[`project-status.md`](project-status.md) 和 [ADR-0032](decisions/0032-organization-workforce-directory-baseline.md)
-记录的待修复项，不能把上述窄链路表述为覆盖“每次状态变化”。relay 通过短事务使用
-`FOR UPDATE SKIP LOCKED` 领取并提交 lease，随后在事务外通过 HTTPS + Client Credentials 投递；
-成功或失败确认使用 event ID 与 lease owner 条件更新。
-
-Workspace 事件端点要求 `actor_type=SERVICE`、`identity.access-events.publish` 和精确可信 publisher `sub`。消费事务先插入 event receipt，再将同 tenant/subject、创建时间不晚于事件时间的 PENDING/ACTIVE membership 置为 `REVOKED`。重复 event ID 幂等成功，旧事件不影响后来创建的 membership，跨 tenant 不受影响。安全禁用可以让 OWNER 变为 REVOKED 并暂时留下无 ACTIVE OWNER 的 Workspace；这优先于继续放行已禁用账号，恢复/所有权处置必须使用后续专用流程。
+账号禁用会阻止后续人员 token 签发：`IdentityFoundationService` 的账号禁用与非 OWNER
+membership revoke 与审计同事务提交。签发 token 时 customizer 把当前 `securityEpoch` 写入
+`sec_epoch` claim；`RevocationAwareOAuth2AuthorizationService` 在查找人员 authorization 时
+用 `sec_epoch` claim 与 Identity 当前 epoch 比对，不等即视为 inactive。账号禁用/密码轮换
+递增 epoch 后，事件前签发的 Token 全部失效，无需订阅撤销事件或维持 access-event outbox。
 
 当前仍未提供公网注册、找回密码、恢复通知、预配激活、租户切换和图形化 client 控制台；Passkey
-协议/条件门禁、恢复、受控 enrollment、step-up、租户成员管理与 tenant-bound Client
-Credentials 内部生命周期 API 已落地。除通用测试 client 外，`dev` profile 已提供固定的
+协议/条件门禁、恢复、受控 enrollment、step-up 与 browser client 控制面已落地。除通用测试 client 外，`dev` profile 已提供固定的
 `ainer-admin-dev` public client；它不是生产 browser client 控制面。
-Directory 与事件 adapter 均默认关闭且不共享数据库；完整投递决策见
-[ADR-0009](decisions/0009-cross-runtime-access-revocation-delivery.md)。
 
-M4.3 的 Authorization Server 在查找人员 authorization 时同时检查 tenant、user、membership 当前状态和同 tenant/subject 最新 access-event 时间。Token `issuedAt` 不晚于最新事件时会被在线视为 inactive；事件发生后签发且当前身份仍 ACTIVE 的 Token 才可继续。该 revocation epoch 利用现有 Identity 事务事实和索引，不新增 Token 表。选择性在线校验只覆盖配置的高风险请求，普通低风险 JWT API 仍存在自然到期窗口，因此不能宣称所有 API 都已强实时全局撤销。
+选择性在线校验只覆盖配置的高风险请求，普通低风险 JWT API 仍存在自然到期窗口，因此
+不能宣称所有 API 都已强实时全局撤销。
 
 ## 7. 安全运维控制面
 
-Identity 耗尽事件重放与 Workspace OWNER 恢复是默认关闭的高风险能力。两者都采用短时两阶段流程：一个 SERVICE JWT 主体持有 request scope 建立申请，另一个 `sub` 不同的 SERVICE JWT 主体持有 approve scope 审批并在同一事务内执行。默认有效期为 15 分钟，tenant-bound scope 只能操作 Token 中的 tenant，只有显式 `.all` scope 允许跨 tenant。
+Identity 耗尽事件重放与 Workspace OWNER 恢复是默认关闭的高风险能力。两者都采用短时两阶段流程：一个 SERVICE JWT 主体持有 request scope 建立申请，另一个 `sub` 不同的 SERVICE JWT 主体持有 approve scope 审批并在同一事务内执行。默认有效期为 15 分钟；申请与审批端点额外要求精确的 trusted publisher/service `sub` 与 scope，不允许普通人员 Token 进入。
 
 必须把 request 与 approve scope 授予不同的 Client Credentials client，并由不同责任人保管凭据。代码中的 `sub` 不同检查只是技术底线，不会自动建立组织上的职责分离。`incidentReference` 只接受受限安全标识，不得填写 Token、密码、客户正文或自由文本故障细节。
 
-Identity 只重置仍属于 `PENDING`/`FAILED`、无有效 lease 且已达最大尝试数的原事件。原 event ID、tenant、subject、类型、版本和发生时间保持不变，仅清理 lease/错误并恢复为可领取状态；因此下游 receipt 幂等语义仍有效。
+Identity 只重置仍属于 `PENDING`/`FAILED`、无有效 lease 且已达最大尝试数的原事件。原 event ID、subject、类型、版本和发生时间保持不变，仅清理 lease/错误并恢复为可领取状态；因此下游 receipt 幂等语义仍有效。
 
-OWNER 恢复只在 Workspace 无 ACTIVE OWNER、至少有一个 REVOKED OWNER，且目标是同 tenant/Workspace 的 ACTIVE 非 OWNER 成员时可执行。审批事务会锁定 Workspace 并重新检查条件；旧的 REVOKED OWNER 保持 REVOKED，不会因恢复流程重新获得访问权。
+OWNER 恢复只在 Workspace 无 ACTIVE OWNER、至少有一个 REVOKED OWNER，且目标是该 Workspace 的 ACTIVE 非 OWNER 成员时可执行。审批事务会锁定 Workspace 并重新检查条件；旧的 REVOKED OWNER 保持 REVOKED，不会因恢复流程重新获得访问权。
 
 申请和成功执行阶段写入模块所属数据库的安全操作审计。当前的同库归档不是 WORM、数字签名或法律意义的不可抵赖；生产发行仍需要独立权限域、对象锁或等价不可变副本。完整决策见 [ADR-0010](decisions/0010-security-operations-and-audit-lifecycle.md)。
 
@@ -436,23 +341,16 @@ OWNER 恢复只在 Workspace 无 ACTIVE OWNER、至少有一个 REVOKED OWNER，
 ./mvnw clean verify
 ```
 
-Resource Server 的 401/403、可信 claim、伪造身份头以及 Workspace 应用授权测试不依赖 Docker。Identity、JDBC 协议表、Client Credentials 签发与 Workspace tenant SQL 测试使用 PostgreSQL Testcontainers；没有 Docker 时会明确跳过，不会改用 H2。
+Resource Server 的 401/403、可信 claim、伪造身份头以及 Workspace 应用授权测试不依赖 Docker。Identity、JDBC 协议表、Client Credentials 签发与 Workspace 资源 SQL 测试使用 PostgreSQL Testcontainers；没有 Docker 时会明确跳过，不会改用 H2。
 
-M4.3 还要求验证低风险不调用 introspection、高风险无正向缓存、inactive 401、在线依赖失败 503、
-专用 client 与普通 client 隔离、RFC 7009 撤销，以及 Identity epoch 的等于/前后边界。指标边界
-还要验证无 Token 401，USER/tenant-bound/missing-scope 403，专用 tenantless SERVICE 200，以及
-业务 Resource Server 关闭时仍不匿名公开。tenant 服务 client 控制面另需验证一次性 secret、scope
-白名单、operator/tenant 隔离、蓝绿轮换、退役后新 Token 401、历史 Token introspection inactive
-和无 secret 审计。PKCE 门禁必须使用真实 HTTP 会话和 PostgreSQL，覆盖 S256 正反路径、登录 CSRF、
+M4.3 还要求验证在线校验、专用 client 与普通 client 隔离、RFC 7009 撤销，以及 Identity submission 时间等于/前后边界。指标与 SERVICE 控制面还需验证无 Token 401、USER/missing-scope 403、专用 SERVICE 200，以及业务 Resource Server 关闭时仍不匿名公开。browser client 控制面还需验证一次性、白名单、operator/tenant 隔离、蓝绿轮换、退役后新 Token 401、历史 Token introspection inactive 和无 secret 审计。PKCE 门禁必须使用真实 HTTP 会话和 PostgreSQL，覆盖 S256 正反路径、登录 CSRF、
 授权码重放、redirect URI、人员 claims、无 refresh token 以及协议记录不落凭证。Passkey 基线还
 必须覆盖配置失败关闭、UV-required options、无凭证 bootstrap、已登记账号条件拦截、生命周期/
-审计同事务、软撤销、replacement、最后凭证保护、恢复/enrollment tenant-subject 绑定、登录
-429 和 step-up 的 200/401/403。租户成员管理还要以真实 PostgreSQL + HTTP 覆盖 USER/SERVICE、
-scope、跨 tenant、实时资源角色与审计。平台预配还要覆盖 tenantless SERVICE、成对 scope、
-operator 白名单、幂等摘要、共享锁、并发预留、过期、核心表零污染、同事务审计和秘密不落库。
-真实 PostgreSQL 和协议 smoke 结果维护在
+审计同事务、软撤销、replacement、最后凭证保护、恢复/enrollment subject 绑定、登录
+429 和 step-up 的 200/401/403。账号禁用的同事务事件、在线 epoch、与 Workspace 事件终点都要以真实 PostgreSQL
+覆盖。真实 PostgreSQL 和协议 smoke 结果维护在
 [`project-status.md`](project-status.md)。
 
-Ainer Admin 还必须以同一个 browser cookie session 覆盖 PKCE、成员操作、当前 access token
+Ainer Admin 还必须以同一个 browser cookie session 覆盖 PKCE、Workspace 操作、当前 access token
 撤销和 OIDC logout；完整同源集成与验收命令见
 [`ainer-admin-integration.md`](ainer-admin-integration.md)。

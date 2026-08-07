@@ -49,10 +49,8 @@ public class AinerPasskeyRecoveryCodeController {
     @PostMapping
     public ApiResponse<RecoveryCodeIssuanceResponse> issue(Authentication authentication, HttpServletRequest request) {
         AinerUserDetails user = requireUser(authentication);
-        AinerPasskeyRecoveryCodeService.RecoveryCodeIssuance issuance = user.accountId() != null
-                && !user.hasLegacyTenantContext()
-                ? recoveryCodeService.issueForAccount(user.accountId())
-                : recoveryCodeService.issue(user.tenantId(), user.subjectId());
+        AinerPasskeyRecoveryCodeService.RecoveryCodeIssuance issuance =
+                recoveryCodeService.issueForAccount(user.accountId());
         return ApiResponse.success(
                 new RecoveryCodeIssuanceResponse(issuance.operationId(), issuance.plaintextCodes()),
                 RequestIds.currentOrCreate(request));
@@ -64,9 +62,7 @@ public class AinerPasskeyRecoveryCodeController {
             Authentication authentication,
             HttpServletRequest request) {
         AinerUserDetails user = requireUser(authentication);
-        boolean redeemed = user.accountId() != null && !user.hasLegacyTenantContext()
-                ? recoveryCodeService.redeemForAccount(user.accountId(), body.code())
-                : recoveryCodeService.redeem(user.tenantId(), user.subjectId(), body.code());
+        boolean redeemed = recoveryCodeService.redeemForAccount(user.accountId(), body.code());
         return ApiResponse.success(new RedeemResponse(redeemed), RequestIds.currentOrCreate(request));
     }
 

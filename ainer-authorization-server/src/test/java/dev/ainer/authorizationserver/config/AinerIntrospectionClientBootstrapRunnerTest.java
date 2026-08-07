@@ -29,7 +29,7 @@ class AinerIntrospectionClientBootstrapRunnerTest {
                 .containsExactly(AinerAuthorizationServerConfiguration.INTROSPECTION_CLIENT_SCOPE);
         assertThat(client.getClientSettings().getSettings())
                 .containsEntry(AinerAuthorizationServerConfiguration.CLIENT_INTROSPECTION_ALLOWED_SETTING, true)
-                .doesNotContainKey(AinerAuthorizationServerConfiguration.CLIENT_TENANT_SETTING);
+                ;
         assertThat(encoder.matches("introspection-client-secret-2026", client.getClientSecret())).isTrue();
     }
 
@@ -57,7 +57,7 @@ class AinerIntrospectionClientBootstrapRunnerTest {
     private static AinerAuthorizationServerProperties withIntrospectionClientBootstrap(
             AinerAuthorizationServerProperties.IntrospectionClientBootstrap bootstrap) {
         return new AinerAuthorizationServerProperties(
-                null, null, null, null, null, bootstrap, null, null, null, null, null, null);
+                null, null, null, null, null, bootstrap, null, null);
     }
 
     private static final class InMemoryRepository implements RegisteredClientRepository {

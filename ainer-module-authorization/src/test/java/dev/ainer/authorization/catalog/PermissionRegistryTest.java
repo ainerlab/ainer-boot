@@ -16,7 +16,7 @@ class PermissionRegistryTest {
 
     private static Permission permission(String code) {
         return new Permission(
-                new PermissionCode(code), "read", new ResourceType("tenant"),
+                new PermissionCode(code), "read", new ResourceType("workspace"),
                 RiskTier.LOW, AuditLevel.ON_DECISION, false, false);
     }
 
@@ -24,7 +24,7 @@ class PermissionRegistryTest {
     void registersAndResolvesContributedPermissions() {
         PermissionRegistry registry = new PermissionRegistry().register(() -> Set.of(
                 permission("platform.metrics.read"),
-                permission("tenant.members.read")));
+                permission("workspace.members.read")));
 
         assertThat(registry.find(new PermissionCode("platform.metrics.read"))).isPresent();
         assertThat(registry.find(new PermissionCode("unknown"))).isEmpty();
@@ -33,7 +33,7 @@ class PermissionRegistryTest {
 
     @Test
     void duplicateCodeWithIdenticalDefinitionIsIdempotent() {
-        Permission permission = permission("tenant.members.read");
+        Permission permission = permission("workspace.members.read");
 
         PermissionRegistry registry = new PermissionRegistry()
                 .register(permission)
@@ -45,9 +45,9 @@ class PermissionRegistryTest {
 
     @Test
     void duplicateCodeWithConflictingDefinitionFailsClosed() {
-        Permission read = permission("tenant.members.read");
+        Permission read = permission("workspace.members.read");
         Permission write = new Permission(
-                new PermissionCode("tenant.members.read"), "write", new ResourceType("tenant"),
+                new PermissionCode("workspace.members.read"), "write", new ResourceType("workspace"),
                 RiskTier.HIGH, AuditLevel.ALWAYS, false, false);
 
         PermissionRegistry registry = new PermissionRegistry().register(read);

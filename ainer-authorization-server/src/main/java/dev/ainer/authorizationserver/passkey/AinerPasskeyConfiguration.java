@@ -1,7 +1,6 @@
 package dev.ainer.authorizationserver.passkey;
 
 import dev.ainer.authorizationserver.config.AinerAuthorizationServerProperties;
-import dev.ainer.module.identity.account.application.IdentityApplicationService;
 import dev.ainer.module.identity.foundation.HumanAccountRepository;
 import dev.ainer.module.identity.foundation.IdentityFoundationService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -47,7 +46,6 @@ public class AinerPasskeyConfiguration {
     AinerJdbcPasskeyCredentialRepository userCredentialRepository(
             JdbcTemplate jdbcTemplate,
             PublicKeyCredentialUserEntityRepository userEntities,
-            IdentityApplicationService identityService,
             IdentityFoundationService foundationService,
             HumanAccountRepository humanAccountRepository,
             AinerAuthorizationServerProperties authorizationProperties,
@@ -57,7 +55,6 @@ public class AinerPasskeyConfiguration {
         return new AinerJdbcPasskeyCredentialRepository(
                         jdbcTemplate,
                         userEntities,
-                        identityService,
                         foundationService,
                         humanAccountRepository,
                         authorizationProperties.getIssuer(),
@@ -101,13 +98,6 @@ public class AinerPasskeyConfiguration {
     }
 
     @Bean
-    AinerPasskeyTenantSubjectGuard ainerPasskeyTenantSubjectGuard(
-            JdbcTemplate jdbcTemplate,
-            HumanAccountRepository humanAccountRepository) {
-        return new AinerPasskeyTenantSubjectGuard(jdbcTemplate, humanAccountRepository);
-    }
-
-    @Bean
     @ConditionalOnProperty(
             prefix = "ainer.security.authorization-server.passkey.recovery",
             name = "self-service-enabled",
@@ -130,20 +120,20 @@ public class AinerPasskeyConfiguration {
     AinerPasskeyAdminRecoveryService ainerPasskeyAdminRecoveryService(
             JdbcTemplate jdbcTemplate,
             AinerJdbcPasskeyCredentialRepository credentialRepository,
-            AinerPasskeyTenantSubjectGuard tenantSubjectGuard,
+            HumanAccountRepository humanAccountRepository,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         return new AinerPasskeyAdminRecoveryService(
-                jdbcTemplate, credentialRepository, tenantSubjectGuard, transactionManager, clock);
+                jdbcTemplate, credentialRepository, humanAccountRepository, transactionManager, clock);
     }
 
     @Bean
     AinerPasskeyEnrollmentGrantService ainerPasskeyEnrollmentGrantService(
             JdbcTemplate jdbcTemplate,
-            AinerPasskeyTenantSubjectGuard tenantSubjectGuard,
+            HumanAccountRepository humanAccountRepository,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         return new AinerPasskeyEnrollmentGrantService(
-                jdbcTemplate, tenantSubjectGuard, transactionManager, clock);
+                jdbcTemplate, humanAccountRepository, transactionManager, clock);
     }
 }

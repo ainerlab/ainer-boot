@@ -32,20 +32,6 @@ ainer:
     authorization-audit-export:
       enabled: ${AINER_WORKSPACE_AUDIT_EXPORT_ENABLED:false}
       trusted-exporter-subject: ${AINER_WORKSPACE_AUDIT_TRUSTED_EXPORTER:}
-    access-event-consumer:
-      enabled: ${AINER_WORKSPACE_ACCESS_EVENT_CONSUMER_ENABLED:false}
-      trusted-publisher-subject: ${AINER_WORKSPACE_ACCESS_EVENT_TRUSTED_PUBLISHER:}
-      max-future-skew: ${AINER_WORKSPACE_ACCESS_EVENT_MAX_FUTURE_SKEW:5m}
-      propagation-slo: ${AINER_WORKSPACE_ACCESS_EVENT_PROPAGATION_SLO:60s}
-  identity:
-    directory-client:
-      enabled: ${AINER_IDENTITY_DIRECTORY_CLIENT_ENABLED:false}
-      base-url: ${AINER_IDENTITY_DIRECTORY_BASE_URL:}
-      token-uri: ${AINER_IDENTITY_DIRECTORY_TOKEN_URI:}
-      client-id: ${AINER_IDENTITY_DIRECTORY_CLIENT_ID:}
-      client-secret: ${AINER_IDENTITY_DIRECTORY_CLIENT_SECRET:}
-      scope: ${AINER_IDENTITY_DIRECTORY_SCOPE:identity.directory.read.all}
-      allow-insecure-http: ${AINER_IDENTITY_DIRECTORY_ALLOW_INSECURE_HTTP:false}
   security:
     resource-server:
       enabled: ${AINER_SECURITY_RESOURCE_SERVER_ENABLED:true}

@@ -26,8 +26,7 @@ public final class JwtAuthenticatedServiceFactory {
                 .map(authority -> authority.getAuthority())
                 .collect(Collectors.toUnmodifiableSet());
         try {
-            return new AuthenticatedService(
-                    jwt.getSubject(), jwt.getClaimAsString("tenant_id"), authorities);
+            return new AuthenticatedService(jwt.getSubject(), authorities);
         } catch (IllegalArgumentException exception) {
             throw new BusinessException(StandardErrorCode.FORBIDDEN);
         }

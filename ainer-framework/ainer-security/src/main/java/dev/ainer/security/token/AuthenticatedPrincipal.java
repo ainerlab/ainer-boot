@@ -12,11 +12,10 @@ import java.util.Set;
 /**
  * Typed, profile-qualified projection of a verified access token (ADR-0030 §2.2, ADR-0033 Greenfield §6.1).
  *
- * <p>Replaces the tenant-bound {@code AuthenticatedActor} as the canonical request-time principal for new
- * Foundation code. It pairs an authority-qualified {@link PrincipalSubjectRef} with a closed {@link
+ * <p>This is the canonical request-time principal for Foundation code. It pairs an authority-qualified
+ * {@link PrincipalSubjectRef} with a closed {@link
  * TokenProfile}, claim-contract version, OAuth audience and scope ceiling, and authentication assurance. The
- * {@code credentialTenantId} of the legacy projection is intentionally absent: tenant is no longer a
- * principal attribute.
+ * Workspace and isolation are resource facts, not principal attributes.
  *
  * <p>Invariants are enforced at construction: a {@code USER_*} profile requires a {@link HumanSubjectRef},
  * {@code SERVICE_V1} requires a {@link ServiceSubjectRef}. A workspace access ceiling (for

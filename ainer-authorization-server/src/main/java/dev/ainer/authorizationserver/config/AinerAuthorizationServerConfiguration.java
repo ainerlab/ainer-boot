@@ -6,10 +6,9 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import dev.ainer.authorizationserver.identity.AinerUserDetailsService;
-import dev.ainer.module.identity.account.application.IdentityApplicationService;
-import dev.ainer.module.identity.account.application.IdentityTokenStatusService;
 import dev.ainer.module.identity.foundation.HumanAccountRepository;
 import dev.ainer.module.identity.foundation.IdentityFoundationService;
+import dev.ainer.module.identity.foundation.ServicePrincipalRepository;
 import dev.ainer.module.identity.foundation.ServicePrincipalFoundationService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -41,7 +40,6 @@ import tools.jackson.databind.json.JsonMapper;
 @EnableConfigurationProperties(AinerAuthorizationServerProperties.class)
 public class AinerAuthorizationServerConfiguration {
 
-    public static final String CLIENT_TENANT_SETTING = "ainer.tenant-id";
     public static final String CLIENT_INTROSPECTION_ALLOWED_SETTING = "ainer.introspection-allowed";
     public static final String TOKEN_PROFILE_SETTING = "ainer.token-profile";
     public static final String SEC_EPOCH_CLAIM = "sec_epoch";
@@ -58,12 +56,14 @@ public class AinerAuthorizationServerConfiguration {
     OAuth2AuthorizationService authorizationService(
             JdbcTemplate jdbcTemplate,
             ManagedRegisteredClientRepository registeredClientRepository,
-            IdentityTokenStatusService identityTokenStatusService) {
+            HumanAccountRepository humanAccountRepository,
+            ServicePrincipalRepository servicePrincipalRepository) {
         OAuth2AuthorizationService jdbc =
                 jdbcAuthorizationService(jdbcTemplate, registeredClientRepository);
         return new RevocationAwareOAuth2AuthorizationService(
                 jdbc,
-                identityTokenStatusService,
+                humanAccountRepository,
+                servicePrincipalRepository,
                 registeredClientRepository::isActiveByRegisteredClientId);
     }
 
@@ -142,23 +142,19 @@ public class AinerAuthorizationServerConfiguration {
     @Bean
     AinerUserDetailsService ainerUserDetailsService(
             AinerAuthorizationServerProperties properties,
-            IdentityFoundationService foundationService,
-            IdentityApplicationService identityService) {
-        return new AinerUserDetailsService(
-                foundationService, identityService, properties.getIssuer());
+            IdentityFoundationService foundationService) {
+        return new AinerUserDetailsService(foundationService, properties.getIssuer());
     }
 
     @Bean
     OAuth2TokenCustomizer<JwtEncodingContext> ainerJwtTokenCustomizer(
             AinerAuthorizationServerProperties properties,
             AinerUserDetailsService userDetailsService,
-            IdentityApplicationService identityService,
             ServicePrincipalFoundationService servicePrincipalFoundationService,
             HumanAccountRepository humanAccountRepository) {
         return new AinerJwtTokenCustomizer(
                 properties,
                 userDetailsService,
-                identityService,
                 servicePrincipalFoundationService,
                 humanAccountRepository);
     }
@@ -171,8 +167,10 @@ public class AinerAuthorizationServerConfiguration {
     AinerMachineClientBootstrapRunner ainerMachineClientBootstrapRunner(
             AinerAuthorizationServerProperties properties,
             RegisteredClientRepository registeredClientRepository,
-            PasswordEncoder passwordEncoder) {
-        return new AinerMachineClientBootstrapRunner(properties, registeredClientRepository, passwordEncoder);
+            PasswordEncoder passwordEncoder,
+            ServicePrincipalFoundationService servicePrincipalFoundationService) {
+        return new AinerMachineClientBootstrapRunner(
+                properties, registeredClientRepository, passwordEncoder, servicePrincipalFoundationService);
     }
 
     @Bean
@@ -203,19 +201,6 @@ public class AinerAuthorizationServerConfiguration {
 
     @Bean
     @ConditionalOnProperty(
-            prefix = "ainer.security.authorization-server.client-control-operator-bootstrap",
-            name = "enabled",
-            havingValue = "true")
-    AinerClientControlOperatorBootstrapRunner ainerClientControlOperatorBootstrapRunner(
-            AinerAuthorizationServerProperties properties,
-            RegisteredClientRepository registeredClientRepository,
-            PasswordEncoder passwordEncoder) {
-        return new AinerClientControlOperatorBootstrapRunner(
-                properties, registeredClientRepository, passwordEncoder);
-    }
-
-    @Bean
-    @ConditionalOnProperty(
             prefix = "ainer.security.authorization-server.browser-client-control-operator-bootstrap",
             name = "enabled",
             havingValue = "true")
@@ -227,46 +212,4 @@ public class AinerAuthorizationServerConfiguration {
                 properties, registeredClientRepository, passwordEncoder);
     }
 
-    @Bean
-    @ConditionalOnProperty(
-            prefix = "ainer.security.authorization-server.platform-identity-operator-bootstrap",
-            name = "enabled",
-            havingValue = "true")
-    AinerPlatformIdentityOperatorBootstrapRunner ainerPlatformIdentityOperatorBootstrapRunner(
-            AinerAuthorizationServerProperties properties,
-            RegisteredClientRepository registeredClientRepository,
-            PasswordEncoder passwordEncoder) {
-        return new AinerPlatformIdentityOperatorBootstrapRunner(
-                properties, registeredClientRepository, passwordEncoder);
-    }
-
-    @Bean
-    @ConditionalOnProperty(
-            prefix = "ainer.security.authorization-server."
-                    + "provisioning-notification-relay-client-bootstrap",
-            name = "enabled",
-            havingValue = "true")
-    AinerProvisioningNotificationRelayClientBootstrapRunner
-            ainerProvisioningNotificationRelayClientBootstrapRunner(
-                    AinerAuthorizationServerProperties properties,
-                    RegisteredClientRepository registeredClientRepository,
-                    PasswordEncoder passwordEncoder) {
-        return new AinerProvisioningNotificationRelayClientBootstrapRunner(
-                properties, registeredClientRepository, passwordEncoder);
-    }
-
-    @Bean
-    @ConditionalOnProperty(
-            prefix = "ainer.security.authorization-server."
-                    + "provisioning-notification-receipt-client-bootstrap",
-            name = "enabled",
-            havingValue = "true")
-    AinerProvisioningNotificationReceiptClientBootstrapRunner
-            ainerProvisioningNotificationReceiptClientBootstrapRunner(
-                    AinerAuthorizationServerProperties properties,
-                    RegisteredClientRepository registeredClientRepository,
-                    PasswordEncoder passwordEncoder) {
-        return new AinerProvisioningNotificationReceiptClientBootstrapRunner(
-                properties, registeredClientRepository, passwordEncoder);
-    }
 }

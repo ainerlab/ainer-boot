@@ -14,7 +14,7 @@ public final class AuthorizationReasonCodes {
     public static final ReasonCode AUTHENTICATED_REQUIRED = new ReasonCode("AUTHENTICATED_REQUIRED");
     public static final ReasonCode UNKNOWN_PERMISSION = new ReasonCode("UNKNOWN_PERMISSION");
     public static final ReasonCode SCOPE_CEILING = new ReasonCode("SCOPE_CEILING");
-    public static final ReasonCode TENANT_CEILING = new ReasonCode("TENANT_CEILING");
+    public static final ReasonCode WORKSPACE_CEILING = new ReasonCode("WORKSPACE_CEILING");
     public static final ReasonCode NO_BINDING = new ReasonCode("NO_BINDING");
     public static final ReasonCode NO_RELATION = new ReasonCode("NO_RELATION");
     public static final ReasonCode STATE_DENIED = new ReasonCode("STATE_DENIED");

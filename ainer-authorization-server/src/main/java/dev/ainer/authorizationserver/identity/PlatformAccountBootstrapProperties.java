@@ -1,0 +1,36 @@
+package dev.ainer.authorizationserver.identity;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
+@ConfigurationProperties("ainer.platform.account-bootstrap")
+public final class PlatformAccountBootstrapProperties {
+
+    private final boolean enabled;
+    private final String username;
+    private final String password;
+    private final String displayName;
+
+    public PlatformAccountBootstrapProperties(
+            boolean enabled, String username, String password, String displayName) {
+        this.enabled = enabled;
+        this.username = username;
+        this.password = password;
+        this.displayName = displayName;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+}

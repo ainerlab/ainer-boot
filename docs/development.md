@@ -115,7 +115,7 @@ git diff --check
 git status --short
 ```
 
-修改数据库时，还要核对 migration 重放；修改 HTTP 时验证真实状态码、响应体和 `X-Request-Id`；修改身份时至少覆盖无 Token、错误 audience、错误 tenant 和权限不足。
+修改数据库时，还要核对 migration 重放；修改 HTTP 时验证真实状态码、响应体和 `X-Request-Id`；修改身份时至少覆盖无 Token、错误 audience、错误 `token_profile` 和权限不足。
 
 ## 7. 新增业务能力
 
@@ -131,16 +131,16 @@ git status --short
 
 ### 7.1 持久化开发
 
-- 简单、单表且 tenant 条件清晰的 CRUD/分页可以在 infrastructure Mapper 使用 `BaseMapper`、
-  Wrapper 与 MyBatis-Plus Page；Repository 端口不得暴露这些类型。
-- 复杂 PostgreSQL SQL、锁、CTE、`RETURNING`、outbox、审计和稳定游标继续写显式 Mapper
+- 简单、单表且资源归属键清晰、等效的 CRUD/分页可以只在 infrastructure Mapper 使用
+  `BaseMapper`、Wrapper 与 MyBatis-Plus Page；Repository 端口不得暴露这些类型。
+- 复杂 PostgreSQL SQL、锁、CTE、`RETURNING`、审计和稳定游标继续写显式 Mapper
   方法与 XML。现有 XML 不需要迁移。
 - Mapper XML 配置使用 `mybatis-plus.mapper-locations`；不要继续新增旧的
   `mybatis.mapper-locations`。
 - 新增数据库生成 ID 的 Row 使用 `IdType.AUTO`，由 PostgreSQL `DEFAULT uuidv7()` 生成并
   回填。不得使用 `ASSIGN_ID` / `ASSIGN_UUID`。
-- tenant interceptor 当前没有启用；每个 tenant 资源查询都必须显式绑定可信 tenant。分页请求
-  在 API 边界校验且最大单页 100。
+- 无 tenant 拦截器；每个资源查询都必须显式绑定可信归属键（`workspace_id`/`account_id` 等）。
+  分页请求在 API 边界校验且最大单页 100。
 - 不默认使用 `IService`、`ServiceImpl`、ActiveRecord、逻辑删除或 MetaObject 自动填充。
 - 本轮没有引入 MyBatis-Plus 代码生成器；生成代码必须等待 Project Initializer 的模板和
   golden consumer 设计。

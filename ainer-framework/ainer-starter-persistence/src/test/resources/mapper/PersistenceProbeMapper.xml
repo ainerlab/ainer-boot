@@ -3,10 +3,10 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.ainer.persistence.mybatisplus.PersistenceProbeMapper">
-    <select id="selectNamesByTenant" resultType="java.lang.String">
+    <select id="selectNamesByScope" resultType="java.lang.String">
         SELECT name
         FROM ainer_persistence_probe
-        WHERE tenant_id = #{tenantId}
+        WHERE scope_id = #{scopeId}
         ORDER BY name
     </select>
 </mapper>

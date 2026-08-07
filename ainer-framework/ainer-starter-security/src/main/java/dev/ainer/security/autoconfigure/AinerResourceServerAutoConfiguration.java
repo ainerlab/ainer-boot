@@ -3,9 +3,8 @@ package dev.ainer.security.autoconfigure;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.core.error.ErrorCodeContributor;
 import dev.ainer.security.AinerSecurityScopes;
-import dev.ainer.security.actor.AuthenticatedActorResolver;
 import dev.ainer.security.authorization.PrometheusEndpointRequestMatcher;
-import dev.ainer.security.authorization.TenantlessServiceScopeAuthorizationManager;
+import dev.ainer.security.authorization.ServiceScopeAuthorizationManager;
 import dev.ainer.security.error.AinerSecurityErrorCode;
 import dev.ainer.security.token.AuthenticatedPrincipalResolver;
 import dev.ainer.security.token.ReferenceTokenProfileResolver;
@@ -44,12 +43,6 @@ import java.util.List;
 @EnableConfigurationProperties(AinerResourceServerProperties.class)
 @EnableMethodSecurity
 public class AinerResourceServerAutoConfiguration {
-
-    @Bean
-    @ConditionalOnMissingBean
-    public AuthenticatedActorResolver authenticatedActorResolver(AinerResourceServerProperties properties) {
-        return new SecurityContextAuthenticatedActorResolver(properties);
-    }
 
     @Bean
     @ConditionalOnMissingBean(TokenProfileResolver.class)
@@ -144,7 +137,7 @@ public class AinerResourceServerAutoConfiguration {
 
         http.authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(new PrometheusEndpointRequestMatcher(environment))
-                        .access(new TenantlessServiceScopeAuthorizationManager(
+                        .access(new ServiceScopeAuthorizationManager(
                                 AinerSecurityScopes.PLATFORM_METRICS_READ))
                         .requestMatchers(publicPaths).permitAll()
                         .anyRequest().authenticated())
