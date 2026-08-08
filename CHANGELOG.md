@@ -112,6 +112,11 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - 增加只读权限的候选 GitHub Actions 质量门禁：锁定 JDK 25，验证 Maven 4 Wrapper 与 Docker，
   执行完整 Reactor、强制 Surefire `skipped=0`、验证 Maven 3/4 外部消费者，并生成短期
   CycloneDX SBOM 工作流制品；正式发布、签名和 provenance 仍保持阻断。
+- 增加 P1 发布能力：根 POM `release` profile 为全部 JAR 制品附加 `-sources.jar` 与
+  `-javadoc.jar`（JDK 25、UTF-8、确定性时间戳）并用 `maven-gpg-plugin` 逐制品生成 `.asc`
+  签名；`release.yml` 支持仓库变量+secrets 驱动的 GPG 密钥导入（缺失 fail-closed）与
+  `actions/attest-build-provenance` 构建 provenance（SLSA v1）；consumer 门禁改为
+  `-Prelease` 安装并断言八个 library 制品的 sources/javadoc 伴随文件存在。
 
 ### Changed
 

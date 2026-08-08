@@ -58,7 +58,8 @@ git status --short --branch
 可重复构建结果、数据库验证、制品 checksum、部署环境和批准人。CI 工作流编排 JDK 25、Maven 4、
 Docker、`skipped=0`、consumer、SBOM 与 gitleaks 秘密扫描门禁；RC6 已上 Central、CI 已于 2026-08-04
 首次跑绿（详见 `project-status.md` §3）。制品发布到 GitHub Packages 的 `distributionManagement`
-与 `release.yml` 工作流已配置（见 §4.1）；制品签名（GPG）与 provenance（SLSA）仍待接入。
+与 `release.yml` 工作流已配置（见 §4.1）；制品签名（GPG）与 provenance（SLSA）已接入
+（见 §4.2）。
 
 ### 4.1 GitHub Packages 发布
 
@@ -69,11 +70,30 @@ parentless `ainer-dependencies` BOM 配置，id=`github-packages`，URL
 1. 更新 `CHANGELOG.md`，确认 `./mvnw clean verify`（含 `0 skipped`）与 consumer 门禁通过；
 2. 打 tag `v<版本>`（如 `v0.1.0`）并推送——`.github/workflows/release.yml` 自动触发；
 3. 工作流从 tag 解析非 SNAPSHOT 版本（`v0.1.0` → `0.1.0`），用 `GITHUB_TOKEN` 认证后
-   `./mvnw -Drevision=<版本> deploy` 发布全部 reactor 制品（含 BOM）；
+   `./mvnw -Drevision=<版本> -Prelease deploy` 发布全部 reactor 制品（含 BOM）；`release`
+   profile 为每个 JAR 制品附加 `-sources.jar` 与 `-javadoc.jar`（P1 门禁，由
+   `verify-maven-consumers.sh` 验证）；
 4. GitHub Packages 对同一 release 版本不可覆盖；SNAPSHOT 可在 dev 期间用，正式发布前必须去掉 SNAPSHOT。
 
 本地手动发布需在 `~/.m2/settings.xml` 为 `github-packages` 配置 GitHub 用户名 + PAT（`write:packages`）。
 下游消费私有 GitHub Packages 制品同样需要 PAT（`read:packages`）认证。
+
+### 4.2 签名与 provenance
+
+`release` profile 在根 POM 启用 `maven-source-plugin`、`maven-javadoc-plugin` 与
+`maven-gpg-plugin`：
+
+- 签名：repository 变量 `AINER_RELEASE_SIGNING=true` 且 secrets `AINER_GPG_KEY_BASE64`（base64
+  ASCII-armored 私钥）与 `AINER_GPG_PASSPHRASE` 已配置时，workflow 导入密钥并用
+  `-Dgpg.keyname/-Dgpg.passphrase` 对每个制品（jar/sources/javadoc/pom）生成 `.asc`；任一
+  丢失时 workflow 失败关闭，不产出未签名发布。未配置变量时跳过签名（构建与 consumer
+  门禁用 `-Dgpg.skip=true` 覆盖）；
+- provenance：`actions/attest-build-provenance` 对 `**/target/*.jar` 生成 GitHub Attestations
+  （SLSA v1 构建来源），要求 workflow `id-token`/`attestations` 写权限；发布记录可在
+  Attestations 标签页核验源码仓库与构建工作流。
+
+签名密钥必须单独管理：不进入仓库、不进 CI 日志；轮换时旧密钥保留在 GitHub Packages
+已有 `.asc` 上，仅新版本改用新密钥。
 
 ## 5. 数据库发布
 

@@ -53,11 +53,23 @@ cd "$boot_root"
 "$wrapper" --batch-mode --no-transfer-progress \
   -Dmaven.repo.local="$local_repository" \
   -Drevision="$ainer_version" \
+  -Dgpg.skip=true \
+  -Prelease \
   -DskipTests \
   clean install
 
 installed_root="$local_repository/dev/ainer"
 [[ -d "$installed_root" ]] || fail "Ainer artifacts were not installed"
+
+# P1 发布门禁：library 制品必须附带 sources/javadoc 与 spring-configuration-metadata
+# （signature 由 release.yml 真实密钥门禁覆盖，consumer 门禁只验证伴随制品存在）。
+publish_artifacts=(ainer-spring ainer-starter-web ainer-starter-persistence ainer-starter-security \
+  ainer-module-identity ainer-module-workspace ainer-module-ai-runtime ainer-module-authorization)
+for artifact in "${publish_artifacts[@]}"; do
+  base="$installed_root/$artifact/$ainer_version/$artifact-$ainer_version"
+  [[ -f "$base-sources.jar" ]] || fail "$artifact sources JAR missing"
+  [[ -f "$base-javadoc.jar" ]] || fail "$artifact javadoc JAR missing"
+done
 
 installed_poms=()
 while IFS= read -r -d '' installed_pom; do

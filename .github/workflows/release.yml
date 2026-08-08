@@ -8,6 +8,8 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
+  attestations: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -54,7 +56,35 @@ jobs:
       - name: Resolve release version from tag
         run: echo "release_version=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
-      - name: Build, verify and publish
+      - name: Import signing key
+        if: vars.AINER_RELEASE_SIGNING == 'true'
+        env:
+          SIGNING_KEY_BASE64: ${{ secrets.AINER_GPG_KEY_BASE64 }}
+          SIGNING_PASSPHRASE: ${{ secrets.AINER_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SIGNING_KEY_BASE64:-}" || -z "${SIGNING_PASSPHRASE:-}" ]]; then
+            echo "AINER_RELEASE_SIGNING=true 但缺少 AINER_GPG_KEY_BASE64/AINER_GPG_PASSPHRASE，签名无法进行" >&2
+            exit 1
+          fi
+          printenv SIGNING_KEY_BASE64 | base64 --decode > "$RUNNER_TEMP/signing.asc"
+          gpg --batch --import "$RUNNER_TEMP/signing.asc"
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$SIGNING_PASSPHRASE" \
+            --export-ownertrust >/dev/null
+          echo "gpg_key_id=$(gpg --batch --with-colons --list-secret-keys | awk -F: '/^sec:/{print $5; exit}')" >> "$GITHUB_ENV"
+
+      - name: Build, sign and publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./mvnw --batch-mode --no-transfer-progress -Drevision=${{ env.release_version }} deploy
+          SIGNING_PASSPHRASE: ${{ secrets.AINER_GPG_PASSPHRASE }}
+        run: |
+          ARGS=(-Drevision="${{ env.release_version }}" -Prelease)
+          if [[ "${AINER_RELEASE_SIGNING:-}" == "true" ]]; then
+            ARGS+=(-Dgpg.keyname="$gpg_key_id" -Dgpg.passphrase="$SIGNING_PASSPHRASE")
+          fi
+          ./mvnw --batch-mode --no-transfer-progress "${ARGS[@]}" deploy
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@1c608d11d69870c2092266b3f9a6f3abbf17002c # v1.4.3
+        with:
+          subject-path: "**/target/*.jar"

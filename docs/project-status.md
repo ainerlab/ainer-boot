@@ -538,7 +538,11 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
   wrapper 已修、本地 `./mvnw clean verify` 已达成 `0 skipped`、consumer 门禁已通过（2026-08-04），工作流已
   首次跑绿（run 30904716377，ubuntu 原生 Docker）；但 private + GitHub 免费版无法启用分支保护/必需检查，
   目前靠「绿了再合」软约束，硬性 gate 待仓库可见性/计费决策，故尚未称为正式 CI；
-  制品签名、发布仓库、provenance 和自动部署仍未实现；
+   制品发布能力已部分闭环：`release` profile 生成 sources/javadoc 伴随制品，consumer 门禁断言其存在，
+   根 POM `-Prelease` 构建本地验证（26 模块），GPG `.asc` 签名与 `actions/attest-build-provenance`
+   provenance（SLSA v1）已接入 `release.yml`（secret 注入式，fail-closed）；尚未打真实非 SNAPSHOT
+   tag 验证 GitHub Packages 端到端发布，正式签名密钥未生成/配置，`gpg.skip` 只用于本地与
+   consumer 验证，签名轮换与首次签名发布记录仍待闭环；
 - 没有具名模块维护者矩阵、`CODEOWNERS` 和正式审查责任分配；
 - 没有生产备份恢复、容量测试、正式错误预算/告警路由和灾难恢复演练；
 - 没有稳定版兼容政策；许可证决策为暂不开源（私有/专有），未来若开源或对外发布再定商业/开源许可；付费产品交付系统未建立；
