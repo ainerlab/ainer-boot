@@ -141,10 +141,11 @@ Foundation Roadmap 仍是 Proposed；其 mdpress-first 是有条件的路线建�
    Stage 0–8 执行）为准；[v2](decisions/0033-account-workspace-isolation-model-baseline-v2.md)、
    [v1](decisions/0033-account-workspace-isolation-model-baseline.md) 与
    [对抗性审查](architecture/adr-0033-adversarial-review.md) 为决策历史。
-   Greenfield 替换脊柱的施工顺序与验收见
+   Greenfield 替换脊柱的早期实施计划与验收见
    [`architecture/identity-foundation-v1-implementation-plan.md`](architecture/identity-foundation-v1-implementation-plan.md)；
    原子清零（C1–C4 合并）的完整施工序列、隐藏缺口与依赖图见
-   [`architecture/0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)
+   [`architecture/0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)，
+   S1–S8 已全部完成并验证
 4. [`decisions/README.md`](decisions/README.md) 中相关安全 ADR
 5. 集成官方参考管理应用时阅读
    [`ainer-admin-integration.md`](ainer-admin-integration.md) 与
@@ -211,8 +212,8 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 | [`architecture/ainer-foundation-v1-roadmap.md`](architecture/ainer-foundation-v1-roadmap.md) | Foundation v1 的能力盘点、FV1-P0～P3 施工顺序、产品验证和明确不做（Proposed） |
 | [`decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md`](decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md) | ADR-0033 Greenfield 基线（Accepted 为目标，Option B：完全移除 Tenant；按 Impact Stage 0–8 执行） |
 | [`architecture/ainer-foundation-greenfield-reset-impact.md`](architecture/ainer-foundation-greenfield-reset-impact.md) | Greenfield reset 的删除/重建范围、迁移 baseline、JWT/API/event reset 与 Stage 0–8 执行顺序 |
-| [`architecture/0033-greenfield-cutover-plan.md`](architecture/0033-greenfield-cutover-plan.md) | Greenfield cutover 执行计划：已就绪脊柱基线、C1–C5 有序测试门、开放决策与评审指引 |
-| [`architecture/0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md) | C1–C4 原子清零完整执行规划：隐藏缺口（password store/securityEpoch/workspace 去 tenant）、S2–S8 施工序列与依赖图 |
+| [`architecture/0033-greenfield-cutover-plan.md`](architecture/0033-greenfield-cutover-plan.md) | Greenfield cutover 早期执行计划（Historical：已被原子执行规划取代，S1–S8 已完成） |
+| [`architecture/0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md) | C1–C4 原子清零完整执行规划：隐藏缺口（password store/securityEpoch/workspace 去 tenant）、S2–S8 施工序列与依赖图（S1–S8 全部完成） |
 | [`decisions/0033-account-workspace-isolation-model-baseline.md`](decisions/0033-account-workspace-isolation-model-baseline.md) | ADR-0033 v1 历史草案（Historical，未生效） |
 | [`architecture/adr-0033-adversarial-review.md`](architecture/adr-0033-adversarial-review.md) | ADR-0033 v1 的对抗性审查与 Major Revision 依据 |
 | [`decisions/0033-account-workspace-isolation-model-baseline-v2.md`](decisions/0033-account-workspace-isolation-model-baseline-v2.md) | ADR-0033 v2 迁移路线草案（Historical，不采用，保留为迁移备选语境） |

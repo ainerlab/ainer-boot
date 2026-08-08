@@ -2,8 +2,8 @@
 
 ## 文档状态
 
-- 状态：执行计划（待施工，非已实施）
-- 日期：2026-08-05
+- 状态：已执行完成（S1–S8 全部落地并被 [原子 Cutover 完整执行规划](0033-greenfield-atomic-cutover-execution-plan.md) 取代，不视为当前施工依据）
+- 日期：2026-08-05（最后更新 2026-08-08：标记历史）
 - 适用：`reset/0033-greenfield` 分支的 S1.2 破坏性 cutover
 - 依据：[ADR-0033 Greenfield](../decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md) +
   [Impact 文档](ainer-foundation-greenfield-reset-impact.md) §3/§4/§10 + 已落地的替换脊柱
@@ -11,6 +11,9 @@
 
 > 本计划把 Impact 文档里抽象的 Stage 1–8 落成有序、带测试门、可勾选的施工清单，供一个**全新、专注的 session**
 > 照单执行 cutover。当前 session 只完成了加法脊柱（下 §1）；**§2 的破坏性 cutover 尚未动**。
+> 后续施工一律以
+> [`0033-greenfield-atomic-cutover-execution-plan.md`](0033-greenfield-atomic-cutover-execution-plan.md)
+> 为准；S8 已于 2026-08-07 作为不可逆原子点完成，本页保留 C1–C5 决策语境。
 
 ---
 
