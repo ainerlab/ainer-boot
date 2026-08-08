@@ -22,6 +22,8 @@
         <module>ainer-server</module>
         <module>ainer-authorization-server</module>
         <module>ainer-offstate-app</module>
+        <module>ainer-initializer</module>
+        <module>ainer-initializer-cli</module>
     </modules>
 
     <properties>
@@ -46,6 +48,7 @@
         <maven.source.plugin.version>3.3.1</maven.source.plugin.version>
         <maven.javadoc.plugin.version>3.12.0</maven.javadoc.plugin.version>
         <maven.gpg.plugin.version>3.2.7</maven.gpg.plugin.version>
+        <maven.shade.plugin.version>3.6.0</maven.shade.plugin.version>
         <openapi.generator.maven.plugin.version>7.24.0</openapi.generator.maven.plugin.version>
     </properties>
 
@@ -150,6 +153,11 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-gpg-plugin</artifactId>
                     <version>${maven.gpg.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <version>${maven.shade.plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.springframework.boot</groupId>

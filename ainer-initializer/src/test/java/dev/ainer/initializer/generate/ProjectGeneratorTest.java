@@ -1,0 +1,205 @@
+package dev.ainer.initializer.generate;
+
+import dev.ainer.core.error.BusinessException;
+import dev.ainer.initializer.error.InitializerErrorCode;
+import dev.ainer.initializer.manifest.ManifestFixture;
+import dev.ainer.initializer.manifest.ManifestV1;
+import dev.ainer.initializer.preview.ProjectDiffer;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class ProjectGeneratorTest {
+
+    @TempDir
+    Path tempDir;
+
+    private ProjectTree generate(ManifestV1 manifest) {
+        return new ProjectGenerator(manifest).generate();
+    }
+
+    @Test
+    @DisplayName("同 manifest 两次生成字节级一致（golden determinism）")
+    void generationIsDeterministic() throws IOException {
+        ManifestV1 manifest = ManifestFixture.sample();
+
+        ProjectTree first = generate(manifest);
+        ProjectTree second = generate(manifest);
+
+        assertThat(first.files()).hasSameSizeAs(second.files());
+        for (int i = 0; i < first.files().size(); i++) {
+            GeneratedFile a = first.files().get(i);
+            GeneratedFile b = second.files().get(i);
+            assertThat(a.path()).isEqualTo(b.path());
+            assertThat(a.content()).isEqualTo(b.content());
+        }
+    }
+
+    @Test
+    @DisplayName("生成的文件清单齐全且路径合法")
+    void generatesExpectedFileList() throws IOException {
+        ProjectTree tree = generate(ManifestFixture.sample());
+
+        List<String> paths = tree.files().stream().map(GeneratedFile::path).toList();
+        assertThat(paths).containsExactly(
+                ".gitignore",
+                "README.md",
+                "pom.xml",
+                "src/main/java/dev/ainer/consumer/sample/SampleProjectApplication.java",
+                "src/main/java/dev/ainer/consumer/sample/ping/PingController.java",
+                "src/main/resources/application.yml",
+                "src/test/java/dev/ainer/consumer/sample/SampleProjectApplicationSmokeTest.java");
+    }
+
+    @Test
+    @DisplayName("pom.xml 引用 BOM import 与隐含 web starter")
+    void pomReferencesBomAndWebStarter() throws IOException {
+        GeneratedFile pom = generate(ManifestFixture.sample()).files().stream()
+                .filter(f -> f.path().equals("pom.xml"))
+                .findFirst()
+                .orElseThrow();
+
+        String content = pom.utf8();
+        assertThat(content).contains(
+                "<artifactId>sample-project</artifactId>",
+                "<groupId>dev.ainer</groupId>",
+                "<artifactId>ainer-dependencies</artifactId>",
+                "<version>0.1.0</version>",
+                "<artifactId>ainer-starter-web</artifactId>",
+                "<java.version>25</java.version>");
+    }
+
+    @Test
+    @DisplayName("extra starter 与 postgres 变体写入 pom 与配置")
+    void postgresVariantAddsDependencies() throws IOException {
+        ManifestV1 pg = ManifestFixture.postgres();
+        ProjectTree tree = generate(pg);
+
+        String pom = tree.files().stream()
+                .filter(f -> f.path().equals("pom.xml"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+        assertThat(pom).contains("org.postgresql", "postgresql", "testcontainers");
+
+        String config = tree.files().stream()
+                .filter(f -> f.path().equals("src/main/resources/application.yml"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+        assertThat(config).contains("datasource", "DATASOURCE_URL");
+    }
+
+    @Test
+    @DisplayName("owner 进入 README 而不进入运行配置")
+    void ownerOnlyInReadme() throws IOException {
+        ManifestV1 pg = ManifestFixture.postgres();
+        ProjectTree tree = generate(pg);
+
+        String readme = tree.files().stream()
+                .filter(f -> f.path().equals("README.md"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+        assertThat(readme).contains("Ainer Team", "team@example.com");
+
+        String config = tree.files().stream()
+                .filter(f -> f.path().equals("src/main/resources/application.yml"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+        assertThat(config).doesNotContain("Ainer Team").doesNotContain("team@example.com");
+    }
+
+    @Test
+    @DisplayName("预览不写入磁盘且只读")
+    void previewDoesNotWrite() throws IOException {
+        ManifestV1 manifest = ManifestFixture.sample();
+        long before = countBytes(tempDir);
+        generate(manifest);
+        long after = countBytes(tempDir);
+        assertThat(after).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("目标非空拒绝覆盖（无 force 时）")
+    void refusesNonEmptyTarget() throws IOException {
+        ManifestV1 manifest = ManifestFixture.sample();
+        Path target = Files.createDirectories(tempDir.resolve("existing"));
+        Files.writeString(target.resolve("keep.txt"), "keep");
+
+        ProjectWriter writer = new ProjectWriter();
+        assertThatThrownBy(() -> writer.write(generate(manifest), target, false))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).errorCode())
+                        .isEqualTo(InitializerErrorCode.UNSUPPORTED_TARGET));
+        assertThat(Files.readString(target.resolve("keep.txt"))).isEqualTo("keep");
+    }
+
+    @Test
+    @DisplayName("force 允许覆盖生成文件但保留外部文件")
+    void forceOverwritesGeneratedFiles() throws IOException {
+        ManifestV1 manifest = ManifestFixture.sample();
+        Path target = Files.createDirectories(tempDir.resolve("forced"));
+        Files.writeString(target.resolve("keep.txt"), "keep");
+
+        new ProjectWriter().write(generate(manifest), target, true);
+
+        assertThat(target.resolve("pom.xml")).isRegularFile();
+        assertThat(Files.readString(target.resolve("keep.txt"))).isEqualTo("keep");
+    }
+
+    @Test
+    @DisplayName("diff 正确识别新增、修改与不变")
+    void diffClassifiesFiles() throws IOException {
+        ManifestV1 manifest = ManifestFixture.sample();
+        Path target = Files.createDirectories(tempDir.resolve("diffed"));
+        new ProjectWriter().write(generate(manifest), target, false);
+        Files.writeString(target.resolve("README.md"), "tampered");
+
+        ProjectDiffer.DiffResult result = new ProjectDiffer().diff(generate(manifest), target);
+
+        assertThat(result.newFiles()).isEmpty();
+        assertThat(result.modifiedFiles()).containsExactly("README.md");
+        assertThat(result.unchangedFiles()).contains("pom.xml");
+    }
+
+    @Test
+    @DisplayName("生成后写入磁盘再 diff 无变更")
+    void replayAfterWriteIsStable() throws IOException {
+        ManifestV1 manifest = ManifestFixture.sample();
+        Path target = tempDir.resolve("replay");
+        new ProjectWriter().write(generate(manifest), target, false);
+
+        ProjectDiffer.DiffResult diff = new ProjectDiffer().diff(generate(manifest), target);
+        assertThat(diff.hasChanges()).isFalse();
+    }
+
+    private long countBytes(Path dir) throws IOException {
+        if (!Files.exists(dir)) {
+            return 0;
+        }
+        try (var paths = Files.walk(dir)) {
+            return paths.filter(Files::isRegularFile)
+                    .mapToLong(path -> {
+                        try {
+                            return Files.size(path);
+                        } catch (IOException e) {
+                            return 0;
+                        }
+                    })
+                    .sum();
+        }
+    }
+}

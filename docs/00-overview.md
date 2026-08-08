@@ -1,6 +1,6 @@
 # Ainer 文档总览：从这里开始
 
-> 文档类型：统一入口 · 状态：生效 · 最近核对：2026-08-03 · 适用版本：`0.1.x`
+> 文档类型：统一入口 · 状态：生效 · 最近核对：2026-08-08 · 适用版本：`0.1.x`
 
 本文是 Ainer Boot 文档的唯一权威入口。它帮助开发者、架构师和 AI agent 先建立同一份项目心智
 模型，再进入具体规范。它不复制各专题文档的细节，也不替代当前状态、架构规范或 ADR。
@@ -60,6 +60,11 @@ ainer-server                          业务 Resource Server
 
 ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管理面
 └── ainer-module-identity             HumanAccount、ServicePrincipal、登录身份与 Credential
+
+ainer-offstate-app                    P1 最小可消费应用（无外部服务冒烟）
+
+ainer-initializer                     P2 离线确定性生成内核（Manifest v1，ADR-0035）
+ainer-initializer-cli                 P2 离线 CLI：preview / init / diff
 ```
 
 必须先理解的四条边界：
@@ -82,7 +87,7 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 | 长期规范 | 以后应当如何设计和实现 | `architecture.md`、`conventions.md` 等 | 代码与规范同一变更 |
 | ADR | 为什么选择这个不可轻易逆转的方案 | [`decisions/README.md`](decisions/README.md) | 接受后不改写结论，以新 ADR 取代 |
 | 专题手册 | 某一领域如何开发、验证和运行 | 数据库、安全、AI、运维等文档 | 对应能力变化时更新 |
-| 研究/设计 | 候选方案、兼容验证和未来路线 | `design/`、`migration/`、Boot 4 备忘 | 不得写成已交付事实 |
+| 研究/设计 | 候选方案、兼容验证和未来路线 | `design/`、`migration/`、Boot 4 备忘、`reviews/` 审计快照 | 不得写成已交付事实 |
 | 变更记录 | 用户可见版本变化 | [`../CHANGELOG.md`](../CHANGELOG.md) | 随功能和发布维护 |
 
 没有一条“代码永远高于文档”或“文档永远高于代码”的简单规则：
@@ -198,6 +203,17 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 先区分 Ainer 的 Maven 4 生产者构建与 Maven 3.9+/Maven 4 外部 consumer 门禁。POM 4.1 和
 `packaging=bom` 尚未进入当前实施范围，不能因 XML 精简而绕过安装后 POM 与真实下游验证。
 
+### 4.10 Java 25 / Maven 4 / Spring Boot 4.1 能力利用
+
+1. [`reviews/java25-maven4-springboot41-capability-audit.md`](reviews/java25-maven4-springboot41-capability-audit.md)
+2. [ADR-0026](decisions/0026-maven-4-build-and-consumer-pom-baseline.md)
+3. [ADR-0029](decisions/0029-jdk25-boot4-modern-baseline.md)（Proposed）
+4. [`boot4-migration-notes.md`](boot4-migration-notes.md)
+5. [`project-status.md`](project-status.md) 中与 ADR-0029 / Maven 4 相关的缺口
+
+该审计是只读快照，回答“基线是否真正被利用、何处仍有遗留或重复基础设施”，不代替 ADR，也不
+把计划能力写成已交付。实施任何 finding 前先对照 ADR 与 `project-status.md`。
+
 ## 5. 完整文档地图
 
 ### 核心认知
@@ -255,6 +271,7 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 | [`releasing.md`](releasing.md) | 版本、制品、兼容、发布和回滚门禁 |
 | [`boot4-migration-notes.md`](boot4-migration-notes.md) | Spring Boot 4/JDK 25 兼容验证 |
 | [`migration/ainer-migration-plan.md`](migration/ainer-migration-plan.md) | 旧项目到 Ainer 的迁移路线 |
+| [`reviews/java25-maven4-springboot41-capability-audit.md`](reviews/java25-maven4-springboot41-capability-audit.md) | Java 25 / Maven 4 / Spring Boot 4.1 能力利用审计快照（只读，含 NO CHANGE） |
 
 仓库级协作规则见 [`../AGENTS.md`](../AGENTS.md)，贡献流程见
 [`../CONTRIBUTING.md`](../CONTRIBUTING.md)。
@@ -301,6 +318,7 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 | 版本、制品、发布或回滚 | `releasing.md` + `CHANGELOG.md` |
 | 新依赖、版本或许可证 | `dependencies.md` |
 | 文档新增、改名、取代 | 本文与所有入链 |
+| 基线能力利用审计快照 | `reviews/`（只读结论）；实施进度仍只写 `project-status.md` |
 
 ## 9. 文档完成定义
 

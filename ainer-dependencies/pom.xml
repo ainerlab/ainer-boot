@@ -85,6 +85,16 @@
                 <version>${revision}</version>
             </dependency>
             <dependency>
+                <groupId>dev.ainer</groupId>
+                <artifactId>ainer-initializer</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.ainer</groupId>
+                <artifactId>ainer-initializer-cli</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
                 <version>${mybatis-plus.version}</version>

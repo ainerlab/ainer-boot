@@ -42,6 +42,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0032](0032-organization-workforce-directory-baseline.md) | Proposed | 组织、员工任职与 SubjectSet 授权基线 |
 | [0033 Greenfield](0033-account-workspace-subject-isolation-greenfield-baseline.md) | Accepted | Account、Workspace、Subject 与 Isolation Greenfield 基线（Option B：完全移除 Tenant；目标基线，按 Impact Stage 0–8 执行） |
 | [0034](0034-knowledge-foundation-and-ai-context-model.md) | Proposed | Knowledge Foundation 与 AI Context Model 基线 |
+| [0035](0035-project-initializer-and-manifest-v1-baseline.md) | Proposed | Project Initializer 与 Manifest v1 基线（确定性生成、安全 preview/diff、golden consumer 门禁） |
 
 ## 历史草案与审查记录
 

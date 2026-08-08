@@ -24,6 +24,12 @@ Authorization Server 承载并于 2026-07-29 部署 dev (release `e6cb0b44bb9e-2
 当前工程是可编译、可运行、可用真实 PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到
 生产或商业发行就绪。
 
+P2 Create & Generate 已启动：`ainner-initializer`（Manifest v1 解析/校验 + 确定性生成内核）与
+`ainner-initializer-cli`（preview/init/diff 离线命令）已交付并通过 40+ 测试与
+`scripts/verify-initializer-consumer.sh`（两轮生成字节一致 diff、无 Ainer 框架源码副本、生成项目
+独立编译）门禁；ADR-0035 已建立 Manifest v1 契约与生成语义基线（Proposed）。TTFR/TTCRUD 计时
+与组织/行业模板仍属 P2 后续切片，不宣称 P2 完成。
+
 ## 2. 已完成
 
 - JDK 25、Maven Reactor、独立 BOM 与 Spring Boot 4.1.0 基线；
@@ -562,10 +568,13 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 按
 [`Ainer Boot 产品定位、竞品能力矩阵与路线图`](design/ainer-scaffold-design.md)
-定义的全局产品化阶段，当前尚未退出 **P0 Baseline Integrity**：候选 CI 尚未首次成功并纳入
-分支保护，Wrapper 官方持久端点、许可证和正式发布门禁仍未闭环。P1 的 BOM/Starter 与
-consumer 原型已有验证结果，但不能因此宣称 P1 Scaffold Ready；P2 Initializer 与 P3 外部消费者尚未
-交付。该设计文档只维护长期阶段和退出条件，本页继续独占当前阶段、完成记录与缺口。
+定义的全局产品化阶段，当前尚未退出 **P0 Baseline Integrity**：候选 CI 已多次跑绿但分支保护
+仍受 private 仓库/免费版限制待决；Wrapper 官方持久端点、许可证（ADR-0004 私有不开源）和正式
+发布门禁（signing key 首次真实生成与配置）仍未闭环。P1 发布能力（release profile、
+sources/javadoc、GPG、provenance）与 P2 Initializer v1 切片（ADR-0035 Manifest v1、
+`ainner-initializer` + `ainner-initializer-cli`、`verify-initializer-consumer.sh`）已有验证结果，
+但不能因此宣称 P1 Scaffold Ready 或 P2 完成：TTFR/TTCRUD 计时、组织模板与 golden consumer 生产化
+仍属 P2 后续切片，P3 外部消费者尚未交付。该设计文档只维护长期阶段和退出条件，本页继续独占当前阶段、完成记录与缺口。
 
 ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -Denforcer.skip=true` 验证；正式
 `./mvnw clean verify`、零跳过门禁与 Testcontainers 集成仍待 Maven 4 RC6 官方发行包恢复后执行）：
@@ -599,7 +608,9 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
    （pre-public 前最有价值）；
 2. 让 Wrapper 官方持久端点、非 SNAPSHOT 制品、最小 off-state 应用与 Maven 3.9+/4 外部消费者
    形成可重复发布验证记录，关闭 P1；
-3. 交付 manifest v1、preview/diff、确定性生成与 TTFR/TTCRUD golden consumer，关闭 P2；
+3. manifest v1、preview/diff、确定性生成与 golden consumer 门禁已交付首切片（ADR-0035、
+   `ainner-initializer` + `ainner-initializer-cli`、`verify-initializer-consumer.sh` 接入 CI）；继续
+   补齐 TTFR/TTCRUD 计时、PostgreSQL 变体 golden consumer、组织/行业模板与 CRUD 生成，关闭 P2；
 4. 立即生成 `xq-platform-next` 并以真实纵向切片进入 P3，不等待 P4/P5 全部企业能力。
 
 Identity、安全与运维纵深继续修复明确生产风险和 P0/P1/P3 阻塞项，但不再作为无限推迟
