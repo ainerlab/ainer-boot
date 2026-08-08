@@ -3,7 +3,7 @@ spring:
     name: {{project.artifactId}}
   main:
     banner-mode: "off"
+{{database.config}}
 
 server:
   port: 8080
-{{database.config}}

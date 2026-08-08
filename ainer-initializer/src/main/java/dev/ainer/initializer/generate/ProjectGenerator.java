@@ -35,6 +35,12 @@ public final class ProjectGenerator {
                     + "            <artifactId>ainer-starter-security</artifactId>\n"
                     + "        </dependency>\n");
 
+    private static final String POSTGRES_STARTER =
+            "        <dependency>\n"
+                    + "            <groupId>dev.ainer</groupId>\n"
+                    + "            <artifactId>ainer-starter-persistence</artifactId>\n"
+                    + "        </dependency>\n";
+
     private static final String DATABASE_DEPENDENCIES =
             "        <dependency>\n"
                     + "            <groupId>org.postgresql</groupId>\n"
@@ -53,8 +59,7 @@ public final class ProjectGenerator {
                     + "        </dependency>\n";
 
     private static final String DATABASE_CONFIG =
-            "\nspring:\n"
-                    + "  datasource:\n"
+            "  datasource:\n"
                     + "    url: ${DATASOURCE_URL}\n"
                     + "    username: ${DATASOURCE_USERNAME}\n"
                     + "    password: ${DATASOURCE_PASSWORD}\n";
@@ -79,11 +84,15 @@ public final class ProjectGenerator {
         files.add(render("Application.java", "src/main/java/" + packagePath + "/" + applicationClassName + "Application.java"));
         files.add(render("PingController.java", "src/main/java/" + packagePath + "/ping/PingController.java"));
         files.add(render("application.yml", "src/main/resources/application.yml"));
-        files.add(render("ApplicationSmokeTest.java",
+        files.add(render(smokeTestTemplate(),
                 "src/test/java/" + packagePath + "/" + applicationClassName + "ApplicationSmokeTest.java"));
         files.add(render(".gitignore.tpl", ".gitignore"));
         files.add(render("README.md", "README.md"));
         return new ProjectTree(files);
+    }
+
+    private String smokeTestTemplate() {
+        return database ? "ApplicationPostgresSmokeTest.java" : "ApplicationSmokeTest.java";
     }
 
     private GeneratedFile render(String templateName, String targetPath) {
@@ -122,7 +131,9 @@ public final class ProjectGenerator {
                 .put("application.className", applicationClassName)
                 .put("owner.block", ownerBlock)
                 .put("extra.starters", extraStartersBlock(manifest))
-                .put("database.dependencies", database ? DATABASE_DEPENDENCIES : "")
+                .put("database.dependencies", database
+                        ? POSTGRES_STARTER + DATABASE_DEPENDENCIES
+                        : "")
                 .put("database.config", database ? DATABASE_CONFIG : "");
         return builder.build();
     }
@@ -148,6 +159,9 @@ public final class ProjectGenerator {
         StringBuilder block = new StringBuilder();
         for (String starter : manifest.effectiveStarters()) {
             if (ManifestV1.FRAMEWORK_STARTER_WEB.equals(starter)) {
+                continue;
+            }
+            if (database && "dev.ainer:ainer-starter-persistence".equals(starter)) {
                 continue;
             }
             String dependency = EXTRA_STARTER_DEPENDENCY.get(starter);

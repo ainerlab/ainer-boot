@@ -3,6 +3,7 @@ package dev.ainer.initializer.generate;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.initializer.error.InitializerErrorCode;
 import dev.ainer.initializer.manifest.ManifestFixture;
+import dev.ainer.initializer.manifest.ManifestReader;
 import dev.ainer.initializer.manifest.ManifestV1;
 import dev.ainer.initializer.preview.ProjectDiffer;
 import org.junit.jupiter.api.DisplayName;
@@ -92,6 +93,7 @@ class ProjectGeneratorTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(pom).contains("org.postgresql", "postgresql", "testcontainers");
+        assertThat(pom).doesNotContain("serverTimezone");
 
         String config = tree.files().stream()
                 .filter(f -> f.path().equals("src/main/resources/application.yml"))
@@ -99,6 +101,73 @@ class ProjectGeneratorTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(config).contains("datasource", "DATASOURCE_URL");
+    }
+
+    @Test
+    @DisplayName("postgres 变体生成 Testcontainers 集成测试且演绎 persistence starter")
+    void postgresVariantAddsTestcontainersSmokeTest() throws IOException {
+        ManifestV1 pg = ManifestFixture.postgres();
+        ProjectTree tree = generate(pg);
+
+        String pom = tree.files().stream()
+                .filter(f -> f.path().equals("pom.xml"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+        assertThat(pom).contains("ainer-starter-persistence");
+
+        String test = tree.files().stream()
+                .filter(f -> f.path().endsWith("ApplicationSmokeTest.java"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+        assertThat(test).contains(
+                "@Testcontainers",
+                "PostgreSQLContainer",
+                "postgres:18.3-alpine",
+                "@DynamicPropertySource",
+                "AutoConfigureTestRestTemplate",
+                "DataSource");
+    }
+
+    @Test
+    @DisplayName("普通变体不生成 Testcontainers 测试")
+    void plainVariantHasNoTestcontainers() throws IOException {
+        ProjectTree tree = generate(ManifestFixture.sample());
+
+        String test = tree.files().stream()
+                .filter(f -> f.path().endsWith("ApplicationSmokeTest.java"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+        assertThat(test).doesNotContain("Testcontainers").doesNotContain("DataSource");
+    }
+
+    @Test
+    @DisplayName("postgres 变体与显式 persistence starter 不重复生成依赖")
+    void postgresVariantDeduplicatesPersistenceStarter() throws IOException {
+        ManifestV1 manifest = new ManifestReader().read(string("""
+                schemaVersion: v1
+                project:
+                  name: dup
+                  groupId: dev.ainer.consumer
+                  artifactId: dup
+                  version: 1.0.0
+                spring-boot: 4.1.0
+                ainner: 0.1.0
+                java: 25
+                database: postgresql
+                starters:
+                  - dev.ainer:ainer-starter-persistence
+                """));
+
+        ProjectTree tree = generate(manifest);
+        String pom = tree.files().stream()
+                .filter(f -> f.path().equals("pom.xml"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+        assertThat(pom).containsOnlyOnce("<artifactId>ainer-starter-persistence</artifactId>");
     }
 
     @Test
@@ -201,5 +270,9 @@ class ProjectGeneratorTest {
                     })
                     .sum();
         }
+    }
+
+    private static java.io.Reader string(String yaml) {
+        return new java.io.StringReader(yaml);
     }
 }

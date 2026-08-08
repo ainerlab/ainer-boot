@@ -2,13 +2,19 @@
 
 ## Status
 
-- 状态：Proposed
+- 状态：Accepted
 - 日期：2026-08-08
 - 决策者：Ainer 项目维护者
 - 取代：无
 - 被取代：无
 - 实现授权：本 ADR 授权在 `reset/0033-greenfield` 分支创建 `ainer-initializer` 模块、Manifest
   v1 模型、确定性生成器与 golden 测试；不授权连接外部仓库、写入数据库或改造现有应用装配
+- 实现证据：`ainer-initializer` 与 `ainer-initializer-cli` 已交付并通过 27 tests + golden 门禁
+  （确定性两轮生成字节一致、preview 只读、非空目标拒绝覆盖、普通与 postgres 变体 consumer 各自
+  独立编译）；决策 4 的 postgres 变体 @Testcontainers 集成测试（`postgres:18.3-alpine`、
+  `@DynamicPropertySource`、真实 `SELECT 1` 连通断言）已由
+  `scripts/verify-initializer-consumer.sh` 在 CI 全通道验证（普通 smoke test 与 postgres
+  集成测试均 0 skipped）
 
 ## Context
 

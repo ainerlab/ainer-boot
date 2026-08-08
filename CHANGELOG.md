@@ -17,11 +17,17 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 ### Added
 
 - 增加 P2 Project Initializer v1 切片：`ainner-initializer`（Manifest v1 解析/校验 +
-  零 Spring 确定性生成内核，ADR-0035）与 `ainner-initializer-cli`（`preview`/`init`/`diff`
+  零 Spring 确定性生成内核，ADR-0035 Accepted）与 `ainner-initializer-cli`（`preview`/`init`/`diff`
   离线命令）；同版本同 manifest 两轮生成字节级一致、preview 不落盘、非空目标拒绝覆盖
   （`--force` 才允许且不删除外部文件）、生成物只引用已发布制品不含 Ainer 源码副本；
   新增 `scripts/verify-initializer-consumer.sh` 并接入 CI，验证确定性、无源码复制与生成项目
   独立编译。
+- 增加 Initializer postgres 变体：`database: postgresql` 生成 `ainner-starter-persistence`、
+  runtime PostgreSQL 驱动与 Testcontainers 测试依赖（版本由 BOM 管理），测试资源生成
+  `@Testcontainers` + `postgres:18.3-alpine` + `@DynamicPropertySource` 集成测试（真实
+  `SELECT 1` 连通断言 + ping 契约），`consumer` 门禁同时验证普通与 postgres 变体、双变体
+  真实测试 0 skipped；Boot 4.1 拆分后 `TestRestTemplate`/`AutoConfigureTestRestTemplate`
+  使用 `org.springframework.boot.resttestclient` 新包。
 - 增加默认关闭的 M4.8B 租户上下文选择：`GET /api/me/tenants` 返回当前 USER 的 ACTIVE
   membership 安全投影（tenant ID、code、name、role、是否默认），LOCKED/DISABLED 不返回；
   Authorization Code + PKCE 人员流程在认证后增加 tenant selection 步骤，多 ACTIVE membership

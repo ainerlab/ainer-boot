@@ -25,10 +25,10 @@ Authorization Server 承载并于 2026-07-29 部署 dev (release `e6cb0b44bb9e-2
 生产或商业发行就绪。
 
 P2 Create & Generate 已启动：`ainner-initializer`（Manifest v1 解析/校验 + 确定性生成内核）与
-`ainner-initializer-cli`（preview/init/diff 离线命令）已交付并通过 24 tests / 0 failure 与
-`scripts/verify-initializer-consumer.sh`（两轮生成字节一致 diff、无 Ainer 框架源码副本、生成项目
-独立编译）门禁；ADR-0035 已建立 Manifest v1 契约与生成语义基线（Proposed）。TTFR/TTCRUD 计时
-与组织/行业模板仍属 P2 后续切片，不宣称 P2 完成。
+`ainner-initializer-cli`（preview/init/diff 离线命令）已交付并通过 27 tests / 0 failure 与
+`scripts/verify-initializer-consumer.sh`（两轮生成字节一致 diff、普通 smoke test 与 postgres
+`@Testcontainers` 集成测试均 0 skipped、无 Ainer 框架源码副本、生成项目独立编译）门禁；
+ADR-0035 已升级为 Accepted。TTFR/TTCRUD 计时与组织/行业模板仍属 P2 后续切片，不宣称 P2 完成。
 
 ## 2. 已完成
 
@@ -608,9 +608,10 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
    （pre-public 前最有价值）；
 2. 让 Wrapper 官方持久端点、非 SNAPSHOT 制品、最小 off-state 应用与 Maven 3.9+/4 外部消费者
    形成可重复发布验证记录，关闭 P1；
-3. manifest v1、preview/diff、确定性生成与 golden consumer 门禁已交付首切片（ADR-0035、
-   `ainner-initializer` + `ainner-initializer-cli`、`verify-initializer-consumer.sh` 接入 CI）；继续
-   补齐 TTFR/TTCRUD 计时、PostgreSQL 变体 golden consumer、组织/行业模板与 CRUD 生成，关闭 P2；
+3. manifest v1、preview/diff、确定性生成与 golden consumer 门禁已交付（ADR-0035 Accepted，
+   `ainner-initializer` + `ainner-initializer-cli`、`verify-initializer-consumer.sh` 接入 CI，
+   PostgreSQL 变体 @Testcontainers 集成测试 0 skipped）；继续
+   补齐 TTFR/TTCRUD 计时、组织/行业模板与 CRUD 生成，关闭 P2；
 4. 立即生成 `xq-platform-next` 并以真实纵向切片进入 P3，不等待 P4/P5 全部企业能力。
 
 Identity、安全与运维纵深继续修复明确生产风险和 P0/P1/P3 阻塞项，但不再作为无限推迟
