@@ -4,6 +4,13 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
+> **破坏性变更（Greenfield S8，不可逆）**：按 ADR-0033 完成去 tenant 化原子切换。删除
+> tenant/多租户上下文、Identity access-event outbox/relay/消费、跨运行时 Directory、平台
+> 预配与通知回执、tenant 服务 client 控制面及 OWNER 专用转移/丢失恢复；重建为
+> HumanAccount/ServicePrincipal/LoginIdentity/Credential foundation 与
+> `SERVICE_V1`/`USER_NEUTRAL_V1` typed token profile，撤销通过 `sec_epoch` 在线比对。
+> 下文历史条目中的 tenant/access-event/relay/预配描述已在当前基线中移除，不再适用。
+
 ### Added
 
 - 增加默认关闭的 M4.8B 租户上下文选择：`GET /api/me/tenants` 返回当前 USER 的 ACTIVE
