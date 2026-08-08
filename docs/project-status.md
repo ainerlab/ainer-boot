@@ -25,7 +25,7 @@ Authorization Server 承载并于 2026-07-29 部署 dev (release `e6cb0b44bb9e-2
 生产或商业发行就绪。
 
 P2 Create & Generate 已启动：`ainner-initializer`（Manifest v1 解析/校验 + 确定性生成内核）与
-`ainner-initializer-cli`（preview/init/diff 离线命令）已交付并通过 40+ 测试与
+`ainner-initializer-cli`（preview/init/diff 离线命令）已交付并通过 24 tests / 0 failure 与
 `scripts/verify-initializer-consumer.sh`（两轮生成字节一致 diff、无 Ainer 框架源码副本、生成项目
 独立编译）门禁；ADR-0035 已建立 Manifest v1 契约与生成语义基线（Proposed）。TTFR/TTCRUD 计时
 与组织/行业模板仍属 P2 后续切片，不宣称 P2 完成。

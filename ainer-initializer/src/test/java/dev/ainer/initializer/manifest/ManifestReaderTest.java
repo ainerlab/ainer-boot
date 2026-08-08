@@ -140,6 +140,16 @@ class ManifestReaderTest {
     }
 
     @Test
+    @DisplayName("fixtures 资源均可被 ManifestReader 接受")
+    void fixtureFilesAreValid() throws IOException {
+        ManifestV1 sample = ManifestFixture.sample();
+        assertThat(sample.project().artifactId()).isEqualTo("sample-project");
+
+        ManifestV1 postgres = ManifestFixture.postgres();
+        assertThat(postgres.database()).isEqualTo(ManifestV1.Database.POSTGRESQL);
+    }
+
+    @Test
     @DisplayName("database postgresql 与额外 starter 被接受")
     void acceptsPostgresAndExtraStarters() throws IOException {
         ManifestV1 manifest = reader.read(string(

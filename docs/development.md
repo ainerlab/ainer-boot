@@ -50,6 +50,9 @@ ainer-module-workspace             租户资源与成员授权
 ainer-module-ai-runtime            模型网关与调用审计
 ainer-server                       业务应用发行物
 ainer-authorization-server         OAuth 2.1/OIDC 发行物
+ainer-offstate-app                 P1 最小可消费应用（无外部服务冒烟）
+ainer-initializer                  P2 离线确定性生成内核（Manifest v1，ADR-0035）
+ainer-initializer-cli              P2 离线 CLI：preview / init / diff
 ```
 
 业务模块内部按 feature 组织 `api -> application -> domain`，infrastructure 实现 application/domain 定义的端口。framework 不得反向依赖业务模块。
