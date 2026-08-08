@@ -30,7 +30,6 @@ grep -Fq 'location = /ainer-login/login.css' "$vhost"
 grep -Fq 'location = /default-ui.css' "$vhost"
 grep -Fq 'location = /favicon.ico' "$vhost"
 grep -Fq 'location = /api/me/access-token-revocations' "$vhost"
-grep -Fq 'location ~ ^/api/tenants/[^/]+/members' "$vhost"
 grep -Fq "curl --noproxy '*'" ops/dev/bootstrap-origin.sh
 grep -Fq -- '--resolve "$domain:443:127.0.0.1"' ops/dev/bootstrap-origin.sh
 grep -Fq "curl --noproxy '*'" scripts/bootstrap-ainer-dev-origin.sh

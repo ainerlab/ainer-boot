@@ -261,7 +261,7 @@ scopes 固定为 `openid profile workspace.read workspace.write`，不注册 Ref
 
 同一 `dev` profile 还可以显式启用 Admin fixture。它通过 Identity 的严格幂等 bootstrap 创建
 `ainer-admin-dev` 的 default OWNER，以及一个独立 HumanAccount。第二个账户不带任何 Workspace
-access，因此可以验证"添加已有用户"；fixture 不提供默认
+access，可用于验证独立登录、撤销互不影响以及非成员访问被拒绝；fixture 不提供默认
 用户名或密码，配置缺失、用户名相同、部分占用或状态漂移均启动失败。
 
 M4.6 增加默认关闭的 Passkey/WebAuthn 协议基础。启用时：

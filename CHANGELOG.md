@@ -10,6 +10,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 > HumanAccount/ServicePrincipal/LoginIdentity/Credential foundation 与
 > `SERVICE_V1`/`USER_NEUTRAL_V1` typed token profile，撤销通过 `sec_epoch` 在线比对。
 > 下文历史条目中的 tenant/access-event/relay/预配描述已在当前基线中移除，不再适用。
+> Ainer Admin JSON 契约同步收敛为 v1.1.0：TenantMembers 管理 API、`/api/me/tenants` 与
+> tenant selector 代理/选择页一并删除，`ainer-admin-v1.yaml` 只保留
+> `POST /api/me/access-token-revocations` 当前会话撤销。
 
 ### Added
 

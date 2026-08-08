@@ -39,7 +39,6 @@ https://ainer-dev.xiaoqu99.com
 /error             -> Ainer Authorization Server
 /connect/logout    -> Ainer Authorization Server
 /api/me/**         -> Ainer Authorization Server
-/api/tenants/**    -> Ainer Authorization Server
 /ainer-studio/**   -> Ainer Studio（开发环境可选）
 ```
 

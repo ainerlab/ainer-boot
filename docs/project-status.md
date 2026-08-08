@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-07 · 工程版本：`0.1.0-SNAPSHOT`
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-08 · 工程版本：`0.1.0-SNAPSHOT`
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -84,10 +84,11 @@ Authorization Server 承载并于 2026-07-29 部署 dev (release `e6cb0b44bb9e-2
   tenant claim + 实时 ACTIVE OWNER/ADMIN 四重门禁，所有实际写入同事务审计且不允许通用接口修改 OWNER；
 - 首个平台 tenant/OWNER 使用默认关闭、严格幂等、不覆盖密码且由 PostgreSQL transaction advisory
   lock 串行化的 Authorization Server bootstrap；业务 Server 不装配 Identity migration；
-- Ainer Admin `dev` public client、双用户 fixture、当前 access token 自助撤销、成员 API
-  active gate、`ainer-admin-v1.yaml` 与 TypeScript SDK 生成入口；
-- 同一 `ainer-admin-dev` browser session 的 PKCE → default tenant → 成员列表/添加/双向改角色/
-  软移除 → revoke → OIDC logout 真实 PostgreSQL 端到端门禁；
+- Ainer Admin `dev` public client、双用户 fixture、当前 access token 自助撤销、撤销端点
+  active gate、`ainer-admin-v1.yaml` 与 TypeScript SDK 生成入口；TenantMembers 契约与
+  tenant selector 已随 S8 删除，契约只保留 `POST /api/me/access-token-revocations`；
+- 同一 `ainer-admin-dev` browser session 的 PKCE → revoke → OIDC logout
+  真实 PostgreSQL 端到端门禁；成员列表/添加/改角色/软移除验证已随 S8 移除；
 - Ainer 品牌服务端登录页：Studio 合同与 Tokens 固定哈希、四种服务端状态、服务端 CSRF、
   SavedRequest、统一凭据错误、HTML 429/`Retry-After`、明确认证基础设施异常 503、精确 CSS
   代理，以及不改变 WebAuthn/MFA filter 的兼容基线；
@@ -500,8 +501,8 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
   outbox、OAuth2/HTTPS 通知网关 relay、已有用户本人接受、安全分页、显式取消与 provider-neutral
   终态回执接收；真实外部通知网关/供应商、供应商回执映射和最终送达验证、禁用/恢复、tenant
   ownership transfer 和成员管理 UI 尚未完成；
-- tenant 成员 API 位于 Authorization Server，但其 step-up/在线校验接入要随生产 browser/OIDC
-  client 策略单独完成；Ainer Admin access token 已强制 active gate，但不能把业务 Server 的默认
+- tenant 成员 API 已随 S8 删除；Ainer Admin 只保留当前会话自助撤销端点，其撤销端点已强制
+  逐请求 online active gate，数据库故障返回 503 并失败关闭；不能把业务 Server 的默认
   step-up 规则误认为覆盖该端点；
 - Ainer Admin 同源代理已有契约但尚未在选定生产 ingress 上完成 HTTPS、Cookie、重定向和缓存
   验收；`ainer-admin-dev` 与开发身份不能替代生产 browser client 生命周期和正式开户。

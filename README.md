@@ -113,7 +113,10 @@ curl -i -X POST http://127.0.0.1:8080/api/ai/chat/completions \
   -d '{"messages":[{"role":"USER","content":"介绍 Ainer"}],"maxOutputTokens":512}'
 ```
 
-AI API 要求 access token 包含合法 `sub`、`tenant_id`、`aud=ainer-api` 和 `ai.invoke` scope；外部身份请求头不再生效。完整签发与验证配置见 [Identity 与 OAuth 2.1 使用基线](docs/security.md)，SSE 和模型配置见 [AI Model Gateway 使用与运维](docs/ai-gateway.md)。
+AI API 要求 access token 携带合法 `sub`（HumanAccount/ServicePrincipal）、`token_profile`、
+`claim_contract_version=1`、`aud=ainer-api` 和 `ai.invoke` scope；外部身份请求头不再生效。
+完整签发与验证配置见 [Identity 与 OAuth 2.1 使用基线](docs/security.md)，SSE 和模型配置见
+[AI Model Gateway 使用与运维](docs/ai-gateway.md)。
 
 所有响应都会携带 `X-Request-Id`。平台信息接口返回：
 
