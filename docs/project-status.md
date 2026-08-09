@@ -219,6 +219,21 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 
 ## 3. 最近验证记录
 
+2026-08-09 P2 收口与 P1 可重复验证基线（`reset/0033-greenfield`，worktree 全量）
+- P2 Create & Generate 四项退出门禁闭环（详见 §1）；`verify-initializer-consumer.sh`
+  三通道（普通/postgres/CRUD 变体）与 `measure-ttcrud.sh`（124s/门禁 1800s）本地重跑通过：
+  CRUD 全链路 create→get→update→list→delete→404 走真实 postgres:18.3-alpine，0 skipped。
+- `verify-maven-consumers.sh` 本地重跑通过：reactor clean install 到隔离 repo 后，
+  8 个 library 制品 sources/javadoc 伴随件齐全、18 个 consumer POM 无裸 `${revision}`、
+  3 个制品 `spring-configuration-metadata.json` 存在、`maven-artifact-plugin:compare`
+  可重复性通过、BOM 下 Maven 3.9.16 与 Maven 4.0.0-rc-6 双 golden consumer 均构建成功。
+- `./mvnw clean verify` 全量（JDK 25 + Colima Docker）BUILD SUCCESS：241 tests /
+  0 failure / 0 error / 0 skipped，`check-surefire-results.sh` 通过；offstate 最小应用
+  `OffStateApplicationTest` 0 skipped。
+- 剩余 P1 发布动作依赖 GitHub Packages PAT + 签名密钥（release/GPG）等仓库资产决策，
+  形成真实 non-SNAPSHOT 发布记录后关闭 P1；P0 剩余分支保护（private + 免费版限制）与
+  仓库可见性决策待定。
+
 2026-08-04(续) CI 首次跑绿 + 基线合入 dev + 许可证决策。
 - CI run 30904716377（`ubuntu-24.04` 原生 Docker）`completed=success`：全量 reactor verify +
   `check-surefire-results.sh` 0-skipped + Maven 3.9/4 consumer + CycloneDX SBOM。修复 2 个 Instant flaky
