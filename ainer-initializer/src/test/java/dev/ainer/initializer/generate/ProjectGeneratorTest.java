@@ -283,6 +283,159 @@ class ProjectGeneratorTest {
         assertThat(diff.hasChanges()).isFalse();
     }
 
+    @Test
+    @DisplayName("crud 变体生成 6 类 CRUD 文件且 deterministic")
+    void crudVariantGeneratesCrudFiles() throws IOException {
+        ManifestV1 crud = ManifestFixture.crud();
+        ProjectTree tree = generate(crud);
+        ProjectTree replay = generate(crud);
+
+        assertThat(tree.files()).hasSameSizeAs(replay.files());
+        List<String> paths = tree.files().stream().map(GeneratedFile::path).toList();
+        assertThat(paths).contains(
+                "src/main/resources/db/migration/V1__init.sql",
+                "src/main/java/dev/ainer/consumer/crud/crud/ProductEntity.java",
+                "src/main/java/dev/ainer/consumer/crud/crud/ProductMapper.java",
+                "src/main/java/dev/ainer/consumer/crud/crud/ProductApplicationService.java",
+                "src/main/java/dev/ainer/consumer/crud/crud/ProductController.java",
+                "src/test/java/dev/ainer/consumer/crud/crud/ProductCrudIntegrationTest.java");
+    }
+
+    @Test
+    @DisplayName("crud migration 使用 uuidv7 主键与参数化 DDL")
+    void crudMigrationUsesUuidv7AndComments() throws IOException {
+        String sql = generate(ManifestFixture.crud()).files().stream()
+                .filter(f -> f.path().equals("src/main/resources/db/migration/V1__init.sql"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(sql).contains("CREATE TABLE ainer_product (");
+        assertThat(sql).contains("id uuid PRIMARY KEY DEFAULT uuidv7()");
+        assertThat(sql).contains("sku varchar(32) NOT NULL");
+        assertThat(sql).contains("price numeric(19,4) NULL");
+        assertThat(sql).contains("published_at timestamptz NOT NULL");
+        assertThat(sql).contains("ref_id uuid NOT NULL");
+        assertThat(sql).contains("CONSTRAINT uq_ainer_product_sku UNIQUE (sku)");
+        assertThat(sql).contains("COMMENT ON COLUMN ainer_product.name IS '产品名称'");
+        assertThat(sql).doesNotContain("{{");
+    }
+
+    @Test
+    @DisplayName("生成实体类拥有字段、访问器与保留时间戳列")
+    void crudEntityHasFieldsAndAccessors() throws IOException {
+        String entity = file(generate(ManifestFixture.crud()), "ProductEntity.java");
+        assertThat(entity).contains("@TableName(\"ainer_product\")")
+                .contains("private String sku;")
+                .contains("private BigDecimal price;")
+                .contains("private Instant publishedAt;")
+                .contains("private UUID refId;")
+                .contains("public String getSku()")
+                .contains("public void setSku(String sku)")
+                .contains("private Instant createdAt;")
+                .contains("import java.math.BigDecimal;")
+                .doesNotContain("UUID.randomUUID()");
+    }
+
+    @Test
+    @DisplayName("生成的 Mapper 使用 RETURNING id 而非应用侧 UUID")
+    void generatedMapperUsesReturningId() throws IOException {
+        String mapper = generate(ManifestFixture.crud()).files().stream()
+                .filter(f -> f.path().endsWith("ProductMapper.java"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(mapper).contains("@Mapper")
+                .contains("extends BaseMapper<ProductEntity>")
+                .contains("INSERT INTO ainer_product (name, sku, price, active, published_at, ref_id, created_at, updated_at)")
+                .contains("VALUES (#{name}, #{sku}, #{price}, #{active}, #{publishedAt}, #{refId}, #{createdAt}, #{updatedAt}) RETURNING id")
+                .doesNotContain("${");
+    }
+
+    @Test
+    @DisplayName("生成的 Service 幂等创建且资源缺失抛 NOT_FOUND")
+    void generatedServiceUsesBoundQueries() throws IOException {
+        String service = generate(ManifestFixture.crud()).files().stream()
+                .filter(f -> f.path().endsWith("ProductApplicationService.java"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(service).contains("BusinessException(StandardErrorCode.NOT_FOUND")
+                .contains("insertReturningId(row)")
+                .contains("public ProductEntity create(ProductEntity row)")
+                .contains("public void delete(UUID id)")
+                .doesNotContain("UUID.randomUUID()");
+    }
+
+    @Test
+    @DisplayName("Controller 全部端点使用 ApiResponse 与 X-Request-Id")
+    void generatedControllerUsesEnvelope() throws IOException {
+        String controller = generate(ManifestFixture.crud()).files().stream()
+                .filter(f -> f.path().endsWith("ProductController.java"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(controller).contains("@RequestMapping(\"/api/products\")")
+                .contains("ApiResponse.success")
+                .contains("RequestIds.currentOrCreate(request)")
+                .contains("@PostMapping", "@GetMapping", "@PutMapping", "@DeleteMapping")
+                .doesNotContain("@PreAuthorize");
+    }
+
+    @Test
+    @DisplayName("CRUD 集成测试覆盖 create→get→update→list→delete 全链路")
+    void crudIntegrationTestCoversLifecycle() throws IOException {
+        String test = generate(ManifestFixture.crud()).files().stream()
+                .filter(f -> f.path().endsWith("ProductCrudIntegrationTest.java"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(test).contains("@Testcontainers", "PostgreSQLContainer", "postgres:18.3-alpine")
+                .contains("JsonPath.parse");
+        assertThat(test).contains("isEqualTo(201)");
+        assertThat(test).contains("isEqualTo(404)");
+        assertThat(test).contains("HttpMethod.PUT");
+    }
+
+    @Test
+    @DisplayName("entities 不允许与 database none 组合（fail-fast）")
+    void entitiesWithNoDatabaseFailsFast() {
+        assertThatThrownBy(() -> {
+            ManifestV1 parsed = new ManifestReader().read(string("""
+                    schemaVersion: v1
+                    project:
+                      name: bad
+                      groupId: dev.ainer.consumer
+                      artifactId: bad
+                      version: 1.0.0
+                    spring-boot: 4.1.0
+                    ainner: 0.1.0
+                    java: 25
+                    database: none
+                    entities:
+                      - name: item
+                        fields:
+                          - name: label
+                            type: string(16)
+                    """));
+            new ProjectGenerator(parsed).generate();
+        })
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).errorCode())
+                        .isEqualTo(InitializerErrorCode.INVALID_MANIFEST));
+    }
+
+    private String file(ProjectTree tree, String suffix) {
+        return tree.files().stream()
+                .filter(f -> f.path().endsWith(suffix))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+    }
     private long countBytes(Path dir) throws IOException {
         if (!Files.exists(dir)) {
             return 0;

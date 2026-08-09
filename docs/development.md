@@ -145,8 +145,10 @@ git status --short
 - 无 tenant 拦截器；每个资源查询都必须显式绑定可信归属键（`workspace_id`/`account_id` 等）。
   分页请求在 API 边界校验且最大单页 100。
 - 不默认使用 `IService`、`ServiceImpl`、ActiveRecord、逻辑删除或 MetaObject 自动填充。
-- 本轮没有引入 MyBatis-Plus 代码生成器；生成代码必须等待 Project Initializer 的模板和
-  golden consumer 设计。
+- 本轮没有引入 MyBatis-Plus 代码生成器；生成代码由 Project Initializer 的确定性
+  v1 模板提供（ADR-0035/ADR-0036）：manifest `entities` 触发 6 类 CRUD 模板文件，
+  主键走 PostgreSQL `DEFAULT uuidv7()` + `INSERT ... RETURNING id`，Mapper 只使用
+  `#{}` 绑定参数，生成物不含 `mybatis-plus-generator` 依赖。
 
 完整规则见
 [ADR-0028](decisions/0028-mybatis-plus-infrastructure-baseline.md) 与

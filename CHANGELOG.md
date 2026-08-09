@@ -16,6 +16,22 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- 增加 Initializer CRUD v1 生成（ADR-0036 Accepted）：Manifest v1 可选顶层 `entities`
+  （字段名/类型词汇表 `string(n)`/`int`/`long`/`decimal`/`boolean`/`instant`/`uuid`/`text`、
+  `nullable`/`unique`/`comment`，未知键、重复字段、模板字面量与 `id` 保留字 fail-fast），
+  仅允许与 `database: postgresql` 组合；每实体生成 6 个文件：Flyway migration
+  （`id uuid primary key default uuidv7()` 符合 ADR-0020、命名唯一约束与 `COMMENT ON`）、
+  MyBatis-Plus `Entity`/`Mapper`（自定义 `INSERT ... RETURNING id` 绑定参数、无 `${}`）、
+  `ApplicationService`（create/get/page/update/delete，缺失抛 `StandardErrorCode.NOT_FOUND`）、
+  `Controller`（`/api/<复数>` 五个端点，全部 `ApiResponse` envelope + `X-Request-Id`，
+  不含 `@PreAuthorize`，安全装配由消费者决定）与 Testcontainers CRUD 全链路集成测试
+  （create→get→update→list→delete→404，0 skipped）；`verify-initializer-consumer.sh`
+  增加第三通道（确定性 diff、无源码复制、无 `mybatis-plus-generator` 依赖、真实 PostgreSQL
+  集成测试 0 skipped）。
+- 增加 TTCRUD 量化门禁：新增 `scripts/measure-ttcrud.sh` 并接入 CI，从含 `entities` 的
+  manifest 到含 migration、API 与 Testcontainers 集成测试全绿的纵向 CRUD 实测 124 秒
+  （设计文档 §12.1 目标 ≤30 分钟），含 reactor install、确定性生成、独立编译与真实
+  PostgreSQL 运行全流程。
 - 增加 P2 Project Initializer v1 切片：`ainner-initializer`（Manifest v1 解析/校验 +
   零 Spring 确定性生成内核，ADR-0035 Accepted）与 `ainner-initializer-cli`（`preview`/`init`/`diff`
   离线命令）；同版本同 manifest 两轮生成字节级一致、preview 不落盘、非空目标拒绝覆盖

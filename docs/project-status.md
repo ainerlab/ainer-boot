@@ -29,8 +29,10 @@ P2 Create & Generate 已启动：`ainner-initializer`（Manifest v1 解析/校�
 `scripts/verify-initializer-consumer.sh`（两轮生成字节一致 diff、普通 smoke test 与 postgres
 `@Testcontainers` 集成测试均 0 skipped、无 Ainer 框架源码副本、生成项目独立编译）门禁；
 `scripts/measure-ttfr.sh` 已接入 CI，官方口径实测 TTFR 100 秒（门禁 600 秒），生成项目的
-`/actuator/health` 已作为 smoke 断言；ADR-0035 已升级为 Accepted。TTCRUD 计时、组织/行业模板
-与 CRUD 生成仍属 P2 后续切片，不宣称 P2 完成。
+`/actuator/health` 已作为 smoke 断言；ADR-0035 已升级为 Accepted。CRUD v1 生成切片
+（ADR-0036 Accepted）已交付：Manifest `entities` 解析、6 类 CRUD 文件、真实 PostgreSQL
+全链路集成测试 0 skipped、`scripts/measure-ttcrud.sh` 接入 CI 并实测 124 秒（门禁 30 分钟）。
+组织/行业模板与 P2 收口仍属后续切片，不宣称 P2 完成。
 
 ## 2. 已完成
 
@@ -613,8 +615,9 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
    形成可重复发布验证记录，关闭 P1；
 3. manifest v1、preview/diff、确定性生成与 golden consumer 门禁已交付（ADR-0035 Accepted，
    `ainner-initializer` + `ainner-initializer-cli`、`verify-initializer-consumer.sh` 接入 CI，
-   PostgreSQL 变体 @Testcontainers 集成测试 0 skipped，TTFR 实测 100s/门禁 600s）；继续
-   补齐 TTCRUD 计时、组织/行业模板与 CRUD 生成，关闭 P2；
+   PostgreSQL 变体 @Testcontainers 集成测试 0 skipped，TTFR 实测 100s/门禁 600s）；CRUD v1
+   生成已交付（ADR-0036 Accepted，`entities` manifest + 6 类 CRUD 文件 + TTCRUD 实测
+   124s/门禁 30min）；继续补齐组织/行业模板，关闭 P2；
 4. 立即生成 `xq-platform-next` 并以真实纵向切片进入 P3，不等待 P4/P5 全部企业能力。
 
 Identity、安全与运维纵深继续修复明确生产风险和 P0/P1/P3 阻塞项，但不再作为无限推迟

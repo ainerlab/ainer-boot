@@ -33,10 +33,13 @@ public final class ManifestReader {
 
     private static final Set<String> KNOWN_TOP_LEVEL_KEYS = Set.of(
             "schemaVersion", "project", "java", "spring-boot", "ainner", "package", "starters",
-            "database", "owner", "allowSnapshot");
+            "database", "owner", "entities", "allowSnapshot");
     private static final Set<String> KNOWN_PROJECT_KEYS =
             Set.of("name", "groupId", "artifactId", "version", "description");
     private static final Set<String> KNOWN_OWNER_KEYS = Set.of("displayName", "email");
+    private static final Set<String> KNOWN_ENTITY_KEYS = Set.of("name", "fields");
+    private static final Set<String> KNOWN_FIELD_KEYS =
+            Set.of("name", "type", "size", "nullable", "unique", "comment", "initial");
 
     private final Yaml yaml;
 
@@ -137,6 +140,7 @@ public final class ManifestReader {
 
         List<String> starters = startersOrEmpty(root);
         ManifestV1.Database database = parseDatabase(stringOrNull(root, "database"));
+        List<EntityDeclaration> entities = extractEntities(root, database);
         Owner owner = parseOwner(mapOrNull(root, "owner"));
 
         return new ManifestV1(
@@ -147,6 +151,7 @@ public final class ManifestReader {
                 packageName,
                 starters,
                 database,
+                entities,
                 owner);
     }
 
@@ -261,6 +266,105 @@ public final class ManifestReader {
             fail("owner.email 必须包含 @");
         }
         return new Owner(displayName, email);
+    }
+
+    private List<EntityDeclaration> extractEntities(Map<?, ?> root, ManifestV1.Database database) {
+        Object value = root.get("entities");
+        if (value == null) {
+            return List.of();
+        }
+        List<EntityDeclaration> result = new ArrayList<>();
+        if (!(value instanceof List<?> entities)) {
+            throw fail("entities 必须是数组");
+        }
+        for (int i = 0; i < entities.size(); i++) {
+            Object item = entities.get(i);
+            if (!(item instanceof Map<?, ?> entityMap)) {
+                throw fail("entities[" + i + "] 必须是映射");
+            }
+            rejectUnknownKeys(entityMap, KNOWN_ENTITY_KEYS, "entities[" + i + "]");
+            String name = requiredString(entityMap, "name", "entities[" + i + "].name");
+            Object fields = entityMap.get("fields");
+            if (!(fields instanceof List<?> fieldList)) {
+                throw fail("entities[" + i + "].fields 必须是数组");
+            }
+            Set<String> seen = new java.util.HashSet<>();
+            List<EntityField> fieldParsed = new ArrayList<>(fieldList.size());
+            for (int j = 0; j < fieldList.size(); j++) {
+                Object fieldItem = fieldList.get(j);
+                if (!(fieldItem instanceof Map<?, ?> fieldMap)) {
+                    throw fail("entities[" + i + "].fields[" + j + "] 必须是映射");
+                }
+                rejectUnknownKeys(fieldMap, KNOWN_FIELD_KEYS, "entities[" + i + "].fields[" + j + "]");
+                EntityField field = parseField(fieldMap, i, j);
+                if (!seen.add(field.name())) {
+                    fail("entities[" + i + "] 字段重复: " + field.name());
+                }
+                fieldParsed.add(field);
+            }
+            result.add(new EntityDeclaration(name, fieldParsed));
+        }
+        return List.copyOf(result);
+    }
+
+    private EntityField parseField(Map<?, ?> map, int entityIndex, int fieldIndex) {
+        String prefix = "entities[" + entityIndex + "].fields[" + fieldIndex + "]";
+        String fieldName = requiredString(map, "name", prefix + ".name");
+        String typeText = requiredString(map, "type", prefix + ".type");
+        checkTemplateLiteral(typeText);
+        EntityFieldParsed parsed = parseFieldType(typeText, prefix);
+        Object sizeValue = map.get("size");
+        if (sizeValue != null && !parsed.type().takesSize()) {
+            fail(prefix + " 类型 " + typeText + " 不接受 size");
+        }
+        String comment = stringOrNull(map, "comment");
+        if (comment != null) {
+            checkTemplateLiteral(comment);
+        }
+        String initial = stringOrNull(map, "initial");
+        if (initial != null) {
+            checkTemplateLiteral(initial);
+        }
+        return new EntityField(fieldName, parsed.type(), parsed.size(), isTrue(map, "nullable"), isTrue(map, "unique"), comment, initial);
+    }
+
+    private record EntityFieldParsed(EntityDeclaration.FieldType type, @Nullable Integer size) {}
+
+    private EntityFieldParsed parseFieldType(String text, String prefix) {
+        String normalized = text.trim();
+        int open = normalized.indexOf('(');
+        if (open != -1) {
+            if (!normalized.endsWith(")")) {
+                fail(prefix + " 字段类型括号不完整: " + text);
+            }
+            String base = normalized.substring(0, open).trim().toUpperCase();
+            if (!"STRING".equals(base)) {
+                fail(prefix + " 只有 string 类型接受长度参数: " + text);
+            }
+            String sizeText = normalized.substring(open + 1, normalized.length() - 1).trim();
+            if (!sizeText.matches("\\d+")) {
+                fail(prefix + "size 必须是数字: " + sizeText);
+            }
+            int size;
+            try {
+                size = Integer.parseInt(sizeText);
+            } catch (NumberFormatException e) {
+                fail(prefix + "size 必须是整数: " + sizeText);
+                throw new AssertionError("unreachable");
+            }
+            if (size <= 0 || size > 4000) {
+                fail(prefix + "size 必须在 1–4000 之间");
+            }
+            return new EntityFieldParsed(EntityDeclaration.FieldType.STRING, size);
+        }
+        String upper = normalized.toUpperCase();
+        for (EntityDeclaration.FieldType type : EntityDeclaration.FieldType.values()) {
+            if (type.name().equals(upper)) {
+                return new EntityFieldParsed(type, null);
+            }
+        }
+        fail(prefix + " 未知字段类型: " + text);
+        throw new AssertionError("unreachable");
     }
 
     private void validateGroupId(String groupId) {

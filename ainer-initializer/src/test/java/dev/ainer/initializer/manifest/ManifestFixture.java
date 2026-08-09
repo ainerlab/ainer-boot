@@ -20,6 +20,10 @@ public final class ManifestFixture {
         return load("manifest/v1/postgres.yaml");
     }
 
+    public static ManifestV1 crud() throws IOException {
+        return load("manifest/v1/crud.yaml");
+    }
+
     private static ManifestV1 load(String resource) throws IOException {
         try (InputStream stream = ManifestFixture.class.getClassLoader().getResourceAsStream(resource)) {
             Objects.requireNonNull(stream, "missing fixture " + resource);

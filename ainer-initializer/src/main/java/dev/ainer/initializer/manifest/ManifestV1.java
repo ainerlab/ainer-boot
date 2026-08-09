@@ -22,6 +22,7 @@ public record ManifestV1(
         @Nullable String packageName,
         List<String> starters,
         Database database,
+        List<EntityDeclaration> entities,
         @Nullable Owner owner) {
 
     /** Schema marker required by the generator. */
@@ -48,6 +49,10 @@ public record ManifestV1(
         starters = List.copyOf(Objects.requireNonNull(starters, "starters"));
         validateStarters(starters);
         database = database == null ? Database.NONE : database;
+        entities = List.copyOf(Objects.requireNonNull(entities, "entities"));
+        if (!entities.isEmpty() && database != Database.POSTGRESQL) {
+            fail("entities 只允许在 database 为 postgresql 时声明（CRUD 生成需要真实表）");
+        }
         if (packageName != null && packageName.isBlank()) {
             fail("package.name 不能为空字符串");
         }
