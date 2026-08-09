@@ -16,6 +16,11 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **P2 Create & Generate 收口（2026-08-09）**：P2 四项退出门禁逐项闭环——生成确定性
+  （同 manifest 两轮 diff=0）、生成安全（preview 不写盘、非空目标拒绝覆盖、生成器不连接
+  或写入数据库、不改菜单）、量化时间目标（TTFR 实测 100s/门禁 600s、TTCRUD 实测
+  124s/门禁 1800s，均已接入 CI）与 PostgreSQL/golden consumer 门禁。组织/行业模板与
+  受控策略包按 ADR-0035 决策 7 归入 Studio/Enterprise 扩展（P3+），不阻塞 P2 收口。
 - 增加 Initializer CRUD v1 生成（ADR-0036 Accepted）：Manifest v1 可选顶层 `entities`
   （字段名/类型词汇表 `string(n)`/`int`/`long`/`decimal`/`boolean`/`instant`/`uuid`/`text`、
   `nullable`/`unique`/`comment`，未知键、重复字段、模板字面量与 `id` 保留字 fail-fast），

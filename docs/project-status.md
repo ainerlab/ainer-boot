@@ -24,15 +24,15 @@ Authorization Server 承载并于 2026-07-29 部署 dev (release `e6cb0b44bb9e-2
 当前工程是可编译、可运行、可用真实 PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到
 生产或商业发行就绪。
 
-P2 Create & Generate 已启动：`ainner-initializer`（Manifest v1 解析/校验 + 确定性生成内核）与
-`ainner-initializer-cli`（preview/init/diff 离线命令）已交付并通过 28 tests / 0 failure 与
-`scripts/verify-initializer-consumer.sh`（两轮生成字节一致 diff、普通 smoke test 与 postgres
-`@Testcontainers` 集成测试均 0 skipped、无 Ainer 框架源码副本、生成项目独立编译）门禁；
-`scripts/measure-ttfr.sh` 已接入 CI，官方口径实测 TTFR 100 秒（门禁 600 秒），生成项目的
-`/actuator/health` 已作为 smoke 断言；ADR-0035 已升级为 Accepted。CRUD v1 生成切片
-（ADR-0036 Accepted）已交付：Manifest `entities` 解析、6 类 CRUD 文件、真实 PostgreSQL
-全链路集成测试 0 skipped、`scripts/measure-ttcrud.sh` 接入 CI 并实测 124 秒（门禁 30 分钟）。
-组织/行业模板与 P2 收口仍属后续切片，不宣称 P2 完成。
+P2 Create & Generate 已收口（2026-08-09）：`ainner-initializer`（Manifest v1 解析/校验 + 确定性
+生成内核）与 `ainner-initializer-cli`（preview/init/diff 离线命令）已交付并全量通过
+`verify-initializer-consumer.sh` 三通道门禁（两轮生成字节一致 diff、普通/postgres/CRUD 三个
+变体真实测试均 0 skipped、无 Ainer 框架源码副本、生成项目独立编译）；ADR-0035 与 ADR-0036 均
+Accepted。P2 退出门禁逐项验证：确定性（同 manifest 两轮 diff=0）、生成安全（preview 不落盘、
+非空目标拒绝覆盖、生成器无数据库/网络写入、默认不改菜单）、TTFR 实测 100s（门禁 600s）、
+TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden consumer 门禁。
+组织/行业模板与策略包是 ADR-0035 决策 7 明示的 v1 非目标，属 Studio/Enterprise 扩展
+（设计文档能力矩阵第 94 行），移交 P3+ 扩展清单，不再作为 P2 阻塞项。
 
 ## 2. 已完成
 
@@ -575,11 +575,10 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 定义的全局产品化阶段，当前尚未退出 **P0 Baseline Integrity**：候选 CI 已多次跑绿但分支保护
  仍受 private 仓库/免费版限制待决；Wrapper 官方持久端点、许可证（ADR-0004 私有不开源）和正式
  发布门禁（signing key 首次真实生成与配置）仍未闭环。P1 发布能力（release profile、
- sources/javadoc、GPG、provenance）与 P2 Initializer v1 切片（ADR-0035 Manifest v1、
- `ainner-initializer` + `ainner-initializer-cli`、`verify-initializer-consumer.sh`、TTFR 实测
- 100s/门禁 600s）已有验证结果，
- 但不能因此宣称 P1 Scaffold Ready 或 P2 完成：TTCRUD 计时、组织模板与 CRUD 生成
- 仍属 P2 后续切片，P3 外部消费者尚未交付。该设计文档只维护长期阶段和退出条件，本页继续独占当前阶段、完成记录与缺口。
+ sources/javadoc、GPG、provenance）与 **P2 Create & Generate 已收口**（ADR-0035/ADR-0036
+ Accepted：manifest v1、preview/diff、三通道 consumer 门禁、TTFR 100s 与 TTCRUD 124s 量化
+ 门禁均闭环）已有验证结果，但 P3 首个外部消费者尚未交付。该设计文档只维护长期阶段和退出
+条件，本页继续独占当前阶段、完成记录与缺口。
 
 ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -Denforcer.skip=true` 验证；正式
 `./mvnw clean verify`、零跳过门禁与 Testcontainers 集成仍待 Maven 4 RC6 官方发行包恢复后执行）：
@@ -604,8 +603,8 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 
 ## 5. 下一里程碑
 
-产品化主线调整为先关闭 P0，再依次进入 P1 Scaffold Ready、P2 Create & Generate 和 P3 首个外部
-消费者。近期可交付顺序是：
+产品化主线调整为先关闭 P0，再依次进入 P1 Scaffold Ready（P2 Create & Generate 已收口）和
+P3 首个外部消费者。近期可交付顺序是：
 
 1. RC6 已上 Central、wrapper 已修正、本地 `./mvnw clean verify` 已达成 `0 skipped`、consumer 门禁已通过、
    CI 已首次跑绿（2026-08-04 run 30904716377）、scaffold 基线已合入 `dev`（PR #2）、许可证已决策（暂不开源，
@@ -613,11 +612,11 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
    （pre-public 前最有价值）；
 2. 让 Wrapper 官方持久端点、非 SNAPSHOT 制品、最小 off-state 应用与 Maven 3.9+/4 外部消费者
    形成可重复发布验证记录，关闭 P1；
-3. manifest v1、preview/diff、确定性生成与 golden consumer 门禁已交付（ADR-0035 Accepted，
-   `ainner-initializer` + `ainner-initializer-cli`、`verify-initializer-consumer.sh` 接入 CI，
-   PostgreSQL 变体 @Testcontainers 集成测试 0 skipped，TTFR 实测 100s/门禁 600s）；CRUD v1
-   生成已交付（ADR-0036 Accepted，`entities` manifest + 6 类 CRUD 文件 + TTCRUD 实测
-   124s/门禁 30min）；继续补齐组织/行业模板，关闭 P2；
+3. **P2 Create & Generate 已收口（2026-08-09）**：manifest v1、preview/diff、确定性生成与
+   golden consumer 门禁交付（ADR-0035 Accepted）；CRUD v1 生成交付（ADR-0036 Accepted，
+   `entities` manifest + 6 类 CRUD 文件）；`verify-initializer-consumer.sh` 三通道、
+   TTFR 实测 100s/门禁 600s 与 TTCRUD 实测 124s/门禁 1800s 均接入 CI 并闭环。
+   组织/行业模板按 ADR-0035 决策 7 属 Studio/Enterprise 扩展，移交 P3+，不阻塞 P2 收口；
 4. 立即生成 `xq-platform-next` 并以真实纵向切片进入 P3，不等待 P4/P5 全部企业能力。
 
 Identity、安全与运维纵深继续修复明确生产风险和 P0/P1/P3 阻塞项，但不再作为无限推迟
