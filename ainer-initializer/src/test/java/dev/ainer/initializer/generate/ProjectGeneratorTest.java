@@ -402,6 +402,38 @@ class ProjectGeneratorTest {
     }
 
     @Test
+    @DisplayName("CRUD 集成测试示例值不超过 string(N) 长度上限")
+    void crudIntegrationTestSamplesRespectStringSize() throws IOException {
+        ManifestV1 manifest = new ManifestReader().read(string("""
+                schemaVersion: v1
+                project:
+                  name: sizesample
+                  groupId: dev.ainer.consumer
+                  artifactId: sizesample
+                  version: 1.0.0
+                spring-boot: 4.1.0
+                ainner: 0.1.0
+                java: 25
+                database: postgresql
+                entities:
+                  - name: item
+                    fields:
+                      - name: code
+                        type: string(8)
+                """));
+        String test = generate(manifest).files().stream()
+                .filter(f -> f.path().endsWith("ItemCrudIntegrationTest.java"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(test).doesNotContain("\"code-created\"");
+        assertThat(test).doesNotContain("\"code-updated\"");
+        assertThat(test).contains("\"code-cre\"");
+        assertThat(test).contains("\"code-upd\"");
+    }
+
+    @Test
     @DisplayName("entities 不允许与 database none 组合（fail-fast）")
     void entitiesWithNoDatabaseFailsFast() {
         assertThatThrownBy(() -> {

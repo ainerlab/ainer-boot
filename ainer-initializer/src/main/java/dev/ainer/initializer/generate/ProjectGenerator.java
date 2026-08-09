@@ -393,8 +393,16 @@ public final class ProjectGenerator {
             case BOOLEAN -> "true";
             case INSTANT -> "\"2026-08-09T00:00:00Z\"";
             case UUID -> "\"00000000-0000-0000-0000-00000000000" + suffix.charAt(0) + "\"";
-            default -> '"' + field.name() + "-" + suffix + '"';
+            default -> '"' + paddedSample(field, suffix) + '"';
         };
+    }
+
+    private String paddedSample(EntityField field, String suffix) {
+        String value = field.name() + "-" + suffix;
+        if (field.size() != null && value.length() > field.size()) {
+            return value.substring(0, field.size());
+        }
+        return value;
     }
 
     private String sampleValue(EntityField field, String suffix) {
@@ -404,7 +412,7 @@ public final class ProjectGenerator {
             case BOOLEAN -> "true";
             case INSTANT -> "2026-08-09T00:00:00Z";
             case UUID -> "00000000-0000-0000-0000-00000000000" + suffix.charAt(0);
-            default -> field.name() + "-" + suffix;
+            default -> paddedSample(field, suffix);
         };
     }
 }

@@ -219,6 +219,18 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 
 ## 3. 最近验证记录
 
+2026-08-09 首个外部消费者 `xq-platform-next` 出生（P3 前置验证）
+- 用 Initializer CLI（manifest v1）在外部独立仓库 `~/01-code/xq/xq-platform-next` 生成
+  `platformApp` 实体 CRUD 全栈：独立 `mvn verify`（Maven 3.9，JDK 25，真实 PostgreSQL 18.3
+  Testcontainers）4 tests / 0 failure / 0 skipped，BUILD SUCCESS。
+- 暴露并修复生成器缺陷：CRUD 测试示例值 `字段名-created/updated` 可能超过 `string(N)` 上限
+  （channelType string(16) 越界导致 500）；`sampleValue`/`sampleJsonValue` 新增
+  `paddedSample()` 按 `EntityField.size()` 截断；新增单测
+  `crudIntegrationTestSamplesRespectStringSize`（string(8) 边界），32 tests 全绿。
+- 独立构建直接暴露旧 SNAPSHOT 污染：`~/.m2` 中 8 月 5 日的 starter-persistence POM 缺
+  mybatis-plus 版本（消费者传入失败）；重装最新 reactor 后解析正常——提示非 SNAPSHOT
+  发布前必须先跑 consumer 通道刷新隔离仓库。
+
 2026-08-09 P2 收口与 P1 可重复验证基线（`reset/0033-greenfield`，worktree 全量）
 - P2 Create & Generate 四项退出门禁闭环（详见 §1）；`verify-initializer-consumer.sh`
   三通道（普通/postgres/CRUD 变体）与 `measure-ttcrud.sh`（124s/门禁 1800s）本地重跑通过：
