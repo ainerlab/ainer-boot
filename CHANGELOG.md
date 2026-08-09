@@ -28,6 +28,10 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   `SELECT 1` 连通断言 + ping 契约），`consumer` 门禁同时验证普通与 postgres 变体、双变体
   真实测试 0 skipped；Boot 4.1 拆分后 `TestRestTemplate`/`AutoConfigureTestRestTemplate`
   使用 `org.springframework.boot.resttestclient` 新包。
+- 增加 TTFR 量化门禁：生成项目隐含 `spring-boot-starter-actuator`（management 只暴露
+  health、`show-details: never`），smoke 测试断言 `/actuator/health` UP；新增
+  `scripts/measure-ttfr.sh` 并接入 CI，从空目录到 `/actuator/health=UP` 实测 100 秒
+  （设计文档 §12.1 目标 ≤10 分钟），含 reactor install、确定性生成与真实启动全流程。
 - 增加默认关闭的 M4.8B 租户上下文选择：`GET /api/me/tenants` 返回当前 USER 的 ACTIVE
   membership 安全投影（tenant ID、code、name、role、是否默认），LOCKED/DISABLED 不返回；
   Authorization Code + PKCE 人员流程在认证后增加 tenant selection 步骤，多 ACTIVE membership

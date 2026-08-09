@@ -60,4 +60,12 @@ class {{application.className}}ApplicationSmokeTest {
             assertThat(result.getInt(1)).isEqualTo(1);
         }
     }
+
+    @Test
+    void actuatorHealthIsUp() {
+        String url = "http://localhost:" + port + "/actuator/health";
+        var response = restTemplate.getForEntity(url, String.class);
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody()).contains("\"status\":\"UP\"");
+    }
 }

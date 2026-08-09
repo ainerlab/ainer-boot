@@ -144,6 +144,34 @@ class ProjectGeneratorTest {
     }
 
     @Test
+    @DisplayName("生成项目包含 actuator health 最小暴露与健康测试")
+    void actuatorHealthIsGenerated() throws IOException {
+        ProjectTree tree = generate(ManifestFixture.sample());
+
+        String pom = tree.files().stream()
+                .filter(f -> f.path().equals("pom.xml"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+        assertThat(pom).contains("spring-boot-starter-actuator");
+
+        String config = tree.files().stream()
+                .filter(f -> f.path().equals("src/main/resources/application.yml"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+        assertThat(config).contains("management:", "include: health");
+
+        String test = tree.files().stream()
+                .filter(f -> f.path().endsWith("ApplicationSmokeTest.java"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+        assertThat(test).contains("/actuator/health")
+                .contains("\\\"status\\\":\\\"UP\\\"");
+    }
+
+    @Test
     @DisplayName("postgres 变体与显式 persistence starter 不重复生成依赖")
     void postgresVariantDeduplicatesPersistenceStarter() throws IOException {
         ManifestV1 manifest = new ManifestReader().read(string("""

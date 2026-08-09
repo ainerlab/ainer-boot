@@ -27,4 +27,12 @@ class {{application.className}}ApplicationSmokeTest {
         assertThat(response.getBody()).contains("\"data\":\"pong\"");
         assertThat(response.getHeaders().getFirst("X-Request-Id")).isNotBlank();
     }
+
+    @Test
+    void actuatorHealthIsUp() {
+        String url = "http://localhost:" + port + "/actuator/health";
+        var response = restTemplate.getForEntity(url, String.class);
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody()).contains("\"status\":\"UP\"");
+    }
 }

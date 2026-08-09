@@ -66,6 +66,9 @@ jobs:
       - name: Verify initializer generation and consumer compilation
         run: ./scripts/verify-initializer-consumer.sh
 
+      - name: Measure and gate TTFR
+        run: ./scripts/measure-ttfr.sh
+
       - name: Generate CycloneDX SBOM artifact
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
