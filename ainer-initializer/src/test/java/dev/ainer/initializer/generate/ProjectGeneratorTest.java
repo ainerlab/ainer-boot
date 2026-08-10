@@ -141,8 +141,8 @@ class ProjectGeneratorTest {
         assertThat(test).contains(
                 "@Testcontainers",
                 "PostgreSQLContainer",
-                "postgres:18.3-alpine",
-                "@DynamicPropertySource",
+                "AinerPostgresContainer.create()",
+                "@ServiceConnection",
                 "AutoConfigureTestRestTemplate",
                 "DataSource");
     }
@@ -411,11 +411,11 @@ class ProjectGeneratorTest {
                 .findFirst()
                 .orElseThrow();
 
-        assertThat(test).contains("@Testcontainers", "PostgreSQLContainer", "postgres:18.3-alpine")
-                .contains("JsonPath.parse");
+        assertThat(test).contains("@Testcontainers", "PostgreSQLContainer", "AinerPostgresContainer.create()")
+                .contains("JsonPath.read");
         assertThat(test).contains("isEqualTo(201)");
         assertThat(test).contains("isEqualTo(404)");
-        assertThat(test).contains("HttpMethod.PUT");
+        assertThat(test).contains("client.putJson");
     }
 
     @Test

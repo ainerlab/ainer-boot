@@ -16,6 +16,12 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **`ainer-test-support` 测试基座（2026-08-10）**：ADR-0029 T1 第 7 项落地。新模块提供
+  `RestTestClient`/`RestResponse`（Boot 4.1 `TestRestTemplate` JSON 集成测试便捷）与
+  `AinerPostgresContainer`（固定 `postgres:18.3-alpine`，配合 `@ServiceConnection` 自动装配
+  DataSource，替代 `@DynamicPropertySource` 样板）。Initializer v1 生成的 SmokeTest 与
+  CRUD 集成测试模板已切换为 test-support，pom 增加 `ainer-test-support` test 依赖；
+  模块自身含 RANDOM_PORT + 真实 PostgreSQL Testcontainers 集成测试。
 - **初始生成项目默认开启虚拟线程（2026-08-10）**：按 ADR-0029 决策 5，双模式压测矩阵
   闭环（等待型 80ms×400 并发虚拟线程 p50 减半、吞吐 +77%，JDBC 场景同级无回归）后，
   Initializer v1 模板新增 `spring.threads.virtual.enabled=true` 默认开启；新增生成

@@ -66,6 +66,11 @@
             </dependency>
             <dependency>
                 <groupId>dev.ainer</groupId>
+                <artifactId>ainer-test-support</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.ainer</groupId>
                 <artifactId>ainer-module-identity</artifactId>
                 <version>${revision}</version>
             </dependency>

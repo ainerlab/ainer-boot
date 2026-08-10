@@ -1,5 +1,6 @@
-package {{package.name}};
+package dev.ainer.testsupport;
 
+import dev.ainer.testsupport.application.TestSupportTestApplication;
 import dev.ainer.testsupport.postgres.AinerPostgresContainer;
 import dev.ainer.testsupport.rest.RestResponse;
 import dev.ainer.testsupport.rest.RestTestClient;
@@ -21,9 +22,10 @@ import java.sql.Statement;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(classes = TestSupportTestApplication.class,
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
-class {{application.className}}ApplicationSmokeTest {
+class TestSupportIntegrationTest {
 
     @Container
     @ServiceConnection
@@ -39,27 +41,38 @@ class {{application.className}}ApplicationSmokeTest {
     private int port;
 
     @Test
-    void pingReturnsPong() {
-        RestResponse response = RestTestClient.forLocalServer(restTemplate, port).get("/api/ping");
-        assertThat(response.status().value()).isEqualTo(200);
-        assertThat(response.body()).contains("\"data\":\"pong\"");
-        assertThat(response.header("X-Request-Id")).isNotBlank();
+    void restTestClientRunsFullJsonLifecycle() {
+        RestTestClient client = RestTestClient.forLocalServer(restTemplate, port);
+
+        RestResponse created = client.postJson("/api/probe", """
+                {"name": "alpha"}
+                """);
+        assertThat(created.status().value()).isEqualTo(200);
+        assertThat(created.jsonPath("$.status")).isEqualTo("created");
+        long id = (long) ((Number) created.jsonPath("$.id")).longValue();
+
+        RestResponse fetched = client.get("/api/probe/" + id);
+        assertThat(fetched.status().value()).isEqualTo(200);
+        assertThat(fetched.jsonPath("$.name")).isEqualTo("alpha");
+
+        RestResponse updated = client.putJson("/api/probe/" + id, """
+                {"name": "beta"}
+                """);
+        assertThat(updated.status().value()).isEqualTo(200);
+        assertThat(updated.jsonPath("$.status")).isEqualTo("updated");
+
+        RestResponse deleted = client.delete("/api/probe/" + id);
+        assertThat(deleted.status().value()).isEqualTo(200);
+        assertThat(deleted.jsonPath("$.status")).isEqualTo("deleted");
     }
 
     @Test
-    void databaseIsReachable() throws Exception {
+    void postgresDatasourceIsReachable() throws Exception {
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
             var result = statement.executeQuery("SELECT 1");
             assertThat(result.next()).isTrue();
             assertThat(result.getInt(1)).isEqualTo(1);
         }
-    }
-
-    @Test
-    void actuatorHealthIsUp() {
-        RestResponse response = RestTestClient.forLocalServer(restTemplate, port).get("/actuator/health");
-        assertThat(response.status().value()).isEqualTo(200);
-        assertThat(response.body()).contains("\"status\":\"UP\"");
     }
 }

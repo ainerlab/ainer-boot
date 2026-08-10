@@ -219,6 +219,23 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 
 ## 3. 最近验证记录
 
+2026-08-10 T1-7 `ainer-test-support` 落地：RestTestClient + `@ServiceConnection` + PostgreSQL 测试基座
+- 新增 `ainer-framework/ainer-test-support` 模块（ADR-0029 T1 第 7 项）：`RestTestClient`/`RestResponse`
+  基于 Boot 4.1 `TestRestTemplate` 提供 JSON 便捷与 JsonPath 断言；`AinerPostgresContainer` 固定
+  `postgres:18.3-alpine` 镜像，配合 Boot `@ServiceConnection`（`JdbcContainerConnectionDetailsFactory`
+  via spring-boot-testcontainers + spring-boot-jdbc）自动装配 DataSource，取代 `@DynamicPropertySource`
+  样板。模块自身 5 个测试全绿（RANDOM_PORT 集成 + 真实 PG 容器 + 单元）。
+- Initializer v1 模板已接入：生成项目 pom 增加 `ainer-test-support` test 依赖；SMOKE/CRUD 测试模板
+  改用 RestTestClient 与 `@ServiceConnection` 基座。ProjectGeneratorTest 断言同步（33 tests 全绿）。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：248 tests / 0 failure / 0 error /
+  0 skipped。`verify-maven-consumers.sh`（19 个 consumer POM、9 个 library 制品 sources/javadoc、
+  Maven 3.9/4 双 golden consumer）与 `verify-initializer-consumer.sh`（普通/postgres/CRUD 三通道
+  真实 Testcontainers 0 skipped）均通过。
+- 关键依赖事实：Boot 4.1 中 `spring-boot-resttestclient` 不传递 `spring-boot-restclient` 与
+  `spring-boot-http-client`，test-support 需显式声明；`spring-boot-jdbc` 的
+  `JdbcContainerConnectionDetailsFactory` 经 `META-INF/spring.factories` 注册
+  `ConnectionDetailsFactory`，`@ServiceConnection` + PG 容器即可生成 JDBC ConnectionDetails。
+
 2026-08-10 P0-5 虚拟线程双模式压测矩阵闭环：等待型场景通过并落地默认开关
 - 脚本升级为双场景：JDBC 分页（`/api/metricRows`）与等待型并发（注入
   `/api/wait` 端点模拟外部 IO 阻塞，`Thread.sleep` 阻塞式等待）。

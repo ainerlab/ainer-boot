@@ -153,8 +153,10 @@ done
 
 grep -q "PostgreSQLContainer" $(find "$pg_dir/src/test" -name '*.java') \
   || fail "postgres variant must contain a Testcontainers integration test"
-grep -q "postgres:18.3-alpine" $(find "$pg_dir/src/test" -name '*.java') \
-  || fail "postgres variant must pin the postgres:18.3-alpine image"
+grep -q "AinerPostgresContainer.create()" $(find "$pg_dir/src/test" -name '*.java') \
+  || fail "postgres variant must use the Ainer test-support PostgreSQL base"
+grep -q "ainer-test-support" "$pg_dir/pom.xml" \
+  || fail "postgres variant must depend on ainer-test-support"
 
 cd "$pg_dir"
 "$wrapper" --batch-mode --no-transfer-progress \

@@ -337,27 +337,27 @@ public final class ProjectGenerator {
         return """
                 String createdPayload = %s;
                 String updatePayload = %s;
-                ResponseEntity<String> created = restTemplate.postForEntity(url("/api/%s"), json(createdPayload), String.class);
-                assertThat(created.getStatusCode().value()).isEqualTo(201);
-                assertThat(created.getHeaders().getFirst("X-Request-Id")).isNotBlank();
-                String id = JsonPath.parse(created.getBody()).read("$.data.id", String.class);
+                RestResponse created = client.postJson("/api/%s", createdPayload);
+                assertThat(created.status().value()).isEqualTo(201);
+                assertThat(created.header("X-Request-Id")).isNotBlank();
+                String id = com.jayway.jsonpath.JsonPath.read(created.body(), "$.data.id");
                 assertThat(id).isNotBlank();
 
-                ResponseEntity<String> fetched = restTemplate.getForEntity(url("/api/%s/" + id), String.class);
-                assertThat(fetched.getStatusCode().value()).isEqualTo(200);
-                assertThat(fetched.getBody()).contains("%s");
+                RestResponse fetched = client.get("/api/%s/" + id);
+                assertThat(fetched.status().value()).isEqualTo(200);
+                assertThat(fetched.body()).contains("%s");
 
-                ResponseEntity<String> updated = restTemplate.exchange(url("/api/%s/" + id), HttpMethod.PUT, json(updatePayload), String.class);
-                assertThat(updated.getStatusCode().value()).isEqualTo(200);
-                assertThat(updated.getBody()).contains("%s");
+                RestResponse updated = client.putJson("/api/%s/" + id, updatePayload);
+                assertThat(updated.status().value()).isEqualTo(200);
+                assertThat(updated.body()).contains("%s");
 
-                ResponseEntity<String> listed = restTemplate.getForEntity(url("/api/%s"), String.class);
-                assertThat(listed.getStatusCode().value()).isEqualTo(200);
-                assertThat(listed.getBody()).contains(id);
+                RestResponse listed = client.get("/api/%s");
+                assertThat(listed.status().value()).isEqualTo(200);
+                assertThat(listed.body()).contains(id);
 
-                restTemplate.delete(url("/api/%s/" + id));
-                ResponseEntity<String> afterDelete = restTemplate.getForEntity(url("/api/%s/" + id), String.class);
-                assertThat(afterDelete.getStatusCode().value()).isEqualTo(404);
+                client.delete("/api/%s/" + id);
+                RestResponse afterDelete = client.get("/api/%s/" + id);
+                assertThat(afterDelete.status().value()).isEqualTo(404);
                 """.formatted(jsonLiteral(payload), jsonLiteral(updatePayload),
                 path, path, firstCreatedValue,
                 path, firstUpdatedValue,

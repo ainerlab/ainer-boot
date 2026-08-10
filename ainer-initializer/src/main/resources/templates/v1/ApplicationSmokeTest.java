@@ -1,5 +1,7 @@
 package {{package.name}};
 
+import dev.ainer.testsupport.rest.RestResponse;
+import dev.ainer.testsupport.rest.RestTestClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -21,18 +23,16 @@ class {{application.className}}ApplicationSmokeTest {
 
     @Test
     void pingReturnsPong() {
-        String url = "http://localhost:" + port + "/api/ping";
-        var response = restTemplate.getForEntity(url, String.class);
-        assertThat(response.getStatusCode().value()).isEqualTo(200);
-        assertThat(response.getBody()).contains("\"data\":\"pong\"");
-        assertThat(response.getHeaders().getFirst("X-Request-Id")).isNotBlank();
+        RestResponse response = RestTestClient.forLocalServer(restTemplate, port).get("/api/ping");
+        assertThat(response.status().value()).isEqualTo(200);
+        assertThat(response.body()).contains("\"data\":\"pong\"");
+        assertThat(response.header("X-Request-Id")).isNotBlank();
     }
 
     @Test
     void actuatorHealthIsUp() {
-        String url = "http://localhost:" + port + "/actuator/health";
-        var response = restTemplate.getForEntity(url, String.class);
-        assertThat(response.getStatusCode().value()).isEqualTo(200);
-        assertThat(response.getBody()).contains("\"status\":\"UP\"");
+        RestResponse response = RestTestClient.forLocalServer(restTemplate, port).get("/actuator/health");
+        assertThat(response.status().value()).isEqualTo(200);
+        assertThat(response.body()).contains("\"status\":\"UP\"");
     }
 }

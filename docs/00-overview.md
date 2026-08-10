@@ -53,7 +53,8 @@ ainer-framework/
 ├── ainer-security                    可信主体与 authority 契约
 ├── ainer-starter-web                 HTTP、错误与请求追踪
 ├── ainer-starter-persistence         MyBatis-Plus/MyBatis、Flyway、PostgreSQL、UUID
-└── ainer-starter-security            JWT Resource Server 共性
+├── ainer-starter-security            JWT Resource Server 共性
+└── ainer-test-support                集成测试基座（RestTestClient、Testcontainers、PostgreSQL）
 
 ainer-server                          业务 Resource Server
 ├── ainer-module-workspace            membership 资源、成员与授权审计
