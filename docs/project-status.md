@@ -219,6 +219,26 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 
 ## 3. 最近验证记录
 
+2026-08-10 P0-5 虚拟线程双模式压测矩阵基线（脚本 `scripts/measure-virtual-threads.sh`）
+- 在临时目录生成 PostgreSQL CRUD 消费者（`metricRows` 实体，manifest v1），以固定
+  Hikari 池 16、Tomcat 线程上限 200 分别启动平台线程（默认）与
+  `spring.threads.virtual.enabled=true` 双模式，ApacheBench 压制 `/api/metricRows`
+  分页接口（真实 JDBC + Flyway migration + 50 行种子数据）。
+- 实测（本机 macOS + Colima, JDK 25）：8000 请求/80 并发下 platform
+  p50=11/p90=20/p95=25/p99=68ms、5636 req/s；virtual p50=10/p90=23/p95=30/p99=69ms、
+  5890 req/s；两轮复跑（2000/40）趋势一致（virtual p95 19–30ms 与 platform
+  20–32ms 同级）。业务失败均为 0（ab 无 Non-2xx 行），Failed 计数为 ab 对
+  keep-alive 复用的 Length 观测伪影（已单独验证 30 次连续响应长度一致）。
+- JFR 录制 `settings=profile`（platform/virtual 各约 2.3–2.9MB）确认
+  jdk.ThreadStart 事件存在（virtual 45 条，含 container-0 容器线程）。
+- 结论：等待型 MVC+JDBC 负载下双模式性能同级，虚拟线程无性能回归；按 ADR-0029
+  决策 5 先保持默认平台线程，"新 MVC 项目默认 v-thread" 的开关需要更重负载
+  （高等待/长阻塞场景）进一步压测后决定。矩阵已接入 CI 独立
+  `virtual-thread-matrix` job（Ubuntu apache2-utils 提供 ab），不阻塞主质量门禁。
+- 过程中暴露 JDK 25 + PG JDBC 环境事实：`jdbc:postgresql://127.0.0.1`（字面
+  IP）经 `InetSocketAddress.createUnresolved` 连接失败（UnknownHostException），
+  使用 `localhost` 正常——脚本已固化为 localhost，写入验证记录便于排查。
+
 2026-08-09 首个外部消费者 `xq-platform-next` 出生（P3 前置验证）
 - 用 Initializer CLI（manifest v1）在外部独立仓库 `~/01-code/xq/xq-platform-next` 生成
   `platformApp` 实体 CRUD 全栈：独立 `mvn verify`（Maven 3.9，JDK 25，真实 PostgreSQL 18.3
@@ -625,8 +645,10 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
   非配置可调。多次尝试（模块局部 forked、根 forked、根 in-process + `.mvn/jvm.config`、`MAVEN_OPTS`）均失败，
   此前因 Maven 4 RC6 wrapper 阻断无法在正式工具链验证（该阻断已于 2026-08-04 修复，见 §3），故已还原配置
   保持构建绿色；NullAway 作为「CI 接入」项可在现已可用的 Maven 4 工具链上重新评估。
-- P0-5 虚拟线程：`aiStreamExecutor` 已标记 `@Bean(defaultCandidate=false)`。**双模式压测矩阵与「新 MVC 项目
-  默认开启 v-thread」仍待办**——需 Docker/运行环境，当前未运行。
+- P0-5 虚拟线程：`aiStreamExecutor` 已标记 `@Bean(defaultCandidate=false)`。**双模式压测矩阵已
+  建立并跑通基线**（`scripts/measure-virtual-threads.sh`，平台/虚拟同级无回归，见 §3 2026-08-10
+  记录）；「新 MVC 项目默认开启 v-thread」在高等待负载补充压测前保持人工决策开关，不对
+  Initializer 模板默认开启。
 
 ## 5. 下一里程碑
 

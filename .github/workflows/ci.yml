@@ -113,3 +113,34 @@ jobs:
           printf '%s\n' "$RUNNER_TEMP" >>"$GITHUB_PATH"
       - name: Run gitleaks
         run: gitleaks detect --source . --config .gitleaks.toml --no-banner --redact
+
+  virtual-thread-matrix:
+    name: Platform vs virtual thread matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: quality
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up JDK 25
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      - name: Install Ainer artifacts to local repository
+        run: ./mvnw --batch-mode --no-transfer-progress -DskipTests -Dgpg.skip=true install
+      - name: Install ApacheBench
+        run: sudo apt-get update && sudo apt-get install -y apache2-utils
+      - name: Run platform vs virtual thread matrix
+        run: ./scripts/measure-virtual-threads.sh -n 2000 -c 40 -d "$RUNNER_TEMP/vt-matrix"
+      - name: Upload matrix artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: virtual-thread-matrix
+          path: "${{ runner.temp }}/vt-matrix/**"
+          if-no-files-found: warn
+          retention-days: 7
