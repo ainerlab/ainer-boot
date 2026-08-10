@@ -16,6 +16,15 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **首个外部消费者 `xq-platform-next` 生成（2026-08-09）**：Initializer 在独立仓库生成
+  `platformApp` CRUD 全栈并通过独立 `mvn verify`（JDK 25 + 真实 PostgreSQL 18.3
+  Testcontainers，4 tests 0 skipped）。修复生成器缺陷：CRUD 测试示例值
+  `字段名-created/updated` 超过 `string(N)` 上限时按 `size` 截断（新增
+  `paddedSample()` 与 string(8) 边界单测）。
+- **第二个外部消费者 `python-learning-service` 登记（2026-08-09）**：在 scaffold 设计
+  §13.5 登记 Python 课程、学习进度、练习、Tutor 后台为第二个消费者，接入方式固定为
+  “版本化制品升级”（非 SNAPSHOT BOM/Starter 固定版本），拒绝源码副本与开发分支依赖；
+  领域模型可先行开发，后台适配层保持隔离，等 P1 发布门槛后正式接入。
 - **P2 Create & Generate 收口（2026-08-09）**：P2 四项退出门禁逐项闭环——生成确定性
   （同 manifest 两轮 diff=0）、生成安全（preview 不写盘、非空目标拒绝覆盖、生成器不连接
   或写入数据库、不改菜单）、量化时间目标（TTFR 实测 100s/门禁 600s、TTCRUD 实测

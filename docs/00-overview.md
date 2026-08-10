@@ -26,8 +26,9 @@ AI-native、但不局限于 AI 的通用企业应用脚手架与平台底座。�
 - Project Initializer、通用企业模块、可选 AI runtime 与参考应用；
 - 未来社区版、企业版和行业产品的工程与商业交付基线。
 
-`xq-platform-next` 是规划中的首个外部产品消费者，不是 Ainer 源码副本；Ainer Studio 独立负责
-管理端模板、Blocks 与视觉交付。完整产品边界见
+`xq-platform-next` 是规划中的首个外部产品消费者，不是 Ainer 源码副本；`python-learning-service`
+已登记为第二个外部消费者（Version-based 升级接入，不绑定开发分支）。Ainer Studio 独立负责
+管理端模板、Blocks 与视觉交付。完整产品边界与消费者登记见
 [`design/ainer-scaffold-design.md`](design/ainer-scaffold-design.md)。
 
 当前优先做正确的模块化单体边界；服务化通过独立发行物、稳定契约、明确数据所有权和可靠事件

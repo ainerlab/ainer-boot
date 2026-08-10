@@ -545,3 +545,37 @@ port 和 local adapter；只有满足 ADR-0024 的拆分条件后再增加 remot
 
 满足这些门禁后立即创建首个消费者，并通过真实纵向切片继续校验脚手架；不得把“所有企业功能
 完成”作为创建产品仓库的前置条件。
+
+### 13.5 外部消费者登记
+
+首个外部消费者固定为 `xq-platform-next`（§13.1）。除它之外，Ainer 登记第二个智能消费方：
+
+| 消费者 | groupId / 位置 | 领域边界 | 接入方式 | 状态 |
+|---|---|---|---|---|
+| `xq-platform-next` | `dev.xq:xq-platform-next`，独立仓库 | 公开行业信息与协作、录货、搜索、交易 | Initializer 生成 + BOM 固定版本 | 已创建（2026-08-09），P3 验证中 |
+| `python-learning-service` | 待定，独立仓库 | Python 课程、学习进度、练习、Tutor | 版本化制品升级（BOM + Starter 固定版本），拒绝源码副本 | 已登记，未接入 |
+
+新消费者接入必须采用“版本化制品升级”，不是 Git 合并或开发分支依赖：
+
+```text
+ainer-boot
+  发布 v0.1.0 / v0.2.0
+       ↓ BOM + Starter
+python-learning-service
+  依赖固定版本
+       ↓ 升级 PR + 完整验证
+新版本 Ainer
+```
+
+`python-learning-service` 的领域模型与 API 契约可以先行开发，但后台适配层保持隔离；
+在 Ainer 具备以下门槛前不得作为正式基础依赖接入：
+
+1. 可固定引用的版本化 BOM/Starter（非 SNAPSHOT）；
+2. 不依赖 Ainer 源码副本；
+3. 明确的 API、配置、数据库和事件兼容规则；
+4. 独立消费者能通过 Maven/Testcontainers/Golden Consumer 门禁；
+5. 可回滚到上一 Ainer 版本。
+
+能力归属沿用 §13.3 的边界：通用安全、数据库、HTTP、AI Runtime 能力回到 `ainer-boot`
+发布新版本；`python-learning-service` 只承载 Python 课程、学习进度、练习、Tutor 等自身
+业务；破坏性变化走 Ainer 新版本 + migration + 兼容性说明，由服务单独升级。

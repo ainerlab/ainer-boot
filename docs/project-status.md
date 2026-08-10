@@ -644,7 +644,13 @@ P3 首个外部消费者。近期可交付顺序是：
    `entities` manifest + 6 类 CRUD 文件）；`verify-initializer-consumer.sh` 三通道、
    TTFR 实测 100s/门禁 600s 与 TTCRUD 实测 124s/门禁 1800s 均接入 CI 并闭环。
    组织/行业模板按 ADR-0035 决策 7 属 Studio/Enterprise 扩展，移交 P3+，不阻塞 P2 收口；
-4. 立即生成 `xq-platform-next` 并以真实纵向切片进入 P3，不等待 P4/P5 全部企业能力。
+4. **首个外部消费者 `xq-platform-next` 已生成（2026-08-09）**：独立仓库
+   `~/01-code/xq/xq-platform-next`，Initializer 生成 `platformApp` CRUD 全栈，独立
+   `mvn verify` 4 tests 0 skipped（真实 PostgreSQL 18.3）；并修复生成器 string(N)
+   示例值越界缺陷（见 §3 验证记录）；
+5. `python-learning-service` 已登记为第二个外部消费者（§13.5）：领域模型与 API 契约
+   可先行开发，后台适配层隔离；等 P1 版本化 BOM/Starter 发布后按“版本化制品升级”接入，
+   不绑定开发分支、不复制源码。
 
 Identity、安全与运维纵深继续修复明确生产风险和 P0/P1/P3 阻塞项，但不再作为无限推迟
 Initializer 与外部消费者的前置功能清单。
