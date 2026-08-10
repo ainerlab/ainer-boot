@@ -3,29 +3,36 @@ set -euo pipefail
 
 # P0-5（ADR-0029 决策 5）：平台线程 / 虚拟线程双模式压测矩阵（MVC + JDBC）。
 # 在临时目录生成 PostgreSQL CRUD 消费者项目，分别以 platform / virtual 两种
-# 线程模式启动，用 ApacheBench 压制 /api/products 分页接口（真实 JDBC + Flyway
-# migration），输出吞吐、P50/P90/P95/P99 与失败率对比，并录制 JFR 虚拟线程诊断
-# 文件。矩阵维度（AI Provider 并发上限、MDC/Trace 传播、SSE 中断与优雅停机）
+# 线程模式启动，用 ApacheBench 压制两类场景：
+#   - /api/metricRows 分页接口（真实 JDBC + Flyway migration）——等待型无高阻塞
+#   - /api/wait 模拟外部 IO 阻塞（sleep 等待时长）——高等待型并发，虚拟线程优势区
+# 输出吞吐、P50/P90/P95/P99 与失败率对比，并录制 JFR 虚拟线程诊断文件。
+# 矩阵维度（AI Provider 并发上限、MDC/Trace 传播、SSE 中断与优雅停机）
 # 随依赖环境逐步补齐，本脚本为可重复基线。
 #
 # 用法：
-#   ./scripts/measure-virtual-threads.sh [-n 请求数] [-c 并发数] [-d 目标目录]
+#   ./scripts/measure-virtual-threads.sh [-n 请求数] [-c 并发数]
+#       [-w 等待毫秒] [-W 等待场景并发数] [-d 目标目录]
 #
 # 环境要求：JDK 25 + Ainer reactor 已安装到本地仓库（或 AINER_VERSION 指定）、
-# Docker/Colima 可用（Testcontainers）。
+# Docker/Colima 可用（Testcontainers）。Aborted requests 数为 0。
 
 boot_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 wrapper="$boot_root/mvnw"
 requests=2000
 concurrency=40
+wait_ms=80
+wait_concurrency=500
 target_dir="${TMPDIR:-/tmp}/ainer-vt-matrix"
 
-while getopts "n:c:d:" opt; do
+while getopts "n:c:w:W:d:" opt; do
   case "$opt" in
     n) requests="$OPTARG" ;;
     c) concurrency="$OPTARG" ;;
+    w) wait_ms="$OPTARG" ;;
+    W) wait_concurrency="$OPTARG" ;;
     d) target_dir="$OPTARG" ;;
-    *) echo "usage: $0 [-n requests] [-c concurrency] [-d target-dir]" >&2; exit 1 ;;
+    *) echo "usage: $0 [-n requests] [-c concurrency] [-w wait-ms] [-W wait-concurrency] [-d target-dir]" >&2; exit 1 ;;
   esac
 done
 
@@ -85,6 +92,28 @@ fi
 cli_jar="$(find ~/.m2/repository/dev/ainer/ainer-initializer-cli -name '*-cli.jar' 2>/dev/null | head -n 1)"
 [[ -n "$cli_jar" ]] || fail "ainer-initializer-cli shaded JAR not found in local repository"
 java -jar "$cli_jar" init "$manifest" "$generated" >/dev/null
+
+# 注入压测专用 /api/wait 端点（模拟外部 IO/下游调用阻塞，阻塞式 Thread.sleep；
+# 虚拟线程在等待期间挂起 carrier，平台线程占用 Tomcat worker）。该文件仅用于
+# 矩阵测量，不属于 Initializer 生成产物。
+cat >"$generated/src/main/java/dev/ainer/vt/ping/WaitController.java" <<'EOF'
+package dev.ainer.vt.ping;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class WaitController {
+
+    @GetMapping("/api/wait")
+    public String simulateWait(@RequestParam(name = "ms", defaultValue = "80") long ms)
+            throws InterruptedException {
+        Thread.sleep(ms);
+        return "ok";
+    }
+}
+EOF
 
 # 2. 编译生成项目（消费者独立构建）。使用主本地仓库中已安装的 Ainer SNAPSHOT
 #    （若本地仓库过期，先执行 ./mvnw clean install 刷新；隔离仓库验证见
@@ -152,8 +181,14 @@ run_mode() {
 
   # 压测分页接口（真实 JDBC 查询 + Flyway 初始化的表）。
   /usr/sbin/ab -n "$requests" -c "$concurrency" \
-    -g "$target_dir/$mode.tsv" \
-    "http://127.0.0.1:$port/api/metricRows?page=1&size=10" >"$target_dir/$mode.ab" 2>&1 || true
+    -g "$target_dir/$mode.jdbc.tsv" \
+    "http://127.0.0.1:$port/api/metricRows?page=1&size=10" >"$target_dir/$mode.jdbc.ab" 2>&1 || true
+
+  # 压测等待型接口（模拟外部 IO 阻塞；高等待并发是虚拟线程的收益区，
+  # 也是 ADR-0029 决策 5 决定「新 MVC 项目默认 v-thread」的判据之一）。
+  /usr/sbin/ab -n "$requests" -c "$wait_concurrency" \
+    -g "$target_dir/$mode.wait.tsv" \
+    "http://127.0.0.1:$port/api/wait?ms=$wait_ms" >"$target_dir/$mode.wait.ab" 2>&1 || true
 
   # 等待 JFR 转储完成再杀进程。
   sleep 3
@@ -184,20 +219,31 @@ PYEOF
 
 echo "== platform（平台线程，默认） =="
 run_mode platform 18081
-platform_summary="$(summarize platform)"
+platform_jdbc="$(summarize platform.jdbc)"
+platform_wait="$(summarize platform.wait)"
 
 echo "== virtual（spring.threads.virtual.enabled=true） =="
 run_mode virtual 18082
-virtual_summary="$(summarize virtual)"
+virtual_jdbc="$(summarize virtual.jdbc)"
+virtual_wait="$(summarize virtual.wait)"
 
 echo
-echo "== 双模式对比（/api/metricRows，n=${requests} c=${concurrency}） =="
+echo "== 双模式对比 — JDBC 分页（/api/metricRows，n=${requests} c=${concurrency}） =="
 printf '%-10s %s\n' "mode" "result"
-printf '%-10s %s\n' "platform" "$platform_summary"
-printf '%-10s %s\n' "virtual" "$virtual_summary"
+printf '%-10s %s\n' "platform" "$platform_jdbc"
+printf '%-10s %s\n' "virtual" "$virtual_jdbc"
+
+echo
+echo "== 双模式对比 — 等待型并发（/api/wait?ms=${wait_ms}，n=${requests} c=${wait_concurrency}） =="
+printf '%-10s %s\n' "mode" "result"
+printf '%-10s %s\n' "platform" "$platform_wait"
+printf '%-10s %s\n' "virtual" "$virtual_wait"
+
 for mode in platform virtual; do
-  grep -E 'Complete requests|Failed requests|Non-2xx responses|Requests per second' "$target_dir/$mode.ab" \
-    | sed "s/^/[$mode] /" || true
+  for scene in jdbc wait; do
+    grep -E 'Complete requests|Failed requests|Non-2xx responses|Requests per second' \
+      "$target_dir/$mode.$scene.ab" | sed "s/^/[$mode-$scene] /" || true
+  done
 done
 # ab 的 Length 失败是 keep-alive 连接复用时的长度基准误报；业务失败以
 # Non-2xx responses 为准，出现为非业务可接受时必须人工核查页面响应。

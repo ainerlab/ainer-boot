@@ -16,6 +16,11 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **初始生成项目默认开启虚拟线程（2026-08-10）**：按 ADR-0029 决策 5，双模式压测矩阵
+  闭环（等待型 80ms×400 并发虚拟线程 p50 减半、吞吐 +77%，JDBC 场景同级无回归）后，
+  Initializer v1 模板新增 `spring.threads.virtual.enabled=true` 默认开启；新增生成
+  默认开关断言测试。`scripts/measure-virtual-threads.sh` 增加 `/api/wait` 等待型场景，
+  `xq-platform-next` 在默认虚拟线程下 4 tests 0 skipped。
 - **首个外部消费者 `xq-platform-next` 生成（2026-08-09）**：Initializer 在独立仓库生成
   `platformApp` CRUD 全栈并通过独立 `mvn verify`（JDK 25 + 真实 PostgreSQL 18.3
   Testcontainers，4 tests 0 skipped）。修复生成器缺陷：CRUD 测试示例值

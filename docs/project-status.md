@@ -219,6 +219,22 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 
 ## 3. 最近验证记录
 
+2026-08-10 P0-5 虚拟线程双模式压测矩阵闭环：等待型场景通过并落地默认开关
+- 脚本升级为双场景：JDBC 分页（`/api/metricRows`）与等待型并发（注入
+  `/api/wait` 端点模拟外部 IO 阻塞，`Thread.sleep` 阻塞式等待）。
+- 等待型实测（80ms × 400 并发，8000 请求两轮复跑一致）：platform
+  p50≈167ms/p95≈174ms、2239 req/s；virtual p50≈87ms/p95≈112ms、3954 req/s——
+  虚拟线程延迟约减半（-48%）、吞吐 +77%；两轮 p50 差 1ms 内稳定。
+- JDBC 分页对比（4000 请求/40 并发）：platform p95=17、virtual p95=16，
+  RPS 4378 vs 4406——双模式同级，虚拟线程无性能回归。
+- 依据 ADR-0029 决策 5 条件成立，Initializer v1 模板新增
+  `spring.threads.virtual.enabled=true` 默认开启；新增
+  `generatedProjectsEnableVirtualThreadsByDefault` 断言（33 tests 全绿）；
+  真实消费者 `xq-platform-next` 重新生成后在默认虚拟线程下
+  clean verify 4 tests 0 skipped 全绿。
+- 业务失败两场景均为 0；ab Length 计数保持为连接复用观测伪影
+  （此前已单独验证 30 次连续响应长度一致）。
+
 2026-08-10 P0-5 虚拟线程双模式压测矩阵基线（脚本 `scripts/measure-virtual-threads.sh`）
 - 在临时目录生成 PostgreSQL CRUD 消费者（`metricRows` 实体，manifest v1），以固定
   Hikari 池 16、Tomcat 线程上限 200 分别启动平台线程（默认）与
@@ -645,10 +661,11 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
   非配置可调。多次尝试（模块局部 forked、根 forked、根 in-process + `.mvn/jvm.config`、`MAVEN_OPTS`）均失败，
   此前因 Maven 4 RC6 wrapper 阻断无法在正式工具链验证（该阻断已于 2026-08-04 修复，见 §3），故已还原配置
   保持构建绿色；NullAway 作为「CI 接入」项可在现已可用的 Maven 4 工具链上重新评估。
-- P0-5 虚拟线程：`aiStreamExecutor` 已标记 `@Bean(defaultCandidate=false)`。**双模式压测矩阵已
-  建立并跑通基线**（`scripts/measure-virtual-threads.sh`，平台/虚拟同级无回归，见 §3 2026-08-10
-  记录）；「新 MVC 项目默认开启 v-thread」在高等待负载补充压测前保持人工决策开关，不对
-  Initializer 模板默认开启。
+- P0-5 虚拟线程：`aiStreamExecutor` 已标记 `@Bean(defaultCandidate=false)`；**双模式压测矩阵
+  已闭环**（`scripts/measure-virtual-threads.sh`，见 §3 2026-08-10 记录）：JDBC 分页场景双模式
+  同级无回归，等待型场景（80ms×400 并发）虚拟线程 p50 减半、吞吐 +77%；**已按 ADR-0029 决策 5
+  落地 Initializer 模板默认 `spring.threads.virtual.enabled=true`**，xq-platform-next 在默认
+  虚拟线程下 4 tests 全绿。
 
 ## 5. 下一里程碑
 

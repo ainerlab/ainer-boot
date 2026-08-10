@@ -101,6 +101,23 @@ class ProjectGeneratorTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(config).contains("datasource", "DATASOURCE_URL");
+        assertThat(config).contains("virtual", "enabled: true");
+    }
+
+    @Test
+    @DisplayName("所有变体默认开启虚拟线程（ADR-0029 决策 5）")
+    void generatedProjectsEnableVirtualThreadsByDefault() throws IOException {
+        for (ManifestV1 manifest : java.util.List.of(
+                ManifestFixture.sample(), ManifestFixture.postgres())) {
+            ProjectTree tree = generate(manifest);
+            String config = tree.files().stream()
+                    .filter(f -> f.path().equals("src/main/resources/application.yml"))
+                    .map(GeneratedFile::utf8)
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(config).contains("threads", "virtual", "enabled: true")
+                    .as("generated project must enable virtual threads by default");
+        }
     }
 
     @Test

@@ -3,6 +3,11 @@ spring:
     name: {{project.artifactId}}
   main:
     banner-mode: "off"
+  threads:
+    virtual:
+      # ADR-0029 决策 5：双模式压测后默认开启虚拟线程（等待型负载
+      # p50 减半、吞吐 +77%，JDBC 场景无回归，见 project-status §3）。
+      enabled: true
 {{database.config}}
 
 server:
