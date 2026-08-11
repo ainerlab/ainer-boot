@@ -242,6 +242,16 @@ gitleaks、私有分支控制形成批准的补偿措施、签名 key/secret 实
 
 ## 3. 最近验证记录
 
+2026-08-11 P0 治理补齐：CODEOWNERS + 分支保护状态确认
+- 新增 `.github/CODEOWNERS`：按安全/身份、授权、数据库、AI、Workspace、构建发布、Initializer、
+  文档决策等领域定义默认 reviewer（`@codefitx`）。当前 private + GitHub 免费版分支保护受计费限制
+  （HTTP 403），CODEOWNERS 为 PR review 默认值与未来多协作者领域归属服务；仓库可见性或计费变更后
+  在 GitHub 设置启用 required review 即可生效。
+- gitleaks 已在 ci.yml `secret-scan` job（`gitleaks detect --config .gitleaks.toml`，docs allowlist）。
+- **P0 剩余**：分支保护（private + 免费版无法启用，待可见性/计费决策，非代码层面）。
+- **P1 剩余**：真实 non-SNAPSHOT `0.1.0-rc.1` 远端发布（GPG 签名 + GitHub Packages tag + provenance），
+  发布基础设施已就绪（release.yml + SCM + GPG 配置），等待实际执行远端发布。
+
 2026-08-11 `0.1.0-rc.1` 就绪批次 1：端点授权真实装配 + 签名发布 fail-closed
 - **端点授权进入真实运行路径**：Servlet Web 宿主在存在 `AuthenticatedPrincipalResolver` 时条件装配
   `AinerRequestAuthorizationManager`、`AinerAuthorizeInterceptor` 与 MVC 注册器。MVC 完成
