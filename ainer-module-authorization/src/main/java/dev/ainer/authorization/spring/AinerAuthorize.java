@@ -12,12 +12,14 @@ import java.lang.annotation.Target;
  *
  * <p>The annotation references a <strong>stable PermissionCode</strong> registered in the
  * {@link dev.ainer.authorization.catalog.PermissionRegistry}. It does not contain SpEL or arbitrary
- * policy — it is a declarative marker consumed by {@link AinerAuthorizeInterceptor}, which sets the
- * permission as a request attribute before the {@link AinerRequestAuthorizationManager} evaluates.
+ * policy — it is a declarative marker consumed by {@link AinerAuthorizeInterceptor}, which invokes
+ * the {@link AinerRequestAuthorizationManager} after MVC handler resolution and before the controller.
  *
  * <p>{@link #accessMode()} defaults to {@link AccessMode#AUTHENTICATED authenticated}. A method may
  * opt into {@link AccessMode#PUBLIC_PROJECTION public} only when it also serves anonymous access
- * via an explicit {@link dev.ainer.authorization.policy.PublicAccessPolicy}.
+ * via an explicit {@link dev.ainer.authorization.policy.PublicAccessPolicy} and the host security
+ * configuration admits that path. The 0.1 adapter does not yet execute the resulting projection
+ * obligation, so public projection remains fail-closed until an obligation executor is installed.
  *
  * <p>High-risk business writes must still call {@link dev.ainer.authorization.AuthorizationService}
  * explicitly in the application service (ADR-0030 §8.4) — this annotation is an HTTP-layer

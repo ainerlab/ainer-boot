@@ -16,17 +16,24 @@ import dev.ainer.authorization.policy.BindingResolver;
 import dev.ainer.authorization.policy.DomainAuthorizationPolicy;
 import dev.ainer.authorization.policy.PublicAccessPolicy;
 import dev.ainer.authorization.policy.ScopePermissionCeiling;
+import dev.ainer.authorization.spring.AinerAuthorizeInterceptor;
+import dev.ainer.authorization.spring.AinerRequestAuthorizationManager;
 import dev.ainer.core.error.ErrorCodeContributor;
+import dev.ainer.security.token.AuthenticatedPrincipalResolver;
 import org.apache.ibatis.annotations.Mapper;
 import org.jspecify.annotations.Nullable;
 import org.mybatis.spring.annotation.MapperScan;
 import org.mybatis.spring.annotation.MapperScans;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.time.Clock;
 import java.util.List;
@@ -146,5 +153,41 @@ public class AuthorizationModuleConfiguration {
         return new AuthorizationService(
                 permissionRegistry, scopeCeiling, publicAccessPolicy,
                 domainPolicy, bindingResolver, policyVersion);
+    }
+
+    /**
+     * Servlet endpoint adapter backed by the same decision service as application-level checks.
+     * It is only contributed when the host has a verified-principal resolver; pure decision-engine
+     * consumers remain independent of Spring Security runtime assembly.
+     */
+    @Bean
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+    @ConditionalOnBean(AuthenticatedPrincipalResolver.class)
+    @ConditionalOnMissingBean
+    AinerRequestAuthorizationManager ainerRequestAuthorizationManager(
+            AuthorizationService authorizationService,
+            AuthenticatedPrincipalResolver principalResolver) {
+        return new AinerRequestAuthorizationManager(authorizationService, principalResolver);
+    }
+
+    @Bean
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+    @ConditionalOnBean(AinerRequestAuthorizationManager.class)
+    @ConditionalOnMissingBean
+    AinerAuthorizeInterceptor ainerAuthorizeInterceptor(
+            AinerRequestAuthorizationManager authorizationManager) {
+        return new AinerAuthorizeInterceptor(authorizationManager);
+    }
+
+    @Bean("ainerAuthorizationWebMvcConfigurer")
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+    @ConditionalOnBean(AinerAuthorizeInterceptor.class)
+    WebMvcConfigurer ainerAuthorizationWebMvcConfigurer(AinerAuthorizeInterceptor interceptor) {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addInterceptors(InterceptorRegistry registry) {
+                registry.addInterceptor(interceptor);
+            }
+        };
     }
 }

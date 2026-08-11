@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit test for {@link AinerRequestAuthorizationManager}. Uses hand-written fakes (no Mockito — the
@@ -111,6 +112,34 @@ class AinerRequestAuthorizationManagerTest {
         assertThat(result.outcome()).isEqualTo(AuthorizationOutcome.ALLOW);
         assertThat(result.isGranted()).as("ALLOW with obligations is not grantable by adapter alone (§8.6)")
                 .isFalse();
+    }
+
+    @Test
+    void publicProjectionUsesAnonymousRequesterWhenNoPrincipalExists() {
+        var manager = manager(publicAllowService(), throwingResolver());
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/public-test");
+        request.setAttribute(AinerAuthorizeInterceptor.PERMISSION_ATTRIBUTE, "test.read");
+        request.setAttribute(AinerAuthorizeInterceptor.ACCESS_MODE_ATTRIBUTE, AccessMode.PUBLIC_PROJECTION);
+
+        AinerAuthorizationResult result = (AinerAuthorizationResult) manager.authorize(auth(), context(request));
+
+        assertThat(result.outcome()).isEqualTo(AuthorizationOutcome.ALLOW);
+        assertThat(result.reasonCode()).isEqualTo("PUBLIC_ALLOWED");
+        assertThat(result.isGranted()).as("public projection obligation is still unhandled").isFalse();
+    }
+
+    @Test
+    void publicProjectionDoesNotDowngradeUnexpectedResolverFailureToAnonymous() {
+        var manager = manager(publicAllowService(), () -> {
+            throw new IllegalStateException("resolver unavailable");
+        });
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/public-test");
+        request.setAttribute(AinerAuthorizeInterceptor.PERMISSION_ATTRIBUTE, "test.read");
+        request.setAttribute(AinerAuthorizeInterceptor.ACCESS_MODE_ATTRIBUTE, AccessMode.PUBLIC_PROJECTION);
+
+        assertThatThrownBy(() -> manager.authorize(auth(), context(request)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("resolver unavailable");
     }
 
     // ---- fixtures ----

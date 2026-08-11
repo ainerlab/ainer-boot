@@ -1,29 +1,41 @@
 package dev.ainer.authorization.spring;
 
 import dev.ainer.authorization.domain.AccessMode;
+import dev.ainer.core.error.BusinessException;
+import dev.ainer.core.error.StandardErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authorization.AuthorizationResult;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import java.util.Objects;
+
 /**
- * Reads the {@link AinerAuthorize} annotation from the handler method and sets the permission and
- * access mode as request attributes (ADR-0037 §4). The {@link AinerRequestAuthorizationManager}
- * reads these attributes when evaluating the request.
+ * Reads the {@link AinerAuthorize} annotation from the resolved handler method and executes the
+ * {@link AinerRequestAuthorizationManager} before controller invocation (ADR-0037 §4).
  *
- * <p>This interceptor must run <em>before</em> the authorization check. In practice it is registered
- * as a Spring MVC {@code InterceptorRegistry} add, and the {@code AuthorizationManager} is wired into
- * the {@code SecurityFilterChain} — the filter chain runs before Spring MVC dispatch, so this
- * interceptor populates attributes that are read by a subsequent adapter call, or by the application
- * service that calls {@link dev.ainer.authorization.AuthorizationService} directly.
+ * <p>Handler annotations are only available after Spring MVC resolves the handler, while the servlet
+ * security filter chain runs earlier. The interceptor therefore invokes the standard Spring Security
+ * {@code AuthorizationManager} itself instead of relying on request attributes being visible to an
+ * earlier {@code AuthorizationFilter}. A denied result is translated to Ainer's generic forbidden
+ * transport contract without exposing the decision id or reason code.
  */
-public class AinerAuthorizeInterceptor implements HandlerInterceptor {
+public final class AinerAuthorizeInterceptor implements HandlerInterceptor {
 
     /** Request attribute key for the resolved permission code. */
     public static final String PERMISSION_ATTRIBUTE = "ainer.authorization.permission";
 
     /** Request attribute key for the resolved access mode. */
     public static final String ACCESS_MODE_ATTRIBUTE = "ainer.authorization.accessMode";
+
+    private final AinerRequestAuthorizationManager authorizationManager;
+
+    public AinerAuthorizeInterceptor(AinerRequestAuthorizationManager authorizationManager) {
+        this.authorizationManager = Objects.requireNonNull(authorizationManager, "authorizationManager");
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -32,6 +44,12 @@ public class AinerAuthorizeInterceptor implements HandlerInterceptor {
             if (annotation != null) {
                 request.setAttribute(PERMISSION_ATTRIBUTE, annotation.permission());
                 request.setAttribute(ACCESS_MODE_ATTRIBUTE, annotation.accessMode());
+                AuthorizationResult result = authorizationManager.authorize(
+                        () -> SecurityContextHolder.getContext().getAuthentication(),
+                        new RequestAuthorizationContext(request));
+                if (result == null || !result.isGranted()) {
+                    throw new BusinessException(StandardErrorCode.FORBIDDEN);
+                }
             }
         }
         return true;

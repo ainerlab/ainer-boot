@@ -17,6 +17,7 @@ import dev.ainer.authorization.domain.ResourceRef;
 import dev.ainer.authorization.domain.ResourceType;
 import dev.ainer.authorization.domain.SubjectRef;
 import dev.ainer.authorization.domain.SubjectType;
+import dev.ainer.authorization.spring.AinerAuthorize;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.core.web.ApiResponse;
@@ -53,6 +54,7 @@ import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -73,6 +75,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -112,6 +115,10 @@ class AuthorizationManagementHttpTest {
     private static final String PROTECTED_WRITE_SCOPE = "consumer.resources.write";
     private static final ResourceType PROTECTED_RESOURCE =
             new ResourceType("consumer.resource");
+    private static final PermissionCode ENDPOINT_PERMISSION =
+            new PermissionCode("consumer.endpoint.read");
+    private static final String ENDPOINT_SCOPE = "consumer.endpoints.read";
+    private static final ResourceType ENDPOINT_RESOURCE = new ResourceType("request");
     private static final UUID PROTECTED_WORKSPACE_ID =
             UUID.fromString("019c1100-0000-7000-8000-000000000001");
     private static final UUID PROTECTED_RESOURCE_ID =
@@ -138,12 +145,15 @@ class AuthorizationManagementHttpTest {
     TestRestTemplate restTemplate;
     @Autowired
     JdbcTemplate jdbcTemplate;
+    @Autowired
+    ProtectedBusinessWriteController protectedBusinessWriteController;
 
     private RestTestClient client;
     private String managementJwt;
 
     @BeforeEach
     void cleanSeedAndAuthenticate() {
+        protectedBusinessWriteController.resetAdapterInvocations();
         client = RestTestClient.forLocalServer(restTemplate, port);
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS consumer_protected_resource (
@@ -408,6 +418,34 @@ class AuthorizationManagementHttpTest {
     }
 
     @Test
+    void annotatedEndpointExecutesTheAuthorizationManagerBeforeControllerInvocation() {
+        authenticateWith(signServiceJwt("svc-adapter", ENDPOINT_SCOPE));
+
+        RestResponse allowed = client.get("/test/consumer-resources/adapter-gate");
+
+        assertThat(allowed.status().value()).isEqualTo(200);
+        assertThat(allowed.jsonPath("$.data")).isEqualTo(1);
+        assertThat(protectedBusinessWriteController.adapterInvocationCount()).isEqualTo(1);
+
+        authenticateWith(signServiceJwt("svc-adapter", "some.other.scope"));
+        RestResponse denied = client.get("/test/consumer-resources/adapter-gate");
+
+        assertThat(denied.status().value()).isEqualTo(403);
+        assertThat(denied.jsonPath("$.code")).isEqualTo("AINER.COMMON.FORBIDDEN");
+        assertThat(protectedBusinessWriteController.adapterInvocationCount()).isEqualTo(1);
+    }
+
+    @Test
+    void annotatedEndpointWithoutBearerTokenIsRejectedBeforeControllerInvocation() {
+        restTemplate.getRestTemplate().getInterceptors().clear();
+
+        RestResponse denied = client.get("/test/consumer-resources/adapter-gate");
+
+        assertThat(denied.status().value()).isEqualTo(401);
+        assertThat(protectedBusinessWriteController.adapterInvocationCount()).isZero();
+    }
+
+    @Test
     void requestWithServiceJwtLackingManagementScopeIsForbidden() {
         // 签发缺少 authorization.manage scope 的 SERVICE JWT → 应被 Controller requireManagement 拒绝（403）
         String noScopeJwt = signServiceJwt("svc-other", "some.other.scope");
@@ -643,6 +681,13 @@ class AuthorizationManagementHttpTest {
                             dev.ainer.authorization.domain.AuditLevel.ON_DECISION,
                             false, false),
                     new dev.ainer.authorization.domain.Permission(
+                            ENDPOINT_PERMISSION,
+                            "read",
+                            ENDPOINT_RESOURCE,
+                            dev.ainer.authorization.domain.RiskTier.LOW,
+                            dev.ainer.authorization.domain.AuditLevel.NONE,
+                            false, false),
+                    new dev.ainer.authorization.domain.Permission(
                             new dev.ainer.authorization.domain.PermissionCode("mgmt.test.unassignable"),
                             "assign",
                             new dev.ainer.authorization.domain.ResourceType("mgmt.test"),
@@ -660,8 +705,9 @@ class AuthorizationManagementHttpTest {
 
         @Bean
         dev.ainer.authorization.policy.ScopePermissionCeiling protectedWriteScopeCeiling() {
-            return (scope, permission) -> PROTECTED_WRITE_SCOPE.equals(scope)
-                    && PROTECTED_WRITE_PERMISSION.equals(permission);
+            return (scope, permission) ->
+                    (PROTECTED_WRITE_SCOPE.equals(scope) && PROTECTED_WRITE_PERMISSION.equals(permission))
+                            || (ENDPOINT_SCOPE.equals(scope) && ENDPOINT_PERMISSION.equals(permission));
         }
 
         @Bean
@@ -669,8 +715,11 @@ class AuthorizationManagementHttpTest {
             return new dev.ainer.authorization.policy.DomainAuthorizationPolicy() {
                 @Override
                 public dev.ainer.authorization.domain.GrantPath pathFor(PermissionCode permission) {
-                    return PROTECTED_WRITE_PERMISSION.equals(permission)
-                            ? dev.ainer.authorization.domain.GrantPath.BINDING_REQUIRED
+                    if (PROTECTED_WRITE_PERMISSION.equals(permission)) {
+                        return dev.ainer.authorization.domain.GrantPath.BINDING_REQUIRED;
+                    }
+                    return ENDPOINT_PERMISSION.equals(permission)
+                            ? dev.ainer.authorization.domain.GrantPath.RELATION_DERIVED
                             : null;
                 }
 
@@ -680,7 +729,8 @@ class AuthorizationManagementHttpTest {
                         PermissionCode permission,
                         ResourceRef resource,
                         AuthorizationContext context) {
-                    return false;
+                    return ENDPOINT_PERMISSION.equals(permission)
+                            && ENDPOINT_RESOURCE.equals(resource.resourceType());
                 }
 
                 @Override
@@ -689,8 +739,10 @@ class AuthorizationManagementHttpTest {
                         PermissionCode permission,
                         ResourceRef resource,
                         AuthorizationContext context) {
-                    return PROTECTED_WRITE_PERMISSION.equals(permission)
-                            && PROTECTED_RESOURCE.equals(resource.resourceType());
+                    return (PROTECTED_WRITE_PERMISSION.equals(permission)
+                                    && PROTECTED_RESOURCE.equals(resource.resourceType()))
+                            || (ENDPOINT_PERMISSION.equals(permission)
+                                    && ENDPOINT_RESOURCE.equals(resource.resourceType()));
                 }
             };
         }
@@ -766,9 +818,25 @@ class AuthorizationManagementHttpTest {
     static class ProtectedBusinessWriteController {
 
         private final ProtectedBusinessWriteService writeService;
+        private final AtomicInteger adapterInvocations = new AtomicInteger();
 
         ProtectedBusinessWriteController(ProtectedBusinessWriteService writeService) {
             this.writeService = writeService;
+        }
+
+        @GetMapping("/adapter-gate")
+        @AinerAuthorize(permission = "consumer.endpoint.read")
+        ApiResponse<Integer> adapterGate(HttpServletRequest request) {
+            int invocation = adapterInvocations.incrementAndGet();
+            return ApiResponse.success(invocation, RequestIds.currentOrCreate(request));
+        }
+
+        int adapterInvocationCount() {
+            return adapterInvocations.get();
+        }
+
+        void resetAdapterInvocations() {
+            adapterInvocations.set(0);
         }
 
         @PostMapping("/{resourceId}/writes")

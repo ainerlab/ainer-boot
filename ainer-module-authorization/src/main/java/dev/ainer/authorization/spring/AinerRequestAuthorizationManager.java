@@ -9,6 +9,7 @@ import dev.ainer.authorization.domain.PermissionCode;
 import dev.ainer.authorization.domain.Requester;
 import dev.ainer.authorization.domain.ResourceRef;
 import dev.ainer.authorization.domain.ResourceType;
+import dev.ainer.core.error.BusinessException;
 import dev.ainer.security.token.AuthenticatedPrincipal;
 import dev.ainer.security.token.AuthenticatedPrincipalResolver;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,6 +18,7 @@ import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Set;
@@ -32,10 +34,14 @@ import java.util.function.Supplier;
  *   <li>resolves the {@link AuthenticatedPrincipal} via {@link AuthenticatedPrincipalResolver}
  *       (which reads the verified JWT from the SecurityContext);</li>
  *   <li>reads the permission code and access mode from request attributes set by
- *       {@link AinerAuthorizeInterceptor} (or defaults to authenticated);</li>
+ *       {@link AinerAuthorizeInterceptor};</li>
  *   <li>builds an {@link AuthorizationRequest} and calls {@link AuthorizationService#authorize};</li>
  *   <li>maps the {@link AuthorizationDecision} to an {@link AinerAuthorizationResult}.</li>
  * </ol>
+ *
+ * <p>The manager is invoked by {@link AinerAuthorizeInterceptor} after Spring MVC resolves the
+ * annotated handler. It is intentionally not installed as the catch-all manager in the earlier
+ * servlet filter chain because handler annotations do not exist at that stage.
  *
  * <p><strong>First-version limitation</strong>: {@link ResourceRef} is a generic placeholder
  * (workspaceId from request attribute if present, otherwise a synthetic "any" resource). A typed
@@ -71,19 +77,13 @@ public final class AinerRequestAuthorizationManager
             return null;
         }
 
-        AuthenticatedPrincipal principal;
-        try {
-            principal = principalResolver.requireCurrent();
-        } catch (RuntimeException unresolved) {
-            // Unauthenticated or invalid token — deny (SecurityFilterChain's 401 entry point handles
-            // the missing-authentication case; if we get here it's a FORBIDDEN).
+        AccessMode accessMode = AinerAuthorizeInterceptor.resolveAccessMode(request);
+        Requester requester = resolveRequester(accessMode);
+        if (requester == null) {
             return new AinerAuthorizationResult(AuthorizationDecision.deny(
                     dev.ainer.authorization.AuthorizationReasonCodes.AUTHENTICATED_REQUIRED,
                     "ainer-adapter", Instant.now()));
         }
-
-        AccessMode accessMode = AinerAuthorizeInterceptor.resolveAccessMode(request);
-        Requester requester = toRequester(principal);
         ResourceRef resource = resolveResource(request);
         AuthorizationRequest authRequest = new AuthorizationRequest(
                 requester,
@@ -99,6 +99,14 @@ public final class AinerRequestAuthorizationManager
 
         AuthorizationDecision decision = authorizationService.authorize(authRequest);
         return new AinerAuthorizationResult(decision);
+    }
+
+    private Requester resolveRequester(AccessMode accessMode) {
+        try {
+            return toRequester(principalResolver.requireCurrent());
+        } catch (BusinessException unresolved) {
+            return accessMode == AccessMode.PUBLIC_PROJECTION ? new Requester.Anonymous() : null;
+        }
     }
 
     private static Requester toRequester(AuthenticatedPrincipal principal) {
@@ -123,6 +131,6 @@ public final class AinerRequestAuthorizationManager
         Object wsId = request.getAttribute("ainer.authorization.workspaceId");
         UUID workspaceId = wsId instanceof UUID u ? u : null;
         return new ResourceRef(workspaceId, new ResourceType("request"), UUID.nameUUIDFromBytes(
-                request.getRequestURI().getBytes()));
+                request.getRequestURI().getBytes(StandardCharsets.UTF_8)));
     }
 }
