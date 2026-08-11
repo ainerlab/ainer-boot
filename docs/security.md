@@ -112,7 +112,25 @@ ACTIVE 成员但角色不足返回 403。
 不能跳过校验。通用管理路径硬性拒绝 system-only Permission、GLOBAL Binding、自授予/自改，以及
 策略目录外的权限、范围和目标；初始产品 owner/operator 等业务使用权必须由验证真实业务关系的
 onboarding/ownership 流程建立并独立审计。Greenfield 已移除 Tenant，所以 ADR-0030 原 tenant OWNER
-bootstrap 文本不能直接复活；后续生产管理入口必须在取代 ADR 中重新定义。
+bootstrap 文本不能直接复活；当前 post-Greenfield 基线以 ADR-0037 为准。
+
+### 3.2 `@AinerAuthorize` 端点粗粒度门禁
+
+宿主装配 `AuthorizationModuleConfiguration`、Servlet Web 与 `AuthenticatedPrincipalResolver` 后，会
+注册 `AinerRequestAuthorizationManager` 和 MVC `AinerAuthorizeInterceptor`。Spring Security filter
+chain 先完成 JWT 认证；MVC 解析出 handler 后，拦截器读取方法上的
+`@AinerAuthorize(permission=...)`，在 controller 执行前调用 manager。DENY、CHALLENGE、未知策略和
+未执行 obligation 均失败关闭为统一 403，不把 decisionId 或内部 reason code 暴露给客户端；缺少
+Bearer Token 仍由 Resource Server 在更早阶段返回 401。
+
+首版注解只适用于低/中风险、`resourceType=request`、无 obligation 的 HTTP 粗门禁。它尚未解析路径
+变量或请求体为真实 `ResourceRef`，也不执行 FieldMask/RecheckBefore；高价值写、资源 ownership 和
+数据库查询范围必须继续在应用服务中显式调用授权端口。Handler 注解只能在 MVC 阶段取得，禁止把
+request attribute 假设成能被更早执行的 `AuthorizationFilter` 读取。
+
+`PUBLIC_PROJECTION` 不会自行把路径加入 Resource Server 的 `public-paths`。即使宿主同时开放路径并
+注册 `PublicAccessPolicy`，当前 public ALLOW 仍携带 projection obligation，而 0.1 adapter 尚未执行
+该 obligation，因此会失败关闭为 403；在 `DecisionObligationExecutor` 交付前不得宣称支持匿名投影。
 
 ## 4. Authorization Server
 

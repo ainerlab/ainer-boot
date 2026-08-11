@@ -25,7 +25,7 @@ Ainer 同时承担三种职责：
 
 ```text
 ainer-server                         JWT Resource Server、Actuator、平台/内部端点
-├── ainer-module-workspace           租户资源、成员生命周期、撤销消费、OWNER 恢复、审计热/冷生命周期
+├── ainer-module-workspace           Workspace 资源、成员生命周期、OWNER 转移、审计热/冷生命周期
 │   ├── ainer-starter-persistence    MyBatis-Plus/MyBatis、Flyway、PostgreSQL、UUID
 │   └── ainer-starter-web            HTTP 异常与请求追踪
 ├── ainer-module-ai-runtime          模型端口、Provider、策略、SSE、费用审计
@@ -82,7 +82,7 @@ ainer-boot/
 │   ├── ainer-starter-observability/
 │   └── ainer-starter-test/
 ├── ainer-module-identity/                # HumanAccount/ServicePrincipal/Credential foundation（去租户化）
-├── ainer-module-authorization/           # S0 决策器落地；S1-S3 有原型（6 表持久化/管理 API/查询计划）但未达 ADR-0030 验收，ADR 仍 Proposed
+├── ainer-module-authorization/           # ADR-0037：决策器、6 表持久化、管理/查询与 Spring 端点适配
 ├── ainer-module-organization/            # Proposed：可选组织、员工任职、岗位与团队目录
 ├── ainer-module-workspace/               # 去租户化的资源授权参考切片（仅 workspace_id/成员关系）
 ├── ainer-module-ai-runtime/              # 模型网关、调用与费用审计
@@ -93,30 +93,24 @@ ainer-boot/
 
 这些是演进方向，不代表应一次性创建所有空模块。模块只在拥有明确职责、测试和消费者时落地。
 
-`ainer-module-authorization` 已落地 S0（ADR-0030，目前 Proposed）：不可变领域类型（Permission、Role、
-SubjectBinding、Scope、AuthorizationDecision）、PermissionRegistry（冲突检测）、AuthorizationService
-（grant-path 真值表纯决策器，含 resourceType/systemOnly/GLOBAL/scope 安全检查与 HIGH-risk Challenge
-收口），全部 Spring-free、@NullMarked。S1（PostgreSQL 6 表持久化 + DB Binding resolver）、S2
-（`/api/authorization/**` 管理 REST API + Effective Access）、S3（`DefaultQueryAuthorizationPlanner` +
-Golden Consumer 查询验证）已有**原型实现并含测试**，但**均未达 ADR-0030 验收**。RESOURCE scope、
-systemOnly PUBLIC 绕过、审计写入、生产装配、真实 JWT 与模块级防提权矩阵已经修复；当前管理面由
-版本化 `GrantAdministrationPolicy` 显式登记可信 SERVICE 与 assignable Permission/Scope/target，缺省
-deny-all，并在应用服务事务边界拒绝 GLOBAL、system-only 与自我授权。隔离 Maven Golden Consumer
-已经只通过 BOM/已安装制品，在 Maven 3.9+ 与 Maven 4 下实际调用 `AuthorizationService` 和
-`DefaultQueryAuthorizationPlanner`；它仍是本地 SNAPSHOT 工程门禁，不等同于不可变正式制品或完整
-产品验收。仓内另有产品所有的 test-scope JDBC adapter，在 PostgreSQL 18.3 上把类型化 `Q` 下推为
-数组参数绑定 SQL，验证未授权 row 不进入 JVM、ALLOW 一次查询、DENY 零查询和 20,003 行夹具索引计划；
-该夹具不是生产产品 Repository。真实 USER JWT 的 test-scope 产品写路径也已验证：管理 API 撤销
-PostgreSQL Binding 后，完全相同且仍有效的 Token 在下一请求被拒绝，产品 effect 不增加且 ALLOW/DENY
-决策均已审计；这仍不是外部产品或生产部署的授权失效 SLA。尚未闭环的是完整外部产品关系/双向独立
-负例与 HTTP 字段投影、授权失效 SLA 验收，以及 Ainer Admin/生产 bootstrap。完整差距清单与后续批次见
-[`docs/project-status.md`](project-status.md) §3。此外 ADR-0030 决策文本仍以 pre-Greenfield 的
-tenant 模型为主，而实现已迁 Workspace 语义（ADR-0033 Greenfield 移除 tenant），完整重述需新增取代 ADR。
-Spring `AuthorizationManager` adapter（方法级 `@AinerAuthorize`）、OpenAPI/SDK 与 Ainer Admin 集成属后续。
-详见 [`Ainer 通用授权与 AI 代行详细方案`](design/authorization-architecture-plan.md)、
-[ADR-0030](decisions/0030-hybrid-fine-grained-authorization-baseline.md) 与
-[ADR-0031](decisions/0031-agent-delegation-and-ai-context-authorization.md)。该模块不会接管
-Identity TenantRole、WorkspaceRole 或产品领域关系。
+`ainer-module-authorization` 以 Accepted 的
+[ADR-0037](decisions/0037-post-greenfield-authorization-baseline.md) 为当前基线，ADR-0030 仅保留为
+被取代的历史设计。公开领域契约、Permission/Role/Binding/Scope、纯决策器与类型化集合查询保持
+Spring-free；PostgreSQL adapter 拥有 6 张表、撤销时重评估和变更/决策审计。管理面由版本化
+`GrantAdministrationPolicy` 精确登记可信 SERVICE 与 assignable Permission/Scope/target，默认拒绝。
+
+Spring 适配只位于 `dev.ainer.authorization.spring`。Servlet 安全过滤链先完成 JWT 认证和通用
+`authenticated()` 门禁；Spring MVC 解析出 `HandlerMethod` 后，`AinerAuthorizeInterceptor` 读取
+`@AinerAuthorize` 并在 controller 执行前调用
+`AinerRequestAuthorizationManager<RequestAuthorizationContext>`。拒绝统一映射为 Ainer 403，决策 ID
+和内部 reason 不进入响应。不能把 MVC 注解属性假设为可供更早执行的 `AuthorizationFilter` 读取。
+首版只支持 `resourceType=request` 的粗粒度空-obligation gate；真实资源归属、高价值写与字段投影仍
+必须在应用服务显式授权。`AuthorizationTargetResolver`、`DecisionObligationExecutor`、RFC 9470 与
+方法级 AOP 是后续切片，不阻塞受控 RC，但不得宣称已支持。
+
+本地隔离制品已由 Maven 3.9+ 与 Maven 4 Golden Consumer 验证；不可变远端制品、Ainer Admin、
+外部产品纵向切片与生产授权失效 SLA 仍按 [`docs/project-status.md`](project-status.md) 推进。该模块
+不会接管 Identity、WorkspaceRole 或产品领域关系。
 
 `ainer-module-organization` 当前同样尚未创建。它作为可选模块装配在 `ainer-server`，不并入
 Identity 或 Authorization Server；Tenant、OrganizationDirectory、Company、Merchant、OrgUnit 与

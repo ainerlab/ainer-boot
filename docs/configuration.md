@@ -230,11 +230,18 @@ Prometheus registry 已随两个可执行发行物引入，但仓库没有部署
 
 优雅停机已启用，shutdown phase 超时为 20 秒。修改超时必须结合请求、SSE 和数据库事务实测。
 
-## 7. 通用授权模块（ADR-0030）
+## 7. 通用授权模块（ADR-0037；ADR-0030 已被取代）
 
 `ainer.authorization.enabled`（默认 `true`）控制 `ainer-module-authorization` 的模块装配。
 关闭后授权管理 API 与 BindingResolver 不注册，决策器仅在消费方显式装配 `AuthorizationService`
 时可用。
+
+启用 Servlet Web 且宿主存在 `AuthenticatedPrincipalResolver` 时，同一配置还注册
+`AinerRequestAuthorizationManager`、`AinerAuthorizeInterceptor` 和 MVC interceptor wiring；不增加
+新的 YAML 开关。`@AinerAuthorize` 采用显式 opt-in，未注解 endpoint 继续服从宿主原有
+`SecurityFilterChain` 与应用服务授权。注解的 `PUBLIC_PROJECTION` 不会隐式修改
+`ainer.security.resource-server.public-paths`；0.1 尚未交付 projection obligation executor，故即使
+宿主开放路径也会失败关闭。
 
 管理 API 端点（`/api/authorization/**`）要求 SERVICE principal + `authorization.manage` scope，
 并要求宿主提供唯一、代码注册且带版本的 `GrantAdministrationPolicy` bean，精确声明可信

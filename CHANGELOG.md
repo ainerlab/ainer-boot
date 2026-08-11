@@ -14,6 +14,22 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 > tenant selector 代理/选择页一并删除，`ainer-admin-v1.yaml` 只保留
 > `POST /api/me/access-token-revocations` 当前会话撤销。
 
+### Fixed
+
+- **`0.1` 端点授权真实装配（2026-08-11）**：修正 `HandlerInterceptor` 与 servlet security filter
+  顺序假设。`AuthorizationModuleConfiguration` 现在在 Servlet Web + verified principal resolver
+  存在时注册 manager、interceptor 与 MVC wiring；MVC 解析 `HandlerMethod` 后，由 interceptor 在
+  controller 执行前调用 `AinerRequestAuthorizationManager`。真实签名 JWT + HTTP + PostgreSQL 测试
+  覆盖匹配 scope 放行、缺 scope 统一 403 且 controller effect 不发生、无 Token 401；未认证
+  `PUBLIC_PROJECTION` 会以 Anonymous requester 进入公共策略，但未执行 obligation 仍失败关闭；
+  principal resolver 的非认证业务异常之外的运行时故障不再降级成匿名访问。
+- **`0.1` 签名发布门禁（2026-08-11）**：tag workflow 现在强制语义化非 SNAPSHOT 版本、Docker、
+  锁定 Maven 3.9.16、Maven 3/4 Golden Consumer、Initializer consumer、完整 clean deploy 与零跳过
+  检查。所有 tag 发布必须配置签名开关和 GPG key/passphrase；passphrase 改由环境变量进入 GPG
+  Plugin best-practices 模式，parentless BOM 增加独立 POM 签名 profile，禁止静默未签名发布。
+  non-SNAPSHOT 可重复性彩排的两次构建统一显式跳过正式签名，避免 `gpg.skip` 进入 consumer POM
+  后产生伪差异；真实 tag 的签名门禁不受该彩排参数影响。
+
 ### Added
 
 - **撤权后原 Token 受保护写失效验证（2026-08-11）**：真实签名 `USER_NEUTRAL_V1` JWT

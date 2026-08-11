@@ -205,9 +205,15 @@ POM 中的 `${revision}` 都有当前安装版本属性可解析，并检查 `ai
 下真实执行 JUnit：由外部项目定义产品 Permission/policy/query constraint，调用
 `AuthorizationService` 与 `DefaultQueryAuthorizationPlanner`，并强制 Surefire 报告为 1 test、零
 failure/error/skipped。这些门禁是本地/自动化工程要求；消费本地 SNAPSHOT 不表示已经存在正式制品
-仓库发布流程，也不替代真实产品的参数化 SQL、row/字段投影与关系矩阵。候选 CI 已编排上述命令，但在 Maven 4 RC6 官方持久发行包可下载并首次
-完整成功前，不能称为生效的正式 CI。脚本默认读取根 POM 的 `revision`；发布过程通过
+仓库发布流程，也不替代真实产品的参数化 SQL、row/字段投影与关系矩阵。候选 CI 已编排并至少成功
+执行过上述命令；最新提交是否具备远端结果、以及分支保护是否把它设为必需检查，以
+[`project-status.md`](project-status.md) 的当前记录为准。脚本默认读取根 POM 的 `revision`；发布过程通过
 `AINER_VERSION=<目标版本>` 覆盖时，该值也会作为 `-Drevision` 传给两次生产者构建和两个
 consumer。
+
+授权端点适配器的发布门禁不能只直接实例化 manager。至少要用真实 Servlet Web、真实签名 JWT 和
+真实 HTTP 验证：匹配 scope/policy 的 `@AinerAuthorize` handler 在 controller 前放行；缺 scope
+返回统一 403 且 controller effect 不发生；无 Bearer Token 返回 401；未注解 endpoint 不被该
+interceptor 接管。资源级业务写仍需单独验证 application-service 授权、审计和撤权后同 Token 失效。
 
 此外还必须确认：数据库测试未因 Docker 缺失而跳过、两个可执行发行物均能启动、Flyway 从空库成功、升级 migration 在备份副本成功、关键鉴权与健康检查通过。M4.2 还要在可运行 Testcontainers 的环境执行双人审批、锁定重检、归档回滚和游标边界集成测试。M4.3 还要在真实 PostgreSQL 上执行 Authorization Server 协议 smoke，证明专用/普通 introspection client 隔离、active、RFC 7009 撤销和 Identity `sec_epoch`，并用接近真实规模数据检查 epoch 查询计划；M4.5 还要执行真实浏览器 HTTP 会话的 PKCE S256 正反门禁，并检查 JDBC authorization 不落凭证。M4.6 当前还必须执行 Passkey options、条件门禁、虚拟 authenticator 签名 ceremony、恢复/enrollment、登录限流和 step-up 门禁；M6 品牌登录发布候选还必须用真实 Chromium 验证四种合同状态的桌面/移动布局、axe-core、CSRF/SavedRequest、通用错误语义和精确静态代理。在宣称生产 MFA 前，必须另补主流真实设备的 registration/authentication、丢失/被盗/同步凭证、恢复通知和多节点 session 验证。生产可观测性切片还要用独立 metrics client 抓取两个真实 exporter，并验证多节点、Token endpoint/数据库故障和告警路由。当前验证快照见 [`project-status.md`](project-status.md)。

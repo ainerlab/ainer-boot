@@ -1,6 +1,6 @@
 # Ainer Boot
 
-> 正式品牌：Ainer · 开源脚手架：Ainer Boot · JDK 25 + Spring Boot 4.1.0
+> 正式品牌：Ainer · 脚手架产品：Ainer Boot · JDK 25 + Spring Boot 4.1.0
 > · Maven 4.0.0-rc-6 preview
 
 Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 AI-native、但不局限于 AI
@@ -9,7 +9,9 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 多标杆能力矩阵和 P0–P5 路线见
 [Ainer Boot 产品定位、竞品能力矩阵与路线图](docs/design/ainer-scaffold-design.md)。
 
-品牌与活动技术标识现已统一为 Ainer，开源脚手架产品名为 **Ainer Boot**。正式决策、产品命名、域名状态、目标标识和迁移记录见 [ADR-0004：Ainer 品牌与技术命名基线](docs/decisions/0004-ainer-brand-and-naming-baseline.md)。
+品牌与活动技术标识现已统一为 Ainer，计划开源的脚手架产品名为 **Ainer Boot**。当前 `0.1`
+仍处于私有、专有的发布候选准备期，不等同于已经完成开源许可或公开发行。正式决策、产品命名、
+域名状态、目标标识和迁移记录见 [ADR-0004：Ainer 品牌与技术命名基线](docs/decisions/0004-ainer-brand-and-naming-baseline.md)。
 
 ## 当前可用能力
 
@@ -22,14 +24,19 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 | `ainer-starter-persistence` | ✅ | MyBatis-Plus/MyBatis、Flyway、PostgreSQL UUID 与受控分页的公共装配 |
 | `ainer-security` | ✅ | 与框架无关的可信参与者与 authority 契约 |
 | `ainer-starter-security` | ✅ | Resource Server、人员/服务 JWT 投影、选择性 RFC 7662 在线校验、tenantless 指标授权与统一 401/403/503 |
-| `ainer-module-identity` | ✅ | 用户/租户、成员管理、平台预配/激活/取消与安全分页、安全 Directory、禁用/撤销、revocation epoch 与可靠 outbox |
-| `ainer-module-workspace` | ✅ | 可信租户资源、成员治理、幂等撤销、OWNER 恢复、授权审计热/归档与 SIEM 契约 |
+| `ainer-module-identity` | ✅ foundation | HumanAccount、ServicePrincipal、LoginIdentity、Credential 与 `security_epoch` 身份基线 |
+| `ainer-module-workspace` | ✅ | Workspace 资源、ACTIVE membership、OWNER 专用转移与授权审计热/归档契约 |
 | `ainer-module-ai-runtime` | ✅ | OpenAI-compatible 网关、SSE、策略、预算与用量/费用审计 |
-| `ainer-module-authorization` | 🔶 原型 S1–S3（ADR-0030 验收未达成） | 通用混合细粒度授权契约、纯决策器（S0）、6 张表 PostgreSQL 持久化、管理 REST API 与集合查询授权的**原型**已提交；但 ADR-0030 仍为 Proposed（决策文本与 Greenfield 无 tenant 地基冲突），且存在 RESOURCE scope CHECK 冲突、审计零写入、决策器无生产装配、无真实 JWT 端到端验证等未闭合缺陷，详见 [`docs/project-status.md`](docs/project-status.md) §3 |
-| `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、可选 Directory client、撤销 consumer/SLO、OWNER 恢复与审计运营端点 |
-| `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、Identity 成员/平台预配/用户激活 API、Ainer Admin 开发 client/fixture、成员 API active gate、自助撤销、OpenAPI/SDK、受限 introspection/RFC 7009 与受审计 JDBC 协议仓库 |
+| `ainer-module-authorization` | ✅ 工程基线 | ADR-0037 Workspace 语义的 RBAC+ReBAC+ABAC 决策器、PostgreSQL Binding/审计、管理 API、类型化集合查询，以及真实 JWT 下由 MVC 拦截器执行的 `@AinerAuthorize` 端点粗粒度门禁；资源 target resolver、obligation executor 与方法级 AOP 仍属后续 |
+| `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、Workspace、AI Runtime 与 Authorization 装配 |
+| `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、typed token profile、RFC 7662/7009 与受审计 JDBC 协议仓库 |
 
 当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
+
+当前推进目标是受控发布 `0.1.0-rc.1`：先发布不可变、签名的 BOM/Starter 给
+`xq-platform-next` 验证，再根据真实业务纵向切片和回滚记录决定是否提升为 `0.1.0`。当前源码仍是
+`0.1.0-SNAPSHOT`，尚未产生远端 RC 制品；动态门禁只以 [`docs/project-status.md`](docs/project-status.md)
+为准。
 
 ## 架构立场
 

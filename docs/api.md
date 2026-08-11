@@ -176,7 +176,18 @@ Workspace 的 ACTIVE 非 OWNER 成员。旧 REVOKED OWNER 不被重新激活。r
 
 SIEM 导出参数 `afterOccurredAt` 与 `afterId` 必须同时提供或同时省略，`limit=1..1000`。结果按 `occurredAt,id` 升序，返回 `nextOccurredAt`、`nextId` 和 `hasMore`。消费者持久化这对游标并按 audit ID 去重；每次导出批次本身也写入安全操作审计。
 
-## 8. 通用授权管理 API（ADR-0030 S2）
+## 8. 通用授权 API（ADR-0037；ADR-0030 已被取代）
+
+### `@AinerAuthorize` 端点门禁
+
+产品 controller 可以在方法上声明 `@AinerAuthorize(permission="...")`。该注解是 controller 执行前
+的粗粒度门禁，不新增 HTTP endpoint，也不替代应用服务中的资源级授权。当前 permission 的
+`resourceType` 必须是 `request`，ALLOW 只有在 obligation 为空时才继续；DENY、CHALLENGE 或未处理
+obligation 返回统一 403。未认证请求仍返回 401。路径/请求体 target 解析、字段投影与方法级 AOP
+尚未进入 `0.1` 支持面。`PUBLIC_PROJECTION` 也不会绕过 Resource Server：宿主必须另行配置
+`public-paths`；即使路径开放，当前 projection obligation 尚无 executor，仍会失败关闭为 403。
+
+### 管理 API
 
 所有 `/api/authorization/**` 端点要求 SERVICE principal + `authorization.manage` scope，并且该精确
 `issuer + sub` 必须由宿主代码注册的版本化 `GrantAdministrationPolicy` 判定为可信管理主体。
