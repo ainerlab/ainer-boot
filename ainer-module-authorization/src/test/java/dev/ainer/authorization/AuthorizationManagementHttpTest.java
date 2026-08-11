@@ -6,8 +6,26 @@ import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import dev.ainer.authorization.application.AuthorizationDecisionAuditService;
+import dev.ainer.authorization.domain.AccessMode;
+import dev.ainer.authorization.domain.AuthorizationContext;
+import dev.ainer.authorization.domain.AuthorizationDecision;
+import dev.ainer.authorization.domain.AuthorizationRequest;
+import dev.ainer.authorization.domain.PermissionCode;
+import dev.ainer.authorization.domain.Requester;
+import dev.ainer.authorization.domain.ResourceRef;
+import dev.ainer.authorization.domain.ResourceType;
+import dev.ainer.authorization.domain.SubjectRef;
+import dev.ainer.authorization.domain.SubjectType;
+import dev.ainer.core.error.BusinessException;
+import dev.ainer.core.error.StandardErrorCode;
+import dev.ainer.core.web.ApiResponse;
+import dev.ainer.security.token.AuthenticatedPrincipal;
+import dev.ainer.security.token.AuthenticatedPrincipalResolver;
 import dev.ainer.testsupport.rest.RestResponse;
 import dev.ainer.testsupport.rest.RestTestClient;
+import dev.ainer.web.request.RequestIds;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +38,8 @@ import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -32,6 +52,12 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -41,8 +67,11 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,7 +84,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * PostgreSQL 18.3 Testcontainers instance.
  *
  * <p>This replaces the earlier stub {@code AuthenticatedPrincipalResolver} (defect #9): the JWT is
- * signed with a test RSA key and the resource server verifies it with the matching public key.
+ * signed with a test RSA key and the resource server verifies it with the matching public key. The
+ * same fixture also proves that a protected product write re-evaluates a USER binding on every
+ * request: after revocation, the exact same still-valid JWT is denied before the product effect.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
@@ -64,6 +95,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         properties = {
                 "ainer.authorization.enabled=true",
                 "ainer.authorization.test-administration-policy=http",
+                "ainer.authorization.test-protected-write=true",
                 "ainer.security.resource-server.enabled=true",
                 "mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml",
                 "spring.main.banner-mode=off"
@@ -75,6 +107,15 @@ class AuthorizationManagementHttpTest {
     private static final KeyPair RSA_KEY_PAIR = generateRsaKeyPair();
     private static final String ISSUER = "https://auth.ainer.test";
     private static final String AUDIENCE = "ainer-api";
+    private static final PermissionCode PROTECTED_WRITE_PERMISSION =
+            new PermissionCode("consumer.resource.write");
+    private static final String PROTECTED_WRITE_SCOPE = "consumer.resources.write";
+    private static final ResourceType PROTECTED_RESOURCE =
+            new ResourceType("consumer.resource");
+    private static final UUID PROTECTED_WORKSPACE_ID =
+            UUID.fromString("019c1100-0000-7000-8000-000000000001");
+    private static final UUID PROTECTED_RESOURCE_ID =
+            UUID.fromString("019c1100-0000-7000-8000-000000000002");
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
@@ -104,6 +145,43 @@ class AuthorizationManagementHttpTest {
     @BeforeEach
     void cleanSeedAndAuthenticate() {
         client = RestTestClient.forLocalServer(restTemplate, port);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS consumer_protected_resource (
+                    id UUID NOT NULL,
+                    workspace_id UUID NOT NULL,
+                    title VARCHAR(100) NOT NULL,
+                    CONSTRAINT pk_consumer_protected_resource PRIMARY KEY (id),
+                    CONSTRAINT uq_consumer_protected_resource_workspace_id
+                        UNIQUE (workspace_id, id),
+                    CONSTRAINT ck_consumer_protected_resource_id_version
+                        CHECK (uuid_extract_version(id) = 7)
+                )
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS consumer_protected_write_event (
+                    id UUID NOT NULL DEFAULT uuidv7(),
+                    workspace_id UUID NOT NULL,
+                    resource_id UUID NOT NULL,
+                    value VARCHAR(100) NOT NULL,
+                    requester_issuer VARCHAR(256) NOT NULL,
+                    requester_id VARCHAR(128) NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL,
+                    CONSTRAINT pk_consumer_protected_write_event PRIMARY KEY (id),
+                    CONSTRAINT fk_consumer_protected_write_event_resource
+                        FOREIGN KEY (workspace_id, resource_id)
+                        REFERENCES consumer_protected_resource (workspace_id, id),
+                    CONSTRAINT ck_consumer_protected_write_event_id_version
+                        CHECK (uuid_extract_version(id) = 7),
+                    CONSTRAINT ck_consumer_protected_write_event_value
+                        CHECK (btrim(value) <> '')
+                )
+                """);
+        jdbcTemplate.execute(
+                "TRUNCATE TABLE consumer_protected_write_event, consumer_protected_resource");
+        jdbcTemplate.update("""
+                INSERT INTO consumer_protected_resource (id, workspace_id, title)
+                VALUES (?, ?, 'Protected fixture resource')
+                """, PROTECTED_RESOURCE_ID, PROTECTED_WORKSPACE_ID);
         jdbcTemplate.execute("DELETE FROM ainer_authorization_change_audit");
         jdbcTemplate.execute("DELETE FROM ainer_authorization_decision_audit");
         jdbcTemplate.execute("DELETE FROM ainer_authorization_subject_binding");
@@ -112,11 +190,11 @@ class AuthorizationManagementHttpTest {
         jdbcTemplate.execute("DELETE FROM ainer_authorization_permission");
         seedPermission("mgmt.test.read", "read", "mgmt.test", "LOW");
         seedPermission("mgmt.test.write", "write", "mgmt.test", "MEDIUM");
+        seedPermission(PROTECTED_WRITE_PERMISSION.value(), "write", PROTECTED_RESOURCE.value(), "MEDIUM");
 
         // 签发真实 SERVICE_V1 JWT，注入 Bearer header 到所有请求
         managementJwt = signServiceJwt("svc-management", "authorization.manage");
-        restTemplate.getRestTemplate().getInterceptors().clear();
-        restTemplate.getRestTemplate().getInterceptors().add(bearerInterceptor(managementJwt));
+        authenticateWith(managementJwt);
     }
 
     private void seedPermission(String code, String action, String resourceType, String riskTier) {
@@ -134,6 +212,11 @@ class AuthorizationManagementHttpTest {
         };
     }
 
+    private void authenticateWith(String jwt) {
+        restTemplate.getRestTemplate().getInterceptors().clear();
+        restTemplate.getRestTemplate().getInterceptors().add(bearerInterceptor(jwt));
+    }
+
     /**
      * Sign a SERVICE_V1 JWT matching the claim contract expected by
      * {@link dev.ainer.security.token.ReferenceTokenProfileResolver}.
@@ -143,6 +226,20 @@ class AuthorizationManagementHttpTest {
     }
 
     private static String signServiceJwtWithIssuer(String subjectId, String scope, String issuer) {
+        return signJwt(subjectId, scope, issuer, "SERVICE_V1", "SERVICE", "client_credentials");
+    }
+
+    private static String signUserJwt(String subjectId, String scope) {
+        return signJwt(subjectId, scope, ISSUER, "USER_NEUTRAL_V1", "USER", "pwd");
+    }
+
+    private static String signJwt(
+            String subjectId,
+            String scope,
+            String issuer,
+            String tokenProfile,
+            String actorType,
+            String assurance) {
         try {
             JWSSigner signer = new RSASSASigner((RSAPrivateKey) RSA_KEY_PAIR.getPrivate());
             SignedJWT signedJWT = new SignedJWT(
@@ -151,11 +248,11 @@ class AuthorizationManagementHttpTest {
                             .issuer(issuer)
                             .audience(AUDIENCE)
                             .subject(subjectId)
-                            .claim("token_profile", "SERVICE_V1")
+                            .claim("token_profile", tokenProfile)
                             .claim("claim_contract_version", "1")
-                            .claim("actor_type", "SERVICE")
+                            .claim("actor_type", actorType)
                             .claim("scope", scope)
-                            .claim("amr", "client_credentials")
+                            .claim("amr", assurance)
                             .claim("client_id", "test-client")
                             .claim("sec_epoch", 0L)
                             .issueTime(new Date())
@@ -242,6 +339,50 @@ class AuthorizationManagementHttpTest {
     }
 
     @Test
+    void revokedBindingImmediatelyBlocksTheSameJwtFromAProtectedBusinessWrite() {
+        UUID roleId = createRole("consumer-writer", PROTECTED_WRITE_PERMISSION.value());
+        RestResponse created = client.postJson("/api/authorization/bindings", """
+                {"issuer": "%s", "subjectType": "USER", "subjectId": "user-writer",
+                 "roleId": "%s", "scopeKind": "WORKSPACE", "workspaceId": "%s"}
+                """.formatted(ISSUER, roleId, PROTECTED_WORKSPACE_ID));
+        assertThat(created.status().value()).isEqualTo(201);
+        String bindingId = (String) created.jsonPath("$.data.id");
+
+        String originalUserJwt = signUserJwt("user-writer", PROTECTED_WRITE_SCOPE);
+        authenticateWith(originalUserJwt);
+        String writePath = "/test/consumer-resources/%s/writes"
+                .formatted(PROTECTED_RESOURCE_ID);
+
+        RestResponse allowed = client.postJson(writePath, """
+                {"value": "first authorized write"}
+                """);
+        assertThat(allowed.status().value()).isEqualTo(201);
+        assertThat(allowed.jsonPath("$.code")).isEqualTo("AINER.COMMON.OK");
+        assertThat(protectedWriteCount()).isEqualTo(1L);
+
+        authenticateWith(managementJwt);
+        RestResponse revoked = client.postJson(
+                "/api/authorization/bindings/" + bindingId + "/revocations",
+                """
+                {"reason": "protected write access removed"}
+                """);
+        assertThat(revoked.status().value()).isEqualTo(200);
+        assertThat(revoked.jsonPath("$.data.status")).isEqualTo("REVOKED");
+
+        // Reuse the exact serialized JWT: only the database Binding changed between requests.
+        authenticateWith(originalUserJwt);
+        RestResponse denied = client.postJson(writePath, """
+                {"value": "write after revocation"}
+                """);
+        assertThat(denied.status().value()).isEqualTo(403);
+        assertThat(denied.jsonPath("$.code")).isEqualTo("AINER.COMMON.FORBIDDEN");
+        assertThat(protectedWriteCount()).isEqualTo(1L);
+
+        assertThat(decisionAuditCount("ALLOW", "AUTHORIZED")).isEqualTo(1L);
+        assertThat(decisionAuditCount("DENY", "NO_BINDING")).isEqualTo(1L);
+    }
+
+    @Test
     void invalidScopeKindReturnsError() {
         UUID roleId = createRole("editor", "mgmt.test.read");
         RestResponse response = client.postJson("/api/authorization/bindings", """
@@ -255,7 +396,7 @@ class AuthorizationManagementHttpTest {
     void permissionsListReturnsCatalog() {
         RestResponse response = client.get("/api/authorization/permissions");
         assertThat(response.status().value()).isEqualTo(200);
-        assertThat(response.jsonPath("$.data.length()")).isEqualTo(2);
+        assertThat(response.jsonPath("$.data.length()")).isEqualTo(3);
     }
 
     @Test
@@ -384,6 +525,32 @@ class AuthorizationManagementHttpTest {
 
     // ---- helpers ----
 
+    private long protectedWriteCount() {
+        return Objects.requireNonNull(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM consumer_protected_write_event", Long.class));
+    }
+
+    private long decisionAuditCount(String outcome, String reasonCode) {
+        return Objects.requireNonNull(jdbcTemplate.queryForObject("""
+                SELECT count(*)
+                FROM ainer_authorization_decision_audit
+                WHERE requester_issuer = ?
+                  AND requester_type = 'USER'
+                  AND requester_id = 'user-writer'
+                  AND permission_code = ?
+                  AND resource_type = ?
+                  AND resource_id = ?
+                  AND outcome = ?
+                  AND reason_code = ?
+                """, Long.class,
+                ISSUER,
+                PROTECTED_WRITE_PERMISSION.value(),
+                PROTECTED_RESOURCE.value(),
+                PROTECTED_RESOURCE_ID,
+                outcome,
+                reasonCode));
+    }
+
     @SuppressWarnings("unchecked")
     private UUID createRole(String code, String... permissions) {
         StringBuilder perms = new StringBuilder();
@@ -469,6 +636,13 @@ class AuthorizationManagementHttpTest {
                             dev.ainer.authorization.domain.AuditLevel.ON_DECISION,
                             false, false),
                     new dev.ainer.authorization.domain.Permission(
+                            PROTECTED_WRITE_PERMISSION,
+                            "write",
+                            PROTECTED_RESOURCE,
+                            dev.ainer.authorization.domain.RiskTier.MEDIUM,
+                            dev.ainer.authorization.domain.AuditLevel.ON_DECISION,
+                            false, false),
+                    new dev.ainer.authorization.domain.Permission(
                             new dev.ainer.authorization.domain.PermissionCode("mgmt.test.unassignable"),
                             "assign",
                             new dev.ainer.authorization.domain.ResourceType("mgmt.test"),
@@ -482,6 +656,58 @@ class AuthorizationManagementHttpTest {
                             dev.ainer.authorization.domain.RiskTier.HIGH,
                             dev.ainer.authorization.domain.AuditLevel.ALWAYS,
                             true, false));
+        }
+
+        @Bean
+        dev.ainer.authorization.policy.ScopePermissionCeiling protectedWriteScopeCeiling() {
+            return (scope, permission) -> PROTECTED_WRITE_SCOPE.equals(scope)
+                    && PROTECTED_WRITE_PERMISSION.equals(permission);
+        }
+
+        @Bean
+        dev.ainer.authorization.policy.DomainAuthorizationPolicy protectedWriteDomainPolicy() {
+            return new dev.ainer.authorization.policy.DomainAuthorizationPolicy() {
+                @Override
+                public dev.ainer.authorization.domain.GrantPath pathFor(PermissionCode permission) {
+                    return PROTECTED_WRITE_PERMISSION.equals(permission)
+                            ? dev.ainer.authorization.domain.GrantPath.BINDING_REQUIRED
+                            : null;
+                }
+
+                @Override
+                public boolean relationGrants(
+                        Requester.Authenticated subject,
+                        PermissionCode permission,
+                        ResourceRef resource,
+                        AuthorizationContext context) {
+                    return false;
+                }
+
+                @Override
+                public boolean resourceStateSatisfies(
+                        Requester.Authenticated subject,
+                        PermissionCode permission,
+                        ResourceRef resource,
+                        AuthorizationContext context) {
+                    return PROTECTED_WRITE_PERMISSION.equals(permission)
+                            && PROTECTED_RESOURCE.equals(resource.resourceType());
+                }
+            };
+        }
+
+        @Bean
+        ProtectedBusinessWriteService protectedBusinessWriteService(
+                AuthorizationService authorizationService,
+                AuthorizationDecisionAuditService decisionAuditService,
+                AuthenticatedPrincipalResolver principalResolver,
+                JdbcTemplate jdbcTemplate,
+                Clock clock) {
+            return new ProtectedBusinessWriteService(
+                    authorizationService,
+                    decisionAuditService,
+                    principalResolver,
+                    jdbcTemplate,
+                    clock);
         }
 
         @Bean
@@ -506,7 +732,10 @@ class AuthorizationManagementHttpTest {
                 public boolean isPermissionAssignable(
                         dev.ainer.security.token.AuthenticatedPrincipal actor,
                         dev.ainer.authorization.domain.Permission permission) {
-                    return java.util.Set.of("mgmt.test.read", "mgmt.test.write")
+                    return java.util.Set.of(
+                                    "mgmt.test.read",
+                                    "mgmt.test.write",
+                                    PROTECTED_WRITE_PERMISSION.value())
                             .contains(permission.code().value());
                 }
 
@@ -523,10 +752,137 @@ class AuthorizationManagementHttpTest {
                         dev.ainer.security.token.AuthenticatedPrincipal actor,
                         dev.ainer.authorization.domain.SubjectRef target) {
                     return target.type() == dev.ainer.authorization.domain.SubjectType.USER
-                            && "ainer-test".equals(target.issuerNamespace());
+                            && java.util.Set.of("ainer-test", ISSUER)
+                                    .contains(target.issuerNamespace());
                 }
             };
         }
+    }
+
+    @RestController
+    @RequestMapping("/test/consumer-resources")
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+            name = "ainer.authorization.test-protected-write", havingValue = "true")
+    static class ProtectedBusinessWriteController {
+
+        private final ProtectedBusinessWriteService writeService;
+
+        ProtectedBusinessWriteController(ProtectedBusinessWriteService writeService) {
+            this.writeService = writeService;
+        }
+
+        @PostMapping("/{resourceId}/writes")
+        ResponseEntity<ApiResponse<ProtectedWriteResponse>> write(
+                @PathVariable UUID resourceId,
+                @RequestBody ProtectedWriteRequest body,
+                HttpServletRequest request) {
+            String requestId = RequestIds.currentOrCreate(request);
+            ProtectedWriteResponse response =
+                    writeService.write(resourceId, body.value(), requestId, null);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(ApiResponse.success(response, requestId));
+        }
+    }
+
+    static class ProtectedBusinessWriteService {
+
+        private final AuthorizationService authorizationService;
+        private final AuthorizationDecisionAuditService decisionAuditService;
+        private final AuthenticatedPrincipalResolver principalResolver;
+        private final JdbcTemplate jdbcTemplate;
+        private final Clock clock;
+
+        ProtectedBusinessWriteService(
+                AuthorizationService authorizationService,
+                AuthorizationDecisionAuditService decisionAuditService,
+                AuthenticatedPrincipalResolver principalResolver,
+                JdbcTemplate jdbcTemplate,
+                Clock clock) {
+            this.authorizationService = authorizationService;
+            this.decisionAuditService = decisionAuditService;
+            this.principalResolver = principalResolver;
+            this.jdbcTemplate = jdbcTemplate;
+            this.clock = clock;
+        }
+
+        @Transactional
+        public ProtectedWriteResponse write(
+                UUID resourceId, String value, String requestId, String traceId) {
+            String normalizedValue = value == null ? "" : value.trim();
+            if (normalizedValue.isEmpty() || normalizedValue.length() > 100) {
+                throw new BusinessException(StandardErrorCode.INVALID_REQUEST);
+            }
+
+            UUID workspaceId = findWorkspaceId(resourceId);
+            AuthenticatedPrincipal principal = principalResolver.requireCurrent();
+            SubjectType subjectType;
+            if (principal.isHuman()) {
+                subjectType = SubjectType.USER;
+            } else if (principal.isService()) {
+                subjectType = SubjectType.SERVICE;
+            } else {
+                throw new BusinessException(StandardErrorCode.FORBIDDEN);
+            }
+            SubjectRef subject = new SubjectRef(
+                    principal.authority().issuer(),
+                    principal.subjectId(),
+                    subjectType);
+            AuthorizationContext context = new AuthorizationContext(
+                    Instant.now(clock),
+                    AuthorizationContext.Assurance.NONE,
+                    principal.clientId(),
+                    requestId,
+                    traceId);
+            AuthorizationRequest authorizationRequest = new AuthorizationRequest(
+                    new Requester.Authenticated(
+                            subject,
+                            principal.scopes(),
+                            principal.audiences(),
+                            principal.clientId()),
+                    AccessMode.AUTHENTICATED,
+                    PROTECTED_WRITE_PERMISSION,
+                    new ResourceRef(workspaceId, PROTECTED_RESOURCE, resourceId),
+                    context);
+            AuthorizationDecision decision = authorizationService.authorize(authorizationRequest);
+
+            // Audit must succeed before the protected effect is allowed to reach the product table.
+            decisionAuditService.recordIfApplicable(
+                    authorizationRequest, decision, requestId, traceId);
+            if (!decision.isAllowed() || !decision.obligations().isEmpty()) {
+                throw new BusinessException(StandardErrorCode.FORBIDDEN);
+            }
+
+            UUID writeId = Objects.requireNonNull(jdbcTemplate.queryForObject("""
+                    INSERT INTO consumer_protected_write_event (
+                        workspace_id, resource_id, value,
+                        requester_issuer, requester_id, created_at
+                    ) VALUES (?, ?, ?, ?, ?, now())
+                    RETURNING id
+                    """, UUID.class,
+                    workspaceId,
+                    resourceId,
+                    normalizedValue,
+                    principal.authority().issuer(),
+                    principal.subjectId()));
+            return new ProtectedWriteResponse(writeId, resourceId);
+        }
+
+        private UUID findWorkspaceId(UUID resourceId) {
+            List<UUID> matches = jdbcTemplate.query(
+                    "SELECT workspace_id FROM consumer_protected_resource WHERE id = ?",
+                    (rows, rowNumber) -> rows.getObject("workspace_id", UUID.class),
+                    resourceId);
+            if (matches.isEmpty()) {
+                throw new BusinessException(StandardErrorCode.NOT_FOUND);
+            }
+            return matches.getFirst();
+        }
+    }
+
+    record ProtectedWriteRequest(String value) {
+    }
+
+    record ProtectedWriteResponse(UUID writeId, UUID resourceId) {
     }
 
     @SpringBootConfiguration

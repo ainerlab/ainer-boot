@@ -127,9 +127,11 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
   Proposed）：`ainer-module-authorization` 拥有纯决策器（S0，Permission/Role/Binding/Scope/Decision +
   grant-path 真值表）、6 张表 PostgreSQL 持久化与 `BindingResolver` 原型（S1）、
   `/api/authorization/**` 管理 REST API 与 Effective Access 原型（S2）、`DefaultQueryAuthorizationPlanner`
-  与 Golden Consumer 查询验证原型（S3，产品定义类型化 `Q` 约束，Ainer 不输出 SQL）。但已核实存在
-  多项未闭合缺陷（详见 §3 差距清单），三个可执行应用均未依赖该模块，决策器无生产装配，ADR-0030
-  决策文本仍以 pre-Greenfield tenant 模型为主。§13.4 创建门禁 8/10 状态未关闭。
+  与 Golden Consumer 查询验证原型（S3，产品定义类型化 `Q` 约束，Ainer 不输出 SQL）。§3 接手复核的
+  13 项缺陷均已有模块级处置与回归证据：`ainer-server` 已按归属装配决策器，真实 JWT、管理防提权、
+  外部制品消费、参数化 PostgreSQL 查询与撤权后同 Token 写拒绝均已覆盖。ADR-0030 决策文本仍以
+  pre-Greenfield tenant 模型为主；§13.4 门禁 8 仍未关闭，门禁 10 仅完成仓内请求链路，外部消费者/
+  生产部署的授权失效 SLA 仍未验收。
 - ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0020、ADR-0022、ADR-0024 至 ADR-0028 与
   ADR-0033 Greenfield 已接受（0033 Greenfield 为目标基线，
   Option B：完全移除 Tenant；按
@@ -414,14 +416,15 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 | 10 | **管理 API 缺防提权矩阵** | ✅ 模块级已修复（2026-08-11）— 新增版本化 `GrantAdministrationPolicy` + `GrantAdministrationGuard`；无策略 deny-all，scope 不能单独授权管理；Controller 与事务服务双层校验 assignable Permission/Scope/target，硬拒绝 system-only、GLOBAL、自 Binding 和修改自己 ACTIVE Binding 所引用 Role。真实 JWT + PG 负向矩阵覆盖。Greenfield 后生产 bootstrap/Ainer Admin 仍属门禁 9 未完成项 | §11.3/§11.5 |
 | 11 | **外部 Golden Consumer 仅编译期 smoke** | ✅ 已修复（2026-08-11）— `scripts/verify-maven-consumers.sh` 在独立临时项目中只通过 BOM 与隔离仓库已安装制品定义产品 Permission/Role/Binding/query intent/constraint，实际调用 `AuthorizationService` 与 `DefaultQueryAuthorizationPlanner`；Maven 3.9+、Maven 4 各执行 1 项 JUnit，均为 1 test / 0 failure / 0 error / 0 skipped。当前验证对象仍是本地 `0.1.0-SNAPSHOT`，不宣称不可变发布制品或完整产品场景验收 | 门禁 8 外部 Golden Consumer 验证 |
 | 12 | **缺真实参数化 SQL 查询验证** | ✅ 已修复（2026-08-11）— 新增 test-scope 产品表与 `ProductListingQueryAdapter`：在真实 PostgreSQL 18.3 中把 planner 生成的 Workspace/resource `Q` 绑定为 `varchar[]`/`uuid[]` PreparedStatement，一次查询只返回授权 Workspace row；DENY 执行 0 次产品查询，注入形态 status 不扩大结果；20,003 行夹具的 `EXPLAIN (ANALYZE, BUFFERS)` 命中 `idx_consumer_listing_authorized_search`。这证明 Golden Consumer adapter 契约，不宣称已有生产产品 Repository 或生产容量结论 | §7.4/§7.5 |
-| 13 | **缺「撤销后原 Token 无法继续业务写」端到端** | 撤销语义仅在 resolver 层验证，无真实 JWT + 真实业务写路径 | 门禁 10 |
+| 13 | **缺「撤销后原 Token 无法继续业务写」端到端** | ✅ 模块级已修复（2026-08-11）— 真实 RSA 签名 `USER_NEUTRAL_V1` JWT 先经产品所有的 test-scope HTTP 路径完成受保护写；可信 SERVICE 通过真实管理 API 撤销 PostgreSQL Binding 后，复用完全相同且仍有效的 JWT 再写返回 403，产品事件仍为 1。产品服务从产品表解析资源所属 Workspace，每次调用 `AuthorizationService`/`PostgresBindingResolver`，无 ALLOW cache；ALLOW 与 `NO_BINDING` DENY 均在 effect 前持久化审计。外部消费者与生产失效 SLA 尚未验收 | 门禁 10 工程链路 |
 
 **§13.4 创建门禁状态**：门禁 8（外部 Golden Consumer 验证）**仍未关闭**。外部 Maven 制品消费与
 真实 `AuthorizationService`/查询规划器调用这一工程维度已补齐，但仍缺不可变已发布制品、ADR 要求的
 完整产品关系/双向独立负例，以及真实 HTTP public row/字段投影验证。test-scope 产品 adapter 的参数化
 PostgreSQL 行过滤维度已补齐；门禁 9（Ainer Admin 管理 + Effective Access）**未关闭**（模块防提权
 矩阵已补，但 Admin UI 与 post-Greenfield 生产 bootstrap 未集成）；门禁 10（撤销后受保护写失效）
-**未关闭**（仅 resolver 层验证，缺端到端）。
+的**仓内工程链路已通过**，但发布级门禁仍未关闭：还需由外部消费者在目标部署拓扑中批准授权失效
+SLA，并验证跨实例/缓存/传播边界。
 
 **ADR-0030 文本与 Greenfield 地基冲突**：ADR-0030 仍以 tenant 模型为主
 （`credentialTenantId`、`TENANT(tenantId)` scope、I0 切片的「allowlisted consumer client 无 tenant
@@ -437,7 +440,26 @@ USER Token」），而 ADR-0033 Greenfield 已完全移除 tenant。实现已迁
    不可变发布制品与完整产品关系/投影场景仍属于门禁 8；
 6. ~~产品 adapter 将类型化 `Q` 下推为参数化 PostgreSQL 并验证 row/查询次数~~（test-scope Golden
    Consumer 已完成）；真实产品 Repository 与 HTTP 字段投影仍属于门禁 8；
-7. 新增取代 ADR-0030 的 post-Greenfield 授权基线 ADR。
+7. ~~撤销 Binding 后复用原 USER Token 验证受保护业务写失败~~（仓内真实 JWT + HTTP + PostgreSQL
+   工程链路已完成）；外部消费者与生产授权失效 SLA 仍属于门禁 10；
+8. 新增取代 ADR-0030 的 post-Greenfield 授权基线 ADR。
+
+2026-08-11 撤权后原 Token 受保护写失效闭环（缺陷 13）
+- 扩展 `AuthorizationManagementHttpTest`：新增 test-scope 产品资源表、产品写事件表与受保护 HTTP
+  写路径。产品服务先从自己的表读取资源所属 Workspace，再构造单资源 `AuthorizationRequest`；
+  Ainer 仍不知道产品表、字段和 effect 语义。
+- 用测试 RSA 私钥签发 `USER_NEUTRAL_V1` JWT，Resource Server 以对应公钥真实验签，再经
+  `ReferenceTokenProfileResolver` 取得 `iss/sub/scope`。第一次写由 Workspace Binding ALLOW；可信
+  `SERVICE_V1` 管理主体通过 `/api/authorization/bindings/{id}/revocations` 提交撤销。
+- 第二次请求复用**完全相同的序列化 JWT**，仅数据库 Binding 状态变化；`PostgresBindingResolver`
+  每次重新查询后返回无 live Binding，HTTP 为 403，产品写事件计数保持 1。
+- 产品 effect 之前调用 `AuthorizationDecisionAuditService`；ALLOW/`AUTHORIZED` 与
+  DENY/`NO_BINDING` 各存在 1 条审计。DENY 审计使用 `REQUIRES_NEW`，在业务事务回滚后仍保留。
+- 定向验证：`AuthorizationManagementHttpTest` **13/0/0/0**。全量 `./mvnw clean verify`
+  （JDK 25 + PostgreSQL 18.3 Testcontainers）通过：**290 tests / 0 failure / 0 error / 0 skipped**；
+  `check-surefire-results.sh` 与 `git diff --check` 通过。
+- 边界：这是单进程、仓内 test-scope 产品路径的工程验证，不等同于外部产品接入、跨实例传播测试，
+  也不批准生产授权失效 SLA；因此门禁 10 的发布级状态仍未关闭。
 
 2026-08-11 Golden Consumer 参数化 PostgreSQL 查询闭环（缺陷 12）
 - 新增 `GoldenConsumerPostgresQueryIntegrationTest`。产品定义的 listing 表、query intent、类型化

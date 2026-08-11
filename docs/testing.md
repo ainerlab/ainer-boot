@@ -85,6 +85,12 @@ starter 的真实 PostgreSQL 兼容测试，覆盖 `BaseMapper`、数据库 UUID
 `EXPLAIN (ANALYZE, BUFFERS)`。测试规模的索引计划只属于工程回归证据，不得外推生产容量或延迟；
 生产 Repository 仍需按真实基数、倾斜和分页重新验收。
 
+Binding 撤销回归必须复用撤销前已经签发的同一序列化 JWT，经真实 Resource Server 验签和管理 API
+撤销 PostgreSQL Binding；下一次受保护业务写必须重新查询授权事实、返回 403 且不新增产品 effect。
+高价值写的 ALLOW/DENY 决策都要在 effect 前成功落审计，DENY 即使使业务事务回滚也必须保留。
+仓内 test-scope 产品路径只能证明模块请求时重评估，不替代外部消费者、跨实例传播或生产授权失效
+SLA 验收。
+
 出现 Testcontainers 失败时依次检查：
 
 1. Docker daemon 是否可访问；

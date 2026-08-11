@@ -16,6 +16,12 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **撤权后原 Token 受保护写失效验证（2026-08-11）**：真实签名 `USER_NEUTRAL_V1` JWT
+  先通过产品所有的 test-scope HTTP 写路径；管理 SERVICE 随后经真实管理 API 撤销 PostgreSQL
+  Binding，复用完全相同且仍在有效期内的 JWT 再写返回 403，业务写事件保持不变。ALLOW 与
+  `NO_BINDING` DENY 均在产品 effect 前写入决策审计。该结果证明模块内无 ALLOW 缓存的请求时
+  重评估链路，不代表外部消费者或生产部署的授权失效 SLA 已验收。
+
 - **Golden Consumer 参数化 PostgreSQL 查询验证（2026-08-11）**：新增 test-scope 产品 listing
   JDBC adapter，在真实 PostgreSQL 18.3 中把 `DefaultQueryAuthorizationPlanner` 生成的类型化 `Q`
   下推为 `varchar[]`/`uuid[]` PreparedStatement。验证未授权 Workspace row 不进入 JVM、注入形态

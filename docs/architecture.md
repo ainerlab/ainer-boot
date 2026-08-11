@@ -106,8 +106,10 @@ deny-all，并在应用服务事务边界拒绝 GLOBAL、system-only 与自我�
 `DefaultQueryAuthorizationPlanner`；它仍是本地 SNAPSHOT 工程门禁，不等同于不可变正式制品或完整
 产品验收。仓内另有产品所有的 test-scope JDBC adapter，在 PostgreSQL 18.3 上把类型化 `Q` 下推为
 数组参数绑定 SQL，验证未授权 row 不进入 JVM、ALLOW 一次查询、DENY 零查询和 20,003 行夹具索引计划；
-该夹具不是生产产品 Repository。尚未闭环的是完整外部产品关系/双向独立负例与 HTTP 字段投影、撤销
-后原 Token 的受保护业务写失效，以及 Ainer Admin/生产 bootstrap。完整差距清单与后续批次见
+该夹具不是生产产品 Repository。真实 USER JWT 的 test-scope 产品写路径也已验证：管理 API 撤销
+PostgreSQL Binding 后，完全相同且仍有效的 Token 在下一请求被拒绝，产品 effect 不增加且 ALLOW/DENY
+决策均已审计；这仍不是外部产品或生产部署的授权失效 SLA。尚未闭环的是完整外部产品关系/双向独立
+负例与 HTTP 字段投影、授权失效 SLA 验收，以及 Ainer Admin/生产 bootstrap。完整差距清单与后续批次见
 [`docs/project-status.md`](project-status.md) §3。此外 ADR-0030 决策文本仍以 pre-Greenfield 的
 tenant 模型为主，而实现已迁 Workspace 语义（ADR-0033 Greenfield 移除 tenant），完整重述需新增取代 ADR。
 Spring `AuthorizationManager` adapter（方法级 `@AinerAuthorize`）、OpenAPI/SDK 与 Ainer Admin 集成属后续。
