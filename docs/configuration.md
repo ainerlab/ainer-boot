@@ -230,7 +230,19 @@ Prometheus registry 已随两个可执行发行物引入，但仓库没有部署
 
 优雅停机已启用，shutdown phase 超时为 20 秒。修改超时必须结合请求、SSE 和数据库事务实测。
 
-## 7. 新增配置检查表
+## 7. 通用授权模块（ADR-0030）
+
+`ainer.authorization.enabled`（默认 `true`）控制 `ainer-module-authorization` 的模块装配。
+关闭后授权管理 API 与 BindingResolver 不注册，决策器仅在消费方显式装配 `AuthorizationService`
+时可用。
+
+管理 API 端点（`/api/authorization/**`）要求 SERVICE principal + `authorization.manage` scope。
+Human principal 和缺 scope 返回 403。端点清单见 [`api.md`](api.md) §8。
+
+RSA 签名密钥、撤销 epoch 和在线 introspection 配置属于 Authorization Server（§5），
+不在通用授权模块配置范围内。
+
+## 8. 新增配置检查表
 
 - 属性归属明确，并使用 `@ConfigurationProperties`；
 - 有安全默认值、边界验证和错误配置测试；

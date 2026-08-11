@@ -78,6 +78,13 @@ public final class AuthorizationService {
             return deny(request, AuthorizationReasonCodes.RESOURCE_TYPE_MISMATCH);
         }
 
+        // systemOnly permissions must never be served via the PUBLIC path (ADR-0030 §3.1/§5.1):
+        // systemOnly means "only controlled SERVICE may use/manage". A PUBLIC_PROJECTION request
+        // for a systemOnly permission is denied regardless of any PublicAccessPolicy.
+        if (permission.systemOnly() && request.accessMode() == AccessMode.PUBLIC_PROJECTION) {
+            return deny(request, AuthorizationReasonCodes.SYSTEM_ONLY);
+        }
+
         if (request.accessMode() == AccessMode.PUBLIC_PROJECTION) {
             return decidePublic(request, permission);
         }

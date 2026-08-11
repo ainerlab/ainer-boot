@@ -137,8 +137,8 @@ class GoldenConsumerAuthorizationTest {
         Map<SubjectRef, Set<SubjectBinding>> table = new HashMap<>();
         table.put(merchantOperator, Set.of(new SubjectBinding(
                 merchantOperator,
-                new Role("merchant-operator", Set.of(LISTING_PUBLISH, LISTING_READ)),
-                new Scope.Resource(LISTING, listingId),
+                new Role("merchant-operator", "Merchant Operator", Set.of(LISTING_PUBLISH, LISTING_READ)),
+                new Scope.Resource(workspace, LISTING, listingId),
                 BindingStatus.ACTIVE, NOW.minusSeconds(3600), null, 1L)));
         return subject -> table.getOrDefault(subject, Set.of());
     }

@@ -51,6 +51,7 @@ subject、URL 或用户输入。
 | `ainer_workspace*` | Workspace |
 | `ainer_ai_*` | AI runtime |
 | `ainer_identity_*` | Identity |
+| `ainer_authorization_*` | 通用授权（ADR-0030） |
 | `oauth2_*` | Authorization Server 协议存储 |
 | `ainer_oauth_*` | Authorization Server 的 Ainer-owned 生命周期与操作审计 |
 | `user_entities` / `user_credentials` | Spring Security WebAuthn 官方 JDBC 协议存储 |
@@ -79,6 +80,21 @@ AI runtime foundation baseline（`V202608070320`）：
 |---|---|
 | `ainer_ai_invocation` / `_result` / `_feedback` | 调用审计、结果与反馈 |
 | `ainer_ai_task` / `_task_run` / `_context_snapshot` | 任务与运行、上下文快照 |
+
+通用授权 foundation baseline（`V202608070340`，ADR-0030 S1）：
+
+| 表 | 用途 |
+|---|---|
+| `ainer_authorization_permission` | 权限目录投影（code PK，action/resource_type/risk_tier/audit_level/system_only/agent_delegable） |
+| `ainer_authorization_role` | 角色聚合（UUIDv7 PK，code/name/system_role/status/version 乐观锁） |
+| `ainer_authorization_role_permission` | 角色-权限关联（复合 PK role_id+permission_code，FK RESTRICT） |
+| `ainer_authorization_subject_binding` | 绑定生命周期（UUIDv7 PK，subject_ref/role_id/scope_kind+scope 列/valid_from/until/status/version/revoked_*） |
+| `ainer_authorization_change_audit` | 变更审计 append-only（actor/target/action/before-after version，no Token/body） |
+| `ainer_authorization_decision_audit` | 决策审计 append-only（decision_id/requester/permission/resource/outcome/reason/evaluated_at） |
+
+`scope_kind` CHECK 适配 Greenfield Workspace 语义：`GLOBAL`（workspace/resource 全 NULL）、
+`WORKSPACE`（workspace_id 非空）、`RESOURCE`（workspace_id+resource_type+resource_id 全非空）。
+GLOBAL binding 仅 SERVICE subject 持有（决策器强制）。
 
 ### 2.2 身份库 `ainer_auth`（`ainer-authorization-server`）
 

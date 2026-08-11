@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.authorization.infrastructure.SubjectBindingMapper">
+
+    <resultMap id="BindingRowMap" type="dev.ainer.authorization.infrastructure.SubjectBindingRow">
+        <id property="id" column="id"/>
+        <result property="issuer" column="issuer"/>
+        <result property="subjectType" column="subject_type"/>
+        <result property="subjectId" column="subject_id"/>
+        <result property="roleId" column="role_id"/>
+        <result property="scopeKind" column="scope_kind"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="resourceType" column="resource_type"/>
+        <result property="resourceId" column="resource_id"/>
+        <result property="validFrom" column="valid_from"/>
+        <result property="validUntil" column="valid_until"/>
+        <result property="status" column="status"/>
+        <result property="version" column="version"/>
+        <result property="revokedAt" column="revoked_at"/>
+        <result property="revokedReason" column="revoked_reason"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="bindingColumns">
+        id, issuer, subject_type, subject_id, role_id, scope_kind,
+        workspace_id, resource_type, resource_id,
+        valid_from, valid_until, status, version,
+        revoked_at, revoked_reason, created_at, updated_at
+    </sql>
+
+    <select id="insertReturningId" resultType="java.util.UUID">
+        INSERT INTO ainer_authorization_subject_binding (
+            issuer, subject_type, subject_id, role_id, scope_kind,
+            workspace_id, resource_type, resource_id,
+            valid_from, valid_until, status, version, created_at, updated_at
+        ) VALUES (
+            #{row.issuer}, #{row.subjectType}, #{row.subjectId}, #{row.roleId}, #{row.scopeKind},
+            #{row.workspaceId}, #{row.resourceType}, #{row.resourceId},
+            #{row.validFrom}, #{row.validUntil}, #{row.status}, #{row.version}, #{now}, #{now}
+        )
+        RETURNING id
+    </select>
+
+    <select id="selectById" resultMap="BindingRowMap">
+        SELECT <include refid="bindingColumns"/>
+        FROM ainer_authorization_subject_binding
+        WHERE id = #{id}
+    </select>
+
+    <!--
+        Live bindings: ACTIVE status AND within the validity window at the given instant.
+        Revoked or expired rows are excluded at the database level — there is no ALLOW cache.
+    -->
+    <select id="selectLiveBindings" resultMap="BindingRowMap">
+        SELECT <include refid="bindingColumns"/>
+        FROM ainer_authorization_subject_binding
+        WHERE issuer = #{issuer}
+          AND subject_type = #{subjectType}
+          AND subject_id = #{subjectId}
+          AND status = 'ACTIVE'
+          AND valid_from &lt;= #{at}
+          AND (valid_until IS NULL OR valid_until &gt; #{at})
+        ORDER BY created_at, id
+    </select>
+
+    <select id="selectAllBySubject" resultMap="BindingRowMap">
+        SELECT <include refid="bindingColumns"/>
+        FROM ainer_authorization_subject_binding
+        WHERE issuer = #{issuer}
+          AND subject_type = #{subjectType}
+          AND subject_id = #{subjectId}
+        ORDER BY created_at, id
+    </select>
+
+    <!--
+        Logical revocation: only an ACTIVE binding can be revoked.
+        The CHECK constraint (ck_ainer_authorization_binding_revoked) requires revoked_at when status=REVOKED.
+    -->
+    <update id="revoke">
+        UPDATE ainer_authorization_subject_binding
+        SET status = 'REVOKED',
+            version = version + 1,
+            revoked_at = #{revokedAt},
+            revoked_reason = #{reason},
+            updated_at = #{now}
+        WHERE id = #{id} AND status = 'ACTIVE'
+    </update>
+
+</mapper>

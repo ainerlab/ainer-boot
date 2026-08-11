@@ -7,16 +7,22 @@ import java.util.Set;
  * A named bundle of permissions (ADR-0030 §4.1). {@code OWNER/ADMIN/MEMBER} are built-in Identity/Workspace
  * roles and are not migrated or duplicated by this model.
  */
-public record Role(String code, Set<PermissionCode> permissions) {
+public record Role(String code, String name, Set<PermissionCode> permissions) {
 
     public Role {
         Objects.requireNonNull(code, "code");
+        Objects.requireNonNull(name, "name");
         Objects.requireNonNull(permissions, "permissions");
-        String normalized = code.trim();
-        if (normalized.isEmpty()) {
+        String normalizedCode = code.trim();
+        String normalizedName = name.trim();
+        if (normalizedCode.isEmpty()) {
             throw new IllegalArgumentException("role code must not be blank");
         }
-        code = normalized;
+        if (normalizedName.isEmpty()) {
+            throw new IllegalArgumentException("role name must not be blank");
+        }
+        code = normalizedCode;
+        name = normalizedName;
         permissions = Set.copyOf(permissions);
     }
 

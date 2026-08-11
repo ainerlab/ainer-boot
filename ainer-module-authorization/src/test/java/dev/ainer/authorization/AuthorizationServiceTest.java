@@ -114,7 +114,7 @@ class AuthorizationServiceTest {
     @Test
     void globalScopeBindingDeniedForNonServiceSubject() {
         SubjectBinding globalBinding = new SubjectBinding(
-                user, new Role("r", Set.of(READ)), new Scope.Global(),
+                user, new Role("r", "Test Role", Set.of(READ)), new Scope.Global(),
                 BindingStatus.ACTIVE, NOW.minusSeconds(3600), null, 1L);
         var svc = service((p, r) -> java.util.Optional.empty(), bindingRequiredWithState(READ, true),
                 subject -> Set.of(globalBinding));
@@ -126,7 +126,7 @@ class AuthorizationServiceTest {
     void bindingFromDifferentSubjectFilteredOut() {
         SubjectRef otherUser = new SubjectRef("ainer", "user-2", SubjectType.USER);
         SubjectBinding othersBinding = new SubjectBinding(
-                otherUser, new Role("r", Set.of(READ)), new Scope.Resource(DOC, ownedDocId),
+                otherUser, new Role("r", "Test Role", Set.of(READ)), new Scope.Resource(workspace, DOC, ownedDocId),
                 BindingStatus.ACTIVE, NOW.minusSeconds(3600), null, 1L);
         var svc = service((p, r) -> java.util.Optional.empty(), bindingRequiredWithState(READ, true),
                 subject -> Set.of(othersBinding));
@@ -145,6 +145,18 @@ class AuthorizationServiceTest {
     void publicProjectionDeniesWithoutPolicy() {
         var svc = service((p, r) -> java.util.Optional.empty(), alwaysBinding(READ), none());
         assertThat(auth(svc, new Requester.Anonymous(), AccessMode.PUBLIC_PROJECTION, READ, DOC, publicDocId)
+                .outcome()).isEqualTo(AuthorizationOutcome.DENY);
+    }
+
+    @Test
+    void systemOnlyPermissionDeniedOnPublicPathEvenWithPolicy() {
+        // ADR-0030 §3.1/§5.1 defense-in-depth: systemOnly permissions must never be served via PUBLIC
+        // path, even when a PublicAccessPolicy would match. The PUBLIC branch is short-circuited before
+        // decidePublic() is reached.
+        var svc = service(
+                (p, r) -> java.util.Optional.of(new PublicProjection("public")),
+                alwaysBinding(SYS_ADMIN), none());
+        assertThat(auth(svc, new Requester.Anonymous(), AccessMode.PUBLIC_PROJECTION, SYS_ADMIN, WORKSPACE, ownedDocId)
                 .outcome()).isEqualTo(AuthorizationOutcome.DENY);
     }
 
@@ -248,7 +260,7 @@ class AuthorizationServiceTest {
 
     private SubjectBinding binding(PermissionCode permission, UUID docId) {
         return new SubjectBinding(
-                user, new Role("r", Set.of(permission)), new Scope.Resource(DOC, docId),
+                user, new Role("r", "Test Role", Set.of(permission)), new Scope.Resource(workspace, DOC, docId),
                 BindingStatus.ACTIVE, NOW.minusSeconds(3600), null, 1L);
     }
 }

@@ -176,7 +176,44 @@ Workspace 的 ACTIVE 非 OWNER 成员。旧 REVOKED OWNER 不被重新激活。r
 
 SIEM 导出参数 `afterOccurredAt` 与 `afterId` 必须同时提供或同时省略，`limit=1..1000`。结果按 `occurredAt,id` 升序，返回 `nextOccurredAt`、`nextId` 和 `hasMore`。消费者持久化这对游标并按 audit ID 去重；每次导出批次本身也写入安全操作审计。
 
-## 8. 兼容与变更
+## 8. 通用授权管理 API（ADR-0030 S2）
+
+所有 `/api/authorization/**` 端点要求 SERVICE principal + `authorization.manage` scope。Human principal
+或缺 scope 返回 403。响应使用统一 `ApiResponse` 信封。
+
+### Permission 目录（只读）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `GET` | `/api/authorization/permissions` | 返回所有已注册权限定义（code、action、resourceType、riskTier、auditLevel、systemOnly、agentDelegable） |
+
+### Role 管理
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/authorization/roles` | 创建角色（code、name、permissions）。未注册 permission code 返回 422。重复 code 返回 409 |
+| `GET` | `/api/authorization/roles/{roleId}` | 查询角色（含 permissions） |
+| `PUT` | `/api/authorization/roles/{roleId}/permissions` | 原子替换角色权限（乐观版本检查）。版本冲突返回 409 |
+
+### Binding 生命周期
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/authorization/bindings` | 创建绑定（issuer、subjectType、subjectId、roleId、scopeKind、可选 workspaceId/resourceType/resourceId/validUntil）。非法 scope 组合返回 422 |
+| `GET` | `/api/authorization/bindings/{bindingId}` | 查询绑定 |
+| `POST` | `/api/authorization/bindings/{bindingId}/revocations` | 逻辑撤销绑定（reason）。撤销后 liveBindings 立即不返回——无 ALLOW 缓存 |
+
+### Effective Access
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `GET` | `/api/authorization/effective-access?issuer=&subjectType=&subjectId=` | 查询某 subject 当前所有有效绑定（ACTIVE + 有效期内） |
+
+Scope kind 与 CHECK 约束：`GLOBAL`（workspace_id/resource_type/resource_id 全 NULL）、
+`WORKSPACE`（workspace_id 非空）、`RESOURCE`（workspace_id + resource_type + resource_id 全非空）。
+GLOBAL binding 仅 SERVICE subject 允许持有（决策器强制）。
+
+## 9. 兼容与变更
 
 - 新增可选响应字段通常向后兼容，客户端必须容忍未知字段；
 - 删除、改名、改变字段类型、收紧枚举或改变 status/error code 都需要发布说明；

@@ -38,9 +38,10 @@ public sealed interface Scope permits Scope.Global, Scope.Workspace, Scope.Resou
         }
     }
 
-    /** Scoped to one concrete resource. */
-    record Resource(ResourceType resourceType, UUID resourceId) implements Scope {
+    /** Scoped to one concrete resource, anchored to the workspace that owns it. */
+    record Resource(UUID workspaceId, ResourceType resourceType, UUID resourceId) implements Scope {
         public Resource {
+            Objects.requireNonNull(workspaceId, "workspaceId");
             Objects.requireNonNull(resourceType, "resourceType");
             Objects.requireNonNull(resourceId, "resourceId");
         }
