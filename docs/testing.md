@@ -79,6 +79,12 @@ starter 的真实 PostgreSQL 兼容测试，覆盖 `BaseMapper`、数据库 UUID
 显式资源归属 SQL 和分页；既有锁、CTE、`RETURNING` 与审计 XML 也必须由所属模块集成
 测试回归。H2 或只检查应用上下文都不能替代这些门禁。
 
+授权集合查询的 Golden Consumer 还必须在真实 PostgreSQL 18 上证明：产品 adapter 只接受
+`AuthorizedQueryPlan.Allowed<Q>` 的类型化约束，以 PreparedStatement 参数绑定资源归属和用户筛选，
+未授权 row 在 SQL 层排除；ALLOW 产品查询次数为 1、DENY 为 0，并以确定性代表夹具执行
+`EXPLAIN (ANALYZE, BUFFERS)`。测试规模的索引计划只属于工程回归证据，不得外推生产容量或延迟；
+生产 Repository 仍需按真实基数、倾斜和分页重新验收。
+
 出现 Testcontainers 失败时依次检查：
 
 1. Docker daemon 是否可访问；

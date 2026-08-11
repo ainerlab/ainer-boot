@@ -104,8 +104,10 @@ systemOnly PUBLIC 绕过、审计写入、生产装配、真实 JWT 与模块级
 deny-all，并在应用服务事务边界拒绝 GLOBAL、system-only 与自我授权。隔离 Maven Golden Consumer
 已经只通过 BOM/已安装制品，在 Maven 3.9+ 与 Maven 4 下实际调用 `AuthorizationService` 和
 `DefaultQueryAuthorizationPlanner`；它仍是本地 SNAPSHOT 工程门禁，不等同于不可变正式制品或完整
-产品验收。尚未闭环的是完整外部产品场景矩阵、真实参数化 SQL 行过滤、撤销后原 Token 的受保护业务
-写失效，以及 Ainer Admin/生产 bootstrap。完整差距清单与后续批次见
+产品验收。仓内另有产品所有的 test-scope JDBC adapter，在 PostgreSQL 18.3 上把类型化 `Q` 下推为
+数组参数绑定 SQL，验证未授权 row 不进入 JVM、ALLOW 一次查询、DENY 零查询和 20,003 行夹具索引计划；
+该夹具不是生产产品 Repository。尚未闭环的是完整外部产品关系/双向独立负例与 HTTP 字段投影、撤销
+后原 Token 的受保护业务写失效，以及 Ainer Admin/生产 bootstrap。完整差距清单与后续批次见
 [`docs/project-status.md`](project-status.md) §3。此外 ADR-0030 决策文本仍以 pre-Greenfield 的
 tenant 模型为主，而实现已迁 Workspace 语义（ADR-0033 Greenfield 移除 tenant），完整重述需新增取代 ADR。
 Spring `AuthorizationManager` adapter（方法级 `@AinerAuthorize`）、OpenAPI/SDK 与 Ainer Admin 集成属后续。

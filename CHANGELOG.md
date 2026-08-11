@@ -16,6 +16,13 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **Golden Consumer 参数化 PostgreSQL 查询验证（2026-08-11）**：新增 test-scope 产品 listing
+  JDBC adapter，在真实 PostgreSQL 18.3 中把 `DefaultQueryAuthorizationPlanner` 生成的类型化 `Q`
+  下推为 `varchar[]`/`uuid[]` PreparedStatement。验证未授权 Workspace row 不进入 JVM、注入形态
+  status 不扩大结果、ALLOW 一次查询、DENY 零查询，以及 20,003 行合成夹具命中授权查询索引。
+  planner 同步拒绝错主体、过期、USER GLOBAL 和错 resourceType Binding。该结果是 Golden Consumer
+  工程验证，不代表已有生产产品 Repository 或生产容量结论。
+
 - **外部授权 Golden Consumer 制品门禁（2026-08-11）**：`verify-maven-consumers.sh` 不再只编译
   `PermissionCode` smoke；独立临时项目只通过 BOM 与隔离仓库已安装制品，自行定义产品
   Permission/Role/Binding/policy/query constraint，并实际调用 `AuthorizationService` 与

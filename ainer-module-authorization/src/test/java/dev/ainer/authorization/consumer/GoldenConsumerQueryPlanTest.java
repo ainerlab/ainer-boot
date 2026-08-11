@@ -38,11 +38,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Golden Consumer verification for ADR-0030 S3: a product module defines its own query-intent type,
  * query-constraint type, and a {@link dev.ainer.authorization.policy.QueryConstraintBuilder}, then
- * uses Ainer's {@link DefaultQueryAuthorizationPlanner} to produce a typed constraint that its
- * repository would apply to exclude unauthorized rows — all without modifying Ainer source.
+ * uses Ainer's {@link DefaultQueryAuthorizationPlanner} to produce a typed constraint — all without
+ * modifying Ainer source. Real PostgreSQL translation and row filtering are covered separately by
+ * {@link GoldenConsumerPostgresQueryIntegrationTest}.
  *
- * <p>This closes scaffold creation gate 8 (Permission/Role/Binding/Scope/Decision minimal closure
- * verified by an external Golden Consumer) for the collection-query dimension.
+ * <p>This unit-level fixture does not by itself close scaffold creation gate 8.
  */
 class GoldenConsumerQueryPlanTest {
 
@@ -178,6 +178,53 @@ class GoldenConsumerQueryPlanTest {
     }
 
     @Test
+    void bindingOwnedByAnotherSubjectIsExcludedFromQueryPlan() {
+        SubjectBinding foreignBinding = new SubjectBinding(
+                customer,
+                new Role("merchant-operator", "Merchant Operator", Set.of(LISTING_LIST_READ)),
+                new Scope.Workspace(workspaceA),
+                BindingStatus.ACTIVE, NOW.minusSeconds(3600), null, 1L);
+
+        assertDenied(subject -> Set.of(foreignBinding));
+    }
+
+    @Test
+    void globalBindingHeldByUserIsExcludedFromQueryPlan() {
+        SubjectBinding invalidGlobalBinding = new SubjectBinding(
+                operator,
+                new Role("platform-reader", "Platform Reader", Set.of(LISTING_LIST_READ)),
+                new Scope.Global(),
+                BindingStatus.ACTIVE, NOW.minusSeconds(3600), null, 1L);
+
+        assertDenied(subject -> Set.of(invalidGlobalBinding));
+    }
+
+    @Test
+    void expiredBindingIsExcludedEvenWhenResolverReturnsIt() {
+        SubjectBinding expiredBinding = new SubjectBinding(
+                operator,
+                new Role("merchant-operator", "Merchant Operator", Set.of(LISTING_LIST_READ)),
+                new Scope.Workspace(workspaceA),
+                BindingStatus.ACTIVE, NOW.minusSeconds(3600), NOW, 1L);
+
+        assertDenied(subject -> Set.of(expiredBinding));
+    }
+
+    @Test
+    void resourceBindingForAnotherResourceTypeIsExcludedFromQueryPlan() {
+        SubjectBinding mismatchedBinding = new SubjectBinding(
+                operator,
+                new Role("merchant-operator", "Merchant Operator", Set.of(LISTING_LIST_READ)),
+                new Scope.Resource(
+                        workspaceA,
+                        new ResourceType("consumer.order"),
+                        listingInA),
+                BindingStatus.ACTIVE, NOW.minusSeconds(3600), null, 1L);
+
+        assertDenied(subject -> Set.of(mismatchedBinding));
+    }
+
+    @Test
     void wrongScopeCeilingDenied() {
         DefaultQueryAuthorizationPlanner<ListingQueryIntent, ListingReadConstraint> planner = buildPlanner(
                 operatorBindings());
@@ -236,6 +283,15 @@ class GoldenConsumerQueryPlanTest {
                 AccessMode.AUTHENTICATED, permission, LISTING, "merchant-listing-search",
                 intent,
                 new AuthorizationContext(NOW, AuthorizationContext.Assurance.RECENT_STRONG, "xq-shop-next", null, null));
+    }
+
+    private void assertDenied(BindingResolver resolver) {
+        AuthorizedQueryPlan<ListingReadConstraint> plan = buildPlanner(resolver).plan(
+                queryRequest(
+                        operator,
+                        LISTING_LIST_READ,
+                        new ListingQueryIntent(workspaceA, Set.of("PUBLISHED"))));
+        assertThat(plan).isInstanceOf(AuthorizedQueryPlan.Denied.class);
     }
 
     private BindingResolver operatorBindings() {

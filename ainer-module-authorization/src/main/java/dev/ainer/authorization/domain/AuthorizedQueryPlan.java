@@ -1,6 +1,9 @@
 package dev.ainer.authorization.domain;
 
+import dev.ainer.authorization.AuthorizationReasonCodes;
+
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Result of a collection-query authorization (ADR-0030 §7, S3). The authorization engine either
@@ -25,6 +28,12 @@ public sealed interface AuthorizedQueryPlan<Q> {
      */
     record Allowed<Q>(Q constraint, List<DecisionObligation> obligations, String policyVersion)
             implements AuthorizedQueryPlan<Q> {
+
+        public Allowed {
+            Objects.requireNonNull(constraint, "constraint");
+            obligations = List.copyOf(Objects.requireNonNull(obligations, "obligations"));
+            Objects.requireNonNull(policyVersion, "policyVersion");
+        }
     }
 
     /**
@@ -34,5 +43,10 @@ public sealed interface AuthorizedQueryPlan<Q> {
      * @param policyVersion the engine's policy version
      */
     record Denied<Q>(String reasonCode, String policyVersion) implements AuthorizedQueryPlan<Q> {
+
+        public Denied {
+            Objects.requireNonNull(reasonCode, "reasonCode");
+            Objects.requireNonNull(policyVersion, "policyVersion");
+        }
     }
 }

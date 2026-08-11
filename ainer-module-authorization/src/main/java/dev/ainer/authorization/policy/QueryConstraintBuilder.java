@@ -1,10 +1,12 @@
 package dev.ainer.authorization.policy;
 
-import dev.ainer.authorization.domain.BindingStatus;
+import dev.ainer.authorization.DefaultQueryAuthorizationPlanner;
+import dev.ainer.authorization.domain.AuthorizedQueryPlan;
 import dev.ainer.authorization.domain.PermissionCode;
 import dev.ainer.authorization.domain.ResourceType;
 import dev.ainer.authorization.domain.Scope;
 import dev.ainer.authorization.domain.SubjectBinding;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Product-supplied builder that translates a set of authorized {@link SubjectBinding}s into a typed
@@ -15,9 +17,9 @@ import dev.ainer.authorization.domain.SubjectBinding;
  * "allow workspace X", "allow resource Y", "allow all if GLOBAL") into a single {@code Q} that the
  * product repository applies to the database/search query.
  *
- * <p>If no binding grants access (the builder produces no constraint), the planner returns
- * {@link AuthorizedQueryPlan.Denied}. This means the builder's {@code result()} is only called when
- * at least one binding contributed.
+ * <p>If no binding grants access, the planner returns {@link AuthorizedQueryPlan.Denied} without
+ * constructing an allowed query plan. The first call receives a {@code null} current constraint;
+ * every implementation must return a non-null product constraint.
  *
  * @param <Q> product-defined typed query constraint
  */
@@ -34,10 +36,15 @@ public interface QueryConstraintBuilder<Q> {
      *   <li>{@link Scope.Resource} → restrict to that specific resource</li>
      * </ul>
      *
-     * @param binding     the live binding that grants the requested permission (never REVOKED)
-     * @param permission  the permission being queried (the binding's role grants it)
+     * @param current      accumulated constraint, or {@code null} on the first call
+     * @param binding      the live binding that grants the requested permission (never REVOKED)
+     * @param permission   the permission being queried (the binding's role grants it)
      * @param resourceType the resource type of the query (matches all relevant bindings)
      * @return the accumulated constraint so far, or a new constraint for the first call
      */
-    Q accumulate(Q current, SubjectBinding binding, PermissionCode permission, ResourceType resourceType);
+    Q accumulate(
+            @Nullable Q current,
+            SubjectBinding binding,
+            PermissionCode permission,
+            ResourceType resourceType);
 }

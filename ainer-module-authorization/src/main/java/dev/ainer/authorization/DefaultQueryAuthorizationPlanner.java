@@ -11,12 +11,15 @@ import dev.ainer.authorization.domain.PermissionCode;
 import dev.ainer.authorization.domain.QueryAuthorizationRequest;
 import dev.ainer.authorization.domain.ResourceType;
 import dev.ainer.authorization.domain.Requester;
+import dev.ainer.authorization.domain.Scope;
 import dev.ainer.authorization.domain.SubjectBinding;
+import dev.ainer.authorization.domain.SubjectType;
 import dev.ainer.authorization.policy.BindingResolver;
 import dev.ainer.authorization.policy.DomainAuthorizationPolicy;
 import dev.ainer.authorization.policy.ScopePermissionCeiling;
 import dev.ainer.authorization.policy.QueryAuthorizationPlanner;
 import dev.ainer.authorization.policy.QueryConstraintBuilder;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
@@ -85,7 +88,7 @@ public final class DefaultQueryAuthorizationPlanner<I, Q> implements QueryAuthor
         }
 
         // System-only permissions require SERVICE.
-        if (perm.systemOnly() && subject.subjectRef().type() != dev.ainer.authorization.domain.SubjectType.SERVICE) {
+        if (perm.systemOnly() && subject.subjectRef().type() != SubjectType.SERVICE) {
             return new AuthorizedQueryPlan.Denied<>(
                     AuthorizationReasonCodes.SYSTEM_ONLY.value(), policyVersion);
         }
@@ -112,16 +115,16 @@ public final class DefaultQueryAuthorizationPlanner<I, Q> implements QueryAuthor
 
         // Collect live bindings that grant this permission and accumulate the constraint.
         Set<SubjectBinding> liveBindings = bindingResolver.liveBindings(subject.subjectRef());
-        Q constraint = null;
+        @Nullable Q constraint = null;
         int contributingBindings = 0;
         for (SubjectBinding binding : liveBindings) {
-            if (!binding.role().grants(permission)) {
+            if (!canContribute(binding, subject, request)) {
                 continue;
             }
-            if (binding.status() != BindingStatus.ACTIVE) {
-                continue;
-            }
-            constraint = constraintBuilder.accumulate(constraint, binding, permission, request.resourceType());
+            constraint = Objects.requireNonNull(
+                    constraintBuilder.accumulate(
+                            constraint, binding, permission, request.resourceType()),
+                    "query constraint builder returned null");
             contributingBindings++;
         }
 
@@ -131,5 +134,30 @@ public final class DefaultQueryAuthorizationPlanner<I, Q> implements QueryAuthor
         }
 
         return new AuthorizedQueryPlan.Allowed<>(constraint, List.of(), policyVersion);
+    }
+
+    private boolean canContribute(
+            SubjectBinding binding,
+            Requester.Authenticated requester,
+            QueryAuthorizationRequest<I> request) {
+        if (!binding.subject().equals(requester.subjectRef())
+                || binding.status() != BindingStatus.ACTIVE
+                || !binding.role().grants(request.permission())) {
+            return false;
+        }
+
+        if (request.context().evaluatedAt().isBefore(binding.validFrom())
+                || (binding.validUntil() != null
+                && !request.context().evaluatedAt().isBefore(binding.validUntil()))) {
+            return false;
+        }
+
+        if (binding.scope() instanceof Scope.Global
+                && requester.subjectRef().type() != SubjectType.SERVICE) {
+            return false;
+        }
+
+        return !(binding.scope() instanceof Scope.Resource resourceScope)
+                || resourceScope.resourceType().equals(request.resourceType());
     }
 }

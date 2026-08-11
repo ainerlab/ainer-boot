@@ -413,14 +413,15 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 | 9 | **HTTP 测试用 stub Principal 绕过真实 JWT** | ✅ 已修复（2026-08-11）— 原 `TestPrincipalResolver` 固定返回。修复：重写 `AuthorizationManagementHttpTest`，删除 stub resolver，启用 resource-server，提供真实 `NimbusJwtDecoder`（测试 RSA 公钥验签 + issuer/audience validator），用 Nimbus `SignedJWT` 签发 SERVICE_V1 JWT（带 `token_profile`/`actor_type`/`scope` claims），客户端带 Bearer header。整条链路真实：SecurityFilterChain → NimbusJwtDecoder 验签 → JwtToVerifiedJwtClaims → ReferenceTokenProfileResolver → Controller。新增 2 项负向测试（无 Bearer → 401、缺 scope → 403） |
 | 10 | **管理 API 缺防提权矩阵** | ✅ 模块级已修复（2026-08-11）— 新增版本化 `GrantAdministrationPolicy` + `GrantAdministrationGuard`；无策略 deny-all，scope 不能单独授权管理；Controller 与事务服务双层校验 assignable Permission/Scope/target，硬拒绝 system-only、GLOBAL、自 Binding 和修改自己 ACTIVE Binding 所引用 Role。真实 JWT + PG 负向矩阵覆盖。Greenfield 后生产 bootstrap/Ainer Admin 仍属门禁 9 未完成项 | §11.3/§11.5 |
 | 11 | **外部 Golden Consumer 仅编译期 smoke** | ✅ 已修复（2026-08-11）— `scripts/verify-maven-consumers.sh` 在独立临时项目中只通过 BOM 与隔离仓库已安装制品定义产品 Permission/Role/Binding/query intent/constraint，实际调用 `AuthorizationService` 与 `DefaultQueryAuthorizationPlanner`；Maven 3.9+、Maven 4 各执行 1 项 JUnit，均为 1 test / 0 failure / 0 error / 0 skipped。当前验证对象仍是本地 `0.1.0-SNAPSHOT`，不宣称不可变发布制品或完整产品场景验收 | 门禁 8 外部 Golden Consumer 验证 |
-| 12 | **缺真实参数化 SQL 查询验证** | 无任何测试验证「产品 adapter 真实将 `Q` 约束翻译为参数化 PostgreSQL 并排除未授权 row」 | §7.4/§7.5 |
+| 12 | **缺真实参数化 SQL 查询验证** | ✅ 已修复（2026-08-11）— 新增 test-scope 产品表与 `ProductListingQueryAdapter`：在真实 PostgreSQL 18.3 中把 planner 生成的 Workspace/resource `Q` 绑定为 `varchar[]`/`uuid[]` PreparedStatement，一次查询只返回授权 Workspace row；DENY 执行 0 次产品查询，注入形态 status 不扩大结果；20,003 行夹具的 `EXPLAIN (ANALYZE, BUFFERS)` 命中 `idx_consumer_listing_authorized_search`。这证明 Golden Consumer adapter 契约，不宣称已有生产产品 Repository 或生产容量结论 | §7.4/§7.5 |
 | 13 | **缺「撤销后原 Token 无法继续业务写」端到端** | 撤销语义仅在 resolver 层验证，无真实 JWT + 真实业务写路径 | 门禁 10 |
 
 **§13.4 创建门禁状态**：门禁 8（外部 Golden Consumer 验证）**仍未关闭**。外部 Maven 制品消费与
 真实 `AuthorizationService`/查询规划器调用这一工程维度已补齐，但仍缺不可变已发布制品、ADR 要求的
-完整产品关系/双向独立负例，以及真实参数化 SQL/row/字段投影验证；门禁 9（Ainer Admin 管理 +
-Effective Access）**未关闭**（模块防提权矩阵已补，但 Admin UI 与 post-Greenfield 生产 bootstrap 未集成）；
-门禁 10（撤销后受保护写失效）**未关闭**（仅 resolver 层验证，缺端到端）。
+完整产品关系/双向独立负例，以及真实 HTTP public row/字段投影验证。test-scope 产品 adapter 的参数化
+PostgreSQL 行过滤维度已补齐；门禁 9（Ainer Admin 管理 + Effective Access）**未关闭**（模块防提权
+矩阵已补，但 Admin UI 与 post-Greenfield 生产 bootstrap 未集成）；门禁 10（撤销后受保护写失效）
+**未关闭**（仅 resolver 层验证，缺端到端）。
 
 **ADR-0030 文本与 Greenfield 地基冲突**：ADR-0030 仍以 tenant 模型为主
 （`credentialTenantId`、`TENANT(tenantId)` scope、I0 切片的「allowlisted consumer client 无 tenant
@@ -434,7 +435,30 @@ USER Token」），而 ADR-0033 Greenfield 已完全移除 tenant。实现已迁
 4. ~~管理 API 模块级防提权矩阵~~（已完成）；post-Greenfield 生产 bootstrap/Ainer Admin 仍待取代 ADR；
 5. ~~外部 Golden Consumer 真正消费 AuthorizationService/查询规划器~~（本地 SNAPSHOT 制品工程门禁已完成）；
    不可变发布制品与完整产品关系/投影场景仍属于门禁 8；
-6. 新增取代 ADR-0030 的 post-Greenfield 授权基线 ADR。
+6. ~~产品 adapter 将类型化 `Q` 下推为参数化 PostgreSQL 并验证 row/查询次数~~（test-scope Golden
+   Consumer 已完成）；真实产品 Repository 与 HTTP 字段投影仍属于门禁 8；
+7. 新增取代 ADR-0030 的 post-Greenfield 授权基线 ADR。
+
+2026-08-11 Golden Consumer 参数化 PostgreSQL 查询闭环（缺陷 12）
+- 新增 `GoldenConsumerPostgresQueryIntegrationTest`。产品定义的 listing 表、query intent、类型化
+  `ListingReadConstraint`、字段投影与 JDBC adapter 全部位于测试消费者边界；Ainer 生产代码仍不包含
+  产品表名、列名或 SQL。
+- adapter 使用固定 SQL + PostgreSQL `varchar[]`/`uuid[]` PreparedStatement 参数，将 Workspace/resource
+  授权约束和已校验状态意图同时下推；只选择公开投影列，不加载 `internal_cost`，不在 JVM 二次过滤。
+  Workspace A 的 PUBLISHED 查询不会返回 Workspace B row；注入形态 status 返回空集且表数据不变。
+- ALLOW 的产品数据查询严格 **1 次**，DENY 为 **0 次**，避免逐 row N+1；类型化 ID 集合上限为 100，
+  空约束与未消费 obligation 失败关闭。
+- 20,003 行合成夹具执行 `ANALYZE` 后，真实 `EXPLAIN (ANALYZE, BUFFERS)` 命中
+  `idx_consumer_listing_authorized_search`。这是确定性测试规模的查询计划证据，不外推生产容量或延迟。
+- 同步加固 `DefaultQueryAuthorizationPlanner`：resolver 即使错误返回其他主体、过期 Binding、USER
+  GLOBAL 或错 resourceType 的 RESOURCE Binding，也不能贡献 `Q`；`QueryConstraintBuilder` 首次
+  `current=null` 现已在公开 nullness 契约中显式表达，Allowed constraint/obligations 均不可为 null。
+- 定向验证：真实 PostgreSQL 适配器 7 tests + planner 10 tests，**17/0/0/0**。
+- 全量 `./mvnw clean verify`（JDK 25 + PostgreSQL 18.3 Testcontainers）通过：
+  **289 tests / 0 failure / 0 error / 0 skipped**；`check-surefire-results.sh` 与 `git diff --check` 通过。
+- 公开 query 契约变更后重新执行 `verify-maven-consumers.sh`：19 模块制品/可复现构建比较通过，
+  Maven 3.9+ 与 Maven 4 外部授权 JUnit 各 **1/0/0/0**。首次冷仓下载因 Maven Central TLS
+  `bad_record_mac` 中断，增加 transport retry 的完整重跑成功；该瞬时网络失败未发生在编译或测试阶段。
 
 2026-08-11 外部授权 Golden Consumer 制品门禁补强（缺陷 11）
 - `scripts/verify-maven-consumers.sh` 生成独立临时 Maven 项目，不复制 Ainer 源码，只从隔离本地仓库
