@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.authorization.infrastructure.AuthorizationChangeAuditMapper">
+
+    <insert id="insert">
+        INSERT INTO ainer_authorization_change_audit (
+            actor_issuer, actor_type, actor_id,
+            target_type, target_id, action,
+            before_version, after_version,
+            request_id, trace_id, occurred_at
+        ) VALUES (
+            #{row.actorIssuer}, #{row.actorType}, #{row.actorId},
+            #{row.targetType}, #{row.targetId}, #{row.action},
+            #{row.beforeVersion}, #{row.afterVersion},
+            #{row.requestId}, #{row.traceId}, #{row.occurredAt}
+        )
+    </insert>
+
+</mapper>

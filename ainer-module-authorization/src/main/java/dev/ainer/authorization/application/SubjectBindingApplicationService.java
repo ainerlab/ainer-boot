@@ -3,6 +3,8 @@ package dev.ainer.authorization.application;
 import dev.ainer.authorization.domain.Scope;
 import dev.ainer.authorization.domain.SubjectRef;
 import dev.ainer.core.error.BusinessException;
+import dev.ainer.security.token.AuthenticatedPrincipal;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,19 +18,29 @@ import java.util.UUID;
  * management (ADR-0030 S1). Bindings assign a persisted Role and a structured Scope to a subject
  * over a validity window. Revocation is a logical state transition — a still-valid JWT cannot
  * restore a revoked database grant.
+ *
+ * <p>Management mutations are audited via {@link AuthorizationChangeAuditService} in the same
+ * transaction (ADR-0030 §11.7).
  */
 @Service
 @Transactional
 public class SubjectBindingApplicationService {
 
+    static final String TARGET_TYPE_BINDING = "BINDING";
+
     private final SubjectBindingRepository bindingRepository;
     private final RoleRepository roleRepository;
+    private final AuthorizationChangeAuditService changeAuditService;
     private final Clock clock;
 
     public SubjectBindingApplicationService(
-            SubjectBindingRepository bindingRepository, RoleRepository roleRepository, Clock clock) {
+            SubjectBindingRepository bindingRepository,
+            RoleRepository roleRepository,
+            AuthorizationChangeAuditService changeAuditService,
+            Clock clock) {
         this.bindingRepository = bindingRepository;
         this.roleRepository = roleRepository;
+        this.changeAuditService = changeAuditService;
         this.clock = clock;
     }
 
@@ -37,10 +49,16 @@ public class SubjectBindingApplicationService {
      *
      * @throws BusinessException if the role does not exist.
      */
-    public UUID createBinding(SubjectRef subject, UUID roleId, Scope scope, Instant validFrom, Instant validUntil) {
+    public UUID createBinding(
+            AuthenticatedPrincipal actor, SubjectRef subject, UUID roleId, Scope scope,
+            Instant validFrom, @Nullable Instant validUntil,
+            @Nullable String requestId, @Nullable String traceId) {
         roleRepository.findById(roleId)
                 .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.ROLE_NOT_FOUND));
-        return bindingRepository.save(subject, roleId, scope, validFrom, validUntil);
+        UUID bindingId = bindingRepository.save(subject, roleId, scope, validFrom, validUntil);
+        changeAuditService.record(actor, TARGET_TYPE_BINDING, bindingId, "CREATE",
+                null, 0L, requestId, traceId);
+        return bindingId;
     }
 
     /**
@@ -48,9 +66,13 @@ public class SubjectBindingApplicationService {
      *
      * @throws BusinessException if the binding is not found or already revoked.
      */
-    public void revokeBinding(UUID bindingId, String reason) {
+    public void revokeBinding(
+            AuthenticatedPrincipal actor, UUID bindingId, @Nullable String reason,
+            @Nullable String requestId, @Nullable String traceId) {
         bindingRepository.revoke(bindingId, Instant.now(clock), reason)
                 .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.BINDING_NOT_FOUND));
+        changeAuditService.record(actor, TARGET_TYPE_BINDING, bindingId, "REVOKE",
+                null, null, requestId, traceId);
     }
 
     /**

@@ -12,6 +12,10 @@ import dev.ainer.authorization.domain.SubjectRef;
 import dev.ainer.authorization.domain.SubjectType;
 import dev.ainer.authorization.infrastructure.PostgresBindingResolver;
 import dev.ainer.authorization.policy.BindingResolver;
+import dev.ainer.security.principal.IdentityAuthorityRef;
+import dev.ainer.security.principal.ServiceSubjectRef;
+import dev.ainer.security.token.AuthenticatedPrincipal;
+import dev.ainer.security.token.TokenProfile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -69,6 +73,8 @@ class AuthorizationPersistenceIntegrationTest {
     @Autowired
     BindingResolver bindingResolver;
     @Autowired
+    dev.ainer.authorization.application.AuthorizationDecisionAuditService decisionAuditService;
+    @Autowired
     JdbcTemplate jdbcTemplate;
 
     private static final PermissionCode READ = new PermissionCode("test.resource.read");
@@ -78,8 +84,20 @@ class AuthorizationPersistenceIntegrationTest {
     private static final SubjectRef SERVICE_X =
             new SubjectRef("ainer-test", "svc-x", SubjectType.SERVICE);
 
+    /** Test actor for change-audit — a SERVICE principal authorizing management operations. */
+    private static final AuthenticatedPrincipal TEST_ACTOR = new AuthenticatedPrincipal(
+            new ServiceSubjectRef(new IdentityAuthorityRef("https://auth.ainer.test"), "svc-management"),
+            new IdentityAuthorityRef("https://auth.ainer.test"),
+            TokenProfile.SERVICE_V1,
+            "1",
+            Set.of("ainer-api"),
+            Set.of("authorization.manage"),
+            "client_credentials",
+            "test-client");
+
     @BeforeEach
     void cleanTables() {
+        jdbcTemplate.execute("DELETE FROM ainer_authorization_change_audit");
         jdbcTemplate.execute("DELETE FROM ainer_authorization_subject_binding");
         jdbcTemplate.execute("DELETE FROM ainer_authorization_role_permission");
         jdbcTemplate.execute("DELETE FROM ainer_authorization_role");
@@ -118,7 +136,7 @@ class AuthorizationPersistenceIntegrationTest {
 
     @Test
     void roleLifecycleCreateFindReplacePermissions() {
-        UUID roleId = roleService.createRole("editor", "Editor", Set.of(READ));
+        UUID roleId = roleService.createRole(TEST_ACTOR, "editor", "Editor", Set.of(READ), null, null);
 
         RoleRepository.RoleRecord loaded = roleService.getRole(roleId);
         assertThat(loaded.role().code()).isEqualTo("editor");
@@ -127,7 +145,7 @@ class AuthorizationPersistenceIntegrationTest {
         assertThat(loaded.createdAt()).isNotNull();
         assertThat(loaded.updatedAt()).isNotNull();
 
-        roleService.replacePermissions(roleId, Set.of(READ, WRITE), loaded.version());
+        roleService.replacePermissions(TEST_ACTOR, roleId, Set.of(READ, WRITE), loaded.version(), null, null);
 
         RoleRepository.RoleRecord reloaded = roleService.getRole(roleId);
         assertThat(reloaded.role().permissions()).containsExactlyInAnyOrder(READ, WRITE);
@@ -135,30 +153,40 @@ class AuthorizationPersistenceIntegrationTest {
         // createdAt 不变，updatedAt 应在 replacePermissions 后刷新
         assertThat(reloaded.createdAt()).isEqualTo(loaded.createdAt());
         assertThat(reloaded.updatedAt()).isAfterOrEqualTo(loaded.updatedAt());
+
+        // change audit：CREATE + REPLACE_PERMISSIONS 两条记录，与变更同事务写入
+        Integer auditCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_authorization_change_audit WHERE target_id = ?",
+                Integer.class, roleId);
+        assertThat(auditCount).isEqualTo(2);
+        String createAction = jdbcTemplate.queryForObject(
+                "SELECT action FROM ainer_authorization_change_audit WHERE target_id = ? AND action = 'CREATE'",
+                String.class, roleId);
+        assertThat(createAction).isEqualTo("CREATE");
     }
 
     @Test
     void duplicateRoleCodeFailsClosed() {
-        roleService.createRole("admin", "Admin", Set.of(READ));
-        assertThatThrownBy(() -> roleService.createRole("admin", "Other", Set.of(WRITE)))
+        roleService.createRole(TEST_ACTOR, "admin", "Admin", Set.of(READ), null, null);
+        assertThatThrownBy(() -> roleService.createRole(TEST_ACTOR, "admin", "Other", Set.of(WRITE), null, null))
                 .isInstanceOf(dev.ainer.core.error.BusinessException.class);
     }
 
     @Test
     void unregisteredPermissionCannotBeAssignedToRole() {
         PermissionCode unknown = new PermissionCode("test.resource.delete");
-        assertThatThrownBy(() -> roleService.createRole("killer", "Killer", Set.of(unknown)))
+        assertThatThrownBy(() -> roleService.createRole(TEST_ACTOR, "killer", "Killer", Set.of(unknown), null, null))
                 .isInstanceOf(dev.ainer.core.error.BusinessException.class);
     }
 
     @Test
     void bindingCreateRevokeAndResolverReflectsImmediately() {
-        UUID roleId = roleService.createRole("editor", "Editor", Set.of(READ, WRITE));
+        UUID roleId = roleService.createRole(TEST_ACTOR, "editor", "Editor", Set.of(READ, WRITE), null, null);
         UUID workspaceId = UUID.randomUUID();
         Scope scope = new Scope.Workspace(workspaceId);
 
         UUID bindingId = bindingService.createBinding(
-                USER_A, roleId, scope, Instant.now().minusSeconds(60), null);
+                TEST_ACTOR, USER_A, roleId, scope, Instant.now().minusSeconds(60), null, null, null);
 
         // Live binding is resolvable immediately.
         assertThat(bindingResolver.liveBindings(USER_A))
@@ -166,7 +194,7 @@ class AuthorizationPersistenceIntegrationTest {
                 .hasSize(1);
 
         // Revoke — still-valid JWT cannot restore the grant.
-        bindingService.revokeBinding(bindingId, "policy changed");
+        bindingService.revokeBinding(TEST_ACTOR, bindingId, "policy changed", null, null);
 
         assertThat(bindingResolver.liveBindings(USER_A))
                 .as("revoked binding must not appear in live bindings")
@@ -175,12 +203,12 @@ class AuthorizationPersistenceIntegrationTest {
 
     @Test
     void expiredBindingExcludedFromLiveBindings() {
-        UUID roleId = roleService.createRole("editor", "Editor", Set.of(READ));
+        UUID roleId = roleService.createRole(TEST_ACTOR, "editor", "Editor", Set.of(READ), null, null);
         UUID workspaceId = UUID.randomUUID();
 
         bindingService.createBinding(
-                USER_A, roleId, new Scope.Workspace(workspaceId),
-                Instant.now().minusSeconds(120), Instant.now().minusSeconds(60));
+                TEST_ACTOR, USER_A, roleId, new Scope.Workspace(workspaceId),
+                Instant.now().minusSeconds(120), Instant.now().minusSeconds(60), null, null);
 
         assertThat(bindingResolver.liveBindings(USER_A))
                 .as("expired binding must not appear in live bindings")
@@ -189,7 +217,7 @@ class AuthorizationPersistenceIntegrationTest {
 
     @Test
     void scopeCheckConstraintRejectsInvalidWorkspaceCombination() {
-        UUID roleId = roleService.createRole("editor", "Editor", Set.of(READ));
+        UUID roleId = roleService.createRole(TEST_ACTOR, "editor", "Editor", Set.of(READ), null, null);
         UUID workspaceId = UUID.randomUUID();
 
         // WORKSPACE scope with resource columns populated should violate the CHECK constraint.
@@ -206,7 +234,7 @@ class AuthorizationPersistenceIntegrationTest {
 
     @Test
     void scopeCheckConstraintRejectsGlobalWithWorkspace() {
-        UUID roleId = roleService.createRole("editor", "Editor", Set.of(READ));
+        UUID roleId = roleService.createRole(TEST_ACTOR, "editor", "Editor", Set.of(READ), null, null);
 
         // GLOBAL scope with workspace_id populated should violate the CHECK constraint.
         assertThatThrownBy(() -> jdbcTemplate.update("""
@@ -222,12 +250,12 @@ class AuthorizationPersistenceIntegrationTest {
 
     @Test
     void postgresBindingResolverProducesDomainSubjectBinding() {
-        UUID roleId = roleService.createRole("editor", "Editor", Set.of(READ, WRITE));
+        UUID roleId = roleService.createRole(TEST_ACTOR, "editor", "Editor", Set.of(READ, WRITE), null, null);
         UUID workspaceId = UUID.randomUUID();
 
         bindingService.createBinding(
-                USER_A, roleId, new Scope.Workspace(workspaceId),
-                Instant.now().minusSeconds(60), null);
+                TEST_ACTOR, USER_A, roleId, new Scope.Workspace(workspaceId),
+                Instant.now().minusSeconds(60), null, null, null);
 
         var live = bindingResolver.liveBindings(USER_A);
         assertThat(live).hasSize(1);
@@ -237,6 +265,43 @@ class AuthorizationPersistenceIntegrationTest {
         assertThat(binding.role().grants(READ)).isTrue();
         assertThat(binding.role().grants(WRITE)).isTrue();
         assertThat(binding.scope()).isInstanceOf(Scope.Workspace.class);
+    }
+
+    @Test
+    void decisionAuditRecordsAuthenticatedDecision() {
+        UUID workspaceId = UUID.randomUUID();
+        dev.ainer.authorization.domain.ResourceRef resource = new dev.ainer.authorization.domain.ResourceRef(
+                workspaceId, new ResourceType("test.resource"), UUID.randomUUID());
+        dev.ainer.authorization.domain.AuthorizationContext ctx =
+                new dev.ainer.authorization.domain.AuthorizationContext(
+                        Instant.now(), dev.ainer.authorization.domain.AuthorizationContext.Assurance.RECENT_STRONG,
+                        null, null, null);
+        dev.ainer.authorization.domain.Requester.Authenticated requester =
+                new dev.ainer.authorization.domain.Requester.Authenticated(
+                        USER_A, java.util.Set.of("test-scope"), java.util.Set.of("ainer-test"), "test-client");
+        dev.ainer.authorization.domain.AuthorizationRequest request =
+                new dev.ainer.authorization.domain.AuthorizationRequest(
+                        requester, dev.ainer.authorization.domain.AccessMode.AUTHENTICATED,
+                        READ, resource, ctx);
+        dev.ainer.authorization.domain.AuthorizationDecision decision =
+                dev.ainer.authorization.domain.AuthorizationDecision.deny(
+                        dev.ainer.authorization.AuthorizationReasonCodes.UNKNOWN_PERMISSION,
+                        "test-policy", Instant.now());
+
+        decisionAuditService.recordIfApplicable(request, decision, "req-1", "trace-1");
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_authorization_decision_audit WHERE decision_id = ?",
+                Integer.class, decision.decisionId());
+        assertThat(count).isEqualTo(1);
+        String outcome = jdbcTemplate.queryForObject(
+                "SELECT outcome FROM ainer_authorization_decision_audit WHERE decision_id = ?",
+                String.class, decision.decisionId());
+        assertThat(outcome).isEqualTo("DENY");
+        String reason = jdbcTemplate.queryForObject(
+                "SELECT reason_code FROM ainer_authorization_decision_audit WHERE decision_id = ?",
+                String.class, decision.decisionId());
+        assertThat(reason).isEqualTo(decision.reasonCode().value());
     }
 
     @TestConfiguration

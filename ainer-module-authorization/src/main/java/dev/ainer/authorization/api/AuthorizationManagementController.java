@@ -91,9 +91,10 @@ public class AuthorizationManagementController {
     public ResponseEntity<ApiResponse<RoleResponse>> createRole(
             @RequestBody CreateRoleRequest body,
             HttpServletRequest request) {
-        requireManagement(principalResolver);
+        AuthenticatedPrincipal principal = requireManagement(principalResolver);
         Set<PermissionCode> codes = parsePermissionCodes(body.permissions());
-        UUID roleId = roleService.createRole(body.code(), body.name(), codes);
+        String requestId = RequestIds.currentOrCreate(request);
+        UUID roleId = roleService.createRole(principal, body.code(), body.name(), codes, requestId, null);
         RoleRepository.RoleRecord record = roleService.getRole(roleId);
         RoleResponse response = RoleResponse.from(record, codes.stream().map(PermissionCode::value)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new)));
@@ -121,7 +122,8 @@ public class AuthorizationManagementController {
         AuthenticatedPrincipal principal = requireManagement(principalResolver);
         RoleRepository.RoleRecord existing = roleService.getRole(roleId);
         Set<PermissionCode> codes = parsePermissionCodes(body.permissions());
-        roleService.replacePermissions(roleId, codes, existing.version());
+        String requestId = RequestIds.currentOrCreate(request);
+        roleService.replacePermissions(principal, roleId, codes, existing.version(), requestId, null);
         RoleRepository.RoleRecord reloaded = roleService.getRole(roleId);
         Set<String> codeStrings = reloaded.role().permissions().stream()
                 .map(PermissionCode::value)
@@ -135,12 +137,13 @@ public class AuthorizationManagementController {
     public ResponseEntity<ApiResponse<BindingResponse>> createBinding(
             @RequestBody CreateBindingRequest body,
             HttpServletRequest request) {
-        requireManagement(principalResolver);
+        AuthenticatedPrincipal principal = requireManagement(principalResolver);
         SubjectRef subject = new SubjectRef(body.issuer(), body.subjectId(),
                 SubjectType.valueOf(body.subjectType()));
         Scope scope = buildScope(body);
+        String requestId = RequestIds.currentOrCreate(request);
         UUID bindingId = bindingService.createBinding(
-                subject, body.roleId(), scope, Instant.now(), body.validUntil());
+                principal, subject, body.roleId(), scope, Instant.now(), body.validUntil(), requestId, null);
         SubjectBindingRepository.PersistedBinding pb = bindingRepository.findById(bindingId)
                 .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.BINDING_NOT_FOUND));
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -162,8 +165,9 @@ public class AuthorizationManagementController {
             @PathVariable UUID bindingId,
             @RequestBody RevokeBindingRequest body,
             HttpServletRequest request) {
-        requireManagement(principalResolver);
-        bindingService.revokeBinding(bindingId, body.reason());
+        AuthenticatedPrincipal principal = requireManagement(principalResolver);
+        String requestId = RequestIds.currentOrCreate(request);
+        bindingService.revokeBinding(principal, bindingId, body.reason(), requestId, null);
         SubjectBindingRepository.PersistedBinding pb = bindingRepository.findById(bindingId)
                 .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.BINDING_NOT_FOUND));
         return ApiResponse.success(BindingResponse.from(pb), RequestIds.currentOrCreate(request));

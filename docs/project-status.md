@@ -227,6 +227,20 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 
 ## 3. 最近验证记录
 
+2026-08-11 授权审计四层写入：change/decision audit 接入（缺陷 3 修复）
+- **change_audit**：新建 `AuthorizationChangeAudit`（domain record）+ port + `AuthorizationChangeAuditService`
+  （同事务 `@Transactional`，审计失败回滚，ADR §11.7）+ mybatis impl/mapper/row/XML。接入
+  `RoleApplicationService.createRole`/`replacePermissions` 与 `SubjectBindingApplicationService.createBinding`/
+  `revokeBinding` 的写方法（actor 从 `AuthenticatedPrincipal` 提取）。Controller 传入 actor + requestId。
+- **decision_audit**：新建 `AuthorizationDecisionAudit` + port + `AuthorizationDecisionAuditService`
+  （`@Transactional(REQUIRES_NEW)`，调用方按 AuditLevel 触发，ADR §12.4）+ mybatis 四层。
+  `AuthorizationService` 保持 Spring-free 纯决策器，调用方（未来的 SecurityManager adapter 或应用服务）
+  在决策后显式调 `recordIfApplicable`。Anonymous/PUBLIC 决策不在此记录（表要求 requester NOT NULL）。
+- 真实 PostgreSQL 18.3 Testcontainers 验证：Role 生命周期测试断言 change_audit 写入 CREATE +
+  REPLACE_PERMISSIONS 两条记录；新增 decisionAudit 测试验证 DENY 决策正确写入。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：**270 tests / 0 failure / 0 error /
+  0 skipped**。零回归。缺陷 3 标记修复。P0 级阻塞缺陷 1-5 + 装配缺陷 6-8 + 审计缺陷 3 全部闭合。
+
 2026-08-11 授权模块生产装配：AuthorizationService 成为 ainer-server 可用 Bean（缺陷 6/7/8 修复）
 - **归属决策**：授权决策与管理 API 归属 `ainer-server`（业务 Resource Server），依据链：ADR-0030 §9.6
   单体装配、§2.2 授权模块不解析 JWT（主体投影唯一来源是 RS 侧 `ainer-starter-security` 的
@@ -348,7 +362,7 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 |---|---|---|---|---|
 | 1 | **RESOURCE scope 持久化违反 CHECK** | ✅ 已修复（2026-08-11） | migration `ck_..._scope_resource` 要求 `workspace_id`/`resource_type`/`resource_id` 三列全 NOT NULL；原 `applyScope()` RESOURCE 分支写死 `workspaceId=null` 且 `Scope.Resource` 不含 workspaceId。修复：`Scope.Resource` 加 workspaceId 字段，全链路同步，真实 PG 验证通过 | §10 Scope CHECK |
 | 2 | **`systemOnly` 权限可经 PUBLIC 路径绕过** | ✅ 已修复（2026-08-11） | 原 `AuthorizationService.decide()` 在检查 systemOnly 前分流到 `decidePublic()`。修复：PUBLIC 分流前加 systemOnly 检查，附负向测试 | §5.1/§3.1 |
-| 3 | **change/decision audit 只有表，零写入路径** | ❌ 未修复（后续批次） | `src/main` 对两张 audit 表零引用，无 mapper/service。`RoleApplicationService` 变更 Role 不写 change audit；`AuthorizationService` 决策不写 decision audit（违反「审计失败回滚/失败关闭」） | §11.7/§12.4 |
+| 3 | **change/decision audit 只有表，零写入路径** | ✅ 已修复（2026-08-11） | 原 `src/main` 对两张 audit 表零引用。修复：新建 `AuthorizationChangeAuditService`（同事务，审计失败回滚）接入 RoleApplicationService/SubjectBindingApplicationService 写方法；新建 `AuthorizationDecisionAuditService`（`REQUIRES_NEW`，调用方按 AuditLevel 触发）供调用方记录 authenticated 决策。四层结构（domain record + port + service + mybatis impl + mapper + XML）各建一套，复刻 workspace 审计范式。真实 PG 验证写入正确 | §11.7/§12.4 |
 | 4 | **`Role.name` 是完全死参数** | ✅ 已修复（2026-08-11） | 原 `new Role(code, permissions)` 丢弃 name；DB name 列存 code 值。修复：`Role` record 加 name 字段，全链路同步，真实 PG 验证 name 正确存取 | §4.1 |
 | 5 | **`RoleResponse` 时间戳是 API 层假数据** | ✅ 已修复（2026-08-11） | 原 `RoleResponse.from()` 用 `Instant.now()` 生成时间戳。修复：`RoleRecord` 加 createdAt/updatedAt，从 DB 读取，真实 PG 验证 replacePermissions 后 updatedAt 刷新 | §11.8 |
 
@@ -381,7 +395,7 @@ USER Token」），而 ADR-0033 Greenfield 已完全移除 tenant。实现已迁
 
 **后续批次（不在当前接手轮实现）**：
 1. ~~修复 P0 缺陷 1/2/4/5~~（已完成 2026-08-11）；~~修复装配缺陷 6/7/8~~（已完成 2026-08-11）；
-   修复缺陷 3（审计四层写入，复刻 workspace 审计范式）；
+   ~~修复缺陷 3（审计四层写入）~~（已完成 2026-08-11）；
 2. Spring Security `AuthorizationManager` adapter（ADR §8.2，`@AinerAuthorize` 端点级 opt-in）；
 3. 真实 JWT 端到端测试（仓库零脚手架，从零搭建 NimbusJwtEncoder 签发 + 公钥校验）；
 4. 管理 API 防提权矩阵（assignable catalog/防自改/OWNER bootstrap）；
