@@ -101,9 +101,11 @@ SubjectBinding、Scope、AuthorizationDecision）、PermissionRegistry（冲突�
 Golden Consumer 查询验证）已有**原型实现并含测试**，但**均未达 ADR-0030 验收**。RESOURCE scope、
 systemOnly PUBLIC 绕过、审计写入、生产装配、真实 JWT 与模块级防提权矩阵已经修复；当前管理面由
 版本化 `GrantAdministrationPolicy` 显式登记可信 SERVICE 与 assignable Permission/Scope/target，缺省
-deny-all，并在应用服务事务边界拒绝 GLOBAL、system-only 与自我授权。仍未闭环的是外部 Maven
-Golden Consumer 对真实 `AuthorizationService`/查询适配器的消费、真实参数化 SQL 行过滤、撤销后原
-Token 的受保护业务写失效，以及 Ainer Admin/生产 bootstrap。完整差距清单与后续批次见
+deny-all，并在应用服务事务边界拒绝 GLOBAL、system-only 与自我授权。隔离 Maven Golden Consumer
+已经只通过 BOM/已安装制品，在 Maven 3.9+ 与 Maven 4 下实际调用 `AuthorizationService` 和
+`DefaultQueryAuthorizationPlanner`；它仍是本地 SNAPSHOT 工程门禁，不等同于不可变正式制品或完整
+产品验收。尚未闭环的是完整外部产品场景矩阵、真实参数化 SQL 行过滤、撤销后原 Token 的受保护业务
+写失效，以及 Ainer Admin/生产 bootstrap。完整差距清单与后续批次见
 [`docs/project-status.md`](project-status.md) §3。此外 ADR-0030 决策文本仍以 pre-Greenfield 的
 tenant 模型为主，而实现已迁 Workspace 语义（ADR-0033 Greenfield 移除 tenant），完整重述需新增取代 ADR。
 Spring `AuthorizationManager` adapter（方法级 `@AinerAuthorize`）、OpenAPI/SDK 与 Ainer Admin 集成属后续。

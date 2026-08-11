@@ -187,10 +187,13 @@ AINER_REPRO_REPOSITORY="$(mktemp -d)"
 ```
 
 两次构建使用同一个隔离本地仓库，避免既有缓存成为参考。consumer 脚本必须证明 Maven 4 与
-系统 Maven 3.9+ 外部项目都能只通过 BOM 和公开坐标完成构建；同时检查 14 个标准 Consumer
+系统 Maven 3.9+ 外部项目都能只通过 BOM 和公开坐标完成构建；同时检查 19 个标准 Consumer
 POM 中的 `${revision}` 都有当前安装版本属性可解析，并检查 `ainer-spring` JAR 含
-`META-INF/spring-configuration-metadata.json`。这些门禁是发布前本地/自动化要求，不表示当前已经
-存在正式制品仓库发布流程。候选 CI 已编排上述命令，但在 Maven 4 RC6 官方持久发行包可下载并首次
+`META-INF/spring-configuration-metadata.json`。脚本中的独立授权 Golden Consumer 还必须在两套 Maven
+下真实执行 JUnit：由外部项目定义产品 Permission/policy/query constraint，调用
+`AuthorizationService` 与 `DefaultQueryAuthorizationPlanner`，并强制 Surefire 报告为 1 test、零
+failure/error/skipped。这些门禁是本地/自动化工程要求；消费本地 SNAPSHOT 不表示已经存在正式制品
+仓库发布流程，也不替代真实产品的参数化 SQL、row/字段投影与关系矩阵。候选 CI 已编排上述命令，但在 Maven 4 RC6 官方持久发行包可下载并首次
 完整成功前，不能称为生效的正式 CI。脚本默认读取根 POM 的 `revision`；发布过程通过
 `AINER_VERSION=<目标版本>` 覆盖时，该值也会作为 `-Drevision` 传给两次生产者构建和两个
 consumer。

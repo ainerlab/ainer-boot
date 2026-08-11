@@ -24,9 +24,11 @@ Ainer 使用语义化版本：`MAJOR.MINOR.PATCH`。当前工程版本为 `0.1.0
 2. `CHANGELOG.md` 的 `Unreleased` 已整理到目标版本；
 3. 所有相关 ADR 已接受，许可证台账已更新；
 4. JDK 25 下的 `./mvnw clean verify` 通过，PostgreSQL Testcontainers 没有因 Docker 缺失跳过；
-5. `scripts/verify-maven-consumers.sh` 证明 Maven 4 与 Maven 3.9+ 下游均可消费制品，14 个标准
+5. `scripts/verify-maven-consumers.sh` 证明 Maven 4 与 Maven 3.9+ 下游均可消费制品，19 个标准
    Consumer POM 中的 `${revision}` 都有当前安装版本属性可解析，`ainer-spring` JAR 包含
-   Spring 配置元数据；
+   Spring 配置元数据；隔离外部授权 Golden Consumer 在两套 Maven 下都必须真实调用
+   `AuthorizationService`/`DefaultQueryAuthorizationPlanner`，且 Surefire 为 1 test、零
+   failure/error/skipped。本地 SNAPSHOT 消费不替代不可变发布制品与真实产品验收；
 6. Maven Artifact Plugin 的 `check-buildplan` 和两次构建 `compare` 均通过；
 7. 两个可执行 JAR 构建并在目标 JDK 启动；
 8. 空库 migration、升级 migration、关键约束和事务回滚已验证；

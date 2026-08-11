@@ -412,27 +412,43 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 |---|---|---|---|
 | 9 | **HTTP 测试用 stub Principal 绕过真实 JWT** | ✅ 已修复（2026-08-11）— 原 `TestPrincipalResolver` 固定返回。修复：重写 `AuthorizationManagementHttpTest`，删除 stub resolver，启用 resource-server，提供真实 `NimbusJwtDecoder`（测试 RSA 公钥验签 + issuer/audience validator），用 Nimbus `SignedJWT` 签发 SERVICE_V1 JWT（带 `token_profile`/`actor_type`/`scope` claims），客户端带 Bearer header。整条链路真实：SecurityFilterChain → NimbusJwtDecoder 验签 → JwtToVerifiedJwtClaims → ReferenceTokenProfileResolver → Controller。新增 2 项负向测试（无 Bearer → 401、缺 scope → 403） |
 | 10 | **管理 API 缺防提权矩阵** | ✅ 模块级已修复（2026-08-11）— 新增版本化 `GrantAdministrationPolicy` + `GrantAdministrationGuard`；无策略 deny-all，scope 不能单独授权管理；Controller 与事务服务双层校验 assignable Permission/Scope/target，硬拒绝 system-only、GLOBAL、自 Binding 和修改自己 ACTIVE Binding 所引用 Role。真实 JWT + PG 负向矩阵覆盖。Greenfield 后生产 bootstrap/Ainer Admin 仍属门禁 9 未完成项 | §11.3/§11.5 |
-| 11 | **外部 Golden Consumer 仅编译期 smoke** | `scripts/verify-maven-consumers.sh` 的 `ConsumerSmoke` 只构造 `new PermissionCode("consumer.smoke").value()`，不调用 `AuthorizationService`/`QueryPlanner`；仓内 `GoldenConsumerQueryPlanTest` 是纯单元测试用内存 fixture，非外部 Maven 消费 | 门禁 8 外部 Golden Consumer 验证 |
+| 11 | **外部 Golden Consumer 仅编译期 smoke** | ✅ 已修复（2026-08-11）— `scripts/verify-maven-consumers.sh` 在独立临时项目中只通过 BOM 与隔离仓库已安装制品定义产品 Permission/Role/Binding/query intent/constraint，实际调用 `AuthorizationService` 与 `DefaultQueryAuthorizationPlanner`；Maven 3.9+、Maven 4 各执行 1 项 JUnit，均为 1 test / 0 failure / 0 error / 0 skipped。当前验证对象仍是本地 `0.1.0-SNAPSHOT`，不宣称不可变发布制品或完整产品场景验收 | 门禁 8 外部 Golden Consumer 验证 |
 | 12 | **缺真实参数化 SQL 查询验证** | 无任何测试验证「产品 adapter 真实将 `Q` 约束翻译为参数化 PostgreSQL 并排除未授权 row」 | §7.4/§7.5 |
 | 13 | **缺「撤销后原 Token 无法继续业务写」端到端** | 撤销语义仅在 resolver 层验证，无真实 JWT + 真实业务写路径 | 门禁 10 |
 
-**§13.4 创建门禁状态**：门禁 8（外部 Golden Consumer 验证）**未关闭**（仅纯单元测试，非外部 Maven
-消费真实 AuthorizationService）；门禁 9（Ainer Admin 管理 + Effective Access）**未关闭**（模块防提权
-矩阵已补，但 Admin UI 与 post-Greenfield 生产 bootstrap 未集成）；门禁 10（撤销后受保护写失效）**未关闭**（仅 resolver 层验证，
-缺端到端）。
+**§13.4 创建门禁状态**：门禁 8（外部 Golden Consumer 验证）**仍未关闭**。外部 Maven 制品消费与
+真实 `AuthorizationService`/查询规划器调用这一工程维度已补齐，但仍缺不可变已发布制品、ADR 要求的
+完整产品关系/双向独立负例，以及真实参数化 SQL/row/字段投影验证；门禁 9（Ainer Admin 管理 +
+Effective Access）**未关闭**（模块防提权矩阵已补，但 Admin UI 与 post-Greenfield 生产 bootstrap 未集成）；
+门禁 10（撤销后受保护写失效）**未关闭**（仅 resolver 层验证，缺端到端）。
 
 **ADR-0030 文本与 Greenfield 地基冲突**：ADR-0030 仍以 tenant 模型为主
 （`credentialTenantId`、`TENANT(tenantId)` scope、I0 切片的「allowlisted consumer client 无 tenant
 USER Token」），而 ADR-0033 Greenfield 已完全移除 tenant。实现已迁 Workspace。完整重述需新增取代 ADR。
 
-**后续批次（不在当前接手轮实现）**：
+**后续批次进展（当前接手轮持续推进）**：
 1. ~~修复 P0 缺陷 1/2/4/5~~（已完成 2026-08-11）；~~修复装配缺陷 6/7/8~~（已完成 2026-08-11）；
    ~~修复缺陷 3（审计四层写入）~~（已完成 2026-08-11）；
 2. Spring Security `AuthorizationManager` adapter（ADR §8.2，`@AinerAuthorize` 端点级 opt-in）；
 3. ~~真实 JWT 端到端测试~~（已完成，真实 RSA 签名 + Nimbus 公钥验签）；
 4. ~~管理 API 模块级防提权矩阵~~（已完成）；post-Greenfield 生产 bootstrap/Ainer Admin 仍待取代 ADR；
-5. 外部 Golden Consumer 真正消费 AuthorizationService；
+5. ~~外部 Golden Consumer 真正消费 AuthorizationService/查询规划器~~（本地 SNAPSHOT 制品工程门禁已完成）；
+   不可变发布制品与完整产品关系/投影场景仍属于门禁 8；
 6. 新增取代 ADR-0030 的 post-Greenfield 授权基线 ADR。
+
+2026-08-11 外部授权 Golden Consumer 制品门禁补强（缺陷 11）
+- `scripts/verify-maven-consumers.sh` 生成独立临时 Maven 项目，不复制 Ainer 源码，只从隔离本地仓库
+  消费 `ainer-dependencies` BOM 与 `ainer-module-authorization` 等公开坐标。
+- 外部测试由消费者自行定义 `consumer.offer.read`、资源、Role/Workspace Binding、领域 policy、
+  query intent 与类型化 constraint；真实调用 `AuthorizationService` 验证同 Workspace ALLOW/跨
+  Workspace DENY，并调用 `DefaultQueryAuthorizationPlanner` 验证受约束集合计划/无 Binding DENY。
+- 系统 Maven 3.9+ 与 Wrapper Maven 4.0.0-rc-6 均执行 `clean verify`；脚本强制读取 Surefire XML，
+  两轮各为 **1 test / 0 failure / 0 error / 0 skipped**。完整 19 模块制品安装、sources/javadoc、
+  consumer POM、配置元数据与可复现构建比较同轮通过。
+- 同轮随后使用 JDK 25 + PostgreSQL 18.3 Testcontainers 完成全量 `./mvnw clean verify`：
+  **278 tests / 0 failure / 0 error / 0 skipped**；`check-surefire-results.sh` 与 `git diff --check` 通过。
+- 证据边界：本轮消费的是隔离仓库中的 `0.1.0-SNAPSHOT`，证明公开 Java 契约与 Maven 3/4 工程可消费性；
+  不证明正式仓库发布、不可变 RC、真实产品关系/投影、参数化 SQL 或发布就绪。
 
 2026-08-10 Docker Compose 开发环境落地：一键启动 PostgreSQL 双库 + 完整应用栈
 - 新增 `docker-compose.yml`（仓库根）、`Dockerfile`（多阶段构建）、`docker/init-db.sh`

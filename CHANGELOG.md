@@ -16,6 +16,13 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **外部授权 Golden Consumer 制品门禁（2026-08-11）**：`verify-maven-consumers.sh` 不再只编译
+  `PermissionCode` smoke；独立临时项目只通过 BOM 与隔离仓库已安装制品，自行定义产品
+  Permission/Role/Binding/policy/query constraint，并实际调用 `AuthorizationService` 与
+  `DefaultQueryAuthorizationPlanner`。Maven 3.9+、Maven 4 各执行 1 项 JUnit，均为零
+  failure/error/skipped。该结果证明本地 `0.1.0-SNAPSHOT` 的公开契约可被外部 Maven 项目消费，
+  不代表正式制品已发布，也不替代完整产品关系、参数化 SQL 与 row/字段投影验收。
+
 - **通用授权管理防提权矩阵（2026-08-11）**：新增代码注册、版本化
   `GrantAdministrationPolicy` 与不可绕过的 `GrantAdministrationGuard`。仅有 SERVICE JWT 和
   `authorization.manage` scope 不再足够；宿主必须精确登记可信主体及 assignable

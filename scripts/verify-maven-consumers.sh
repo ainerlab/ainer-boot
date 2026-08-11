@@ -47,7 +47,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$local_repository" "$consumer_dir/src/main/java/dev/ainer/consumer"
+mkdir -p "$local_repository" \
+  "$consumer_dir/src/main/java/dev/ainer/consumer" \
+  "$consumer_dir/src/test/java/dev/ainer/consumer"
 
 cd "$boot_root"
 "$wrapper" --batch-mode --no-transfer-progress \
@@ -137,6 +139,11 @@ cat >"$consumer_dir/pom.xml" <<EOF
             <groupId>dev.ainer</groupId>
             <artifactId>ainer-module-authorization</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -148,6 +155,11 @@ cat >"$consumer_dir/pom.xml" <<EOF
                 <configuration>
                     <release>25</release>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.3</version>
             </plugin>
         </plugins>
     </build>
@@ -180,14 +192,217 @@ final class ConsumerSmoke {
 }
 EOF
 
+cat >"$consumer_dir/src/test/java/dev/ainer/consumer/AuthorizationGoldenConsumerTest.java" <<'EOF'
+package dev.ainer.consumer;
+
+import dev.ainer.authorization.AuthorizationService;
+import dev.ainer.authorization.DefaultQueryAuthorizationPlanner;
+import dev.ainer.authorization.catalog.PermissionRegistry;
+import dev.ainer.authorization.domain.AccessMode;
+import dev.ainer.authorization.domain.AuditLevel;
+import dev.ainer.authorization.domain.AuthorizationContext;
+import dev.ainer.authorization.domain.AuthorizationDecision;
+import dev.ainer.authorization.domain.AuthorizationOutcome;
+import dev.ainer.authorization.domain.AuthorizationRequest;
+import dev.ainer.authorization.domain.AuthorizedQueryPlan;
+import dev.ainer.authorization.domain.BindingStatus;
+import dev.ainer.authorization.domain.GrantPath;
+import dev.ainer.authorization.domain.Permission;
+import dev.ainer.authorization.domain.PermissionCode;
+import dev.ainer.authorization.domain.QueryAuthorizationRequest;
+import dev.ainer.authorization.domain.Requester;
+import dev.ainer.authorization.domain.ResourceRef;
+import dev.ainer.authorization.domain.ResourceType;
+import dev.ainer.authorization.domain.RiskTier;
+import dev.ainer.authorization.domain.Role;
+import dev.ainer.authorization.domain.Scope;
+import dev.ainer.authorization.domain.SubjectBinding;
+import dev.ainer.authorization.domain.SubjectRef;
+import dev.ainer.authorization.domain.SubjectType;
+import dev.ainer.authorization.policy.BindingResolver;
+import dev.ainer.authorization.policy.DomainAuthorizationPolicy;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+
+/**
+ * Artifact-only external consumer: product types and policies live here, outside the Ainer reactor.
+ */
+class AuthorizationGoldenConsumerTest {
+
+    private static final PermissionCode OFFER_READ = new PermissionCode("consumer.offer.read");
+    private static final ResourceType OFFER = new ResourceType("consumer.offer");
+    private static final String READ_SCOPE = "consumer.offers.read";
+    private static final Instant NOW = Instant.parse("2026-08-11T00:00:00Z");
+    private static final UUID WORKSPACE = UUID.fromString("019c1000-0000-7000-8000-000000000001");
+    private static final UUID OTHER_WORKSPACE = UUID.fromString("019c1000-0000-7000-8000-000000000002");
+    private static final UUID OFFER_ID = UUID.fromString("019c1000-0000-7000-8000-000000000003");
+    private static final SubjectRef OPERATOR =
+            new SubjectRef("consumer-authority", "operator-1", SubjectType.USER);
+    private static final SubjectRef OUTSIDER =
+            new SubjectRef("consumer-authority", "outsider-1", SubjectType.USER);
+
+    record OfferQueryIntent(Set<String> statuses) {
+    }
+
+    record OfferReadConstraint(Set<UUID> allowedWorkspaceIds) {
+        OfferReadConstraint {
+            allowedWorkspaceIds = Set.copyOf(allowedWorkspaceIds);
+        }
+    }
+
+    @Test
+    void consumesAuthorizationServiceAndQueryPlannerFromInstalledArtifacts() {
+        PermissionRegistry registry = new PermissionRegistry().register(() -> Set.of(
+                new Permission(
+                        OFFER_READ, "read", OFFER, RiskTier.LOW,
+                        AuditLevel.ON_DECISION, false, false)));
+        DomainAuthorizationPolicy policy = bindingRequiredPolicy();
+        BindingResolver resolver = productBindings();
+
+        AuthorizationService service = new AuthorizationService(
+                registry,
+                (scope, permission) -> READ_SCOPE.equals(scope) && OFFER_READ.equals(permission),
+                (permission, resource) -> Optional.empty(),
+                policy,
+                resolver,
+                "external-consumer-v1");
+
+        AuthorizationDecision allowed = service.authorize(singleResourceRequest(OPERATOR, WORKSPACE));
+        AuthorizationDecision crossWorkspace = service.authorize(
+                singleResourceRequest(OPERATOR, OTHER_WORKSPACE));
+        assertEquals(AuthorizationOutcome.ALLOW, allowed.outcome());
+        assertEquals(AuthorizationOutcome.DENY, crossWorkspace.outcome());
+
+        DefaultQueryAuthorizationPlanner<OfferQueryIntent, OfferReadConstraint> planner =
+                new DefaultQueryAuthorizationPlanner<>(
+                        registry,
+                        (scope, permission) -> READ_SCOPE.equals(scope) && OFFER_READ.equals(permission),
+                        resolver,
+                        policy,
+                        (current, binding, permission, resourceType) -> {
+                            Set<UUID> workspaces = current == null
+                                    ? new HashSet<>()
+                                    : new HashSet<>(current.allowedWorkspaceIds());
+                            if (binding.scope() instanceof Scope.Workspace workspaceScope) {
+                                workspaces.add(workspaceScope.workspaceId());
+                            }
+                            return new OfferReadConstraint(workspaces);
+                        },
+                        "external-consumer-v1");
+
+        AuthorizedQueryPlan<OfferReadConstraint> allowedPlan = planner.plan(queryRequest(OPERATOR));
+        AuthorizedQueryPlan.Allowed<?> allowedQuery =
+                assertInstanceOf(AuthorizedQueryPlan.Allowed.class, allowedPlan);
+        OfferReadConstraint constraint = assertInstanceOf(
+                OfferReadConstraint.class, allowedQuery.constraint());
+        assertEquals(Set.of(WORKSPACE), constraint.allowedWorkspaceIds());
+        assertInstanceOf(AuthorizedQueryPlan.Denied.class, planner.plan(queryRequest(OUTSIDER)));
+    }
+
+    private static AuthorizationRequest singleResourceRequest(SubjectRef subject, UUID workspaceId) {
+        return new AuthorizationRequest(
+                requester(subject),
+                AccessMode.AUTHENTICATED,
+                OFFER_READ,
+                new ResourceRef(workspaceId, OFFER, OFFER_ID),
+                context());
+    }
+
+    private static QueryAuthorizationRequest<OfferQueryIntent> queryRequest(SubjectRef subject) {
+        return new QueryAuthorizationRequest<>(
+                requester(subject),
+                AccessMode.AUTHENTICATED,
+                OFFER_READ,
+                OFFER,
+                "consumer-offer-search",
+                new OfferQueryIntent(Set.of("PUBLISHED")),
+                context());
+    }
+
+    private static Requester.Authenticated requester(SubjectRef subject) {
+        return new Requester.Authenticated(
+                subject, Set.of(READ_SCOPE), Set.of("consumer-api"), "external-consumer");
+    }
+
+    private static AuthorizationContext context() {
+        return new AuthorizationContext(
+                NOW, AuthorizationContext.Assurance.RECENT_STRONG,
+                "external-consumer", "consumer-request", "consumer-trace");
+    }
+
+    private static BindingResolver productBindings() {
+        SubjectBinding binding = new SubjectBinding(
+                OPERATOR,
+                new Role("offer-reader", "Offer Reader", Set.of(OFFER_READ)),
+                new Scope.Workspace(WORKSPACE),
+                BindingStatus.ACTIVE,
+                NOW.minusSeconds(60),
+                null,
+                1L);
+        return subject -> OPERATOR.equals(subject) ? Set.of(binding) : Set.of();
+    }
+
+    private static DomainAuthorizationPolicy bindingRequiredPolicy() {
+        return new DomainAuthorizationPolicy() {
+            @Override
+            public GrantPath pathFor(PermissionCode permission) {
+                return OFFER_READ.equals(permission) ? GrantPath.BINDING_REQUIRED : null;
+            }
+
+            @Override
+            public boolean relationGrants(
+                    Requester.Authenticated subject,
+                    PermissionCode permission,
+                    ResourceRef resource,
+                    AuthorizationContext context) {
+                return false;
+            }
+
+            @Override
+            public boolean resourceStateSatisfies(
+                    Requester.Authenticated subject,
+                    PermissionCode permission,
+                    ResourceRef resource,
+                    AuthorizationContext context) {
+                return true;
+            }
+        };
+    }
+}
+EOF
+
+verify_authorization_consumer_test() {
+  local maven_label="$1"
+  local report="$consumer_dir/target/surefire-reports/TEST-dev.ainer.consumer.AuthorizationGoldenConsumerTest.xml"
+  [[ -f "$report" ]] || fail "$maven_label authorization Golden Consumer report is missing"
+  grep -Eq '<testsuite[^>]*tests="1"' "$report" \
+    || fail "$maven_label authorization Golden Consumer did not execute exactly one test"
+  grep -Eq '<testsuite[^>]*failures="0"' "$report" \
+    || fail "$maven_label authorization Golden Consumer reported a failure"
+  grep -Eq '<testsuite[^>]*errors="0"' "$report" \
+    || fail "$maven_label authorization Golden Consumer reported an error"
+  grep -Eq '<testsuite[^>]*skipped="0"' "$report" \
+    || fail "$maven_label authorization Golden Consumer was skipped"
+}
+
 "$maven3_command" --batch-mode --no-transfer-progress \
   --file "$consumer_dir/pom.xml" \
   -Dmaven.repo.local="$local_repository" \
-  clean package
+  clean verify
+verify_authorization_consumer_test "Maven 3.9+"
 
 "$wrapper" --batch-mode --no-transfer-progress \
   --file "$consumer_dir/pom.xml" \
   -Dmaven.repo.local="$local_repository" \
-  clean package
+  clean verify
+verify_authorization_consumer_test "Maven 4"
 
 echo "[ainer-maven-consumer] Maven 3.9+ and Maven 4 consumer checks passed"
