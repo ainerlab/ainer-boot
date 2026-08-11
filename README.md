@@ -25,7 +25,7 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 | `ainer-module-identity` | ✅ | 用户/租户、成员管理、平台预配/激活/取消与安全分页、安全 Directory、禁用/撤销、revocation epoch 与可靠 outbox |
 | `ainer-module-workspace` | ✅ | 可信租户资源、成员治理、幂等撤销、OWNER 恢复、授权审计热/归档与 SIEM 契约 |
 | `ainer-module-ai-runtime` | ✅ | OpenAI-compatible 网关、SSE、策略、预算与用量/费用审计 |
-| `ainer-module-authorization` | ✅ S0 | 通用混合细粒度授权契约与纯决策器（Permission/Role/Binding/Scope/Decision + PolicyRegistry + Golden Consumer） |
+| `ainer-module-authorization` | 🔶 原型 S1–S3（ADR-0030 验收未达成） | 通用混合细粒度授权契约、纯决策器（S0）、6 张表 PostgreSQL 持久化、管理 REST API 与集合查询授权的**原型**已提交；但 ADR-0030 仍为 Proposed（决策文本与 Greenfield 无 tenant 地基冲突），且存在 RESOURCE scope CHECK 冲突、审计零写入、决策器无生产装配、无真实 JWT 端到端验证等未闭合缺陷，详见 [`docs/project-status.md`](docs/project-status.md) §3 |
 | `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、可选 Directory client、撤销 consumer/SLO、OWNER 恢复与审计运营端点 |
 | `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、Identity 成员/平台预配/用户激活 API、Ainer Admin 开发 client/fixture、成员 API active gate、自助撤销、OpenAPI/SDK、受限 introspection/RFC 7009 与受审计 JDBC 协议仓库 |
 

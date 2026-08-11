@@ -1,6 +1,6 @@
 # Ainer 架构总览
 
-> 权威状态：M4.8A + Ainer Admin integration；通用授权与组织/员工目录方案 Proposed · 2026-08-02
+> 权威状态：M4.8A + Ainer Admin integration；通用授权 Proposed（S0 决策器落地，S1–S3 原型未达 ADR-0030 验收）· 核对 2026-08-11
 
 ## 1. 系统定位
 
@@ -82,7 +82,7 @@ ainer-boot/
 │   ├── ainer-starter-observability/
 │   └── ainer-starter-test/
 ├── ainer-module-identity/                # HumanAccount/ServicePrincipal/Credential foundation（去租户化）
-├── ainer-module-authorization/           # S0 已落地：Permission/Role/Binding/Decision 契约与纯决策器；S1-S3 待实施
+├── ainer-module-authorization/           # S0 决策器落地；S1-S3 有原型（6 表持久化/管理 API/查询计划）但未达 ADR-0030 验收，ADR 仍 Proposed
 ├── ainer-module-organization/            # Proposed：可选组织、员工任职、岗位与团队目录
 ├── ainer-module-workspace/               # 去租户化的资源授权参考切片（仅 workspace_id/成员关系）
 ├── ainer-module-ai-runtime/              # 模型网关、调用与费用审计
@@ -93,13 +93,19 @@ ainer-boot/
 
 这些是演进方向，不代表应一次性创建所有空模块。模块只在拥有明确职责、测试和消费者时落地。
 
-`ainer-module-authorization` 已落地 S0（ADR-0030）：不可变领域类型（Permission、Role、SubjectBinding、
-Scope、AuthorizationDecision）、PermissionRegistry（冲突检测）、AuthorizationService（grant-path
-真值表纯决策器，含 resourceType/systemOnly/GLOBAL/scope 安全检查与 HIGH-risk Challenge 收口），
-全部 Spring-free、@NullMarked，16 项测试通过。S1（PostgreSQL 持久化 + DB Binding resolver）、
-S2（Spring AuthorizationManager adapter + 管理 API）、S3（关系/查询/Golden Consumer）及 Agent
-（ADR-0031）与组织（ADR-0032）尚未实现。详见
-[`Ainer 通用授权与 AI 代行详细方案`](design/authorization-architecture-plan.md)、
+`ainer-module-authorization` 已落地 S0（ADR-0030，目前 Proposed）：不可变领域类型（Permission、Role、
+SubjectBinding、Scope、AuthorizationDecision）、PermissionRegistry（冲突检测）、AuthorizationService
+（grant-path 真值表纯决策器，含 resourceType/systemOnly/GLOBAL/scope 安全检查与 HIGH-risk Challenge
+收口），全部 Spring-free、@NullMarked。S1（PostgreSQL 6 表持久化 + DB Binding resolver）、S2
+（`/api/authorization/**` 管理 REST API + Effective Access）、S3（`DefaultQueryAuthorizationPlanner` +
+Golden Consumer 查询验证）已有**原型实现并含测试**，但**均未达 ADR-0030 验收**：存在 RESOURCE scope
+CHECK 冲突、systemOnly 可经 PUBLIC 路径绕过、change/decision audit 零写入、决策器与 Planner 无生产
+装配、三个可执行应用均未依赖授权模块、管理 API 缺 assignable catalog/防自提权/OWNER 边界矩阵、HTTP
+测试用 stub Principal 绕过真实 JWT、外部 Maven consumer 仅构造 `PermissionCode`。完整差距清单与后续
+批次见 [`docs/project-status.md`](project-status.md) §3。此外 ADR-0030 决策文本仍以 pre-Greenfield 的
+tenant 模型为主，而实现已迁 Workspace 语义（ADR-0033 Greenfield 移除 tenant），完整重述需新增取代 ADR。
+Spring `AuthorizationManager` adapter（方法级 `@AinerAuthorize`）、OpenAPI/SDK 与 Ainer Admin 集成属后续。
+详见 [`Ainer 通用授权与 AI 代行详细方案`](design/authorization-architecture-plan.md)、
 [ADR-0030](decisions/0030-hybrid-fine-grained-authorization-baseline.md) 与
 [ADR-0031](decisions/0031-agent-delegation-and-ai-context-authorization.md)。该模块不会接管
 Identity TenantRole、WorkspaceRole 或产品领域关系。

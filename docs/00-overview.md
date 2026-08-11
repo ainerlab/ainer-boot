@@ -152,7 +152,8 @@ Foundation Roadmap 仍是 Proposed；其 mdpress-first 是有条件的路线建�
    [`architecture/identity-foundation-v1-implementation-plan.md`](architecture/identity-foundation-v1-implementation-plan.md)；
    原子清零（C1–C4 合并）的完整施工序列、隐藏缺口与依赖图见
    [`architecture/0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)，
-   S1–S8 已全部完成并验证
+   S1–S8 已全部完成并验证（注意：此处的 S1–S8 指 Greenfield ADR-0033 的账号/主体隔离脊柱施工切片，
+   与 ADR-0030 通用授权的内部切片 S0–S3 是**两套不同的 S 编号**，后者仅有原型且未达验收）
 4. [`decisions/README.md`](decisions/README.md) 中相关安全 ADR
 5. 集成官方参考管理应用时阅读
    [`ainer-admin-integration.md`](ainer-admin-integration.md) 与
@@ -317,6 +318,7 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 | 表、字段、类型、约束、索引 | `database-design-standard.md` + `database.md` |
 | 测试命令、门禁、跳过行为 | `testing.md` |
 | 启停、诊断、备份、恢复 | `operations.md` |
+| 开发环境容器化、本地启动 | `docker-compose.yml` + `.env.example`（见 [`development.md`](development.md) §3） |
 | 版本、制品、发布或回滚 | `releasing.md` + `CHANGELOG.md` |
 | 新依赖、版本或许可证 | `dependencies.md` |
 | 文档新增、改名、取代 | 本文与所有入链 |

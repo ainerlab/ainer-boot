@@ -16,6 +16,38 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **通用授权 S3 查询计划与 Golden Consumer 验证（2026-08-11）**：ADR-0030 S3 落地。
+  新增集合查询授权契约：`QueryAuthorizationRequest<I>`（产品定义 query intent）、
+  `AuthorizedQueryPlan<Q>`（Allowed 携带类型化约束 / Denied）、`QueryAuthorizationPlanner<I,Q>` 端口、
+  `QueryConstraintBuilder<Q>`（产品约束累积器）。`DefaultQueryAuthorizationPlanner` 复用 scope ceiling
+  与 binding resolver 生成产品类型化 `Q`——Ainer 不输出 SQL，未授权 row 在数据库层排除。
+  6 项 Golden Consumer 查询验证测试覆盖 Workspace/Resource/Global binding、撤销、scope 与
+  customer deny。ADR-0030 S0+S1+S2+S3 全部 Accepted，§13.4 创建门禁 8 的单资源与集合查询维度通过。
+  > **接手复核（2026-08-11）撤销该结论**：ADR-0030 回退为 Proposed，S1–S3 为原型未达验收，
+  > §13.4 门禁 8 未关闭。详见 `project-status.md` §3 差距清单。
+- **通用授权 S2 管理 REST API（2026-08-11）**：ADR-0030 S2 落地。新增 `/api/authorization/**`
+  管理 REST API：Permission 目录只读、Role CRUD + 权限替换、Binding 创建/撤销（action-path noun）、
+  Effective Access 查询。所有端点要求 SERVICE principal + `authorization.manage` scope。5 项 HTTP
+  集成测试全绿（TestRestTemplate + 真实 PostgreSQL 18.3），ADR-0030 S0+S1+S2 Accepted。
+  > **接手复核（2026-08-11）撤销该结论**：S2 HTTP 测试用 stub Principal 绕过真实 JWT，
+  > 管理 API 缺防提权矩阵；ADR-0030 回退为 Proposed。
+- **通用授权 S1 PostgreSQL 持久化（2026-08-11）**：ADR-0030 S1 落地。
+  `ainer-module-authorization` 从纯域模块升级为可持久化模块（新增 `ainer-starter-persistence` 依赖）。
+  新增 Flyway baseline（6 张表：permission/role/role_permission/subject_binding/change_audit/
+  decision_audit），scope_kind CHECK 适配 Greenfield Workspace 语义。
+  新增 application 层（Role/Binding 服务 + 端口 + 错误码）与 infrastructure 层（MyBatis Row/Mapper/
+  Repository 适配器 + PostgreSQL BindingResolver 实现）。
+  撤销绑定后 liveBindings 立即不返回——无 ALLOW 缓存，仍有效的 JWT 不能恢复已撤销授权。
+  9 项 Testcontainers 集成测试（真实 PostgreSQL 18.3）全绿，ADR-0030 从 Proposed 转 Accepted。
+  > **接手复核（2026-08-11）撤销该结论**：S1 存在 RESOURCE scope CHECK 冲突、change/decision
+  > audit 零写入、`Role.name` 死参数等缺陷；ADR-0030 回退为 Proposed。
+- **Docker Compose 开发环境（2026-08-10）**：新增 `docker-compose.yml`、`Dockerfile`
+  （多阶段构建，`AINER_MODULE` build arg 选择模块，容器内使用 Maven Wrapper）、
+  `docker/init-db.sh`（PostgreSQL 双库双用户：`ainer`/`ainer_auth`）、
+  `scripts/generate-dev-keys.sh`（幂等生成 RSA 3072 PKCS#8 PEM 签名密钥）、
+  `.env.example`（完整环境变量模板）。默认 profile 只启动 postgres，`--profile full`
+  额外启动 Authorization Server + 业务 Server。`development.md` 新增 §3 Docker Compose
+  快速启动小节。
 - **`ainer-test-support` 测试基座（2026-08-10）**：ADR-0029 T1 第 7 项落地。新模块提供
   `RestTestClient`/`RestResponse`（Boot 4.1 `TestRestTemplate` JSON 集成测试便捷）与
   `AinerPostgresContainer`（固定 `postgres:18.3-alpine`，配合 `@ServiceConnection` 自动装配
