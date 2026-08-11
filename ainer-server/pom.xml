@@ -32,6 +32,10 @@
             <artifactId>ainer-module-ai-runtime</artifactId>
         </dependency>
         <dependency>
+            <groupId>dev.ainer</groupId>
+            <artifactId>ainer-module-authorization</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>

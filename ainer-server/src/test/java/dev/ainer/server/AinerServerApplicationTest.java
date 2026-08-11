@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         properties = {
                 "ainer.workspace.enabled=false",
                 "ainer.ai.enabled=false",
+                "ainer.authorization.enabled=false",
                 "ainer.security.resource-server.enabled=false",
                 "spring.flyway.enabled=false",
                 "spring.autoconfigure.exclude="

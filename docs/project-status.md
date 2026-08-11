@@ -227,6 +227,22 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 
 ## 3. 最近验证记录
 
+2026-08-11 授权模块生产装配：AuthorizationService 成为 ainer-server 可用 Bean（缺陷 6/7/8 修复）
+- **归属决策**：授权决策与管理 API 归属 `ainer-server`（业务 Resource Server），依据链：ADR-0030 §9.6
+  单体装配、§2.2 授权模块不解析 JWT（主体投影唯一来源是 RS 侧 `ainer-starter-security` 的
+  `AuthenticatedPrincipalResolver`，仅在 `resource-server.enabled=true` 时注册）、`database.md` 将
+  V202608070340 归业务库 `ainer`。
+- **装配实现**：`AuthorizationModuleConfiguration` 新增 `authorizationService` @Bean（注入 PermissionRegistry/
+  ScopePermissionCeiling/PublicAccessPolicy/DomainAuthorizationPolicy/BindingResolver + policyVersion
+  配置属性）+ 三个 deny-all 默认 @Bean（全部 `@ConditionalOnMissingBean`，保证未配置时端到端默认拒绝）。
+  `ainer-server` pom 加 `ainer-module-authorization` 依赖，主类 @Import `AuthorizationModuleConfiguration`，
+  V202608070340 migration 随之在 ainer 库执行。`DefaultQueryAuthorizationPlanner`（泛型 `<I,Q>`）按设计
+  由产品模块实例化，不在 Ainer 装配。Spring Security `AuthorizationManager` adapter（ADR §8.2）属后续。
+- ainer-server 冒烟测试（`AinerServerApplicationTest`/`AinerServerMetricsSecurityTest`）增加
+  `ainer.authorization.enabled=false`（排除 DataSource 时跳过 @Repository 装配）。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：**269 tests / 0 failure / 0 error /
+  0 skipped**。零回归。缺陷 6/7/8 标记修复。
+
 2026-08-11 接手复核：WIP 拆清、ADR/状态文档纠正、Docker 修复、授权 P0 缺陷修复
 - **核实**：逐行核实交接点名的全部技术证据，确认交接文档判断正确（探查代理只读文档得出的
   「S0–S3 已落地」结论错误）。详见本节「ADR-0030 授权模块实现差距清单」。
@@ -338,11 +354,11 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 
 **装配级缺陷（决策器不可用）**：
 
-| # | 缺陷 | 证据 |
-|---|---|---|
-| 6 | **`AuthorizationService`/`DefaultQueryAuthorizationPlanner` 无生产装配** | main 中无 `new AuthorizationService`；`AuthorizationModuleConfiguration` 不声明这些 bean；两者均为无注解 `final class`。决策器在生产运行时根本不存在 |
-| 7 | **`PolicyRegistry`/`FactsProvider`/`DomainAuthorizationPolicy` 无生产装配** | 同上，Configuration 不声明；无默认 deny-all 实现 |
-| 8 | **三个可执行应用均不依赖授权模块** | `ainer-server`/`ainer-authorization-server`/`ainer-offstate-app` 的 pom.xml 零引用 `ainer-module-authorization`，主类无 `@Import(AuthorizationModuleConfiguration.class)`；因此 `V202608070340` migration 不会被任何应用执行 |
+| # | 缺陷 | 状态 | 证据 |
+|---|---|---|---|
+| 6 | **`AuthorizationService` 无生产装配** | ✅ 已修复（2026-08-11） | 原 Configuration 不声明 AuthorizationService bean。修复：`AuthorizationModuleConfiguration` 新增 `authorizationService` @Bean（`@ConditionalOnMissingBean`，注入 5 个依赖 + policyVersion 配置属性）。`DefaultQueryAuthorizationPlanner` 仍不装配（泛型 `<I,Q>`，按设计由产品模块实例化） |
+| 7 | **`DomainAuthorizationPolicy`/`PublicAccessPolicy`/`ScopePermissionCeiling` 无生产装配** | ✅ 已修复（2026-08-11） | 原 Configuration 不声明，无默认实现。修复：新增三个 deny-all 默认 @Bean（全部 `@ConditionalOnMissingBean`），保证未配置时端到端默认拒绝。产品模块覆盖即可提供真实策略 |
+| 8 | **三个可执行应用均不依赖授权模块** | ✅ 部分修复（2026-08-11） | 原 ainer-server/authorization-server/offstate-app 均无 pom 依赖、无 @Import。修复：ainer-server pom 加 `ainer-module-authorization` 依赖，主类 @Import `AuthorizationModuleConfiguration`；V202608070340 migration 随之在 ainer 库执行。authorization-server/offstate-app 不装配（归属依据：ADR §9.6 单体装配 + §2.2 授权模块不解析 JWT + database.md 业务库归属） |
 
 **验收级缺陷（ADR 验收项未达成）**：
 
@@ -364,8 +380,9 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 USER Token」），而 ADR-0033 Greenfield 已完全移除 tenant。实现已迁 Workspace。完整重述需新增取代 ADR。
 
 **后续批次（不在当前接手轮实现）**：
-1. ~~修复 P0 缺陷 1/2/4/5~~（已完成 2026-08-11）；修复缺陷 3（审计四层写入，复刻 workspace 审计范式）；
-2. 授权模块生产装配（决策归属 + @Import + PermissionRegistry 默认 policy/provider）；
+1. ~~修复 P0 缺陷 1/2/4/5~~（已完成 2026-08-11）；~~修复装配缺陷 6/7/8~~（已完成 2026-08-11）；
+   修复缺陷 3（审计四层写入，复刻 workspace 审计范式）；
+2. Spring Security `AuthorizationManager` adapter（ADR §8.2，`@AinerAuthorize` 端点级 opt-in）；
 3. 真实 JWT 端到端测试（仓库零脚手架，从零搭建 NimbusJwtEncoder 签发 + 公钥校验）；
 4. 管理 API 防提权矩阵（assignable catalog/防自改/OWNER bootstrap）；
 5. 外部 Golden Consumer 真正消费 AuthorizationService；
