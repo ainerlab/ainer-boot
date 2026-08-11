@@ -227,6 +227,21 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 
 ## 3. 最近验证记录
 
+2026-08-11 真实 JWT 端到端测试：替换 stub Principal（缺陷 9 修复）
+- **改造 `AuthorizationManagementHttpTest`**：删除 stub `AuthenticatedPrincipalResolver`，启用
+  `ainer.security.resource-server.enabled=true`。新增测试 `JwtDecoder` bean：测试生成 RSA 3072 密钥对，
+  `NimbusJwtDecoder.withPublicKey` 验签 + issuer/audience validator（issuer=`https://auth.ainer.test`，
+  audience=`ainer-api`）。用 Nimbus `SignedJWT` + `RSASSASigner` 签发 SERVICE_V1 JWT（带
+  `token_profile`/`claim_contract_version`/`actor_type`/`scope` claims），客户端注入 Bearer header。
+- **整条链路真实**：SecurityFilterChain → NimbusJwtDecoder 验签 → JwtToVerifiedJwtClaims →
+  ReferenceTokenProfileResolver（解析 SERVICE_V1）→ SecurityContextAuthenticatedPrincipalResolver →
+  Controller requireManagement。新增 2 项负向测试：无 Bearer → 401、SERVICE 缺 scope → 403。
+- `AuthorizationPersistenceIntegrationTest` 补充 resource-server enabled + 最小 fake JwtDecoder（该测试
+  测持久化切片不测 HTTP，真实 JWT 由 HttpTest 覆盖）。
+- pom 加 `ainer-starter-security` + `spring-security-oauth2-jose` test scope（Nimbus 传递依赖）。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：**273 tests / 0 failure / 0 error /
+  0 skipped**（较上轮 270 + 3 新增负向 JWT 测试）。零回归。缺陷 9 标记修复。
+
 2026-08-11 授权审计四层写入：change/decision audit 接入（缺陷 3 修复）
 - **change_audit**：新建 `AuthorizationChangeAudit`（domain record）+ port + `AuthorizationChangeAuditService`
   （同事务 `@Transactional`，审计失败回滚，ADR §11.7）+ mybatis impl/mapper/row/XML。接入
@@ -378,7 +393,7 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 
 | # | 缺陷 | 证据 | 对应 ADR 验收项 |
 |---|---|---|---|
-| 9 | **HTTP 测试用 stub Principal 绕过真实 JWT** | `AuthorizationManagementHttpTest.TestPrincipalResolver` 固定返回 SERVICE principal，注释自认 "real JWT chain tested elsewhere"，但全测试目录无真实 `JwtDecoder`——「elsewhere」不存在 | 真实签名 JWT issuer/audience/scope 端到端 |
+| 9 | **HTTP 测试用 stub Principal 绕过真实 JWT** | ✅ 已修复（2026-08-11）— 原 `TestPrincipalResolver` 固定返回。修复：重写 `AuthorizationManagementHttpTest`，删除 stub resolver，启用 resource-server，提供真实 `NimbusJwtDecoder`（测试 RSA 公钥验签 + issuer/audience validator），用 Nimbus `SignedJWT` 签发 SERVICE_V1 JWT（带 `token_profile`/`actor_type`/`scope` claims），客户端带 Bearer header。整条链路真实：SecurityFilterChain → NimbusJwtDecoder 验签 → JwtToVerifiedJwtClaims → ReferenceTokenProfileResolver → Controller。新增 2 项负向测试（无 Bearer → 401、缺 scope → 403） |
 | 10 | **管理 API 缺防提权矩阵** | `requireManagement` 仅查 SERVICE + `authorization.manage` scope；无 assignable catalog、无防自改、无 OWNER/bootstrap 边界 | §11.3/§11.5 |
 | 11 | **外部 Golden Consumer 仅编译期 smoke** | `scripts/verify-maven-consumers.sh` 的 `ConsumerSmoke` 只构造 `new PermissionCode("consumer.smoke").value()`，不调用 `AuthorizationService`/`QueryPlanner`；仓内 `GoldenConsumerQueryPlanTest` 是纯单元测试用内存 fixture，非外部 Maven 消费 | 门禁 8 外部 Golden Consumer 验证 |
 | 12 | **缺真实参数化 SQL 查询验证** | 无任何测试验证「产品 adapter 真实将 `Q` 约束翻译为参数化 PostgreSQL 并排除未授权 row」 | §7.4/§7.5 |

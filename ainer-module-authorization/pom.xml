@@ -72,5 +72,16 @@
             <artifactId>ainer-test-support</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- 真实签名 JWT 端到端测试：resource-server auto-config + NimbusJwtDecoder/SignedJWT -->
+        <dependency>
+            <groupId>dev.ainer</groupId>
+            <artifactId>ainer-starter-security</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
