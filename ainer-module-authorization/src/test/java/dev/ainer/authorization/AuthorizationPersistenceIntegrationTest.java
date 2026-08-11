@@ -45,6 +45,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = AuthorizationPersistenceIntegrationTest.TestApplication.class, properties = {
         "ainer.authorization.enabled=true",
+        "ainer.authorization.test-administration-policy=persistence",
         "mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml",
         "spring.main.banner-mode=off"
 })
@@ -315,6 +316,40 @@ class AuthorizationPersistenceIntegrationTest {
                     new dev.ainer.authorization.domain.Permission(
                             WRITE, "write", new ResourceType("test.resource"),
                             RiskTier.MEDIUM, AuditLevel.ON_DECISION, false, false));
+        }
+
+        @org.springframework.context.annotation.Bean
+        @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+                name = "ainer.authorization.test-administration-policy", havingValue = "persistence")
+        dev.ainer.authorization.policy.GrantAdministrationPolicy persistenceGrantAdministrationPolicy() {
+            return new dev.ainer.authorization.policy.GrantAdministrationPolicy() {
+                @Override
+                public String version() {
+                    return "persistence-test-administration-v1";
+                }
+
+                @Override
+                public boolean isTrustedManager(AuthenticatedPrincipal actor) {
+                    return TEST_ACTOR.principalSubjectRef().equals(actor.principalSubjectRef());
+                }
+
+                @Override
+                public boolean isPermissionAssignable(
+                        AuthenticatedPrincipal actor,
+                        dev.ainer.authorization.domain.Permission permission) {
+                    return permission.code().equals(READ) || permission.code().equals(WRITE);
+                }
+
+                @Override
+                public boolean isScopeAssignable(AuthenticatedPrincipal actor, Scope scope) {
+                    return !(scope instanceof Scope.Global);
+                }
+
+                @Override
+                public boolean isTargetAssignable(AuthenticatedPrincipal actor, SubjectRef target) {
+                    return true;
+                }
+            };
         }
     }
 

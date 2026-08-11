@@ -16,6 +16,15 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **通用授权管理防提权矩阵（2026-08-11）**：新增代码注册、版本化
+  `GrantAdministrationPolicy` 与不可绕过的 `GrantAdministrationGuard`。仅有 SERVICE JWT 和
+  `authorization.manage` scope 不再足够；宿主必须精确登记可信主体及 assignable
+  Permission/Scope/target，未登记时默认 deny-all。Controller 与事务应用服务双层拒绝
+  system-only/策略外 Permission、GLOBAL/策略外 Scope、越界目标、自 Binding 与修改自己的 ACTIVE
+  Binding 所引用 Role。真实签名 JWT + PostgreSQL 18.3 补齐任意持 scope SERVICE、目录外授权、
+  GLOBAL、越界 target 和自我提权负向矩阵。Greenfield 后生产 bootstrap 与 Ainer Admin 集成仍待
+  取代 ADR 定义。
+
 - **通用授权 S3 查询计划与 Golden Consumer 验证（2026-08-11）**：ADR-0030 S3 落地。
   新增集合查询授权契约：`QueryAuthorizationRequest<I>`（产品定义 query intent）、
   `AuthorizedQueryPlan<Q>`（Allowed 携带类型化约束 / Denied）、`QueryAuthorizationPlanner<I,Q>` 端口、

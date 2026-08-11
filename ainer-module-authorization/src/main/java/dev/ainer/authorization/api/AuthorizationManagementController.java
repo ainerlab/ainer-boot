@@ -1,6 +1,7 @@
 package dev.ainer.authorization.api;
 
 import dev.ainer.authorization.application.AuthorizationErrorCode;
+import dev.ainer.authorization.application.GrantAdministrationGuard;
 import dev.ainer.authorization.application.PermissionCatalogRepository;
 import dev.ainer.authorization.application.RoleApplicationService;
 import dev.ainer.authorization.application.RoleRepository;
@@ -38,10 +39,10 @@ import static dev.ainer.authorization.api.AuthorizationApiDtos.*;
 /**
  * Management REST API for the authorization module (ADR-0030 S2).
  *
- * <p>All endpoints require a service principal with {@code authorization.manage} scope. Human principals
- * are rejected — authorization management is a platform operation, not an end-user action.
- * Resource-level authorization (e.g. workspace-scoped binding management) will be layered on top of
- * these application services in S3.
+ * <p>All endpoints require a service principal with {@code authorization.manage} scope plus exact
+ * trust from the host's versioned GrantAdministrationPolicy. The guard also constrains assignable
+ * permissions, scopes and targets and rejects self modification; scope possession alone never
+ * grants administration authority.
  *
  * <p>Mutations use the action-path noun convention ({@code POST .../revocations}) rather than physical
  * DELETE — revocation is a logical state transition, not row deletion.
@@ -50,14 +51,13 @@ import static dev.ainer.authorization.api.AuthorizationApiDtos.*;
 @RequestMapping("/api/authorization")
 public class AuthorizationManagementController {
 
-    static final String MANAGE_SCOPE = "authorization.manage";
-
     private final RoleApplicationService roleService;
     private final SubjectBindingApplicationService bindingService;
     private final RoleRepository roleRepository;
     private final SubjectBindingRepository bindingRepository;
     private final PermissionCatalogRepository permissionCatalogRepository;
     private final AuthenticatedPrincipalResolver principalResolver;
+    private final GrantAdministrationGuard administrationGuard;
 
     public AuthorizationManagementController(
             RoleApplicationService roleService,
@@ -65,20 +65,22 @@ public class AuthorizationManagementController {
             RoleRepository roleRepository,
             SubjectBindingRepository bindingRepository,
             PermissionCatalogRepository permissionCatalogRepository,
-            AuthenticatedPrincipalResolver principalResolver) {
+            AuthenticatedPrincipalResolver principalResolver,
+            GrantAdministrationGuard administrationGuard) {
         this.roleService = roleService;
         this.bindingService = bindingService;
         this.roleRepository = roleRepository;
         this.bindingRepository = bindingRepository;
         this.permissionCatalogRepository = permissionCatalogRepository;
         this.principalResolver = principalResolver;
+        this.administrationGuard = administrationGuard;
     }
 
     // ---- Permission catalog (read-only) ----
 
     @GetMapping("/permissions")
     public ApiResponse<List<PermissionResponse>> permissions(HttpServletRequest request) {
-        requireManagement(principalResolver);
+        requireManagement();
         List<PermissionResponse> items = permissionCatalogRepository.findAll().stream()
                 .map(PermissionResponse::from)
                 .toList();
@@ -91,7 +93,7 @@ public class AuthorizationManagementController {
     public ResponseEntity<ApiResponse<RoleResponse>> createRole(
             @RequestBody CreateRoleRequest body,
             HttpServletRequest request) {
-        AuthenticatedPrincipal principal = requireManagement(principalResolver);
+        AuthenticatedPrincipal principal = requireManagement();
         Set<PermissionCode> codes = parsePermissionCodes(body.permissions());
         String requestId = RequestIds.currentOrCreate(request);
         UUID roleId = roleService.createRole(principal, body.code(), body.name(), codes, requestId, null);
@@ -106,7 +108,7 @@ public class AuthorizationManagementController {
     public ApiResponse<RoleResponse> getRole(
             @PathVariable UUID roleId,
             HttpServletRequest request) {
-        requireManagement(principalResolver);
+        requireManagement();
         RoleRepository.RoleRecord record = roleService.getRole(roleId);
         Set<String> codes = record.role().permissions().stream()
                 .map(PermissionCode::value)
@@ -119,7 +121,7 @@ public class AuthorizationManagementController {
             @PathVariable UUID roleId,
             @RequestBody ReplaceRolePermissionsRequest body,
             HttpServletRequest request) {
-        AuthenticatedPrincipal principal = requireManagement(principalResolver);
+        AuthenticatedPrincipal principal = requireManagement();
         RoleRepository.RoleRecord existing = roleService.getRole(roleId);
         Set<PermissionCode> codes = parsePermissionCodes(body.permissions());
         String requestId = RequestIds.currentOrCreate(request);
@@ -137,7 +139,7 @@ public class AuthorizationManagementController {
     public ResponseEntity<ApiResponse<BindingResponse>> createBinding(
             @RequestBody CreateBindingRequest body,
             HttpServletRequest request) {
-        AuthenticatedPrincipal principal = requireManagement(principalResolver);
+        AuthenticatedPrincipal principal = requireManagement();
         SubjectRef subject = new SubjectRef(body.issuer(), body.subjectId(),
                 SubjectType.valueOf(body.subjectType()));
         Scope scope = buildScope(body);
@@ -154,7 +156,7 @@ public class AuthorizationManagementController {
     public ApiResponse<BindingResponse> getBinding(
             @PathVariable UUID bindingId,
             HttpServletRequest request) {
-        requireManagement(principalResolver);
+        requireManagement();
         SubjectBindingRepository.PersistedBinding pb = bindingRepository.findById(bindingId)
                 .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.BINDING_NOT_FOUND));
         return ApiResponse.success(BindingResponse.from(pb), RequestIds.currentOrCreate(request));
@@ -165,7 +167,7 @@ public class AuthorizationManagementController {
             @PathVariable UUID bindingId,
             @RequestBody RevokeBindingRequest body,
             HttpServletRequest request) {
-        AuthenticatedPrincipal principal = requireManagement(principalResolver);
+        AuthenticatedPrincipal principal = requireManagement();
         String requestId = RequestIds.currentOrCreate(request);
         bindingService.revokeBinding(principal, bindingId, body.reason(), requestId, null);
         SubjectBindingRepository.PersistedBinding pb = bindingRepository.findById(bindingId)
@@ -181,7 +183,7 @@ public class AuthorizationManagementController {
             @org.springframework.web.bind.annotation.RequestParam String subjectType,
             @org.springframework.web.bind.annotation.RequestParam String subjectId,
             HttpServletRequest request) {
-        requireManagement(principalResolver);
+        requireManagement();
         SubjectRef subject = new SubjectRef(issuer, subjectId, SubjectType.valueOf(subjectType));
         List<SubjectBindingRepository.PersistedBinding> bindings = bindingService.liveBindings(subject);
         EffectiveAccessResponse response = EffectiveAccessResponse.from(issuer, subjectType, subjectId, bindings);
@@ -190,14 +192,9 @@ public class AuthorizationManagementController {
 
     // ---- Helpers ----
 
-    private static AuthenticatedPrincipal requireManagement(AuthenticatedPrincipalResolver resolver) {
-        AuthenticatedPrincipal principal = resolver.requireCurrent();
-        if (!principal.isService()) {
-            throw new BusinessException(dev.ainer.core.error.StandardErrorCode.FORBIDDEN);
-        }
-        if (!principal.hasScope(MANAGE_SCOPE)) {
-            throw new BusinessException(dev.ainer.core.error.StandardErrorCode.FORBIDDEN);
-        }
+    private AuthenticatedPrincipal requireManagement() {
+        AuthenticatedPrincipal principal = principalResolver.requireCurrent();
+        administrationGuard.requireManager(principal);
         return principal;
     }
 

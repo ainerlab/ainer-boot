@@ -1,6 +1,6 @@
 # Ainer Identity 与 OAuth 2.1 使用基线
 
-> 适用版本：Greenfield S8（canonical Workspace/Identity）· 核对 2026-08-07
+> 适用版本：Greenfield S8（canonical Workspace/Identity）· 核对 2026-08-11
 
 ## 1. 已落地边界
 
@@ -100,6 +100,19 @@ ACTIVE 成员但角色不足返回 403。
 审计查询使用 `workspace.audit.read` scope，并继续要求查询者是目标 Workspace 的 ACTIVE OWNER/ADMIN。查询 SQL 绑定 workspace，按时间和 UUID 稳定倒序分页；成功或拒绝读取审计的决策也进入审计。M4.2 的后台任务可将超过热保留期的记录在同一业务库内原子迁移到归档表，普通查询仍统一读取热表与归档表。默认关闭的 SIEM 拉取端点使用 `(occurredAt, id)` 游标，并为每批导出追加安全操作审计。
 
 每个 Workspace SQL 都显式绑定 `workspace_id`；成员分页同时绑定 subject 和 `ACTIVE` 状态。完整设计见 [ADR-0006](decisions/0006-workspace-tenant-authorization-baseline.md) 与 [ADR-0007](decisions/0007-workspace-membership-lifecycle-and-audit.md)，去 tenant 化见 Greenfield S6。PostgreSQL RLS 仍是未来纵深防御选项，当前不能把尚未验证的连接池租户会话当作安全边界。
+
+### 3.1 通用授权管理防提权
+
+`authorization.manage` 只是 OAuth 能力上限，不能单独证明“谁能授权谁”。通用授权模块要求宿主以
+唯一的版本化 `GrantAdministrationPolicy` bean 精确登记可信 SERVICE `issuer + sub`，并分别计算
+可授予 Permission、Scope 与目标主体集合；这些集合不得从管理者 Effective Access 自动推导。
+未登记策略时，所有 `/api/authorization/**` 管理访问默认拒绝。
+
+应用服务事务边界会再次执行同一 guard，因此绕过 HTTP Controller 直接调用 Role/Binding 写服务也
+不能跳过校验。通用管理路径硬性拒绝 system-only Permission、GLOBAL Binding、自授予/自改，以及
+策略目录外的权限、范围和目标；初始产品 owner/operator 等业务使用权必须由验证真实业务关系的
+onboarding/ownership 流程建立并独立审计。Greenfield 已移除 Tenant，所以 ADR-0030 原 tenant OWNER
+bootstrap 文本不能直接复活；后续生产管理入口必须在取代 ADR 中重新定义。
 
 ## 4. Authorization Server
 

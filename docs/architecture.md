@@ -98,11 +98,13 @@ SubjectBinding、Scope、AuthorizationDecision）、PermissionRegistry（冲突�
 （grant-path 真值表纯决策器，含 resourceType/systemOnly/GLOBAL/scope 安全检查与 HIGH-risk Challenge
 收口），全部 Spring-free、@NullMarked。S1（PostgreSQL 6 表持久化 + DB Binding resolver）、S2
 （`/api/authorization/**` 管理 REST API + Effective Access）、S3（`DefaultQueryAuthorizationPlanner` +
-Golden Consumer 查询验证）已有**原型实现并含测试**，但**均未达 ADR-0030 验收**：存在 RESOURCE scope
-CHECK 冲突、systemOnly 可经 PUBLIC 路径绕过、change/decision audit 零写入、决策器与 Planner 无生产
-装配、三个可执行应用均未依赖授权模块、管理 API 缺 assignable catalog/防自提权/OWNER 边界矩阵、HTTP
-测试用 stub Principal 绕过真实 JWT、外部 Maven consumer 仅构造 `PermissionCode`。完整差距清单与后续
-批次见 [`docs/project-status.md`](project-status.md) §3。此外 ADR-0030 决策文本仍以 pre-Greenfield 的
+Golden Consumer 查询验证）已有**原型实现并含测试**，但**均未达 ADR-0030 验收**。RESOURCE scope、
+systemOnly PUBLIC 绕过、审计写入、生产装配、真实 JWT 与模块级防提权矩阵已经修复；当前管理面由
+版本化 `GrantAdministrationPolicy` 显式登记可信 SERVICE 与 assignable Permission/Scope/target，缺省
+deny-all，并在应用服务事务边界拒绝 GLOBAL、system-only 与自我授权。仍未闭环的是外部 Maven
+Golden Consumer 对真实 `AuthorizationService`/查询适配器的消费、真实参数化 SQL 行过滤、撤销后原
+Token 的受保护业务写失效，以及 Ainer Admin/生产 bootstrap。完整差距清单与后续批次见
+[`docs/project-status.md`](project-status.md) §3。此外 ADR-0030 决策文本仍以 pre-Greenfield 的
 tenant 模型为主，而实现已迁 Workspace 语义（ADR-0033 Greenfield 移除 tenant），完整重述需新增取代 ADR。
 Spring `AuthorizationManager` adapter（方法级 `@AinerAuthorize`）、OpenAPI/SDK 与 Ainer Admin 集成属后续。
 详见 [`Ainer 通用授权与 AI 代行详细方案`](design/authorization-architecture-plan.md)、

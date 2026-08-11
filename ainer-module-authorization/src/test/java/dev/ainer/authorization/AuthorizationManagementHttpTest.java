@@ -63,6 +63,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
                 "ainer.authorization.enabled=true",
+                "ainer.authorization.test-administration-policy=http",
                 "ainer.security.resource-server.enabled=true",
                 "mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml",
                 "spring.main.banner-mode=off"
@@ -273,6 +274,101 @@ class AuthorizationManagementHttpTest {
         restTemplate.getRestTemplate().getInterceptors().add(bearerInterceptor(noScopeJwt));
         RestResponse response = client.get("/api/authorization/permissions");
         assertThat(response.status().value()).isEqualTo(403);
+        assertThat(response.jsonPath("$.code"))
+                .isEqualTo("AINER.AUTHORIZATION.GRANT_ADMINISTRATION_DENIED");
+    }
+
+    @Test
+    void managementScopeDoesNotTrustAnArbitraryServicePrincipal() {
+        String untrustedJwt = signServiceJwt("svc-other", "authorization.manage");
+        restTemplate.getRestTemplate().getInterceptors().clear();
+        restTemplate.getRestTemplate().getInterceptors().add(bearerInterceptor(untrustedJwt));
+
+        RestResponse response = client.get("/api/authorization/permissions");
+
+        assertThat(response.status().value()).isEqualTo(403);
+        assertThat(response.jsonPath("$.code"))
+                .isEqualTo("AINER.AUTHORIZATION.GRANT_ADMINISTRATION_DENIED");
+    }
+
+    @Test
+    void unassignableAndSystemOnlyPermissionsAreRejected() {
+        RestResponse unassignable = client.postJson("/api/authorization/roles", """
+                {"code": "unassignable", "name": "Unassignable", "permissions": ["mgmt.test.unassignable"]}
+                """);
+        assertThat(unassignable.status().value()).isEqualTo(422);
+        assertThat(unassignable.jsonPath("$.code"))
+                .isEqualTo("AINER.AUTHORIZATION.PERMISSION_NOT_ASSIGNABLE");
+
+        RestResponse systemOnly = client.postJson("/api/authorization/roles", """
+                {"code": "system", "name": "System", "permissions": ["mgmt.test.system"]}
+                """);
+        assertThat(systemOnly.status().value()).isEqualTo(422);
+        assertThat(systemOnly.jsonPath("$.code"))
+                .isEqualTo("AINER.AUTHORIZATION.PERMISSION_NOT_ASSIGNABLE");
+    }
+
+    @Test
+    void globalScopeAndIneligibleTargetAreRejected() {
+        UUID roleId = createRole("editor", "mgmt.test.read");
+
+        RestResponse global = client.postJson("/api/authorization/bindings", """
+                {"issuer": "ainer-test", "subjectType": "USER", "subjectId": "user-global",
+                 "roleId": "%s", "scopeKind": "GLOBAL"}
+                """.formatted(roleId));
+        assertThat(global.status().value()).isEqualTo(422);
+        assertThat(global.jsonPath("$.code"))
+                .isEqualTo("AINER.AUTHORIZATION.SCOPE_NOT_ASSIGNABLE");
+
+        RestResponse ineligibleTarget = client.postJson("/api/authorization/bindings", """
+                {"issuer": "other-authority", "subjectType": "USER", "subjectId": "user-other",
+                 "roleId": "%s", "scopeKind": "WORKSPACE", "workspaceId": "%s"}
+                """.formatted(roleId, UUID.randomUUID()));
+        assertThat(ineligibleTarget.status().value()).isEqualTo(403);
+        assertThat(ineligibleTarget.jsonPath("$.code"))
+                .isEqualTo("AINER.AUTHORIZATION.GRANT_ADMINISTRATION_DENIED");
+    }
+
+    @Test
+    void genericManagementApiRejectsSelfBindingAndOwnRoleMutation() {
+        UUID roleId = createRole("editor", "mgmt.test.read");
+        UUID workspaceId = UUID.randomUUID();
+
+        RestResponse selfBinding = client.postJson("/api/authorization/bindings", """
+                {"issuer": "%s", "subjectType": "SERVICE", "subjectId": "svc-management",
+                 "roleId": "%s", "scopeKind": "WORKSPACE", "workspaceId": "%s"}
+                """.formatted(ISSUER, roleId, workspaceId));
+        assertThat(selfBinding.status().value()).isEqualTo(403);
+        assertThat(selfBinding.jsonPath("$.code"))
+                .isEqualTo("AINER.AUTHORIZATION.SELF_GRANT_FORBIDDEN");
+
+        // Simulate a binding established by a separate trusted bootstrap/onboarding path. Once the
+        // role grants the manager access, the generic API must not let that manager enlarge it.
+        UUID ownBindingId = jdbcTemplate.queryForObject("""
+                INSERT INTO ainer_authorization_subject_binding (
+                    issuer, subject_type, subject_id, role_id, scope_kind, workspace_id,
+                    valid_from, status, version, created_at, updated_at
+                ) VALUES (?, 'SERVICE', ?, ?, 'WORKSPACE', ?, now(), 'ACTIVE', 0, now(), now())
+                RETURNING id
+                """, UUID.class, ISSUER, "svc-management", roleId, workspaceId);
+
+        RestResponse ownRoleMutation = client.putJson(
+                "/api/authorization/roles/" + roleId + "/permissions",
+                """
+                {"permissions": ["mgmt.test.read", "mgmt.test.write"]}
+                """);
+        assertThat(ownRoleMutation.status().value()).isEqualTo(403);
+        assertThat(ownRoleMutation.jsonPath("$.code"))
+                .isEqualTo("AINER.AUTHORIZATION.SELF_GRANT_FORBIDDEN");
+
+        RestResponse ownBindingRevocation = client.postJson(
+                "/api/authorization/bindings/" + ownBindingId + "/revocations",
+                """
+                {"reason": "self change"}
+                """);
+        assertThat(ownBindingRevocation.status().value()).isEqualTo(403);
+        assertThat(ownBindingRevocation.jsonPath("$.code"))
+                .isEqualTo("AINER.AUTHORIZATION.SELF_GRANT_FORBIDDEN");
     }
 
     @Test
@@ -371,7 +467,65 @@ class AuthorizationManagementHttpTest {
                             new dev.ainer.authorization.domain.ResourceType("mgmt.test"),
                             dev.ainer.authorization.domain.RiskTier.MEDIUM,
                             dev.ainer.authorization.domain.AuditLevel.ON_DECISION,
-                            false, false));
+                            false, false),
+                    new dev.ainer.authorization.domain.Permission(
+                            new dev.ainer.authorization.domain.PermissionCode("mgmt.test.unassignable"),
+                            "assign",
+                            new dev.ainer.authorization.domain.ResourceType("mgmt.test"),
+                            dev.ainer.authorization.domain.RiskTier.HIGH,
+                            dev.ainer.authorization.domain.AuditLevel.ALWAYS,
+                            false, false),
+                    new dev.ainer.authorization.domain.Permission(
+                            new dev.ainer.authorization.domain.PermissionCode("mgmt.test.system"),
+                            "administer",
+                            new dev.ainer.authorization.domain.ResourceType("mgmt.test"),
+                            dev.ainer.authorization.domain.RiskTier.HIGH,
+                            dev.ainer.authorization.domain.AuditLevel.ALWAYS,
+                            true, false));
+        }
+
+        @Bean
+        @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+                name = "ainer.authorization.test-administration-policy", havingValue = "http")
+        dev.ainer.authorization.policy.GrantAdministrationPolicy httpTestGrantAdministrationPolicy() {
+            return new dev.ainer.authorization.policy.GrantAdministrationPolicy() {
+                @Override
+                public String version() {
+                    return "http-test-administration-v1";
+                }
+
+                @Override
+                public boolean isTrustedManager(
+                        dev.ainer.security.token.AuthenticatedPrincipal actor) {
+                    return actor.isService()
+                            && ISSUER.equals(actor.authority().issuer())
+                            && "svc-management".equals(actor.subjectId());
+                }
+
+                @Override
+                public boolean isPermissionAssignable(
+                        dev.ainer.security.token.AuthenticatedPrincipal actor,
+                        dev.ainer.authorization.domain.Permission permission) {
+                    return java.util.Set.of("mgmt.test.read", "mgmt.test.write")
+                            .contains(permission.code().value());
+                }
+
+                @Override
+                public boolean isScopeAssignable(
+                        dev.ainer.security.token.AuthenticatedPrincipal actor,
+                        dev.ainer.authorization.domain.Scope scope) {
+                    return scope instanceof dev.ainer.authorization.domain.Scope.Workspace
+                            || scope instanceof dev.ainer.authorization.domain.Scope.Resource;
+                }
+
+                @Override
+                public boolean isTargetAssignable(
+                        dev.ainer.security.token.AuthenticatedPrincipal actor,
+                        dev.ainer.authorization.domain.SubjectRef target) {
+                    return target.type() == dev.ainer.authorization.domain.SubjectType.USER
+                            && "ainer-test".equals(target.issuerNamespace());
+                }
+            };
         }
     }
 

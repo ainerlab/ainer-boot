@@ -30,16 +30,19 @@ public class SubjectBindingApplicationService {
 
     private final SubjectBindingRepository bindingRepository;
     private final RoleRepository roleRepository;
+    private final GrantAdministrationGuard administrationGuard;
     private final AuthorizationChangeAuditService changeAuditService;
     private final Clock clock;
 
     public SubjectBindingApplicationService(
             SubjectBindingRepository bindingRepository,
             RoleRepository roleRepository,
+            GrantAdministrationGuard administrationGuard,
             AuthorizationChangeAuditService changeAuditService,
             Clock clock) {
         this.bindingRepository = bindingRepository;
         this.roleRepository = roleRepository;
+        this.administrationGuard = administrationGuard;
         this.changeAuditService = changeAuditService;
         this.clock = clock;
     }
@@ -47,14 +50,17 @@ public class SubjectBindingApplicationService {
     /**
      * Create a new binding.
      *
-     * @throws BusinessException if the role does not exist.
+     * @throws BusinessException if the manager/target/scope/Role permissions are not assignable or
+     *                           the role does not exist.
      */
     public UUID createBinding(
             AuthenticatedPrincipal actor, SubjectRef subject, UUID roleId, Scope scope,
             Instant validFrom, @Nullable Instant validUntil,
             @Nullable String requestId, @Nullable String traceId) {
-        roleRepository.findById(roleId)
+        administrationGuard.requireManager(actor);
+        RoleRepository.RoleRecord role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.ROLE_NOT_FOUND));
+        administrationGuard.requireBindingCreation(actor, subject, role, scope);
         UUID bindingId = bindingRepository.save(subject, roleId, scope, validFrom, validUntil);
         changeAuditService.record(actor, TARGET_TYPE_BINDING, bindingId, "CREATE",
                 null, 0L, requestId, traceId);
@@ -64,11 +70,15 @@ public class SubjectBindingApplicationService {
     /**
      * Revoke a binding (logical, not physical delete).
      *
-     * @throws BusinessException if the binding is not found or already revoked.
+     * @throws BusinessException if the binding belongs to the actor, is not found, or is already revoked.
      */
     public void revokeBinding(
             AuthenticatedPrincipal actor, UUID bindingId, @Nullable String reason,
             @Nullable String requestId, @Nullable String traceId) {
+        administrationGuard.requireManager(actor);
+        SubjectBindingRepository.PersistedBinding binding = bindingRepository.findById(bindingId)
+                .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.BINDING_NOT_FOUND));
+        administrationGuard.requireBindingRevocation(actor, binding);
         bindingRepository.revoke(bindingId, Instant.now(clock), reason)
                 .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.BINDING_NOT_FOUND));
         changeAuditService.record(actor, TARGET_TYPE_BINDING, bindingId, "REVOKE",

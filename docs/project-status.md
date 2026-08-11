@@ -227,6 +227,23 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 
 ## 3. 最近验证记录
 
+2026-08-11 授权管理 API 防提权矩阵（缺陷 10 模块级修复）
+- 新增代码注册、版本化 `GrantAdministrationPolicy`：宿主显式声明精确可信 SERVICE 与 assignable
+  Permission/Scope/target；没有策略时 `GrantAdministrationGuard` 使用内建 deny-all，
+  `authorization.manage` scope 不再自动产生管理权。
+- Controller 的全部管理读取与写入先校验 guard；Role/Binding application service 在事务边界再次
+  校验，直接调用服务也不能绕过。硬性拒绝 system-only/策略外 Permission、GLOBAL/策略外 Scope、
+  越界 target、自建/自撤 Binding，以及修改自己的任一 ACTIVE Binding 所引用 Role。
+- 真实 RSA 签名 JWT + PostgreSQL 18.3 HTTP 矩阵新增 4 项：任意持 scope SERVICE 拒绝、不可授予与
+  system-only Permission 拒绝、GLOBAL 与越界 target 拒绝、自 Binding/自 Role 修改拒绝；另增 1 项
+  无宿主策略默认拒绝单测。
+- Greenfield 已移除 Tenant，未复活 ADR-0030 的 tenant OWNER bootstrap；生产管理主体、Ainer Admin
+  与产品 onboarding/bootstrap 仍需由 post-Greenfield 取代 ADR 定义。模块当前安全默认是“不可管理”，
+  不是“任意 SERVICE 可管理”。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：**278 tests / 0 failure / 0 error /
+  0 skipped**（较上轮 273 + 4 项 HTTP 防提权矩阵 + 1 项默认 deny-all 单测）。`git diff --check`
+  通过，缺陷 10 标记为模块级修复。
+
 2026-08-11 真实 JWT 端到端测试：替换 stub Principal（缺陷 9 修复）
 - **改造 `AuthorizationManagementHttpTest`**：删除 stub `AuthenticatedPrincipalResolver`，启用
   `ainer.security.resource-server.enabled=true`。新增测试 `JwtDecoder` bean：测试生成 RSA 3072 密钥对，
@@ -394,14 +411,14 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 | # | 缺陷 | 证据 | 对应 ADR 验收项 |
 |---|---|---|---|
 | 9 | **HTTP 测试用 stub Principal 绕过真实 JWT** | ✅ 已修复（2026-08-11）— 原 `TestPrincipalResolver` 固定返回。修复：重写 `AuthorizationManagementHttpTest`，删除 stub resolver，启用 resource-server，提供真实 `NimbusJwtDecoder`（测试 RSA 公钥验签 + issuer/audience validator），用 Nimbus `SignedJWT` 签发 SERVICE_V1 JWT（带 `token_profile`/`actor_type`/`scope` claims），客户端带 Bearer header。整条链路真实：SecurityFilterChain → NimbusJwtDecoder 验签 → JwtToVerifiedJwtClaims → ReferenceTokenProfileResolver → Controller。新增 2 项负向测试（无 Bearer → 401、缺 scope → 403） |
-| 10 | **管理 API 缺防提权矩阵** | `requireManagement` 仅查 SERVICE + `authorization.manage` scope；无 assignable catalog、无防自改、无 OWNER/bootstrap 边界 | §11.3/§11.5 |
+| 10 | **管理 API 缺防提权矩阵** | ✅ 模块级已修复（2026-08-11）— 新增版本化 `GrantAdministrationPolicy` + `GrantAdministrationGuard`；无策略 deny-all，scope 不能单独授权管理；Controller 与事务服务双层校验 assignable Permission/Scope/target，硬拒绝 system-only、GLOBAL、自 Binding 和修改自己 ACTIVE Binding 所引用 Role。真实 JWT + PG 负向矩阵覆盖。Greenfield 后生产 bootstrap/Ainer Admin 仍属门禁 9 未完成项 | §11.3/§11.5 |
 | 11 | **外部 Golden Consumer 仅编译期 smoke** | `scripts/verify-maven-consumers.sh` 的 `ConsumerSmoke` 只构造 `new PermissionCode("consumer.smoke").value()`，不调用 `AuthorizationService`/`QueryPlanner`；仓内 `GoldenConsumerQueryPlanTest` 是纯单元测试用内存 fixture，非外部 Maven 消费 | 门禁 8 外部 Golden Consumer 验证 |
 | 12 | **缺真实参数化 SQL 查询验证** | 无任何测试验证「产品 adapter 真实将 `Q` 约束翻译为参数化 PostgreSQL 并排除未授权 row」 | §7.4/§7.5 |
 | 13 | **缺「撤销后原 Token 无法继续业务写」端到端** | 撤销语义仅在 resolver 层验证，无真实 JWT + 真实业务写路径 | 门禁 10 |
 
 **§13.4 创建门禁状态**：门禁 8（外部 Golden Consumer 验证）**未关闭**（仅纯单元测试，非外部 Maven
-消费真实 AuthorizationService）；门禁 9（Ainer Admin 管理 + Effective Access）**未关闭**（API 层原型
-在，但缺防提权矩阵且 Admin UI 未集成）；门禁 10（撤销后受保护写失效）**未关闭**（仅 resolver 层验证，
+消费真实 AuthorizationService）；门禁 9（Ainer Admin 管理 + Effective Access）**未关闭**（模块防提权
+矩阵已补，但 Admin UI 与 post-Greenfield 生产 bootstrap 未集成）；门禁 10（撤销后受保护写失效）**未关闭**（仅 resolver 层验证，
 缺端到端）。
 
 **ADR-0030 文本与 Greenfield 地基冲突**：ADR-0030 仍以 tenant 模型为主
@@ -412,8 +429,8 @@ USER Token」），而 ADR-0033 Greenfield 已完全移除 tenant。实现已迁
 1. ~~修复 P0 缺陷 1/2/4/5~~（已完成 2026-08-11）；~~修复装配缺陷 6/7/8~~（已完成 2026-08-11）；
    ~~修复缺陷 3（审计四层写入）~~（已完成 2026-08-11）；
 2. Spring Security `AuthorizationManager` adapter（ADR §8.2，`@AinerAuthorize` 端点级 opt-in）；
-3. 真实 JWT 端到端测试（仓库零脚手架，从零搭建 NimbusJwtEncoder 签发 + 公钥校验）；
-4. 管理 API 防提权矩阵（assignable catalog/防自改/OWNER bootstrap）；
+3. ~~真实 JWT 端到端测试~~（已完成，真实 RSA 签名 + Nimbus 公钥验签）；
+4. ~~管理 API 模块级防提权矩阵~~（已完成）；post-Greenfield 生产 bootstrap/Ainer Admin 仍待取代 ADR；
 5. 外部 Golden Consumer 真正消费 AuthorizationService；
 6. 新增取代 ADR-0030 的 post-Greenfield 授权基线 ADR。
 

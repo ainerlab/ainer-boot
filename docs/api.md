@@ -178,8 +178,15 @@ SIEM 导出参数 `afterOccurredAt` 与 `afterId` 必须同时提供或同时省
 
 ## 8. 通用授权管理 API（ADR-0030 S2）
 
-所有 `/api/authorization/**` 端点要求 SERVICE principal + `authorization.manage` scope。Human principal
-或缺 scope 返回 403。响应使用统一 `ApiResponse` 信封。
+所有 `/api/authorization/**` 端点要求 SERVICE principal + `authorization.manage` scope，并且该精确
+`issuer + sub` 必须由宿主代码注册的版本化 `GrantAdministrationPolicy` 判定为可信管理主体。
+仅持有 scope 不产生授权管理权；未注册策略时全部管理端点失败关闭为 403。响应使用统一
+`ApiResponse` 信封。
+
+通用管理面只处理策略声明的 assignable Permission、Scope 和目标主体，不从管理者自己的
+Effective Access 推导分配权。Role 不能包含 `systemOnly` 或策略未列入的权限；通用 Binding API
+不能创建 GLOBAL scope，也不能创建、撤销自己的 Binding；管理者任一 ACTIVE Binding 引用的 Role 不能由其
+本人扩大或替换权限。产品 onboarding/bootstrap 如需创建初始业务授权，必须走独立关系校验与审计路径。
 
 ### Permission 目录（只读）
 
@@ -191,15 +198,15 @@ SIEM 导出参数 `afterOccurredAt` 与 `afterId` 必须同时提供或同时省
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| `POST` | `/api/authorization/roles` | 创建角色（code、name、permissions）。未注册 permission code 返回 422。重复 code 返回 409 |
+| `POST` | `/api/authorization/roles` | 创建角色（code、name、permissions）。未注册或不可授予/system-only permission 返回 422。重复 code 返回 409 |
 | `GET` | `/api/authorization/roles/{roleId}` | 查询角色（含 permissions） |
-| `PUT` | `/api/authorization/roles/{roleId}/permissions` | 原子替换角色权限（乐观版本检查）。版本冲突返回 409 |
+| `PUT` | `/api/authorization/roles/{roleId}/permissions` | 原子替换角色权限（乐观版本检查）。自己的 ACTIVE Binding 引用该 Role 时返回 403；版本冲突返回 409 |
 
 ### Binding 生命周期
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| `POST` | `/api/authorization/bindings` | 创建绑定（issuer、subjectType、subjectId、roleId、scopeKind、可选 workspaceId/resourceType/resourceId/validUntil）。非法 scope 组合返回 422 |
+| `POST` | `/api/authorization/bindings` | 创建绑定（issuer、subjectType、subjectId、roleId、scopeKind、可选 workspaceId/resourceType/resourceId/validUntil）。GLOBAL/不可授予 scope 返回 422，越界目标或自授予返回 403 |
 | `GET` | `/api/authorization/bindings/{bindingId}` | 查询绑定 |
 | `POST` | `/api/authorization/bindings/{bindingId}/revocations` | 逻辑撤销绑定（reason）。撤销后 liveBindings 立即不返回——无 ALLOW 缓存 |
 
@@ -209,9 +216,10 @@ SIEM 导出参数 `afterOccurredAt` 与 `afterId` 必须同时提供或同时省
 |---|---|---|
 | `GET` | `/api/authorization/effective-access?issuer=&subjectType=&subjectId=` | 查询某 subject 当前所有有效绑定（ACTIVE + 有效期内） |
 
-Scope kind 与 CHECK 约束：`GLOBAL`（workspace_id/resource_type/resource_id 全 NULL）、
+Scope kind 与底层 CHECK 约束：`GLOBAL`（workspace_id/resource_type/resource_id 全 NULL）、
 `WORKSPACE`（workspace_id 非空）、`RESOURCE`（workspace_id + resource_type + resource_id 全非空）。
-GLOBAL binding 仅 SERVICE subject 允许持有（决策器强制）。
+通用管理 API 不创建 GLOBAL Binding；受控平台路径若建立 GLOBAL Binding，决策器仍只允许 SERVICE
+subject 使用。
 
 ## 9. 兼容与变更
 

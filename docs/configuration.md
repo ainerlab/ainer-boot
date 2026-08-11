@@ -236,8 +236,11 @@ Prometheus registry 已随两个可执行发行物引入，但仓库没有部署
 关闭后授权管理 API 与 BindingResolver 不注册，决策器仅在消费方显式装配 `AuthorizationService`
 时可用。
 
-管理 API 端点（`/api/authorization/**`）要求 SERVICE principal + `authorization.manage` scope。
-Human principal 和缺 scope 返回 403。端点清单见 [`api.md`](api.md) §8。
+管理 API 端点（`/api/authorization/**`）要求 SERVICE principal + `authorization.manage` scope，
+并要求宿主提供唯一、代码注册且带版本的 `GrantAdministrationPolicy` bean，精确声明可信
+`issuer + sub`、assignable Permission/Scope/target。未提供时模块使用内建 deny-all 行为；Human、
+缺 scope、任意持 scope 的未登记 SERVICE 均返回 403。该策略刻意不提供 YAML 形式，避免通过漂移配置
+任意扩大授权目录。端点与防提权错误语义见 [`api.md`](api.md) §8。
 
 RSA 签名密钥、撤销 epoch 和在线 introspection 配置属于 Authorization Server（§5），
 不在通用授权模块配置范围内。
