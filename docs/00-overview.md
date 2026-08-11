@@ -153,7 +153,8 @@ Foundation Roadmap 仍是 Proposed；其 mdpress-first 是有条件的路线建�
    原子清零（C1–C4 合并）的完整施工序列、隐藏缺口与依赖图见
    [`architecture/0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)，
    S1–S8 已全部完成并验证（注意：此处的 S1–S8 指 Greenfield ADR-0033 的账号/主体隔离脊柱施工切片，
-   与 ADR-0030 通用授权的内部切片 S0–S3 是**两套不同的 S 编号**，后者仅有原型且未达验收）
+   与 ADR-0030 通用授权的内部切片 S0–S3 是**两套不同的 S 编号**；ADR-0030 已被
+   [ADR-0037](decisions/0037-post-greenfield-authorization-baseline.md) 取代，13 项差距全闭合）
 4. [`decisions/README.md`](decisions/README.md) 中相关安全 ADR
 5. 集成官方参考管理应用时阅读
    [`ainer-admin-integration.md`](ainer-admin-integration.md) 与

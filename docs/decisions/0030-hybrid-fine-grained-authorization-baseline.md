@@ -1,12 +1,12 @@
 # ADR-0030：通用混合细粒度授权基线
 
-- 状态：Proposed（部分原型实现，未满足验收；详见文末「Greenfield 后状态注释」）
+- 状态：Superseded by [ADR-0037](0037-post-greenfield-authorization-baseline.md)（2026-08-11）
 - 日期：2026-08-02（Proposed）
 - 决策者：Ainer 项目维护者
 - 取代：无
 - 局部修订（接受后）：ADR-0005 决策 3、4，仅限 opt-in 通用授权端点的 tenant-optional 认证投影；
   现有 tenant-bound 用例不变
-- 被取代：无
+- 被取代：[ADR-0037](0037-post-greenfield-authorization-baseline.md)
 
 > ⚠️ **Greenfield 后状态注释（2026-08-11 复核）**
 >

@@ -37,13 +37,16 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0027](0027-keep-jdk-25-production-baseline.md) | Accepted | 保留 JDK 25 生产基线并跟踪 JDK 27 |
 | [0028](0028-mybatis-plus-infrastructure-baseline.md) | Accepted | MyBatis-Plus 基础设施增强基线 |
 | [0029](0029-jdk25-boot4-modern-baseline.md) | Proposed | JDK 25 / Spring Boot 4 现代化基线 |
-| [0030](0030-hybrid-fine-grained-authorization-baseline.md) | Proposed | 通用混合细粒度授权基线（决策文本仍以 tenant 模型为主，与 Greenfield 地基冲突；部分原型实现，未达验收） |
+| [0030](0030-hybrid-fine-grained-authorization-baseline.md) | Superseded by [0037](0037-post-greenfield-authorization-baseline.md) | 通用混合细粒度授权基线（pre-Greenfield tenant 模型，已被 ADR-0037 取代） |
 | [0031](0031-agent-delegation-and-ai-context-authorization.md) | Proposed | Agent 代行、Capability 与 AI 上下文授权基线 |
 | [0032](0032-organization-workforce-directory-baseline.md) | Proposed | 组织、员工任职与 SubjectSet 授权基线 |
 | [0033 Greenfield](0033-account-workspace-subject-isolation-greenfield-baseline.md) | Accepted | Account、Workspace、Subject 与 Isolation Greenfield 基线（Option B：完全移除 Tenant；目标基线，按 Impact Stage 0–8 执行） |
 | [0034](0034-knowledge-foundation-and-ai-context-model.md) | Proposed | Knowledge Foundation 与 AI Context Model 基线 |
 | [0035](0035-project-initializer-and-manifest-v1-baseline.md) | Accepted | Project Initializer 与 Manifest v1 基线（确定性生成、安全 preview/diff、golden consumer 门禁） |
 | [0036](0036-initializer-crud-generation.md) | Accepted | Initial CRUD 生成：manifest `entities` 段、单表 CRUD 文件清单、PostgreSQL 门禁与 TTCRUD 计时 |
+| [0037](0037-post-greenfield-authorization-baseline.md) | Accepted | post-Greenfield 通用混合细粒度授权基线（取代 ADR-0030，Workspace 语义 + adapter 归属决策） |
+
+## 历史草案与审查记录
 
 ## 历史草案与审查记录
 

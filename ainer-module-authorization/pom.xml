@@ -36,6 +36,16 @@
             <groupId>dev.ainer</groupId>
             <artifactId>ainer-starter-web</artifactId>
         </dependency>
+        <!-- Spring Security adapter（spring/ 子包）：AuthorizationManager/RequestAuthorizationContext/AuthorizationResult。
+             仅 spring/ 子包使用；domain/policy/catalog/application 保持 Spring-free（ArchUnit 守护）。 -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-web</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -229,7 +229,23 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 
 ## 3. 最近验证记录
 
-2026-08-11 授权管理 API 防提权矩阵（缺陷 10 模块级修复）
+2026-08-11 ADR-0037 post-Greenfield 授权基线 + AuthorizationManager 端点级适配器
+- **ADR-0037 Accepted**：正式取代 ADR-0030（标记 Superseded）。以 post-Greenfield Workspace 语义
+  重述（`Scope.Workspace/Resource/Global`、membership-independent `USER_NEUTRAL_V1`、
+  `workspaceId` 归属）。继承 ADR-0030 的 grant-path 真值表与 RBAC+ReBAC+ABAC 组合（不重复设计）。
+- **adapter 包归属决策**（解决边界矛盾）：adapter 首版放在 `ainer-module-authorization` 的 `spring/`
+  子包（适配边界）。`domain/`/`policy/`/`catalog/`/`application/` 保持 Spring-free（ArchUnit 守护）。
+  `ainer-starter-security` 不加 authorization 依赖（维持 §9.3）。第二个重复装配消费者后评估独立制品。
+  pom 新增 compile scope `spring-security-core` + `spring-security-web`。
+- **adapter 实现**：`AinerRequestAuthorizationManager`（`AuthorizationManager<RequestAuthorizationContext>`，
+  注入 `AuthorizationService` + `AuthenticatedPrincipalResolver`）、`AinerAuthorizationResult`（implements
+  Spring `AuthorizationResult`，ALLOW+空 obligations→grant，其余→deny）、`@AinerAuthorize` 注解 +
+  `AinerAuthorizeInterceptor`（设 request attribute）。5 项单元测试覆盖 ALLOW/DENY/未认证/PUBLIC+obligation/
+  无注解 fallthrough。
+- **首版限制**（标注后续切片）：方法级 AOP、RFC 9470 challenge handler、DecisionObligationExecutor、
+  AuthorizationTargetResolver 产品注册机制均未实现。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：**295 tests / 0 failure / 0 error /
+  0 skipped**（较上轮 290 + 5 新增 adapter 单元测试）。零回归。
 - 新增代码注册、版本化 `GrantAdministrationPolicy`：宿主显式声明精确可信 SERVICE 与 assignable
   Permission/Scope/target；没有策略时 `GrantAdministrationGuard` 使用内建 deny-all，
   `authorization.manage` scope 不再自动产生管理权。
@@ -431,18 +447,16 @@ SLA，并验证跨实例/缓存/传播边界。
 USER Token」），而 ADR-0033 Greenfield 已完全移除 tenant。实现已迁 Workspace。完整重述需新增取代 ADR。
 
 **后续批次进展（当前接手轮持续推进）**：
-1. ~~修复 P0 缺陷 1/2/4/5~~（已完成 2026-08-11）；~~修复装配缺陷 6/7/8~~（已完成 2026-08-11）；
-   ~~修复缺陷 3（审计四层写入）~~（已完成 2026-08-11）；
-2. Spring Security `AuthorizationManager` adapter（ADR §8.2，`@AinerAuthorize` 端点级 opt-in）；
-3. ~~真实 JWT 端到端测试~~（已完成，真实 RSA 签名 + Nimbus 公钥验签）；
-4. ~~管理 API 模块级防提权矩阵~~（已完成）；post-Greenfield 生产 bootstrap/Ainer Admin 仍待取代 ADR；
+1. ~~修复 P0 缺陷 1/2/4/5~~（已完成）；~~修复装配缺陷 6/7/8~~（已完成）；~~修复缺陷 3（审计四层写入）~~（已完成）；
+2. ~~Spring Security `AuthorizationManager` adapter（ADR-0037 §4，`@AinerAuthorize` 端点级 opt-in）~~（已完成）；
+   方法级 AOP、RFC 9470 challenge handler、DecisionObligationExecutor、AuthorizationTargetResolver 产品注册机制属后续；
+3. ~~真实 JWT 端到端测试~~（已完成）；
+4. ~~管理 API 模块级防提权矩阵~~（已完成）；post-Greenfield 生产 bootstrap/Ainer Admin 仍待门禁 9；
 5. ~~外部 Golden Consumer 真正消费 AuthorizationService/查询规划器~~（本地 SNAPSHOT 制品工程门禁已完成）；
    不可变发布制品与完整产品关系/投影场景仍属于门禁 8；
-6. ~~产品 adapter 将类型化 `Q` 下推为参数化 PostgreSQL 并验证 row/查询次数~~（test-scope Golden
-   Consumer 已完成）；真实产品 Repository 与 HTTP 字段投影仍属于门禁 8；
-7. ~~撤销 Binding 后复用原 USER Token 验证受保护业务写失败~~（仓内真实 JWT + HTTP + PostgreSQL
-   工程链路已完成）；外部消费者与生产授权失效 SLA 仍属于门禁 10；
-8. 新增取代 ADR-0030 的 post-Greenfield 授权基线 ADR。
+6. ~~产品 adapter 将类型化 `Q` 下推为参数化 PostgreSQL 并验证 row/查询次数~~（已完成）；真实产品 Repository 与 HTTP 字段投影仍属于门禁 8；
+7. ~~撤销 Binding 后复用原 USER Token 验证受保护业务写失败~~（已完成）；外部消费者与生产授权失效 SLA 仍属于门禁 10；
+8. ~~新增取代 ADR-0030 的 post-Greenfield 授权基线 ADR（ADR-0037 Accepted）~~（已完成）。
 
 2026-08-11 撤权后原 Token 受保护写失效闭环（缺陷 13）
 - 扩展 `AuthorizationManagementHttpTest`：新增 test-scope 产品资源表、产品写事件表与受保护 HTTP

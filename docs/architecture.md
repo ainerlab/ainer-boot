@@ -1,6 +1,6 @@
 # Ainer 架构总览
 
-> 权威状态：M4.8A + Ainer Admin integration；通用授权 Proposed（S0 决策器落地，S1–S3 原型未达 ADR-0030 验收）· 核对 2026-08-11
+> 权威状态：M4.8A + Ainer Admin integration；通用授权 Accepted（ADR-0037 post-Greenfield 基线取代 ADR-0030，13 项差距全闭合 + AuthorizationManager adapter）· 核对 2026-08-11
 
 ## 1. 系统定位
 
