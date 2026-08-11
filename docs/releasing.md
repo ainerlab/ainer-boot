@@ -1,6 +1,6 @@
 # Ainer 版本与发布规范
 
-> 文档类型：长期维护规范 · 状态：基础版 · 最近核对：2026-07-30 · 适用版本：`0.1.x`
+> 文档类型：长期维护规范 · 状态：基础版 · 最近核对：2026-08-11 · 适用版本：`0.1.x`
 
 ## 1. 版本策略
 
@@ -22,7 +22,8 @@ Ainer 使用语义化版本：`MAJOR.MINOR.PATCH`。当前工程版本为 `0.1.0
 
 1. 里程碑范围和未完成项已更新到 `project-status.md`；
 2. `CHANGELOG.md` 的 `Unreleased` 已整理到目标版本；
-3. 所有相关 ADR 已接受，许可证台账已更新；
+3. 所有相关 ADR 已接受，许可证台账已更新；私有/专有 RC 必须明确分发边界，公开发行还必须先
+   完成 LICENSE/NOTICE 与品牌资产决策；
 4. JDK 25 下的 `./mvnw clean verify` 通过，PostgreSQL Testcontainers 没有因 Docker 缺失跳过；
 5. `scripts/verify-maven-consumers.sh` 证明 Maven 4 与 Maven 3.9+ 下游均可消费制品，19 个标准
    Consumer POM 中的 `${revision}` 都有当前安装版本属性可解析，`ainer-spring` JAR 包含
@@ -46,7 +47,8 @@ export AINER_VERSION='<目标版本>'
 AINER_REPRO_REPOSITORY="$(mktemp -d)"
 ./mvnw -Drevision="$AINER_VERSION" -Dmaven.repo.local="$AINER_REPRO_REPOSITORY" clean install
 ./mvnw -Drevision="$AINER_VERSION" -Dmaven.repo.local="$AINER_REPRO_REPOSITORY" clean verify artifact:compare
-./scripts/verify-maven-consumers.sh
+AINER_VERSION="$AINER_VERSION" ./scripts/verify-maven-consumers.sh
+AINER_VERSION="$AINER_VERSION" ./scripts/verify-initializer-consumer.sh
 git diff --check
 git status --short --branch
 ```
@@ -71,11 +73,13 @@ parentless `ainer-dependencies` BOM 配置，id=`github-packages`，URL
 
 1. 更新 `CHANGELOG.md`，确认 `./mvnw clean verify`（含 `0 skipped`）与 consumer 门禁通过；
 2. 打 tag `v<版本>`（如 `v0.1.0`）并推送——`.github/workflows/release.yml` 自动触发；
-3. 工作流从 tag 解析非 SNAPSHOT 版本（`v0.1.0` → `0.1.0`），用 `GITHUB_TOKEN` 认证后
-   `./mvnw -Drevision=<版本> -Prelease deploy` 发布全部 reactor 制品（含 BOM）；`release`
-   profile 为每个 JAR 制品附加 `-sources.jar` 与 `-javadoc.jar`（P1 门禁，由
-   `verify-maven-consumers.sh` 验证）；
-4. GitHub Packages 对同一 release 版本不可覆盖；SNAPSHOT 可在 dev 期间用，正式发布前必须去掉 SNAPSHOT。
+3. 工作流严格校验语义化非 SNAPSHOT tag，安装锁定的 Maven 3.9.16，并以该 tag 版本运行 Maven
+   3/4 Golden Consumer 和 Initializer 独立消费门禁；
+4. 工作流要求 Docker 可用、签名开关和两个 GPG secret 均存在，然后用
+   `./mvnw -Drevision=<版本> -Dgpg.keyname=<key> -Prelease clean deploy` 执行完整测试、签名与发布；
+   `release` profile 为每个 JAR 附加 sources/Javadoc，并单独为 parentless BOM 的 POM 生成签名；
+5. deploy 后 `check-surefire-results.sh` 再次要求 failure/error/skipped 全为零，随后生成 provenance；
+6. GitHub Packages 对同一 release 版本不可覆盖；SNAPSHOT 可在 dev 期间用，正式发布前必须去掉 SNAPSHOT。
 
 本地手动发布需在 `~/.m2/settings.xml` 为 `github-packages` 配置 GitHub 用户名 + PAT（`write:packages`）。
 下游消费私有 GitHub Packages 制品同样需要 PAT（`read:packages`）认证。
@@ -83,13 +87,13 @@ parentless `ainer-dependencies` BOM 配置，id=`github-packages`，URL
 ### 4.2 签名与 provenance
 
 `release` profile 在根 POM 启用 `maven-source-plugin`、`maven-javadoc-plugin` 与
-`maven-gpg-plugin`：
+`maven-gpg-plugin`；parentless `ainer-dependencies` 拥有自己的等价 GPG profile：
 
-- 签名：repository 变量 `AINER_RELEASE_SIGNING=true` 且 secrets `AINER_GPG_KEY_BASE64`（base64
-  ASCII-armored 私钥）与 `AINER_GPG_PASSPHRASE` 已配置时，workflow 导入密钥并用
-  `-Dgpg.keyname/-Dgpg.passphrase` 对每个制品（jar/sources/javadoc/pom）生成 `.asc`；任一
-  丢失时 workflow 失败关闭，不产出未签名发布。未配置变量时跳过签名（构建与 consumer
-  门禁用 `-Dgpg.skip=true` 覆盖）；
+- 签名：所有 tag 发布强制要求 repository 变量 `AINER_RELEASE_SIGNING=true`，以及 secrets
+  `AINER_GPG_KEY_BASE64`（base64 ASCII-armored 私钥）和 `AINER_GPG_PASSPHRASE`。任一缺失都在
+  deploy 前失败关闭，不允许静默发布未签名制品。passphrase 只通过
+  `MAVEN_GPG_PASSPHRASE` 环境变量进入 Maven GPG Plugin 的 best-practices 模式，不作为 Maven
+  命令行参数；本地可重复构建和 consumer 门禁才显式使用 `-Dgpg.skip=true`；
 - provenance：`actions/attest-build-provenance` 对 `**/target/*.jar` 生成 GitHub Attestations
   （SLSA v1 构建来源），要求 workflow `id-token`/`attestations` 写权限；发布记录可在
   Attestations 标签页核验源码仓库与构建工作流。

@@ -99,6 +99,7 @@ done
 "$wrapper" --batch-mode --no-transfer-progress \
   -Dmaven.repo.local="$local_repository" \
   -Drevision="$ainer_version" \
+  -Dgpg.skip=true \
   -DskipTests \
   clean verify \
   org.apache.maven.plugins:maven-artifact-plugin:3.6.1:compare

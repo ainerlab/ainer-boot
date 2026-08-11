@@ -19,7 +19,7 @@ jobs:
   publish:
     name: Publish to GitHub Packages
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -35,6 +35,24 @@ jobs:
 
       - name: Verify locked Maven 4 distribution
         run: ./mvnw --version
+
+      - name: Verify Docker runtime
+        run: docker info
+
+      - name: Install locked Maven 3 consumer runtime
+        env:
+          MAVEN3_VERSION: 3.9.16
+          MAVEN3_SHA512: 831a8591fe20c8243b1dbe7d71e3244f31d1665b0804b2e825e38cbbe5ce0cafb8338851f90780735568773e0a6cd07bbec107cda0b896b008b861075358b6f
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/apache-maven-$MAVEN3_VERSION-bin.tar.gz"
+          curl --fail --location --retry 3 \
+            --output "$archive" \
+            "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/$MAVEN3_VERSION/apache-maven-$MAVEN3_VERSION-bin.tar.gz"
+          printf '%s  %s\n' "$MAVEN3_SHA512" "$archive" | sha512sum --check -
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          printf 'MAVEN3_COMMAND=%s\n' \
+            "$RUNNER_TEMP/apache-maven-$MAVEN3_VERSION/bin/mvn" >>"$GITHUB_ENV"
 
       - name: Configure GitHub Packages authentication
         run: |
@@ -54,35 +72,65 @@ jobs:
           SETTINGS
 
       - name: Resolve release version from tag
-        run: echo "release_version=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+        run: |
+          set -euo pipefail
+          release_version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "发布 tag 不是受支持的语义化版本: $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+          if [[ "$release_version" == *-SNAPSHOT ]]; then
+            echo "tag 发布禁止 SNAPSHOT 版本: $release_version" >&2
+            exit 1
+          fi
+          echo "release_version=$release_version" >> "$GITHUB_ENV"
+
+      - name: Verify non-SNAPSHOT consumers and initializer
+        run: |
+          AINER_VERSION="$release_version" ./scripts/verify-maven-consumers.sh
+          AINER_VERSION="$release_version" ./scripts/verify-initializer-consumer.sh
 
       - name: Import signing key
-        if: vars.AINER_RELEASE_SIGNING == 'true'
         env:
+          AINER_RELEASE_SIGNING: ${{ vars.AINER_RELEASE_SIGNING }}
           SIGNING_KEY_BASE64: ${{ secrets.AINER_GPG_KEY_BASE64 }}
           SIGNING_PASSPHRASE: ${{ secrets.AINER_GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
+          if [[ "${AINER_RELEASE_SIGNING:-}" != "true" ]]; then
+            echo "tag 发布必须设置 repository variable AINER_RELEASE_SIGNING=true" >&2
+            exit 1
+          fi
           if [[ -z "${SIGNING_KEY_BASE64:-}" || -z "${SIGNING_PASSPHRASE:-}" ]]; then
-            echo "AINER_RELEASE_SIGNING=true 但缺少 AINER_GPG_KEY_BASE64/AINER_GPG_PASSPHRASE，签名无法进行" >&2
+            echo "缺少 AINER_GPG_KEY_BASE64/AINER_GPG_PASSPHRASE，签名无法进行" >&2
             exit 1
           fi
           printenv SIGNING_KEY_BASE64 | base64 --decode > "$RUNNER_TEMP/signing.asc"
           gpg --batch --import "$RUNNER_TEMP/signing.asc"
-          gpg --batch --yes --pinentry-mode loopback --passphrase "$SIGNING_PASSPHRASE" \
-            --export-ownertrust >/dev/null
-          echo "gpg_key_id=$(gpg --batch --with-colons --list-secret-keys | awk -F: '/^sec:/{print $5; exit}')" >> "$GITHUB_ENV"
+          gpg_key_id="$(gpg --batch --with-colons --list-secret-keys | awk -F: '/^sec:/{print $5; exit}')"
+          if [[ -z "$gpg_key_id" ]]; then
+            echo "导入后未找到 GPG 私钥" >&2
+            exit 1
+          fi
+          echo "gpg_key_id=$gpg_key_id" >> "$GITHUB_ENV"
 
       - name: Build, sign and publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SIGNING_PASSPHRASE: ${{ secrets.AINER_GPG_PASSPHRASE }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.AINER_GPG_PASSPHRASE }}
         run: |
-          ARGS=(-Drevision="${{ env.release_version }}" -Prelease)
-          if [[ "${AINER_RELEASE_SIGNING:-}" == "true" ]]; then
-            ARGS+=(-Dgpg.keyname="$gpg_key_id" -Dgpg.passphrase="$SIGNING_PASSPHRASE")
+          set -euo pipefail
+          if [[ -z "${MAVEN_GPG_PASSPHRASE:-}" ]]; then
+            echo "缺少 AINER_GPG_PASSPHRASE，签名无法进行" >&2
+            exit 1
           fi
-          ./mvnw --batch-mode --no-transfer-progress "${ARGS[@]}" deploy
+          ./mvnw --batch-mode --no-transfer-progress \
+            -Drevision="$release_version" \
+            -Dgpg.keyname="$gpg_key_id" \
+            -Prelease clean deploy
+
+      - name: Require zero failed, errored, or skipped tests
+        run: ./scripts/check-surefire-results.sh
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@1c608d11d69870c2092266b3f9a6f3abbf17002c # v1.4.3
