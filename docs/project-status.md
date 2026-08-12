@@ -242,6 +242,16 @@ gitleaks、私有分支控制形成批准的补偿措施、签名 key/secret 实
 
 ## 3. 最近验证记录
 
+2026-08-12 ADR-0038：P4 范围精简与企业基建前置
+- **产品方向决策**：基于 Ainer-Boot 核心思想（AI-native 平台内核，非万能企业后台），重新定义 P3/P4：
+  - **P3 扩展**：纳入文件存储 SPI、字典/配置极简模块（开发任何产品后台的阻塞基座）
+  - **P4 收窄**：聚焦 AI 治理深化（Agent 代行 ADR-0031、Knowledge ADR-0034、Evaluation/Guardrails）
+  - **通知/任务/缓存等改为端口 + 文档**：业务语义高度产品特定，Ainer 提供端口契约与最佳实践文档，
+    产品自实现，避免脚手架膨胀为万能工具包
+  - **组织目录（ADR-0032）精简为 P3 可选**：扁平组织 + 任职，复杂层级推迟
+- scaffold-design §13 P3/P4 验收标准已同步更新。
+- **首批代码实现**：文件存储 SPI（`FileStoragePort` + 本地 adapter）→ 字典/配置极简模块。
+
 2026-08-11 P0 治理补齐：CODEOWNERS + 分支保护状态确认
 - 新增 `.github/CODEOWNERS`：按安全/身份、授权、数据库、AI、Workspace、构建发布、Initializer、
   文档决策等领域定义默认 reviewer（`@codefitx`）。当前 private + GitHub 免费版分支保护受计费限制

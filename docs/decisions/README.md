@@ -45,6 +45,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0035](0035-project-initializer-and-manifest-v1-baseline.md) | Accepted | Project Initializer 与 Manifest v1 基线（确定性生成、安全 preview/diff、golden consumer 门禁） |
 | [0036](0036-initializer-crud-generation.md) | Accepted | Initial CRUD 生成：manifest `entities` 段、单表 CRUD 文件清单、PostgreSQL 门禁与 TTCRUD 计时 |
 | [0037](0037-post-greenfield-authorization-baseline.md) | Accepted | post-Greenfield 通用混合细粒度授权基线（取代 ADR-0030，Workspace 语义 + adapter 归属决策） |
+| [0038](0038-p4-scope-refinement-and-enterprise-base.md) | Accepted | P4 范围精简与企业基建前置（文件/字典/配置提入 P3，P4 聚焦 AI 治理，通知/任务/缓存改为端口+文档） |
 
 ## 历史草案与审查记录
 
