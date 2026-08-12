@@ -55,7 +55,7 @@ public class DictionaryApplicationService {
             typeRepository.findById(parentId).orElseThrow(() ->
                     new IllegalArgumentException("Parent type not found: " + parentId));
         }
-        UUID id = UUID.randomUUID();
+        UUID id = dev.ainer.core.uuid.Uuidv7.generate();
         DictionaryType type = new DictionaryType(id, parentId, code, name, nameEn, description,
                 DictionaryStatus.ACTIVE, 0, 0);
         return typeRepository.save(type);
@@ -87,7 +87,7 @@ public class DictionaryApplicationService {
         itemRepository.findActiveByCode(typeId, code).ifPresent(existing -> {
             throw new IllegalArgumentException("Dictionary item already exists: " + code);
         });
-        UUID id = UUID.randomUUID();
+        UUID id = dev.ainer.core.uuid.Uuidv7.generate();
         DictionaryItem item = new DictionaryItem(id, typeId, code, label, labelEn, value, sortIndex,
                 DictionaryStatus.ACTIVE, cssClass, remark, 0);
         return itemRepository.save(item);

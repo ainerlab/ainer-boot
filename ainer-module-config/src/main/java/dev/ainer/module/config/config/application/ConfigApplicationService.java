@@ -7,7 +7,6 @@ import dev.ainer.security.token.AuthenticatedPrincipal;
 import org.jspecify.annotations.Nullable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,14 +21,10 @@ import java.util.UUID;
  * (ADR-0039) — {@code @Cacheable} for read path, {@code @CacheEvict} on writes. Cache backend
  * is swappable: Caffeine (local, default) or Redis/Valkey (distributed).
  *
- * <p>Cache keys:
- * <ul>
- *   <li>{@code config:entry:{namespace}:{key}} — full ConfigEntry (for getValue/getSecret);</li>
- * </ul>
- * Evicted on any setValue/setSecret write.
- *
- * <p>Secret values are never stored in plaintext. The caller supplies the plaintext when setting a
- * secret; the service stores the encrypted ciphertext.
+ * <p>Secret values are encrypted via {@link ConfigEncryptionPort} (AES-GCM default). The caller
+ * supplies <strong>plaintext</strong> to {@link #setSecret}; the service encrypts it before
+ * persistence. {@link #getSecret} decrypts and returns plaintext. The raw ciphertext is never
+ * exposed to callers.
  */
 @Service
 @Transactional
@@ -39,14 +34,17 @@ public class ConfigApplicationService {
 
     private final ConfigEntryRepository entryRepository;
     private final ConfigHistoryRepository historyRepository;
+    private final ConfigEncryptionPort encryption;
     private final Clock clock;
 
     public ConfigApplicationService(
             ConfigEntryRepository entryRepository,
             ConfigHistoryRepository historyRepository,
+            ConfigEncryptionPort encryption,
             Clock clock) {
         this.entryRepository = entryRepository;
         this.historyRepository = historyRepository;
+        this.encryption = encryption;
         this.clock = clock;
     }
 
@@ -67,7 +65,7 @@ public class ConfigApplicationService {
             entryRepository.update(entry.id(), value, null, entry.version(), newVersion);
             recordHistory(entry, entry.value(), value, entry.version(), newVersion, changedBy);
         } else {
-            UUID id = UUID.randomUUID();
+            UUID id = dev.ainer.core.uuid.Uuidv7.generate();
             ConfigEntry entry = new ConfigEntry(id, namespace, key, value, valueType, false, null,
                     description, 0);
             entryRepository.save(entry);
@@ -75,31 +73,33 @@ public class ConfigApplicationService {
         }
     }
 
+    /**
+     * Set a secret config value. The {@code plaintext} is encrypted via {@link ConfigEncryptionPort}
+     * before persistence — the raw plaintext is never stored.
+     */
     @CacheEvict(value = CACHE_CONFIG_ENTRY, key = "#namespace + ':' + #key")
     public void setSecret(
-            String namespace, String key, String encryptedValue, ConfigValueType valueType,
+            String namespace, String key, String plaintext, ConfigValueType valueType,
             @Nullable String description, @Nullable AuthenticatedPrincipal changedBy) {
-        Objects.requireNonNull(encryptedValue, "encryptedValue");
+        Objects.requireNonNull(plaintext, "plaintext");
+        String ciphertext = encryption.encrypt(plaintext);
         Optional<ConfigEntry> existing = entryRepository.findByNamespaceAndKey(namespace, key);
         if (existing.isPresent()) {
             ConfigEntry entry = existing.get();
             long newVersion = entry.version() + 1;
-            entryRepository.update(entry.id(), null, encryptedValue, entry.version(), newVersion);
-            recordHistory(entry, entry.encryptedValue(), encryptedValue, entry.version(), newVersion, changedBy);
+            entryRepository.update(entry.id(), null, ciphertext, entry.version(), newVersion);
+            recordHistory(entry, null, "[encrypted]", entry.version(), newVersion, changedBy);
         } else {
-            UUID id = UUID.randomUUID();
+            UUID id = dev.ainer.core.uuid.Uuidv7.generate();
             ConfigEntry entry = new ConfigEntry(id, namespace, key, null, valueType, true,
-                    encryptedValue, description, 0);
+                    ciphertext, description, 0);
             entryRepository.save(entry);
-            recordHistory(entry, null, encryptedValue, null, 0L, changedBy);
+            recordHistory(entry, null, "[encrypted]", null, 0L, changedBy);
         }
     }
 
     // ---- Read (cached) ----
 
-    /**
-     * Get the raw string value of a non-secret config key. Returns empty if not found or secret.
-     */
     @Cacheable(value = CACHE_CONFIG_ENTRY, key = "#namespace + ':' + #key", unless = "#result == null || !#result.isPresent()")
     @Transactional(readOnly = true)
     public Optional<ConfigEntry> getEntry(String namespace, String key) {
@@ -116,9 +116,15 @@ public class ConfigApplicationService {
         return getValue(namespace, key).map(raw -> parseType(raw, type));
     }
 
+    /**
+     * Get a secret config value as decrypted plaintext. The ciphertext is decrypted via
+     * {@link ConfigEncryptionPort}.
+     */
     @Transactional(readOnly = true)
-    public Optional<String> getEncryptedSecret(String namespace, String key) {
-        return getEntry(namespace, key).filter(ConfigEntry::secret).map(ConfigEntry::encryptedValue);
+    public Optional<String> getSecret(String namespace, String key) {
+        return getEntry(namespace, key)
+                .filter(ConfigEntry::secret)
+                .map(e -> encryption.decrypt(e.encryptedValue()));
     }
 
     @Transactional(readOnly = true)
@@ -140,7 +146,7 @@ public class ConfigApplicationService {
             @Nullable Long oldVersion, @Nullable Long newVersion,
             @Nullable AuthenticatedPrincipal changedBy) {
         historyRepository.insert(new ConfigHistory(
-                UUID.randomUUID(),
+                dev.ainer.core.uuid.Uuidv7.generate(),
                 entry.id(),
                 entry.namespace(),
                 entry.key(),

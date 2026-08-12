@@ -58,7 +58,7 @@ public class AinerRedisCacheAutoConfiguration {
 
         @Override
         public Optional<LockHandle> tryLock(String key, Duration ttl) {
-            String token = UUID.randomUUID().toString();
+            String token = dev.ainer.core.uuid.Uuidv7.generate().toString();
             Boolean acquired = redis.opsForValue()
                     .setIfAbsent(key, token, ttl);
             return Boolean.TRUE.equals(acquired)
@@ -68,12 +68,25 @@ public class AinerRedisCacheAutoConfiguration {
 
         @Override
         public void release(LockHandle handle) {
-            // Token-checked release: only delete if the stored value matches our token.
-            // This prevents releasing a lock that has expired and been re-acquired by another caller.
-            String current = redis.opsForValue().get(handle.key());
-            if (handle.token().equals(current)) {
-                redis.delete(handle.key());
-            }
+            // Atomic token-checked release via Lua script: GET+DEL in a single Redis operation
+            // prevents race where another caller acquires the lock between our GET and DEL.
+            redis.execute((org.springframework.data.redis.core.RedisCallback<Long>) connection -> {
+                byte[] script = """
+                        if redis.call("get", KEYS[1]) == ARGV[1] then
+                            return redis.call("del", KEYS[1])
+                        else
+                            return 0
+                        end
+                        """.getBytes();
+                byte[] keyBytes = handle.key().getBytes();
+                byte[] tokenBytes = handle.token().getBytes();
+                return connection.scriptingCommands().eval(
+                        script,
+                        org.springframework.data.redis.connection.ReturnType.INTEGER,
+                        1,
+                        keyBytes,
+                        tokenBytes);
+            });
         }
     }
 }

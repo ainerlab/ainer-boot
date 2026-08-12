@@ -33,7 +33,9 @@ public sealed class LoggingChannelSender implements ChannelSender
 
     @Override
     public void send(String recipient, String title, String body) {
-        log.info("[NOTIFICATION:{}], recipient={}, title={}, body={}", channel, recipient, title, body);
+        // 不记录 recipient/title/body 原文（可能含 PII/敏感内容），只记录渠道和脱敏哈希
+        log.info("[NOTIFICATION:{}], recipientHash={}, titleLength={}, bodyLength={}",
+                channel, Integer.toHexString(recipient.hashCode()), title.length(), body.length());
     }
 
     @Component("smsSender")

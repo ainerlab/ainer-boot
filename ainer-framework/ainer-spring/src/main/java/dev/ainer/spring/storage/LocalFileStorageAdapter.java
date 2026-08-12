@@ -44,7 +44,7 @@ public class LocalFileStorageAdapter implements FileStoragePort {
         if (!nsDir.startsWith(baseDirectory)) {
             throw new BusinessException(StorageErrorCode.INVALID_NAMESPACE);
         }
-        String generatedKey = namespace + "/" + UUID.randomUUID();
+        String generatedKey = namespace + "/" + dev.ainer.core.uuid.Uuidv7.generate();
         Path target = baseDirectory.resolve(generatedKey).normalize();
         if (!target.startsWith(baseDirectory)) {
             throw new BusinessException(StorageErrorCode.INVALID_KEY);

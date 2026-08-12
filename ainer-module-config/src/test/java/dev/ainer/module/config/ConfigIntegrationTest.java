@@ -105,22 +105,23 @@ class ConfigIntegrationTest {
     }
 
     @Test
-    void secretIsStoredEncryptedAndNotRetrievableAsPlaintext() {
-        service.setSecret("app", "db.password", "AES-GCM:ciphertext==", ConfigValueType.STRING,
-                "Encrypted DB password", null);
+    void secretIsEncryptedAndDecryptedCorrectly() {
+        // setSecret 接收明文，内部 AES-GCM 加密后存储
+        service.setSecret("app", "db.password", "my-secret-db-password", ConfigValueType.STRING,
+                "DB password", null);
 
-        // getValue 不返回 secret
-        Optional<String> plaintext = service.getValue("app", "db.password");
-        assertThat(plaintext).isEmpty();
+        // getValue 不返回 secret（secret 不走明文路径）
+        Optional<String> viaGetValue = service.getValue("app", "db.password");
+        assertThat(viaGetValue).isEmpty();
 
-        // getEncryptedSecret 返回密文
-        Optional<String> ciphertext = service.getEncryptedSecret("app", "db.password");
-        assertThat(ciphertext).contains("AES-GCM:ciphertext==");
+        // getSecret 解密后返回明文
+        Optional<String> decrypted = service.getSecret("app", "db.password");
+        assertThat(decrypted).contains("my-secret-db-password");
     }
 
     @Test
     void cannotSetPlaintextForExistingSecretKey() {
-        service.setSecret("app", "api.key", "encrypted==", ConfigValueType.STRING, null, null);
+        service.setSecret("app", "api.key", "my-api-key", ConfigValueType.STRING, null, null);
         assertThatThrownBy(() -> service.setValue("app", "api.key", "plaintext",
                 ConfigValueType.STRING, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -130,7 +131,7 @@ class ConfigIntegrationTest {
     void getByNamespaceReturnsAllEntries() {
         service.setValue("ns", "a", "1", ConfigValueType.STRING, null, null);
         service.setValue("ns", "b", "2", ConfigValueType.STRING, null, null);
-        service.setSecret("ns", "c", "enc==", ConfigValueType.STRING, null, null);
+        service.setSecret("ns", "c", "my-secret", ConfigValueType.STRING, null, null);
 
         List<ConfigEntry> entries = service.getByNamespace("ns");
         assertThat(entries).hasSize(3);

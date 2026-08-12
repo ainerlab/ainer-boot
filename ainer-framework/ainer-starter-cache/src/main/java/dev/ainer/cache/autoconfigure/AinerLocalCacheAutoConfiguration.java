@@ -52,7 +52,7 @@ public class AinerLocalCacheAutoConfiguration {
 
         @Override
         public Optional<LockHandle> tryLock(String key, Duration ttl) {
-            String token = UUID.randomUUID().toString();
+            String token = dev.ainer.core.uuid.Uuidv7.generate().toString();
             LockHandle handle = new LockHandle(key, token);
             var existing = locks.putIfAbsent(key, handle);
             if (existing != null) {

@@ -61,7 +61,7 @@ public class NotificationApplicationService {
         templateRepository.findActiveByCode(code).ifPresent(t -> {
             throw new IllegalArgumentException("Template already exists: " + code);
         });
-        UUID id = UUID.randomUUID();
+        UUID id = dev.ainer.core.uuid.Uuidv7.generate();
         Instant now = clock.instant();
         NotificationTemplate template = new NotificationTemplate(
                 id, code, channel, titleTemplate, bodyTemplate,
@@ -95,7 +95,7 @@ public class NotificationApplicationService {
             String title, String body, Map<String, Object> payload) {
         Instant now = clock.instant();
         return new NotificationRecord(
-                UUID.randomUUID(), templateCode, channel, recipient, title, body, payload,
+                dev.ainer.core.uuid.Uuidv7.generate(), templateCode, channel, recipient, title, body, payload,
                 NotificationStatus.PENDING, 0, 3, null, null, null, now, now);
     }
 
