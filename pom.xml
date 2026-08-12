@@ -29,6 +29,7 @@
         <module>ainer-module-authorization</module>
         <module>ainer-module-dictionary</module>
         <module>ainer-module-config</module>
+        <module>ainer-module-notification</module>
         <module>ainer-server</module>
         <module>ainer-authorization-server</module>
         <module>ainer-offstate-app</module>
