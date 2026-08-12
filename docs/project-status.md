@@ -250,7 +250,13 @@ gitleaks、私有分支控制形成批准的补偿措施、签名 key/secret 实
     产品自实现，避免脚手架膨胀为万能工具包
   - **组织目录（ADR-0032）精简为 P3 可选**：扁平组织 + 任职，复杂层级推迟
 - scaffold-design §13 P3/P4 验收标准已同步更新。
-- **首批代码实现**：文件存储 SPI（`FileStoragePort` + 本地 adapter）→ 字典/配置极简模块。
+- **文件存储 SPI**（首批 P3 基建代码）：`FileStoragePort` 端口 + `StoredFile` record +
+  `StorageErrorCode`（ainer-core）；`LocalFileStorageAdapter` 本地适配器 +
+  `LocalFileStorageAutoConfiguration`（ainer-spring，`@ConditionalOnMissingBean`，产品可覆盖）；
+  UUID 存储键、namespace 隔离、路径遍历防护；10 项单元测试全绿。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：**309 tests / 0 failure / 0 error /
+  0 skipped**。零回归。
+- **下一批**：字典/配置极简模块（`type-code-label` + `namespace-key-value`）。
 
 2026-08-11 P0 治理补齐：CODEOWNERS + 分支保护状态确认
 - 新增 `.github/CODEOWNERS`：按安全/身份、授权、数据库、AI、Workspace、构建发布、Initializer、
