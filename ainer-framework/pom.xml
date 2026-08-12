@@ -22,6 +22,7 @@
         <module>ainer-starter-web</module>
         <module>ainer-starter-persistence</module>
         <module>ainer-starter-security</module>
+        <module>ainer-starter-cache</module>
         <module>ainer-test-support</module>
     </modules>
 </project>
