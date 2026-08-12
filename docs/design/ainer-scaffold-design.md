@@ -400,8 +400,8 @@ Industry Products
 | **P0 Baseline Integrity** | 让代码、文档、测试、数据与许可证事实可信 | PostgreSQL 18 正式门禁 0 skipped；未验收能力保持 Proposed 或默认关闭；秘密扫描与依赖许可证无未处置问题；权威文档与 ADR 无冲突 |
 | **P1 Scaffold Ready** | 把平台内核变成可发布、可独立消费的制品 | 非 SNAPSHOT BOM/Starter 发布；Maven 3.9+ 与 Maven 4 独立消费者通过；最小应用关闭全部可选模块仍能启动；source/Javadoc、LICENSE/NOTICE、SBOM、checksum/signature/provenance 和兼容政策齐全 |
 | **P2 Create & Generate** | 安全、确定性地创建项目和纵向 CRUD | manifest v1、preview/diff、默认不覆盖/不改菜单/不写数据库；同版本同 manifest 生成无差异；TTFR 与 TTCRUD 目标通过；生成物通过 PostgreSQL 与 golden consumer 门禁 |
-| **P3 Minimum Admin & First Consumer** | 用可用管理面、最小企业基座和真实产品证明脚手架边界 | Identity、可选精简组织/任职、RBAC/数据范围、**文件存储 SPI**、**字典/配置**、菜单与审计形成关键 E2E；Initializer 生成 `xq-platform-next`；不含 Ainer 源码副本或 SNAPSHOT；两个小程序 SDK 可编译；至少一个真实纵向切片和一次 Ainer minor 升级通过（ADR-0038） |
-| **P4 AI Governance Deepening** | AI 治理深化：Agent、Knowledge、Evaluation 形成完整安全闭环 | Agent/Tool/RAG/Evaluation 具备身份、权限、预算、数据治理、人工反馈和回归门禁；AI 模块关闭时企业应用不受影响；通知/任务/缓存等通过端口 + 文档支持，不提供通用实现（ADR-0038） |
+| **P3 Minimum Admin & First Consumer** | 用可用管理面、商业级企业基座和真实产品证明脚手架边界 | Identity、组织/任职/岗位（ADR-0032）、RBAC/数据范围、**文件存储（SPI+元数据）**、**字典（树形+多语言+缓存）**、**配置（类型安全+热更新+版本）**、**通知（多渠道+模板+重试）**、菜单与审计形成关键 E2E；Initializer 生成 `xq-platform-next`；不含 Ainer 源码副本或 SNAPSHOT；两个小程序 SDK 可编译；至少一个真实纵向切片和一次 Ainer minor 升级通过（ADR-0038） |
+| **P4 AI Governance Deepening** | AI 治理深化 + 任务/幂等补齐 | Agent/Tool/RAG/Evaluation 具备身份、权限、预算、数据治理、人工反馈和回归门禁；任务调度管理面闭环；AI 模块关闭时企业应用不受影响（ADR-0038） |
 | **P5 Ecosystem & Commercial Delivery** | 建立生态、升级、LTS 和商业交付闭环 | 至少两个独立消费者；模块安装/移除不改 core；连续两个 minor 完成升级验证；兼容清单、升级助手、entitlement、LTS/补丁与行业模块交付流程落地 |
 
 P3 不等待 P4 或 P5。否则 Ainer 会继续成为只被自身使用的平台，而不是经过外部产品验证的
