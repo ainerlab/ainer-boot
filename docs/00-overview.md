@@ -49,16 +49,21 @@ ainer-dependencies                    统一依赖版本
 
 ainer-framework/
 ├── ainer-core                        无 Spring 依赖的核心契约
-├── ainer-spring                      Spring 共性
+├── ainer-spring                      Spring 共性 + 文件存储 adapter
 ├── ainer-security                    可信主体与 authority 契约
 ├── ainer-starter-web                 HTTP、错误与请求追踪
 ├── ainer-starter-persistence         MyBatis-Plus/MyBatis、Flyway、PostgreSQL、UUID
 ├── ainer-starter-security            JWT Resource Server 共性
+├── ainer-starter-cache               Spring Cache + Caffeine/Redis + 分布式锁（ADR-0039）
 └── ainer-test-support                集成测试基座（RestTestClient、Testcontainers、PostgreSQL）
 
 ainer-server                          业务 Resource Server
 ├── ainer-module-workspace            membership 资源、成员与授权审计
-└── ainer-module-ai-runtime           模型网关、策略、用量与费用审计
+├── ainer-module-ai-runtime           模型网关、策略、用量与费用审计
+├── ainer-module-authorization        混合细粒度授权 + adapter + 审计（ADR-0037）
+├── ainer-module-dictionary           树形字典 + 多语言 + Spring Cache（ADR-0038）
+├── ainer-module-config               动态配置 + 类型安全 + 热更新 + 版本（ADR-0038）
+└── ainer-module-notification         多渠道通知 + PG SKIP LOCKED 队列（ADR-0038）
 
 ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管理面
 └── ainer-module-identity             HumanAccount、ServicePrincipal、登录身份与 Credential

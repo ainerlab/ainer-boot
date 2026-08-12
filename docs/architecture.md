@@ -79,14 +79,18 @@ ainer-boot/
 │   ├── ainer-starter-web/
 │   ├── ainer-starter-persistence/       # 已落地的 MyBatis-Plus/MyBatis/Flyway/PostgreSQL 共性
 │   ├── ainer-starter-security/          # Resource Server 通用能力
+│   ├── ainer-starter-cache/             # Spring Cache + Caffeine/Redis + 分布式锁（ADR-0039）
 │   ├── ainer-starter-observability/
 │   └── ainer-starter-test/
 ├── ainer-module-identity/                # HumanAccount/ServicePrincipal/Credential foundation（去租户化）
 ├── ainer-module-authorization/           # ADR-0037：决策器、6 表持久化、管理/查询与 Spring 端点适配
+├── ainer-module-dictionary/              # 树形字典 + 多语言 + Spring Cache（ADR-0038）
+├── ainer-module-config/                  # 动态配置 + 类型安全 + 热更新 + 版本历史 + secret（ADR-0038）
+├── ainer-module-notification/            # 多渠道通知 + PG SKIP LOCKED 队列 + virtual thread（ADR-0038）
 ├── ainer-module-organization/            # Proposed：可选组织、员工任职、岗位与团队目录
 ├── ainer-module-workspace/               # 去租户化的资源授权参考切片（仅 workspace_id/成员关系）
 ├── ainer-module-ai-runtime/              # 模型网关、调用与费用审计
-├── ainer-server/                          # 已落地的业务 Resource Server 发行物
+├── ainer-server/                          # 业务 Resource Server（装配 workspace/ai/auth/dict/config/notif）
 ├── ainer-authorization-server/            # 已落地的独立认证发行物
 └── ainer-app-*/                           # 满足明确拆分条件后创建的服务发行物
 ```

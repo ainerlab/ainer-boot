@@ -34,6 +34,11 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 组织/行业模板与策略包是 ADR-0035 决策 7 明示的 v1 非目标，属 Studio/Enterprise 扩展
 （设计文档能力矩阵第 94 行），移交 P3+ 扩展清单，不再作为 P2 阻塞项。
 
+2026-08-12 P3 企业基建批次完成：文件存储 SPI、字典、配置、通知、缓存 starter、Spring Cache 改造。
+新建 5 个模块（ainer-module-dictionary/config/notification + ainer-starter-cache + 文件存储 SPI），
+全部装配到 ainer-server。ADR-0038（P4 范围精简）+ ADR-0039（缓存基础设施）Accepted。
+验证基线：336 tests / 0 fail / 0 error / 0 skipped，23 模块全部 SUCCESS。
+
 2026-08-11 已确认按分阶段方式推进 `0.1`：先形成只供 `xq-platform-next` 使用的受控
 `0.1.0-rc.1`，再以远端不可变制品完成一个真实产品纵向切片、升级和回滚验证，之后才决定提升为
 `0.1.0` 并开放给其他内部产品。方法级 AOP、RFC 9470、完整 obligation executor、组织目录、RAG/
