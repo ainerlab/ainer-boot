@@ -82,8 +82,8 @@ while IFS= read -r -d '' installed_pom; do
   fi
 done < <(find "$installed_root" -type f -name '*.pom' ! -name '*-build.pom' -print0)
 
-[[ "${#installed_poms[@]}" -eq 19 ]] \
-  || fail "expected 19 installed Ainer consumer POMs, found ${#installed_poms[@]}"
+[[ "${#installed_poms[@]}" -eq 23 ]] \
+  || fail "expected 23 installed Ainer consumer POMs, found ${#installed_poms[@]}"
 
 # Ainer 的公开配置类（含 @ConfigurationProperties 的 library/module 制品）必须随 JAR
 # 生成 spring-configuration-metadata.json（ADR-0029 P0-3）。应用可执行 JAR（ainer-server、
