@@ -30,6 +30,10 @@
         </dependency>
         <dependency>
             <groupId>dev.ainer</groupId>
+            <artifactId>ainer-starter-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>dev.ainer</groupId>
             <artifactId>ainer-starter-persistence</artifactId>
         </dependency>
         <dependency>

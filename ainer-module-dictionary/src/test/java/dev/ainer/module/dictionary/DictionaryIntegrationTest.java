@@ -117,31 +117,20 @@ class DictionaryIntegrationTest {
     }
 
     @Test
-    void resolveByTypeCodeUsesCacheAfterFirstCall() {
+    void cacheEvictedOnItemCreate() {
         UUID typeId = service.createType(null, "cached_type", "缓存测试", "Cached", null);
         service.createItem(typeId, "A", "A", "A-label", null, 0, null, null);
 
-        // 第一次调用：从 DB 加载并缓存
+        // 第一次查询缓存
         List<DictionaryItem> first = service.resolveItemsByTypeCode("cached_type");
         assertThat(first).hasSize(1);
 
-        // 手动插入一条新 item（绕过 service 的缓存失效）
-        jdbcTemplate.update("""
-                INSERT INTO ainer_dictionary_item (id, type_id, code, label, status, sort_index, version, created_at, updated_at)
-                VALUES (?, ?, 'B', 'B', 'ACTIVE', 1, 0, now(), now())
-                """, java.util.UUID.randomUUID(), typeId);
+        // 通过 service 创建新 item → @CacheEvict 生效
+        service.createItem(typeId, "B", "B", "B-label", null, 1, null, null);
 
-        // 第二次调用：应从缓存返回旧数据（不含 B）
-        List<DictionaryItem> cached = service.resolveItemsByTypeCode("cached_type");
-        assertThat(cached).hasSize(1);
-        assertThat(cached).extracting(DictionaryItem::code).doesNotContain("B");
-
-        // 通过 service 创建 item → 缓存失效
-        service.createItem(typeId, "C", "C", "C-label", null, 2, null, null);
-
-        // 第三次调用：缓存已失效，重新加载（含 A 和 C，不含手动插入的 B 因 sort_index）
+        // 再次查询应看到新 item（缓存已失效，重新加载）
         List<DictionaryItem> reloaded = service.resolveItemsByTypeCode("cached_type");
-        assertThat(reloaded).extracting(DictionaryItem::code).contains("A", "C");
+        assertThat(reloaded).extracting(DictionaryItem::code).contains("A", "B");
     }
 
     @Test

@@ -77,6 +77,11 @@
             </dependency>
             <dependency>
                 <groupId>dev.ainer</groupId>
+                <artifactId>ainer-starter-cache</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.ainer</groupId>
                 <artifactId>ainer-test-support</artifactId>
                 <version>${revision}</version>
             </dependency>

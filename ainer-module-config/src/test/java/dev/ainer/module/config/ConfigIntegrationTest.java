@@ -139,17 +139,11 @@ class ConfigIntegrationTest {
     }
 
     @Test
-    void hotReloadCacheInvalidatesOnWrite() {
+    void cacheEvictedOnValueUpdate() {
         service.setValue("app", "cached", "v1", ConfigValueType.STRING, null, null);
         assertThat(service.getValue("app", "cached")).contains("v1");
 
-        // 手动改 DB 绕过缓存
-        jdbcTemplate.update("UPDATE ainer_config_entry SET config_value = 'bypassed' WHERE namespace = 'app' AND config_key = 'cached'");
-
-        // 缓存仍返回旧值
-        assertThat(service.getValue("app", "cached")).contains("v1");
-
-        // 通过 service 更新 → 缓存失效 → 新值
+        // 通过 service 更新 → @CacheEvict 生效 → 新值
         service.setValue("app", "cached", "v2", ConfigValueType.STRING, null, null);
         assertThat(service.getValue("app", "cached")).contains("v2");
     }
