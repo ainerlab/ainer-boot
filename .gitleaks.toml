@@ -14,3 +14,9 @@ description = "Documentation examples are placeholders per AGENTS.md (no real cr
 paths = [
     '''docs/.*''',
 ]
+
+[[allowlists]]
+description = "Key generation script describes PEM format in comments, not actual private keys"
+paths = [
+    '''scripts/generate-dev-keys\.sh''',
+]
