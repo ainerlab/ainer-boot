@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.dictionary.dictionary.infrastructure.DictionaryItemMapper">
+
+    <resultMap id="ItemRowMap" type="dev.ainer.module.dictionary.dictionary.infrastructure.DictionaryItemRow">
+        <id property="id" column="id"/>
+        <result property="typeId" column="type_id"/>
+        <result property="code" column="code"/>
+        <result property="label" column="label"/>
+        <result property="labelEn" column="label_en"/>
+        <result property="value" column="value"/>
+        <result property="sortIndex" column="sort_index"/>
+        <result property="status" column="status"/>
+        <result property="cssClass" column="css_class"/>
+        <result property="remark" column="remark"/>
+        <result property="version" column="version"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="itemColumns">
+        id, type_id, code, label, label_en, value, sort_index, status, css_class, remark, version, created_at, updated_at
+    </sql>
+
+    <select id="insertReturningId" resultType="java.util.UUID">
+        INSERT INTO ainer_dictionary_item (
+            id, type_id, code, label, label_en, value, sort_index, status, css_class, remark, version, created_at, updated_at
+        ) VALUES (
+            #{row.id}, #{row.typeId}, #{row.code}, #{row.label}, #{row.labelEn}, #{row.value},
+            #{row.sortIndex}, #{row.status}, #{row.cssClass}, #{row.remark}, #{row.version}, #{now}, #{now}
+        )
+        RETURNING id
+    </select>
+
+    <select id="selectById" resultMap="ItemRowMap">
+        SELECT <include refid="itemColumns"/>
+        FROM ainer_dictionary_item WHERE id = #{id}
+    </select>
+
+    <select id="selectActiveByCode" resultMap="ItemRowMap">
+        SELECT <include refid="itemColumns"/>
+        FROM ainer_dictionary_item
+        WHERE type_id = #{typeId} AND code = #{code} AND status = 'ACTIVE'
+    </select>
+
+    <select id="selectActiveByTypeId" resultMap="ItemRowMap">
+        SELECT <include refid="itemColumns"/>
+        FROM ainer_dictionary_item
+        WHERE type_id = #{typeId} AND status = 'ACTIVE'
+        ORDER BY sort_index, code
+    </select>
+
+</mapper>
