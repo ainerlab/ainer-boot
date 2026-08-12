@@ -19,6 +19,11 @@ public final class BusinessException extends RuntimeException {
         this.errorCode = Objects.requireNonNull(errorCode, "errorCode");
     }
 
+    public BusinessException(ErrorCode errorCode, @Nullable Throwable cause) {
+        super(errorCode.defaultMessage(), cause);
+        this.errorCode = Objects.requireNonNull(errorCode, "errorCode");
+    }
+
     public ErrorCode errorCode() {
         return errorCode;
     }

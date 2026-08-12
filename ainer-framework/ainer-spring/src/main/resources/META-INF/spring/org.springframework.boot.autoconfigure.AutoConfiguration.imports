@@ -1,1 +1,2 @@
 dev.ainer.spring.runtime.AinerRuntimeAutoConfiguration
+dev.ainer.spring.storage.LocalFileStorageAutoConfiguration
