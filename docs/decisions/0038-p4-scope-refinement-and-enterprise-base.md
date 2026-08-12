@@ -1,10 +1,15 @@
 # ADR-0038：P4 范围精简与企业基建前置
 
-- 状态：Accepted
-- 日期：2026-08-12
+- 状态：Superseded by [ADR-0040](0040-p3-enterprise-base-and-1.0-product-contract.md)
+- 日期：2026-08-12（初版 Accepted）；2026-08-13（Superseded）
 - 决策者：Ainer 项目维护者
-- 取代：无（局部修订 `design/ainer-scaffold-design.md` §13 P3/P4 验收标准）
-- 被取代：无
+- 取代：无
+- 被取代：[ADR-0040](0040-p3-enterprise-base-and-1.0-product-contract.md)
+
+> ⚠️ **维护规则违规记录（2026-08-13）**：本 ADR 的 §3 结论曾被**直接改写**（从「端口+文档，产品自实现」
+> 改为「商业级完整实现 + SPI 可替换」），违反 `decisions/README.md` 维护规则：「已接受 ADR 不改写结论。
+> 改变结论时新增 ADR，并在旧 ADR 标记被取代」。ADR-0040 正式取代本 ADR，以合规方式记录「商业级完整实现」
+> 的决策。本 ADR 文本保留当前状态（含被改写后的 §3），不回退内容——改写事实本身作为历史教训保留。
 
 ## 背景
 
