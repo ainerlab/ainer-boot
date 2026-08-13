@@ -4,6 +4,10 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
+当前无尚未归入版本的用户可见变化。
+
+## [0.1.0-rc.3] - 2026-08-13
+
 ### Fixed
 
 - **Initializer 独立构建合同补正（2026-08-13）**：修复 Project Initializer 的生成项目 README
@@ -11,7 +15,8 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   Wrapper 3.3.4，固定 Maven 3.9.16 的 Maven Central 地址与 SHA-256；POSIX 写入保留 `mvnw`
   执行位，`diff` 同时检测字节与执行位漂移。Initializer consumer、TTFR 与 TTCRUD 门禁改为使用
   生成项目自己的 Wrapper，不再借用 Ainer 生产者的 Maven 4 Wrapper。该缺口由首个产品消费者
-  `xq-platform-next` 复核发现；修复尚未进入 `v0.1.0-rc.2`，必须发布新版本坐标后才能远端消费。
+  `xq-platform-next` 复核发现；`v0.1.0-rc.2` 保持不可变，本修复归入唯一的新候选
+  `v0.1.0-rc.3`。在 tag workflow 全部门禁完成前，不宣称该坐标已经可以远端消费。
 
 ## [0.1.0-rc.2] - 2026-08-13
 
@@ -373,5 +378,6 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - 稳定版仍要求 `xq-platform-next` 从远端 RC 完成真实纵向切片、migration replay、升级与回滚；
   本仓库测试和 RC 发布不能替代产品证据。
 
-[Unreleased]: https://github.com/ainerlab/ainer-boot/compare/v0.1.0-rc.2...HEAD
+[Unreleased]: https://github.com/ainerlab/ainer-boot/compare/v0.1.0-rc.3...HEAD
+[0.1.0-rc.3]: https://github.com/ainerlab/ainer-boot/releases/tag/v0.1.0-rc.3
 [0.1.0-rc.2]: https://github.com/ainerlab/ainer-boot/releases/tag/v0.1.0-rc.2

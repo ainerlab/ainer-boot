@@ -38,8 +38,8 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 OpenPGP 签名、107/107 远端制品读回以及 Maven 3/Maven 4/Project Initializer 空仓消费均已通过。
 随后由 `xq-platform-next` 复核发现，`rc.2` 生成的项目缺少 README 已约定的 Maven Wrapper；当时
 的 Initializer 门禁借用了 Ainer 生产者 Wrapper，因而没有覆盖生成项目自带工具链这一合同。当前
-开发版本已补正，必须发布唯一的新 RC 后，产品才能以 `rc.2` 为升级/回滚起点、以新 RC 为最终
-消费版本完成真实业务纵向切片和 migration replay。
+开发版本已补正，必须发布唯一的新候选 `v0.1.0-rc.3` 后，产品才能以 `rc.2` 为升级/回滚起点、
+以 `rc.3` 为最终消费版本完成真实业务纵向切片和 migration replay。
 `0.1.0-rc.1` 仍是 withdrawn/non-qualifying，禁止消费或复用；当前开发版本仍为
 `0.1.0-SNAPSHOT`。`rc.2` 不是稳定版、公开发行版、生产就绪或 1.0 声明；动态门禁只以
 [`docs/project-status.md`](docs/project-status.md) 为准。
