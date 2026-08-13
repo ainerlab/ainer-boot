@@ -49,8 +49,9 @@ SPI），全部装配到 ainer-server。ADR-0039 Accepted；ADR-0038 已因决�
 工程版本保持 `0.1.0-SNAPSHOT`，下一候选必须使用 `0.1.0-rc.2` 或更高唯一版本。当前发布加固代码已
 加入 annotated tag/source 校验、版本存在性预检、passphrase-protected GPG 与 fingerprint 固定、远端
 Maven 3/4 与 Initializer 空仓消费、107 个主制品/107 个签名完整读回、签名
-SBOM/checksum/provenance 和最后创建 immutable GitHub Release；本地实现与验证已完成，尚需远端 CI
-与新 RC 实跑证据。许可状态仍为私有/专有；
+SBOM/checksum/provenance 和最后创建 immutable GitHub Release；本地实现、验证与 PR #3 head CI
+已完成，最终代码门禁由 run `31664911800` 验证通过；尚需合并 commit 的默认分支 CI 与新 RC 实跑
+证据。许可状态仍为私有/专有；
 公开发行必须另行完成 LICENSE/NOTICE、品牌资产和对外许可决策。
 
 ## 2. 当前已完成能力与历史施工记录
@@ -273,17 +274,21 @@ SBOM/checksum/provenance 和最后创建 immutable GitHub Release；本地实现
   不再 `continue-on-error`，也不把项目 provenance 宣称为 GitHub Attestation/SLSA 等级。
 - **虚拟线程矩阵**：修复 Ubuntu 上 `command -v ab` 检查后仍硬编码 `/usr/sbin/ab` 的 CI 失败，统一使用
   实际解析路径，并修正 `AINNER_VERSION` 拼写。缩短版本地双模式矩阵通过：平台/虚拟两种模式的
-  JDBC 与等待接口各 40 请求，合计 160 请求、0 failed；完整 matrix 数值须由本变更远端 CI 重新产生。
+  JDBC 与等待接口各 40 请求。run `31664911800` 的完整矩阵四场景各完成 2000 请求，Non-2xx、
+  Connect、Receive、Exceptions 全为 0；Length-only 分别为 `2/0/4/0`。脚本现显式解析结果并对真实
+  HTTP/传输失败关闭，不再让 `ab ... || true` 掩盖故障；Length 差异只作为动态响应观测记录。
 - **本地验证**：JDK 25 + Maven 4.0.0-rc-6 `./mvnw clean verify` 为 23/23 SUCCESS，
   **336 tests / 0 failure / 0 error / 0 skipped**；本地 Maven 3/4 Golden Consumer、Initializer
   普通/PostgreSQL/CRUD 门禁通过。passphrase-protected 临时 key 已分别验证根 reactor 与 parentless BOM
   的 GPG 配置；本地 HTTP registry 夹具完成 107 个主制品 + 107 个签名读回、精确 fingerprint 验证和
   107-subject provenance。shell/发布合同、严格 SemVer 正负例、版本存在性正负例、workflow YAML 与
   `git diff --check` 均通过。
-- **证据边界**：上述 registry 结果使用本地一次性夹具，不是 GitHub Packages 证据；正式 key 已在
-  隔离 keyring 完成签名 probe、根 reactor 与 parentless BOM Maven GPG 验证，但尚未执行 tag workflow。
-  release hardening commit `b65bc92` 已推送 PR #3，远端 CI/gitleaks/完整 matrix 正在等待终态；
-  `rc.2+` deploy、远端消费者与 immutable GitHub Release 均未发生。
+- **PR 远端验证**：最终代码 commit `1328d27` 的 run `31664911800` 全绿：quality、gitleaks、完整
+  virtual-thread matrix 成功；336/0/0/0，Maven 3/4 Consumer 与 Initializer 三通道通过，TTFR 48s、
+  TTCRUD 73s。该结果仍是 PR head 证据，合并 commit 必须由默认分支 CI 单独验证。
+- **证据边界**：本地 registry 结果使用一次性夹具，不是 GitHub Packages 证据；正式 key 已在隔离
+  keyring 完成签名 probe、根 reactor 与 parentless BOM Maven GPG 验证，但尚未执行 tag workflow。
+  `rc.2` deploy、远端消费者与 immutable GitHub Release 均未发生。
 
 2026-08-12 历史 ADR-0038 批次：P4 范围精简与企业基建前置（已被 ADR-0040 取代）
 - **决策状态**：下列方向是当时记录；ADR-0038 后续被直接改写，现已由 ADR-0040 合规取代。当前
@@ -1105,8 +1110,9 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 
 `0.1` 主线按以下顺序推进：
 
-1. 等待 PR #3 最新 commit 的 CI/gitleaks/完整 virtual-thread matrix 终态，完成范围评审后合并到默认
-   分支 `dev`；正式 signing key、fingerprint、Immutable Releases 与对应 variables 已配置；
+1. PR #3 的最终代码 CI/gitleaks/完整 virtual-thread matrix 已通过；完成本状态记录的 CI 后合并到
+   默认分支 `dev`，再验证精确 merge commit；正式 signing key、fingerprint、Immutable Releases 与
+   对应 variables 已配置；
 2. `CHANGELOG.md` 已冻结 `0.1.0-rc.2` 章节；合并并取得默认分支精确 SHA 的 CI 后，创建全新
    annotated `v0.1.0-rc.2` tag，要求 workflow 完成 107/107 远端验签、空仓消费者、签名证据和
    immutable GitHub Release；
