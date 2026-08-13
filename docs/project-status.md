@@ -39,17 +39,24 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 Ainer 生产者仓库的 Maven 4 Wrapper，因而“生成项目独立构建”的证据不完整。当前开发分支已补入
 Apache Maven Wrapper 3.3.4、固定 Maven 3.9.16 官方发行包与 SHA-256、POSIX 执行位写入/diff，
 并让 consumer/TTFR/TTCRUD 使用生成项目自己的 Wrapper。定向测试与独立 Wrapper 冒烟已通过；
-完整 reactor、三通道消费者、TTFR 与 TTCRUD 本地门禁也已通过。唯一的新候选目标已冻结为
-`v0.1.0-rc.3`，annotated tag、远端制品与 immutable GitHub Release 尚未创建。
-因此 P2 的已发布实现合同暂时重开；`rc.2` 保持不可变，只作为升级/回滚的已发布起点而非最终
-消费目标。只有 `rc.3` 发布并完成
-`rc.2 -> rc.3 -> rc.2` 的升级/回滚验证后，才能重新关闭这一缺口。
+完整 reactor、三通道消费者、TTFR 与 TTCRUD 本地门禁也已通过。修复已进入已发布候选
+`v0.1.0-rc.3`；远端 Initializer CLI 生成的三个项目均携带并实际使用自己的 Maven 3.9.16 Wrapper，
+P2 的已发布实现合同已重新关闭。`rc.2` 保持不可变，只作为升级/回滚的已发布起点；G2 仍要求
+`xq-platform-next` 完成 `rc.2 -> rc.3 -> rc.2` 的真实产品升级/回滚与 migration replay。
 
 2026-08-12 P3 企业基建首批代码完成：文件存储 SPI、字典、配置、通知、缓存 starter、Spring Cache
 改造。新建 5 个模块（ainer-module-dictionary/config/notification + ainer-starter-cache + 文件存储
 SPI），全部装配到 ainer-server。ADR-0039 Accepted；ADR-0038 已因决策维护违规被 ADR-0040 合规取代。
 最近完整基线为 338 tests / 0 fail / 0 error / 0 skipped，23 模块全部 SUCCESS。G1 尚未关闭：文件
 元数据持久化、P3 服务端管理 API/OpenAPI 与对应安全/审计门禁仍需完成。
+
+2026-08-13 `v0.1.0-rc.3` 已成为当前**合格受控 RC**：annotated tag、不可变 GitHub Release 与默认
+分支精确绑定到 merge commit `666b1556f11935925369586152a3791180b7314e`；默认分支 run
+`31675092195` 和发布 run `31675920731` 均成功。发布流程完成 338 tests / 0 failure / 0 error /
+0 skipped、107 个主制品/107 个 OpenPGP 签名的远端完整读回、Maven 3/Maven 4 空仓消费和从远端
+CLI 执行的 Initializer 普通/PostgreSQL/CRUD 三通道；生成项目自带并实际使用锁定 Maven 3.9.16
+的 Wrapper。Release 是 prerelease、非 draft、`immutable=true`，含 16 个签名证据资产；发布后
+独立下载验证 `EVIDENCE-SHA256SUMS` 的 14 项、全部适用 detached signatures 与精确 fingerprint。
 
 2026-08-13 `v0.1.0-rc.2` 已按 ADR-0041 完成第一个**合格受控 RC**：annotated tag、不可变 GitHub
 Release 与默认分支精确绑定到 merge commit `0f99ee08f5d9145bc5bc72052eaf59774aad8054`；默认分支
@@ -60,11 +67,11 @@ Release。Release 有 16 个 assets；发布后又在隔离 keyring 验证 7 个
 `EVIDENCE-SHA256SUMS` 的 14 项全部通过。GitHub Attestations 因未显式启用而按设计跳过，强制的
 Ainer 项目签名 provenance 已通过。
 
-这关闭了 P1 的合格受控 RC 发布门禁，但没有关闭 G2。Initializer Wrapper 缺口要求发布唯一的
-`v0.1.0-rc.3`；`xq-platform-next` 需以远端 `rc.2` 为升级起点、以 `rc.3` 为最终消费版本，
+`rc.2` 关闭了 P1 的首个合格受控 RC 发布门禁；`rc.3` 又关闭了 Initializer Wrapper 的已发布合同
+缺口，但没有关闭 G2。`xq-platform-next` 仍需以远端 `rc.2` 为升级起点、以 `rc.3` 为最终消费版本，
 完成真实产品纵向切片、PostgreSQL migration replay、升级和回滚，之后才能评估稳定 `0.1.0`。
 `0.1.0-rc.1` 仍是 **withdrawn / non-qualifying**，禁止消费、复用、移动或覆盖；当前开发版本保持
-`0.1.0-SNAPSHOT`。`rc.2` 不是稳定版、公开发行版、生产就绪或 1.0 声明。许可状态仍为私有/专有；
+`0.1.0-SNAPSHOT`。`rc.3` 不是稳定版、公开发行版、生产就绪或 1.0 声明。许可状态仍为私有/专有；
 公开发行必须另行完成 LICENSE/NOTICE、品牌资产和对外许可决策。
 
 ## 2. 当前已完成能力与历史施工记录
@@ -265,7 +272,7 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
-2026-08-13 `xq-platform-next` 消费者接管审计与 Initializer Wrapper 补正（代码与默认分支 CI 闭环）
+2026-08-13 `xq-platform-next` 消费者接管审计、Initializer Wrapper 补正与 `rc.3` 发布
 - **消费者事实**：独立仓库由 Initializer 生成，当前仍固定 `0.1.0-SNAPSHOT`；README 要求
   `./mvnw`，仓库内却没有 Wrapper。这证明 `rc.2` 的远端 Initializer 三通道只验证了生成源码与
   Ainer 制品消费，没有验证生成项目可独立携带约定工具链。
@@ -278,11 +285,19 @@ Ainer 项目签名 provenance 已通过。
   0 failure / 0 error / 0 skipped**。普通、PostgreSQL、CRUD 三种生成项目分别通过 2、1、4 项
   测试，均为零失败/错误/跳过，且全部执行生成项目自己的 Maven 3.9.16 Wrapper；PostgreSQL
   18.3 migration 从空库成功重放。冷仓 TTFR 147s / 600s、TTCRUD 180s / 1800s，发布合同脚本、
-  Wrapper 资产比对与 `git diff --check` 通过。远端新 RC 尚未发布，本条不宣称远端修复已可消费。
+  Wrapper 资产比对与 `git diff --check` 通过。
 - **远端代码证据**：PR #5 的 run `31672808212` 全绿并合入 `dev`；默认分支 run
   `31673523854` 在精确 merge commit `19151697a508a7e21ed4fa5838b8a384dfe7a582` 上再次通过
   quality、gitleaks、Maven 3/4 consumer、Initializer 三通道、TTFR、TTCRUD、SBOM 与完整
-  platform/virtual-thread matrix。该结果证明待发布源码，不等于 `rc.3` 制品已经存在。
+  platform/virtual-thread matrix。发布冻结 PR #6 合入后，最终默认分支 run `31675092195` 又在
+  merge commit `666b1556f11935925369586152a3791180b7314e` 上通过同一完整门禁。
+- **远端发布证据**：release run `31675920731` 全绿；338/0/0/0，107 个主制品及 107 个 `.asc`
+  全部远端读回验签，Maven 3/Maven 4 空仓消费和远端 Initializer 三通道通过。Release API 读回
+  `immutable=true`、`prerelease=true`、精确 target commit 与 16 个资产；GitHub Attestations 未启用，
+  强制的项目签名 provenance、SBOM 和 SHA-256/SHA-512 清单均已签名上传。
+- **独立发布读回**：重新下载 16 个 Release 资产，在隔离 keyring 验证全部适用 detached signatures，
+  fingerprint 为 `DC72A6994ABFA48B3D9B1DE145361DCB6F65F6FD`；`EVIDENCE-SHA256SUMS`
+  的 14 项全部匹配，release evidence 记录 107 个远端主制品与精确源码 SHA。
 - **权限边界**：本机当前 GitHub 凭据没有 `read:packages`，因此不能把 `xq-platform-next` 的
   `0.1.0-SNAPSHOT` 立即替换成远端 RC 并执行冷仓消费。发布修复和通用远端门禁可先推进；真实
   产品消费仍需最小 `read:packages` 授权，不使用本地缓存伪装远端证据。
@@ -363,9 +378,10 @@ Ainer 项目签名 provenance 已通过。
   在 GitHub 设置启用 required review 即可生效。
 - gitleaks 已在 ci.yml `secret-scan` job（`gitleaks detect --config .gitleaks.toml`，docs allowlist）。
 - **P0 剩余**：分支保护（private + 免费版无法启用，待可见性/计费决策，非代码层面）。
-- **P1/G2 状态**：`v0.1.0-rc.2` 已完成 release hardening、正式 signing key、默认分支 CI、远端
-  空仓消费、107/107 签名读回、SBOM/checksum/provenance 与 immutable GitHub Release，P1 合格
-  受控 RC 门禁关闭；G2 只剩 `xq-platform-next` 的真实产品消费、migration replay、升级与回滚。
+- **P1/P2/G2 状态**：`v0.1.0-rc.2` 已关闭首个合格受控 RC 门禁；`v0.1.0-rc.3` 又以正式 signing
+  key、默认分支 CI、远端空仓消费、107/107 签名读回、远端自带 Wrapper 的 Initializer、
+  SBOM/checksum/provenance 与 immutable GitHub Release 重新关闭 P2 已发布合同。G2 只剩
+  `xq-platform-next` 的真实产品消费、migration replay、升级与回滚。
 
 2026-08-11 `0.1.0-rc.1` 就绪批次 1：端点授权真实装配 + 签名发布 fail-closed
 - **端点授权进入真实运行路径**：Servlet Web 宿主在存在 `AuthenticatedPrincipalResolver` 时条件装配
@@ -1133,9 +1149,10 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 按
 [`Ainer Boot 产品定位、竞品能力矩阵与路线图`](design/ainer-scaffold-design.md)
 定义的全局产品化阶段，当前是 **G0 已冻结、G1 收口、P1 私有受控 RC 门禁已完成、P2 已发布合同
-补正中、G2 产品消费验证中**：P3
-企业基座已有代码但文件元数据与管理 API/OpenAPI 尚未完成；`rc.1` 已撤回，`v0.1.0-rc.2` 已通过
-release hardening、默认分支 CI、远端读回/消费和 immutable Release。private 仓库分支保护仍缺远端
+已补正、G2 产品消费验证中**：P3
+企业基座已有代码但文件元数据与管理 API/OpenAPI 尚未完成；`rc.1` 已撤回，`v0.1.0-rc.2` 保留为
+升级/回滚起点，`v0.1.0-rc.3` 已通过 release hardening、默认分支 CI、远端读回/消费和 immutable
+Release。private 仓库分支保护仍缺远端
 强制执行；`xq-platform-next` 目前仍未完成基于合格远端 RC 的真实产品纵向切片、migration replay、
 升级与回滚，因此不允许把当前源码标记为稳定 `0.1.0`。
 
@@ -1169,13 +1186,15 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 
 1. `v0.1.0-rc.2` 已完成默认分支 CI、annotated tag、107/107 远端验签、空仓消费者、签名证据和
    immutable GitHub Release；该合格受控 RC 保留为升级/回滚的已发布起点，不覆盖或移动；
-2. 发布包含 Initializer Wrapper 补正的不可变 `v0.1.0-rc.3`，让 `xq-platform-next` 删除
-   `0.1.0-SNAPSHOT` 与本地仓库依赖，固定从远端 `rc.3` 消费，并以 `rc.2` 为起点完成升级、回滚、JWT、
+2. `v0.1.0-rc.3` 已完成 338/0/0/0、107/107 远端验签、Maven 3/4 与自带 Wrapper 的远端
+   Initializer 消费、签名证据和 immutable GitHub Release；该版本是当前最终消费目标，不覆盖或移动；
+3. 让 `xq-platform-next` 删除 `0.1.0-SNAPSHOT` 与本地仓库依赖，固定从远端 `rc.3` 消费，并以
+   `rc.2` 为起点完成升级、回滚、JWT、
    Workspace/资源授权、PostgreSQL migration replay、真实 HTTP 错误和客户端 SDK 的产品所有纵向
    切片，同时演练升级与回滚；
-3. 若产品消费暴露兼容性或发布链问题，使用唯一的新 `rc.N+1` 修复并重复完整门禁，不移动 tag、
+4. 若产品消费暴露兼容性或发布链问题，使用唯一的新 `rc.N+1` 修复并重复完整门禁，不移动 tag、
    覆盖制品或回退本地源码依赖；
-4. 只有上述消费证据通过后才评估提升 `0.1.0` 并开放给其他内部产品；
+5. 只有上述消费证据通过后才评估提升 `0.1.0` 并开放给其他内部产品；
    `python-learning-service` 保持版本化 BOM/Starter 接入，不绑定开发分支、不复制源码。
 
 Identity、安全与运维纵深继续修复明确的 P0/P1/P3 风险，但方法级授权、组织目录、真实设备矩阵、

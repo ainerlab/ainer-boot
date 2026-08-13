@@ -15,8 +15,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   Wrapper 3.3.4，固定 Maven 3.9.16 的 Maven Central 地址与 SHA-256；POSIX 写入保留 `mvnw`
   执行位，`diff` 同时检测字节与执行位漂移。Initializer consumer、TTFR 与 TTCRUD 门禁改为使用
   生成项目自己的 Wrapper，不再借用 Ainer 生产者的 Maven 4 Wrapper。该缺口由首个产品消费者
-  `xq-platform-next` 复核发现；`v0.1.0-rc.2` 保持不可变，本修复归入唯一的新候选
-  `v0.1.0-rc.3`。在 tag workflow 全部门禁完成前，不宣称该坐标已经可以远端消费。
+  `xq-platform-next` 复核发现；`v0.1.0-rc.2` 保持不可变，本修复归入新的不可变候选
+  `v0.1.0-rc.3`。release run `31675920731` 已完成 338 tests 零失败/错误/跳过、107/107 远端
+  制品读回验签、Maven 3/Maven 4 空仓消费、远端 Initializer 三通道和 immutable GitHub Release。
 
 ## [0.1.0-rc.2] - 2026-08-13
 
