@@ -41,7 +41,8 @@ AI-native、但不局限于 AI 的通用企业应用脚手架与平台底座。�
 
 Ainer 生产者构建通过 Maven Wrapper 使用 Maven 4.0.0-rc-6 preview，由 Maven 4 内建
 Consumer POM 处理 `${revision}`，不再使用 Flatten Maven Plugin；Maven 3.9+ 只作为已发布制品
-的下游消费兼容门禁。完整边界见
+的下游消费兼容门禁。Initializer 生成项目自带另一份 Wrapper，固定稳定 Maven 3.9.16；生成项目
+不得借用 Ainer 生产者仓库的 Maven 4 Wrapper。完整边界见
 [ADR-0026](decisions/0026-maven-4-build-and-consumer-pom-baseline.md)。
 
 ```text

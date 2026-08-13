@@ -14,6 +14,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -44,6 +47,7 @@ class ProjectGeneratorTest {
             GeneratedFile b = second.files().get(i);
             assertThat(a.path()).isEqualTo(b.path());
             assertThat(a.content()).isEqualTo(b.content());
+            assertThat(a.executable()).isEqualTo(b.executable());
         }
     }
 
@@ -55,12 +59,67 @@ class ProjectGeneratorTest {
         List<String> paths = tree.files().stream().map(GeneratedFile::path).toList();
         assertThat(paths).containsExactly(
                 ".gitignore",
+                ".mvn/wrapper/maven-wrapper.properties",
                 "README.md",
+                "mvnw",
+                "mvnw.cmd",
                 "pom.xml",
                 "src/main/java/dev/ainer/consumer/sample/SampleProjectApplication.java",
                 "src/main/java/dev/ainer/consumer/sample/ping/PingController.java",
                 "src/main/resources/application.yml",
                 "src/test/java/dev/ainer/consumer/sample/SampleProjectApplicationSmokeTest.java");
+    }
+
+    @Test
+    @DisplayName("生成项目自带固定版本和摘要的 Maven Wrapper")
+    void generatesPinnedMavenWrapper() throws IOException {
+        ProjectTree tree = generate(ManifestFixture.sample());
+
+        GeneratedFile shellWrapper = tree.files().stream()
+                .filter(file -> file.path().equals("mvnw"))
+                .findFirst()
+                .orElseThrow();
+        GeneratedFile windowsWrapper = tree.files().stream()
+                .filter(file -> file.path().equals("mvnw.cmd"))
+                .findFirst()
+                .orElseThrow();
+        String properties = tree.files().stream()
+                .filter(file -> file.path().equals(".mvn/wrapper/maven-wrapper.properties"))
+                .map(GeneratedFile::utf8)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(shellWrapper.executable()).isTrue();
+        assertThat(windowsWrapper.executable()).isFalse();
+        assertThat(shellWrapper.utf8()).contains("Apache Maven Wrapper startup batch script, version 3.3.4");
+        assertThat(properties).contains(
+                "wrapperVersion=3.3.4",
+                "distributionType=only-script",
+                "apache-maven/3.9.16/apache-maven-3.9.16-bin.zip",
+                "distributionSha256Sum=5af3b743dd8b876b5c45da33b676251e5f1687712644abb4ee519ca56e1d89ce");
+    }
+
+    @Test
+    @DisplayName("写入后在 POSIX 文件系统保留 Wrapper 执行位且 diff 检测模式漂移")
+    void writesAndDiffsWrapperExecutionMode() throws IOException {
+        ProjectTree tree = generate(ManifestFixture.sample());
+        Path target = tempDir.resolve("wrapper-mode");
+        new ProjectWriter().write(tree, target, false);
+        Path wrapper = target.resolve("mvnw");
+
+        PosixFileAttributeView posix = Files.getFileAttributeView(wrapper, PosixFileAttributeView.class);
+        if (posix == null) {
+            return;
+        }
+        assertThat(Files.isExecutable(wrapper)).isTrue();
+        Files.setPosixFilePermissions(wrapper, EnumSet.of(
+                PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.GROUP_READ,
+                PosixFilePermission.OTHERS_READ));
+
+        ProjectDiffer.DiffResult diff = new ProjectDiffer().diff(tree, target);
+        assertThat(diff.modifiedFiles()).containsExactly("mvnw");
     }
 
     @Test

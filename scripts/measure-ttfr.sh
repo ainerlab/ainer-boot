@@ -7,11 +7,11 @@ set -euo pipefail
 #
 # Optional overrides:
 #   AINER_VERSION   Ainer version to install and generate against (default: pom <revision>)
-#   TTFR_LIMIT_SEC  gate threshold in seconds (default: 600)
+#   TTFR_LIMIT_SEC  gate threshold in seconds (default: 600; TTFR_LIMIT remains compatible)
 #   TTFR_START_REPO reuse an existing local repository (skip reactor install)
 
 boot_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-wrapper="$boot_root/mvnw"
+producer_wrapper="$boot_root/mvnw"
 
 fail() {
   echo "[ainer-ttfr] ERROR: $*" >&2
@@ -23,13 +23,14 @@ configured_version="$(
     | sed -n '1p'
 )"
 ainner_version="${AINER_VERSION:-$configured_version}"
-ttfr_limit="${TTFR_LIMIT:-600}"
+ttfr_limit="${TTFR_LIMIT_SEC:-${TTFR_LIMIT:-600}}"
 [[ -n "$ainner_version" ]] || fail "cannot determine the Ainer version; set AINER_VERSION explicitly"
-[[ -x "$wrapper" ]] || fail "Maven Wrapper is missing or not executable: $wrapper"
+[[ -x "$producer_wrapper" ]] \
+  || fail "producer Maven Wrapper is missing or not executable: $producer_wrapper"
 
 temporary_parent="${TMPDIR:-/tmp}"
 temporary_dir="$(mktemp -d "$temporary_parent/ainer-ttfr.XXXXXX")"
-local_repository="$temporary_dir/repository"
+local_repository="${TTFR_START_REPO:-$temporary_dir/repository}"
 generated_dir="$temporary_dir/generated"
 manifest="$temporary_dir/manifest.yaml"
 cli_jar="$temporary_dir/initializer-cli.jar"
@@ -56,7 +57,7 @@ start_marker="$(date +%s)"
 
 # 2. Install the reactor artifacts into the isolated repository (skip when reused).
 if [[ -z "${TTFR_START_REPO:-}" ]]; then
-  "$wrapper" --batch-mode --no-transfer-progress \
+  "$producer_wrapper" --batch-mode --no-transfer-progress \
     -Dmaven.repo.local="$local_repository" \
     -Drevision="$ainner_version" \
     -Dgpg.skip=true \
@@ -85,10 +86,13 @@ cli_jar="$(find "$local_repository/dev/ainer/ainer-initializer-cli" -name '*-cli
 [[ -n "$cli_jar" ]] || fail "ainner-initializer-cli shaded JAR was not installed"
 java -jar "$cli_jar" init "$manifest" "$generated_dir" >/dev/null \
   || fail "initializer failed to generate the consumer project"
+consumer_wrapper="$generated_dir/mvnw"
+[[ -x "$consumer_wrapper" ]] \
+  || fail "generated Maven Wrapper is missing or not executable: $consumer_wrapper"
 
 # 3. Launch via spring-boot:run and poll /actuator/health until UP.
 cd "$generated_dir"
-"$wrapper" --batch-mode --no-transfer-progress \
+"$consumer_wrapper" --batch-mode --no-transfer-progress \
   -Dmaven.repo.local="$local_repository" \
   -DskipTests \
   spring-boot:run \

@@ -4,7 +4,14 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
-当前无尚未归入版本的用户可见变化。
+### Fixed
+
+- **Initializer 独立构建合同补正（2026-08-13）**：修复 Project Initializer 的生成项目 README
+  要求执行 `./mvnw`，实际生成树却缺少 Maven Wrapper 的合同缺口。生成项目现在自带 Apache Maven
+  Wrapper 3.3.4，固定 Maven 3.9.16 的 Maven Central 地址与 SHA-256；POSIX 写入保留 `mvnw`
+  执行位，`diff` 同时检测字节与执行位漂移。Initializer consumer、TTFR 与 TTCRUD 门禁改为使用
+  生成项目自己的 Wrapper，不再借用 Ainer 生产者的 Maven 4 Wrapper。该缺口由首个产品消费者
+  `xq-platform-next` 复核发现；修复尚未进入 `v0.1.0-rc.2`，必须发布新版本坐标后才能远端消费。
 
 ## [0.1.0-rc.2] - 2026-08-13
 

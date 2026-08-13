@@ -4,6 +4,7 @@ set -euo pipefail
 boot_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 release_workflow="$boot_root/.github/workflows/release.yml"
 artifact_manifest="$boot_root/scripts/release-artifacts.txt"
+initializer_templates="$boot_root/ainer-initializer/src/main/resources/templates/v1"
 
 fail() {
   echo "[ainer-release-contracts] ERROR: $*" >&2
@@ -69,6 +70,26 @@ fi
 if grep -n -E '/usr/sbin/ab|AINNER_VERSION' "$boot_root/scripts/measure-virtual-threads.sh"; then
   fail "virtual-thread tooling must resolve ab from PATH and use AINER_VERSION"
 fi
+
+for wrapper_asset in mvnw mvnw.cmd maven-wrapper.properties; do
+  [[ -f "$initializer_templates/$wrapper_asset" ]] \
+    || fail "initializer Maven Wrapper asset is missing: $wrapper_asset"
+done
+grep -Fq 'apache-maven/3.9.16/apache-maven-3.9.16-bin.zip' \
+  "$initializer_templates/maven-wrapper.properties" \
+  || fail "initializer wrapper must pin Maven 3.9.16"
+grep -Fq 'distributionSha256Sum=5af3b743dd8b876b5c45da33b676251e5f1687712644abb4ee519ca56e1d89ce' \
+  "$initializer_templates/maven-wrapper.properties" \
+  || fail "initializer Maven distribution checksum is missing or changed"
+grep -Fq 'plain_wrapper="$generated_dir/mvnw"' \
+  "$boot_root/scripts/verify-initializer-consumer.sh" \
+  || fail "initializer consumer gate must execute the generated Maven Wrapper"
+grep -Fq 'consumer_wrapper="$generated_dir/mvnw"' \
+  "$boot_root/scripts/measure-ttfr.sh" \
+  || fail "TTFR gate must execute the generated Maven Wrapper"
+grep -Fq 'consumer_wrapper="$generated_dir/mvnw"' \
+  "$boot_root/scripts/measure-ttcrud.sh" \
+  || fail "TTCRUD gate must execute the generated Maven Wrapper"
 grep -Fq 'assert_ab_result' "$boot_root/scripts/measure-virtual-threads.sh" \
   || fail "virtual-thread matrix must fail closed on ApacheBench results"
 if grep -n -- '-Dgpg.passphrase' "$release_workflow"; then

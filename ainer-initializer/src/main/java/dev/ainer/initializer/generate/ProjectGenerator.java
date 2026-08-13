@@ -87,6 +87,10 @@ public final class ProjectGenerator {
     public ProjectTree generate() {
         List<GeneratedFile> files = new ArrayList<>();
         files.add(render("pom.xml", "pom.xml"));
+        files.add(staticFile("mvnw", "mvnw", true));
+        files.add(staticFile("mvnw.cmd", "mvnw.cmd", false));
+        files.add(staticFile("maven-wrapper.properties",
+                ".mvn/wrapper/maven-wrapper.properties", false));
         files.add(render("Application.java", "src/main/java/" + packagePath + "/" + applicationClassName + "Application.java"));
         files.add(render("PingController.java", "src/main/java/" + packagePath + "/ping/PingController.java"));
         files.add(render("application.yml", "src/main/resources/application.yml"));
@@ -127,6 +131,11 @@ public final class ProjectGenerator {
         String template = loadTemplate(templateName);
         String rendered = renderer.render(template, templateName);
         return new GeneratedFile(targetPath, rendered.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private GeneratedFile staticFile(String templateName, String targetPath, boolean executable) {
+        return new GeneratedFile(targetPath,
+                loadTemplate(templateName).getBytes(StandardCharsets.UTF_8), executable);
     }
 
     private GeneratedFile renderEntity(String templateName, String targetPath, EntityDeclaration entity) {

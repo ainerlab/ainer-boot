@@ -1,6 +1,6 @@
 # Ainer 第三方依赖与许可证台账
 
-> 状态：M4.8A + 公共制品策略 · 2026-07-30
+> 状态：M4.8A + 公共制品策略 · 2026-08-13
 
 本台账记录 Ainer 主动选择的构建与运行基线，服务于 clean-room、商业发行和后续 SBOM 审计。版本来自当前 Maven Reactor 的有效依赖；许可证以 Maven Central 发布 POM、上游仓库许可证文件为依据。
 
@@ -17,8 +17,8 @@
 | ArchUnit | 1.4.2 | 包和分层边界测试 | Apache-2.0；其发布 POM 同时声明传递 ASM 的 BSD 许可证 | `com.tngtech.archunit:archunit` |
 | Micrometer Core | 1.17.0 | 在线校验、撤销传播与安全运营指标 API | Apache-2.0 | `io.micrometer:micrometer-core` |
 | Micrometer Prometheus Registry | 1.17.0 | 两个可执行发行物的 Prometheus 文本格式导出 | Apache-2.0 | `io.micrometer:micrometer-registry-prometheus` |
-| Apache Maven | 4.0.0-rc-6 | Ainer 生产者构建的 preview 基线 | Apache-2.0 | `org.apache.maven:apache-maven` |
-| Maven Wrapper | 3.3.4 | 固定 Maven 发行版、下载地址与校验值 | Apache-2.0 | `org.apache.maven.wrapper:maven-wrapper` |
+| Apache Maven | 4.0.0-rc-6 / 3.9.16 | Ainer 生产者 preview 基线 / Initializer 生成项目稳定 consumer 基线 | Apache-2.0 | `org.apache.maven:apache-maven` |
+| Maven Wrapper | 3.3.4 | 分别固定生产者与生成项目的 Maven 发行版、下载地址和校验值 | Apache-2.0 | `org.apache.maven.wrapper:maven-wrapper` |
 | Maven Clean Plugin | 3.5.0 | 清理构建输出 | Apache-2.0 | `org.apache.maven.plugins:maven-clean-plugin` |
 | Maven Resources Plugin | 3.5.0 | 复制与过滤资源 | Apache-2.0 | `org.apache.maven.plugins:maven-resources-plugin` |
 | Maven Compiler Plugin | 3.14.0 | JDK 25 编译、参数名与显式注解处理器 | Apache-2.0 | `org.apache.maven.plugins:maven-compiler-plugin` |
@@ -137,6 +137,9 @@ final class ContextSnapshotJacksonAdapter {
 
 - Ainer 生产者构建使用 Maven Wrapper 锁定 Maven 4.0.0-rc-6；该版本仍是 preview，不把它描述
   为 Maven 4 稳定版。Wrapper 发行包必须来自 Apache 官方持久发布端点并校验摘要。
+- Project Initializer 生成的独立消费者使用同一 Apache Maven Wrapper 3.3.4 脚本，但固定稳定的
+  Maven 3.9.16 发行包与精确 SHA-256。消费者不得继承 Ainer reactor 的 Maven 4 preview
+  工具链，也不得借用生产者仓库根目录的 `mvnw`。
 - Maven 4 内建 Consumer POM 负责处理当前 POM 4.0 与 `${revision}`，第三方 Flatten Maven
   Plugin 已从构建和本台账移除；`maven.consumer.pom.flatten=false` 固定当前已验证行为，不表示
   继续使用 Flatten。
