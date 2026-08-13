@@ -8,6 +8,7 @@ independent consumer of published Ainer artifacts; it contains no Ainer source c
 - Ainer BOM: `dev.ainer:ainer-dependencies:{{ainner.version}}`
 - Spring Boot: {{spring.boot.version}}
 - Java: {{java.release}}{{owner.block}}
+- Maven Wrapper: 3.3.4 / Maven 3.9.16 (distribution checksum pinned)
 
 ## Run
 

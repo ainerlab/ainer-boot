@@ -2,7 +2,7 @@
 set -euo pipefail
 
 boot_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-wrapper="$boot_root/mvnw"
+producer_wrapper="$boot_root/mvnw"
 artifact_source="${AINER_ARTIFACT_SOURCE:-local}"
 maven_settings="${AINER_MAVEN_SETTINGS:-}"
 
@@ -35,7 +35,8 @@ elif [[ "$artifact_source" == "remote" ]]; then
   fail "remote initializer verification requires AINER_MAVEN_SETTINGS"
 fi
 
-[[ -x "$wrapper" ]] || fail "Maven Wrapper is missing or not executable: $wrapper"
+[[ -x "$producer_wrapper" ]] \
+  || fail "producer Maven Wrapper is missing or not executable: $producer_wrapper"
 
 temporary_parent="${TMPDIR:-/tmp}"
 temporary_dir="$(mktemp -d "$temporary_parent/ainer-initializer-consumer.XXXXXX")"
@@ -58,7 +59,7 @@ trap cleanup EXIT
 
 cd "$boot_root"
 if [[ "$artifact_source" == "local" ]]; then
-  "$wrapper" --batch-mode --no-transfer-progress \
+  "$producer_wrapper" --batch-mode --no-transfer-progress \
     "${maven_settings_args[@]}" \
     -Dmaven.repo.local="$local_repository" \
     -Drevision="$ainner_version" \
@@ -68,7 +69,7 @@ if [[ "$artifact_source" == "local" ]]; then
 else
   [[ ! -e "$local_repository/dev/ainer" ]] \
     || fail "remote initializer repository must start without Ainer artifacts"
-  "$wrapper" --batch-mode --no-transfer-progress \
+  "$producer_wrapper" --batch-mode --no-transfer-progress \
     "${maven_settings_args[@]}" \
     -Dmaven.repo.local="$local_repository" \
     org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy \
@@ -106,6 +107,16 @@ run_cli() {
   java -jar "$cli_jar" "$@"
 }
 
+reject_ainer_source_copies() {
+  local source_root="$1"
+  local variant="$2"
+  while IFS= read -r -d '' source_file; do
+    if grep -Eq "package dev\.ainer\.(core|web|security|initializer|spring|starter|module)(\.|;)" "$source_file"; then
+      fail "generated $variant project must not copy Ainer sources: $source_file"
+    fi
+  done < <(find "$source_root/src" -type f -name '*.java' -print0)
+}
+
 mkdir -p "$generated_dir"
 run_cli init "$manifest" "$generated_dir"
 
@@ -115,30 +126,32 @@ mkdir -p "$second_dir"
 run_cli init "$manifest" "$second_dir"
 diff -r "$generated_dir" "$second_dir" \
   || fail "regeneration is not deterministic (diff -r mismatch)"
+run_cli diff "$manifest" "$generated_dir" >/dev/null \
+  || fail "generated project bytes or execution modes differ from the manifest"
 
 # 2. Generated project must not contain Ainer framework sources (only artifacts are referenced).
 #    Framework packages are dev.ainer.core / dev.ainer.web / dev.ainer.security / dev.ainer.initializer;
 #    the consumer's own package is dev.ainer.<groupId suffix> and is allowed.
 grep -rq "dev.ainer" "$generated_dir/pom.xml" || fail "generated POM must reference Ainer artifacts"
-for source_file in "$generated_dir"/src/main/java/**/*.java "$generated_dir"/src/test/java/**/*.java; do
-  [[ -f "$source_file" ]] || continue
-  if grep -Eq "package dev\.ainer\.(core|web|security|initializer|spring|starter|module)(\.|;)" "$source_file"; then
-    fail "generated project must not copy Ainer sources: $source_file"
-  fi
-done
+reject_ainer_source_copies "$generated_dir" "plain"
 
 # 3. The generated project must compile and its smoke test must run green
 #    (ADR-0035 decision 6: consumer gate builds the project and starts the smoke
-#    endpoint, with 0 skipped tests) as an independent consumer (Maven 4 wrapper).
+#    endpoint, with 0 skipped tests) through the generated project's own pinned wrapper.
 cd "$generated_dir"
-"$wrapper" --batch-mode --no-transfer-progress \
+plain_wrapper="$generated_dir/mvnw"
+[[ -x "$plain_wrapper" ]] || fail "generated Maven Wrapper is missing or not executable"
+plain_maven_banner="$("$plain_wrapper" --version | sed -n '1p')"
+[[ "$plain_maven_banner" == "Apache Maven 3.9.16"* ]] \
+  || fail "generated wrapper must pin Maven 3.9.16 (got: $plain_maven_banner)"
+"$plain_wrapper" --batch-mode --no-transfer-progress \
   "${maven_settings_args[@]}" \
   -Dmaven.repo.local="$local_repository" \
   -DskipTests \
   clean compile \
   || fail "generated consumer project failed to compile"
 
-"$wrapper" --batch-mode --no-transfer-progress \
+"$plain_wrapper" --batch-mode --no-transfer-progress \
   "${maven_settings_args[@]}" \
   -Dmaven.repo.local="$local_repository" \
   test \
@@ -179,13 +192,10 @@ run_cli init "$pg_manifest" "$pg_dir"
 run_cli init "$pg_manifest" "$pg_second"
 diff -r "$pg_dir" "$pg_second" \
   || fail "postgres regeneration is not deterministic (diff -r mismatch)"
+run_cli diff "$pg_manifest" "$pg_dir" >/dev/null \
+  || fail "generated postgres bytes or execution modes differ from the manifest"
 
-for source_file in "$pg_dir"/src/main/java/**/*.java "$pg_dir"/src/test/java/**/*.java; do
-  [[ -f "$source_file" ]] || continue
-  if grep -Eq "package dev\.ainer\.(core|web|security|initializer|spring|starter|module)(\.|;)" "$source_file"; then
-    fail "generated postgres project must not copy Ainer sources: $source_file"
-  fi
-done
+reject_ainer_source_copies "$pg_dir" "postgres"
 
 grep -q "PostgreSQLContainer" $(find "$pg_dir/src/test" -name '*.java') \
   || fail "postgres variant must contain a Testcontainers integration test"
@@ -195,14 +205,16 @@ grep -q "ainer-test-support" "$pg_dir/pom.xml" \
   || fail "postgres variant must depend on ainer-test-support"
 
 cd "$pg_dir"
-"$wrapper" --batch-mode --no-transfer-progress \
+pg_wrapper="$pg_dir/mvnw"
+[[ -x "$pg_wrapper" ]] || fail "generated postgres Maven Wrapper is missing or not executable"
+"$pg_wrapper" --batch-mode --no-transfer-progress \
   "${maven_settings_args[@]}" \
   -Dmaven.repo.local="$local_repository" \
   -DskipTests \
   clean compile \
   || fail "generated postgres consumer project failed to compile"
 
-"$wrapper" --batch-mode --no-transfer-progress \
+"$pg_wrapper" --batch-mode --no-transfer-progress \
   "${maven_settings_args[@]}" \
   -Dmaven.repo.local="$local_repository" \
   test \
@@ -263,13 +275,10 @@ run_cli init "$crud_manifest" "$crud_dir"
 run_cli init "$crud_manifest" "$crud_second"
 diff -r "$crud_dir" "$crud_second" \
   || fail "CRUD regeneration is not deterministic (diff -r mismatch)"
+run_cli diff "$crud_manifest" "$crud_dir" >/dev/null \
+  || fail "generated CRUD bytes or execution modes differ from the manifest"
 
-for source_file in "$crud_dir"/src/main/java/**/*.java "$crud_dir"/src/test/java/**/*.java; do
-  [[ -f "$source_file" ]] || continue
-  if grep -Eq "package dev\.ainer\.(core|web|security|initializer|spring|starter|module)(\.|;)" "$source_file"; then
-    fail "generated CRUD project must not copy Ainer sources: $source_file"
-  fi
-done
+reject_ainer_source_copies "$crud_dir" "CRUD"
 
 grep -q "mybatis-plus-generator" "$crud_dir/pom.xml" \
   && fail "CRUD variant must not depend on mybatis-plus-generator (hand-written templates only)"
@@ -278,14 +287,16 @@ grep -q "CrudIntegrationTest" $(find "$crud_dir/src/test" -name '*.java') \
   || fail "CRUD variant must contain a CRUD lifecycle integration test"
 
 cd "$crud_dir"
-"$wrapper" --batch-mode --no-transfer-progress \
+crud_wrapper="$crud_dir/mvnw"
+[[ -x "$crud_wrapper" ]] || fail "generated CRUD Maven Wrapper is missing or not executable"
+"$crud_wrapper" --batch-mode --no-transfer-progress \
   "${maven_settings_args[@]}" \
   -Dmaven.repo.local="$local_repository" \
   -DskipTests \
   clean compile \
   || fail "generated CRUD consumer project failed to compile"
 
-"$wrapper" --batch-mode --no-transfer-progress \
+"$crud_wrapper" --batch-mode --no-transfer-progress \
   "${maven_settings_args[@]}" \
   -Dmaven.repo.local="$local_repository" \
   test \

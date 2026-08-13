@@ -8,11 +8,11 @@ set -euo pipefail
 #
 # Optional overrides:
 #   AINER_VERSION    Ainer version to install and generate against (default: pom <revision>)
-#   TTCRUD_LIMIT_SEC gate threshold in seconds (default: 1800)
+#   TTCRUD_LIMIT_SEC gate threshold in seconds (default: 1800; TTCRUD_LIMIT remains compatible)
 #   TTCRUD_START_REPO reuse an existing local repository (skip reactor install)
 
 boot_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-wrapper="$boot_root/mvnw"
+producer_wrapper="$boot_root/mvnw"
 
 fail() {
   echo "[ainer-ttcrud] ERROR: $*" >&2
@@ -24,13 +24,14 @@ configured_version="$(
     | sed -n '1p'
 )"
 ainner_version="${AINER_VERSION:-$configured_version}"
-ttcrud_limit="${TTCRUD_LIMIT:-1800}"
+ttcrud_limit="${TTCRUD_LIMIT_SEC:-${TTCRUD_LIMIT:-1800}}"
 [[ -n "$ainner_version" ]] || fail "cannot determine the Ainer version; set AINER_VERSION explicitly"
-[[ -x "$wrapper" ]] || fail "Maven Wrapper is missing or not executable: $wrapper"
+[[ -x "$producer_wrapper" ]] \
+  || fail "producer Maven Wrapper is missing or not executable: $producer_wrapper"
 
 temporary_parent="${TMPDIR:-/tmp}"
 temporary_dir="$(mktemp -d "$temporary_parent/ainer-ttcrud.XXXXXX")"
-local_repository="$temporary_dir/repository"
+local_repository="${TTCRUD_START_REPO:-$temporary_dir/repository}"
 generated_dir="$temporary_dir/generated"
 manifest="$temporary_dir/manifest.yaml"
 cli_jar="$temporary_dir/initializer-cli.jar"
@@ -56,7 +57,7 @@ start_marker="$(date +%s)"
 
 # 1. Install the reactor artifacts into the isolated repository (skip when reused).
 if [[ -z "${TTCRUD_START_REPO:-}" ]]; then
-  "$wrapper" --batch-mode --no-transfer-progress \
+  "$producer_wrapper" --batch-mode --no-transfer-progress \
     -Dmaven.repo.local="$local_repository" \
     -Drevision="$ainner_version" \
     -Dgpg.skip=true \
@@ -105,16 +106,19 @@ cli_jar="$(find "$local_repository/dev/ainer/ainer-initializer-cli" -name '*-cli
 [[ -n "$cli_jar" ]] || fail "ainner-initializer-cli shaded JAR was not installed"
 java -jar "$cli_jar" init "$manifest" "$generated_dir" >/dev/null \
   || fail "initializer failed to generate the CRUD consumer project"
+consumer_wrapper="$generated_dir/mvnw"
+[[ -x "$consumer_wrapper" ]] \
+  || fail "generated Maven Wrapper is missing or not executable: $consumer_wrapper"
 
 # 2. The generated project must compile and run the PostgreSQL vertical CRUD tests green.
 cd "$generated_dir"
-"$wrapper" --batch-mode --no-transfer-progress \
+"$consumer_wrapper" --batch-mode --no-transfer-progress \
   -Dmaven.repo.local="$local_repository" \
   -DskipTests \
   clean compile >/dev/null 2>&1 \
   || fail "generated CRUD consumer project failed to compile"
 
-"$wrapper" --batch-mode --no-transfer-progress \
+"$consumer_wrapper" --batch-mode --no-transfer-progress \
   -Dmaven.repo.local="$local_repository" \
   test \
   || fail "generated CRUD consumer integration tests failed"

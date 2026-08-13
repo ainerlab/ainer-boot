@@ -84,6 +84,8 @@ v1 字段：
 |---|---|
 | `pom.xml` | parent 非 Ainer root，而是 `dev.ainer:ainer-dependencies` BOM import，依赖
   使用 BOM 管理版本；项目不复制 Ainer 源码 |
+| `mvnw`、`mvnw.cmd`、`.mvn/wrapper/maven-wrapper.properties` | Apache Maven Wrapper
+  3.3.4；固定 Maven 3.9.16 官方发行包与摘要，POSIX `mvnw` 带执行位 |
 | `src/main/java/<pkg>/Application.java` | `@SpringBootApplication` 主类 |
 | `src/main/java/<pkg>/ping/PingController.java` | `GET /api/ping` 返回平台 envelope（演示
   真实 HTTP 与 `X-Request-Id`） |
@@ -94,6 +96,14 @@ v1 字段：
 
 `database=postgresql` 时追加：PostgreSQL 驱动与 Testcontainers 依赖、`spring.datasource`
   环境变量占位配置与对应 Testcontainers 集成测试（`@Testcontainers` + `postgres:18.3-alpine`）。
+
+> 实施补正（2026-08-13）：首个产品消费者 `xq-platform-next` 复核发现，`v0.1.0-rc.2`
+> 的 README 与决策 6 已要求 `./mvnw`，但生成树没有包含 Wrapper，门禁又借用了 Ainer
+> 生产者仓库的 Wrapper，因而掩盖了缺口。该实现补正不改变本 ADR 的结论：v1 模板增加
+> 上述 Wrapper 三件套，使用 Apache Maven Wrapper
+> 3.3.4 固定 Maven 3.9.16 及其官方 SHA-256；生成树保存 POSIX 执行位，`diff` 检查执行位，
+> consumer/TTFR/TTCRUD 门禁只执行生成项目自己的 Wrapper。修复必须通过新版本坐标发布，不能
+> 覆盖不可变的 `v0.1.0-rc.2`。
 
 不生成：菜单、路由、管理页面、数据库表、OpenAPI、CI 工作流。CRUD 生成属于 P2-P4 的纵向
 切片，由 Studio/后续迭代交付（ADR-0035 不授权）。菜单与页面语义在 studio 模板且不随

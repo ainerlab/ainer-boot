@@ -72,6 +72,7 @@ class InitializerCliTest {
 
         assertThat(result.exit()).isZero();
         assertThat(target.resolve("pom.xml")).isRegularFile();
+        assertThat(target.resolve("mvnw")).isRegularFile();
         assertThat(target.resolve("src/main/resources/application.yml")).isRegularFile();
     }
 
@@ -101,7 +102,7 @@ class InitializerCliTest {
         RunResult result = run("diff", manifest.toString(), target.toString());
 
         assertThat(result.exit()).isZero();
-        assertThat(result.stdout()).contains("不变 7");
+        assertThat(result.stdout()).contains("不变 10");
     }
 
     @Test

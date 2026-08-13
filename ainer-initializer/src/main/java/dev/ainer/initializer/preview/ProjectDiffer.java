@@ -8,6 +8,8 @@ import dev.ainer.initializer.generate.ProjectTree;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -62,7 +64,9 @@ public final class ProjectDiffer {
             Path resolved = target.resolve(file.path());
             if (!Files.exists(resolved)) {
                 newFiles.add(file.path());
-            } else if (Files.isRegularFile(resolved) && sameBytes(resolved, file.content())) {
+            } else if (Files.isRegularFile(resolved)
+                    && sameBytes(resolved, file.content())
+                    && sameExecutionMode(resolved, file.executable())) {
                 unchanged.add(file.path());
             } else {
                 modified.add(file.path());
@@ -90,6 +94,21 @@ public final class ProjectDiffer {
         try {
             byte[] onDisk = Files.readAllBytes(file);
             return java.util.Arrays.equals(onDisk, content);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private boolean sameExecutionMode(Path file, boolean executable) {
+        if (Files.getFileAttributeView(file, PosixFileAttributeView.class) == null) {
+            return true;
+        }
+        try {
+            var permissions = Files.getPosixFilePermissions(file);
+            boolean actualExecutable = permissions.contains(PosixFilePermission.OWNER_EXECUTE)
+                    || permissions.contains(PosixFilePermission.GROUP_EXECUTE)
+                    || permissions.contains(PosixFilePermission.OTHERS_EXECUTE);
+            return actualExecutable == executable;
         } catch (IOException e) {
             return false;
         }

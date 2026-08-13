@@ -36,7 +36,10 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 [`v0.1.0-rc.2`](https://github.com/ainerlab/ainer-boot/releases/tag/v0.1.0-rc.2) 已成为第一个
 **合格**的受控 RC：不可变 Release、精确源码 `0f99ee08f5d9145bc5bc72052eaf59774aad8054`、正式
 OpenPGP 签名、107/107 远端制品读回以及 Maven 3/Maven 4/Project Initializer 空仓消费均已通过。
-下一步由 `xq-platform-next` 固定消费该版本，完成真实业务纵向切片、migration replay、升级与回滚。
+随后由 `xq-platform-next` 复核发现，`rc.2` 生成的项目缺少 README 已约定的 Maven Wrapper；当时
+的 Initializer 门禁借用了 Ainer 生产者 Wrapper，因而没有覆盖生成项目自带工具链这一合同。当前
+开发版本已补正，必须发布唯一的新 RC 后，产品才能以 `rc.2` 为升级/回滚起点、以新 RC 为最终
+消费版本完成真实业务纵向切片和 migration replay。
 `0.1.0-rc.1` 仍是 withdrawn/non-qualifying，禁止消费或复用；当前开发版本仍为
 `0.1.0-SNAPSHOT`。`rc.2` 不是稳定版、公开发行版、生产就绪或 1.0 声明；动态门禁只以
 [`docs/project-status.md`](docs/project-status.md) 为准。
@@ -71,7 +74,8 @@ preview，不表示 Maven 4 已进入稳定版。请使用 JDK 25，并从仓库
 ```
 
 系统 Maven 3.9+ 只用于 `scripts/verify-maven-consumers.sh` 的下游兼容门禁，不能替代 Wrapper
-构建、安装或发布 Ainer reactor。
+构建、安装或发布 Ainer reactor。Initializer 生成的独立项目例外：必须使用生成目录自己的
+`./mvnw`，它固定 Maven 3.9.16 与发行包摘要。
 若 Apache 刚发布新的 rc、持久下载端点尚在同步，新环境首次启动 Wrapper 可能暂时返回 404；
 不要把仓库 URL 改到会被删除的临时候选目录，当前同步状态见
 [`docs/project-status.md`](docs/project-status.md)。

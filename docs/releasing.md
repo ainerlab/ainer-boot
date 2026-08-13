@@ -67,7 +67,8 @@ git status --short --branch
 ```
 
 脚本默认使用 `AINER_ARTIFACT_SOURCE=local`，在隔离仓库安装 producer 后验证 23 个 consumer POM、
-公开配置元数据、sources/Javadoc、Maven 3/4 Golden Consumer 和 Initializer。发布后的远端门禁使用：
+公开配置元数据、sources/Javadoc、Maven 3/4 Golden Consumer 和 Initializer。Initializer 的普通、
+PostgreSQL 与 CRUD 三通道必须执行各自生成的 Maven 3.9.16 Wrapper。发布后的远端门禁使用：
 
 ```bash
 export AINER_ARTIFACT_SOURCE=remote
@@ -87,14 +88,15 @@ AINER_VERSION="$AINER_VERSION" ./scripts/verify-initializer-consumer.sh
 1. checkout 完整历史，验证 tag 是 annotated SemVer tag，且 peel 后 commit 同时等于 workflow 源码与
    当前默认分支头；
 2. 检查 `AINER_IMMUTABLE_RELEASES=true` 声明，并在 GitHub Packages 查询 BOM POM；版本存在即停止；
-3. 运行 shell/release 契约、Docker、锁定 Maven 3.9.16、本地 non-SNAPSHOT consumers/Initializer；
+3. 运行 shell/release 契约、Docker、锁定 Maven 3.9.16、本地 non-SNAPSHOT consumers，以及使用
+   生成项目自身 Wrapper 的 Initializer 三通道；
 4. 导入 passphrase-protected GPG key，执行一次临时签名与验签 probe；
 5. 使用 `-Prelease clean deploy` 完整测试、附加 sources/Javadoc、签名并部署；
 6. 强制 Surefire failure/error/skipped 全为零，生成 CycloneDX release SBOM；
 7. 下载 107 个 Maven 主制品及 107 个 `.asc`，带重试逐一校验精确 fingerprint，生成
    checksum/provenance；
-8. 确认远端制品完整可见后，从两个空仓运行 Maven 3/4 consumer，并从远端获取 CLI 运行 Initializer
-   三通道；
+8. 确认远端制品完整可见后，从两个空仓运行 Maven 3/4 consumer，并从远端获取 CLI 生成带 Wrapper
+   的项目，再以生成 Wrapper 运行 Initializer 三通道；
 9. 上传签名发布证据；若启用 GitHub Attestations，attestation 也必须成功；
 10. 最后创建 GitHub Release，并从 release API 读回 `immutable=true`；否则本版本不合格。
 

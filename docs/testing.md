@@ -1,6 +1,6 @@
 # Ainer 测试与质量门禁
 
-> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-08-07 · 适用版本：`0.1.x`
+> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-08-13 · 适用版本：`0.1.x`
 
 ## 1. 目标
 
@@ -46,7 +46,8 @@
 
 Surefire XML 报告位于各模块 `target/surefire-reports/`。`target/` 是构建产物，不提交。
 生产者验证必须使用锁定 Maven 4.0.0-rc-6 preview 的 Wrapper；系统 Maven 3.9+ 只由
-`scripts/verify-maven-consumers.sh` 用于下游兼容门禁。
+`scripts/verify-maven-consumers.sh` 用于下游兼容门禁。Initializer consumer、TTFR 与 TTCRUD
+必须执行生成项目自带的 Maven 3.9.16 Wrapper；借用生产者 Wrapper 不算独立生成物证据。
 发布质量检查还必须执行 `./scripts/check-surefire-results.sh`；该脚本在没有报告、没有执行测试、
 存在 failure/error 或任何 skipped 测试时失败。
 
@@ -196,6 +197,7 @@ AINER_REPRO_REPOSITORY="$(mktemp -d)"
 ./mvnw -Dmaven.repo.local="$AINER_REPRO_REPOSITORY" clean install
 ./mvnw -Dmaven.repo.local="$AINER_REPRO_REPOSITORY" clean verify artifact:compare
 ./scripts/verify-maven-consumers.sh
+./scripts/verify-initializer-consumer.sh
 ```
 
 两次构建使用同一个隔离本地仓库，避免既有缓存成为参考。consumer 脚本必须证明 Maven 4 与

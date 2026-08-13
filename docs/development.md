@@ -1,6 +1,6 @@
 # Ainer 本地开发手册
 
-> 文档类型：开发操作 · 状态：生效 · 最近核对：2026-08-10 · 适用版本：`0.1.x`
+> 文档类型：开发操作 · 状态：生效 · 最近核对：2026-08-13 · 适用版本：`0.1.x`
 
 ## 1. 环境要求
 
@@ -16,7 +16,8 @@
 JDK 和 Maven 版本由 Maven Enforcer 强制检查。Maven 4.0.0-rc-6 仍是 preview；生产者构建必须
 使用仓库内 Wrapper，不能用全局 Maven 替代。系统 Maven 3.9+ 只供
 `scripts/verify-maven-consumers.sh` 验证已安装制品的下游兼容性。未经单独兼容性验证，不承诺
-其他 JDK、数据库或 Windows 原生环境可用。
+其他 JDK、数据库或 Windows 原生环境可用。Initializer 生成的消费者项目自带 Wrapper 3.3.4，
+固定 Maven 3.9.16；应在生成目录执行它自己的 `./mvnw`，不得借用本仓库的 Maven 4 Wrapper。
 
 ```bash
 java -version
