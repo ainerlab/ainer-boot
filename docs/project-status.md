@@ -39,10 +39,11 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 Ainer 生产者仓库的 Maven 4 Wrapper，因而“生成项目独立构建”的证据不完整。当前开发分支已补入
 Apache Maven Wrapper 3.3.4、固定 Maven 3.9.16 官方发行包与 SHA-256、POSIX 执行位写入/diff，
 并让 consumer/TTFR/TTCRUD 使用生成项目自己的 Wrapper。定向测试与独立 Wrapper 冒烟已通过；
-完整 reactor、三通道消费者、TTFR 与 TTCRUD 本地门禁也已通过，远端新 RC 仍待本批次发布。
+完整 reactor、三通道消费者、TTFR 与 TTCRUD 本地门禁也已通过。唯一的新候选目标已冻结为
+`v0.1.0-rc.3`，annotated tag、远端制品与 immutable GitHub Release 尚未创建。
 因此 P2 的已发布实现合同暂时重开；`rc.2` 保持不可变，只作为升级/回滚的已发布起点而非最终
-消费目标。只有新 RC 发布并完成
-`rc.2 -> 新 RC -> rc.2` 的升级/回滚验证后，才能重新关闭这一缺口。
+消费目标。只有 `rc.3` 发布并完成
+`rc.2 -> rc.3 -> rc.2` 的升级/回滚验证后，才能重新关闭这一缺口。
 
 2026-08-12 P3 企业基建首批代码完成：文件存储 SPI、字典、配置、通知、缓存 starter、Spring Cache
 改造。新建 5 个模块（ainer-module-dictionary/config/notification + ainer-starter-cache + 文件存储
@@ -59,9 +60,9 @@ Release。Release 有 16 个 assets；发布后又在隔离 keyring 验证 7 个
 `EVIDENCE-SHA256SUMS` 的 14 项全部通过。GitHub Attestations 因未显式启用而按设计跳过，强制的
 Ainer 项目签名 provenance 已通过。
 
-这关闭了 P1 的合格受控 RC 发布门禁，但没有关闭 G2。Initializer Wrapper 缺口要求发布唯一的新
-RC；`xq-platform-next` 需以远端 `rc.2` 为升级起点、以新 RC 为最终消费版本，完成真实产品纵向
-切片、PostgreSQL migration replay、升级和回滚，之后才能评估稳定 `0.1.0`。
+这关闭了 P1 的合格受控 RC 发布门禁，但没有关闭 G2。Initializer Wrapper 缺口要求发布唯一的
+`v0.1.0-rc.3`；`xq-platform-next` 需以远端 `rc.2` 为升级起点、以 `rc.3` 为最终消费版本，
+完成真实产品纵向切片、PostgreSQL migration replay、升级和回滚，之后才能评估稳定 `0.1.0`。
 `0.1.0-rc.1` 仍是 **withdrawn / non-qualifying**，禁止消费、复用、移动或覆盖；当前开发版本保持
 `0.1.0-SNAPSHOT`。`rc.2` 不是稳定版、公开发行版、生产就绪或 1.0 声明。许可状态仍为私有/专有；
 公开发行必须另行完成 LICENSE/NOTICE、品牌资产和对外许可决策。
@@ -264,7 +265,7 @@ RC；`xq-platform-next` 需以远端 `rc.2` 为升级起点、以新 RC 为最�
 
 ## 3. 最近验证记录
 
-2026-08-13 `xq-platform-next` 消费者接管审计与 Initializer Wrapper 补正（本地闭环）
+2026-08-13 `xq-platform-next` 消费者接管审计与 Initializer Wrapper 补正（代码与默认分支 CI 闭环）
 - **消费者事实**：独立仓库由 Initializer 生成，当前仍固定 `0.1.0-SNAPSHOT`；README 要求
   `./mvnw`，仓库内却没有 Wrapper。这证明 `rc.2` 的远端 Initializer 三通道只验证了生成源码与
   Ainer 制品消费，没有验证生成项目可独立携带约定工具链。
@@ -278,6 +279,10 @@ RC；`xq-platform-next` 需以远端 `rc.2` 为升级起点、以新 RC 为最�
   测试，均为零失败/错误/跳过，且全部执行生成项目自己的 Maven 3.9.16 Wrapper；PostgreSQL
   18.3 migration 从空库成功重放。冷仓 TTFR 147s / 600s、TTCRUD 180s / 1800s，发布合同脚本、
   Wrapper 资产比对与 `git diff --check` 通过。远端新 RC 尚未发布，本条不宣称远端修复已可消费。
+- **远端代码证据**：PR #5 的 run `31672808212` 全绿并合入 `dev`；默认分支 run
+  `31673523854` 在精确 merge commit `19151697a508a7e21ed4fa5838b8a384dfe7a582` 上再次通过
+  quality、gitleaks、Maven 3/4 consumer、Initializer 三通道、TTFR、TTCRUD、SBOM 与完整
+  platform/virtual-thread matrix。该结果证明待发布源码，不等于 `rc.3` 制品已经存在。
 - **权限边界**：本机当前 GitHub 凭据没有 `read:packages`，因此不能把 `xq-platform-next` 的
   `0.1.0-SNAPSHOT` 立即替换成远端 RC 并执行冷仓消费。发布修复和通用远端门禁可先推进；真实
   产品消费仍需最小 `read:packages` 授权，不使用本地缓存伪装远端证据。
@@ -1164,8 +1169,8 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 
 1. `v0.1.0-rc.2` 已完成默认分支 CI、annotated tag、107/107 远端验签、空仓消费者、签名证据和
    immutable GitHub Release；该合格受控 RC 保留为升级/回滚的已发布起点，不覆盖或移动；
-2. 发布包含 Initializer Wrapper 补正的新不可变 RC，让 `xq-platform-next` 删除
-   `0.1.0-SNAPSHOT` 与本地仓库依赖，固定从远端新 RC 消费，并以 `rc.2` 为起点完成升级、回滚、JWT、
+2. 发布包含 Initializer Wrapper 补正的不可变 `v0.1.0-rc.3`，让 `xq-platform-next` 删除
+   `0.1.0-SNAPSHOT` 与本地仓库依赖，固定从远端 `rc.3` 消费，并以 `rc.2` 为起点完成升级、回滚、JWT、
    Workspace/资源授权、PostgreSQL migration replay、真实 HTTP 错误和客户端 SDK 的产品所有纵向
    切片，同时演练升级与回滚；
 3. 若产品消费暴露兼容性或发布链问题，使用唯一的新 `rc.N+1` 修复并重复完整门禁，不移动 tag、
