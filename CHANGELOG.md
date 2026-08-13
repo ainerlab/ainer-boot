@@ -22,6 +22,8 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 - **`0.1` 发布列车失败关闭加固（2026-08-13）**：修复虚拟线程矩阵在 Ubuntu 上先从 `PATH`
   发现 `ab`、执行时却硬编码 `/usr/sbin/ab` 的失败，并修正 `AINER_VERSION` 拼写。发布 workflow
+  同时要求 ApacheBench 完成全部请求，拒绝 Non-2xx、Connect、Receive 与 Exceptions，只允许动态
+  响应产生的 Length 差异，避免 `|| true` 把真实压测失败伪装为绿色。发布 workflow
   现在要求 annotated tag/source 一致、目标 package 版本不存在、GitHub Immutable Releases 已启用；
   GPG 恢复 best-practices + passphrase 环境变量模式，拒绝无口令私钥、非预期 fingerprint 和 Maven
   CLI 口令。发布后按与 reactor POM 对照的唯一清单逐一读回 107 个主制品与 107 个 `.asc` 验证精确

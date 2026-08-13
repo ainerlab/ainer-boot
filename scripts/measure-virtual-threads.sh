@@ -171,25 +171,30 @@ run_mode() {
     kill -0 "$app_pid" 2>/dev/null || fail "application exited early, see $log"
     sleep 1
   done
+  curl -sf "http://127.0.0.1:$port/actuator/health" >/dev/null \
+    || fail "application did not become healthy, see $log"
 
   # 灌入行数据（直接写 POST；示例值由 manifest 决定，事务单行写入）。
   for i in $(seq 1 50); do
     curl -sf -X POST "http://127.0.0.1:$port/api/metricRows" \
       -H 'Content-Type: application/json' \
       -d "{\"code\":\"seed-$i\",\"payload\":\"p-$i\",\"amount\":12.5,\"active\":true,\"recordedAt\":\"2026-08-09T00:00:00Z\"}" \
-      >/dev/null 2>&1 || true
+      >/dev/null \
+      || fail "failed to seed metricRow $i in $mode mode"
   done
 
   # 压测分页接口（真实 JDBC 查询 + Flyway 初始化的表）。
   "$ab_command" -n "$requests" -c "$concurrency" \
     -g "$target_dir/$mode.jdbc.tsv" \
     "http://127.0.0.1:$port/api/metricRows?page=1&size=10" >"$target_dir/$mode.jdbc.ab" 2>&1 || true
+  assert_ab_result "$mode-jdbc" "$target_dir/$mode.jdbc.ab" "$requests"
 
   # 压测等待型接口（模拟外部 IO 阻塞；高等待并发是虚拟线程的收益区，
   # 也是 ADR-0029 决策 5 决定「新 MVC 项目默认 v-thread」的判据之一）。
   "$ab_command" -n "$requests" -c "$wait_concurrency" \
     -g "$target_dir/$mode.wait.tsv" \
     "http://127.0.0.1:$port/api/wait?ms=$wait_ms" >"$target_dir/$mode.wait.ab" 2>&1 || true
+  assert_ab_result "$mode-wait" "$target_dir/$mode.wait.ab" "$requests"
 
   # 等待 JFR 转储完成再杀进程。
   sleep 3
@@ -197,6 +202,42 @@ run_mode() {
   wait "$app_pid" 2>/dev/null || true
   docker rm -f ainer-vt-pg >/dev/null 2>&1 || true
   trap - EXIT
+}
+
+assert_ab_result() {
+  local label="$1"
+  local report="$2"
+  local expected_requests="$3"
+  local complete failed non_2xx breakdown connect receive length exceptions
+
+  [[ -s "$report" ]] || fail "$label ApacheBench report is missing or empty"
+  complete="$(awk '/^Complete requests:/ {print $3; exit}' "$report")"
+  failed="$(awk '/^Failed requests:/ {print $3; exit}' "$report")"
+  non_2xx="$(awk '/^Non-2xx responses:/ {print $3; exit}' "$report")"
+  non_2xx="${non_2xx:-0}"
+  [[ "$complete" == "$expected_requests" ]] \
+    || fail "$label completed ${complete:-0}/$expected_requests requests"
+  [[ "$failed" =~ ^[0-9]+$ ]] || fail "$label has no valid failed-request count"
+  [[ "$non_2xx" == "0" ]] || fail "$label returned $non_2xx non-2xx responses"
+
+  if [[ "$failed" == "0" ]]; then
+    connect=0
+    receive=0
+    length=0
+    exceptions=0
+  else
+    breakdown="$(sed -n \
+      's/.*(Connect: \([0-9][0-9]*\), Receive: \([0-9][0-9]*\), Length: \([0-9][0-9]*\), Exceptions: \([0-9][0-9]*\)).*/\1 \2 \3 \4/p' \
+      "$report" | sed -n '1p')"
+    [[ -n "$breakdown" ]] || fail "$label failed requests have no parseable category breakdown"
+    read -r connect receive length exceptions <<<"$breakdown"
+  fi
+
+  [[ "$connect" == "0" && "$receive" == "0" && "$exceptions" == "0" ]] \
+    || fail "$label transport failures: connect=$connect receive=$receive exceptions=$exceptions"
+  [[ "$failed" == "$length" ]] \
+    || fail "$label has non-length failures: failed=$failed length=$length"
+  echo "[vt-matrix] $label gate passed: complete=$complete non-2xx=$non_2xx length-only=$length"
 }
 
 summarize() {
@@ -246,8 +287,8 @@ for mode in platform virtual; do
       "$target_dir/$mode.$scene.ab" | sed "s/^/[$mode-$scene] /" || true
   done
 done
-# ab 的 Length 失败是 keep-alive 连接复用时的长度基准误报；业务失败以
-# Non-2xx responses 为准，出现为非业务可接受时必须人工核查页面响应。
-echo "[vt-matrix] 注：ab 的 Length 失败为连接复用观测伪影，业务失败以 Non-2xx responses 为准"
+# 动态响应可能产生 ApacheBench Length 差异；assert_ab_result 只允许这一类差异，
+# 对 incomplete、Non-2xx、Connect、Receive 与 Exceptions 一律失败关闭。
+echo "[vt-matrix] 注：仅允许动态响应的 Length 差异；传输与 Non-2xx 失败均已强制为零"
 echo "JFR 录制：$target_dir/platform.jfr $target_dir/virtual.jfr"
 echo "[vt-matrix] matrix run finished (artifacts under $target_dir)"

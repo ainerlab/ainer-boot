@@ -69,6 +69,8 @@ fi
 if grep -n -E '/usr/sbin/ab|AINNER_VERSION' "$boot_root/scripts/measure-virtual-threads.sh"; then
   fail "virtual-thread tooling must resolve ab from PATH and use AINER_VERSION"
 fi
+grep -Fq 'assert_ab_result' "$boot_root/scripts/measure-virtual-threads.sh" \
+  || fail "virtual-thread matrix must fail closed on ApacheBench results"
 if grep -n -- '-Dgpg.passphrase' "$release_workflow"; then
   fail "GPG passphrases must never be passed on the Maven command line"
 fi
