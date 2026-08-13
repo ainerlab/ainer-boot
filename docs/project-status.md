@@ -1107,8 +1107,8 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 
 1. 等待 PR #3 最新 commit 的 CI/gitleaks/完整 virtual-thread matrix 终态，完成范围评审后合并到默认
    分支 `dev`；正式 signing key、fingerprint、Immutable Releases 与对应 variables 已配置；
-2. 审核 Changelog 后创建全新
-   annotated `v0.1.0-rc.2` 或更高 tag，要求 workflow 完成 107/107 远端验签、空仓消费者、签名证据和
+2. `CHANGELOG.md` 已冻结 `0.1.0-rc.2` 章节；合并并取得默认分支精确 SHA 的 CI 后，创建全新
+   annotated `v0.1.0-rc.2` tag，要求 workflow 完成 107/107 远端验签、空仓消费者、签名证据和
    immutable GitHub Release；
 3. 让 `xq-platform-next` 删除 `0.1.0-SNAPSHOT` 与本地仓库依赖，固定从合格远端 RC 消费，完成 JWT、
    Workspace/资源授权、PostgreSQL migration replay、真实 HTTP 错误和客户端 SDK 的产品所有纵向

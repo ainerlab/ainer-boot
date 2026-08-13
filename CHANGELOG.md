@@ -4,6 +4,10 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
+当前无尚未归入版本的用户可见变化。
+
+## [0.1.0-rc.2] - 2026-08-13
+
 > **破坏性变更（Greenfield S8，不可逆）**：按 ADR-0033 完成去 tenant 化原子切换。删除
 > tenant/多租户上下文、Identity access-event outbox/relay/消费、跨运行时 Directory、平台
 > 预配与通知回执、tenant 服务 client 控制面及 OWNER 专用转移/丢失恢复；重建为
@@ -344,20 +348,21 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Known limitations
 
-- 当前仍为 `0.1.0-SNAPSHOT` foundation，不是生产就绪发行版。
-- Maven 4.0.0-rc-6 仍是 preview；Wrapper 已配置 Maven Central 持久地址和校验值，但该发行包
-  当前尚未同步，`./mvnw --version` 仍会下载失败；不使用临时候选目录替代。
-- 在线撤销只覆盖配置的高风险路径；普通低风险自包含 JWT 仍存在自然到期窗口。
-- Authorization Server 已成为高风险 API 的在线依赖；Prometheus 导出与独立抓取凭据已有代码基线，但生产高可用、容量、凭据退役轮换、dashboard 和告警路由尚未完成。
-- PKCE 自动化除通用测试 client 外已覆盖固定的 Ainer Admin 开发 public client；Passkey 代码
-  主线已有虚拟 authenticator 签名 ceremony、
-  受控 enrollment、恢复与 step-up，但尚缺恢复通知、主流真实设备矩阵、共享限流与多节点会话；
-  生产 browser/OIDC client 控制面和登录体验也尚未完成。
-- M4.8A 已完成预配申请、一次性激活核心、加密 notification outbox、OAuth2/HTTPS 网关 relay
-  与已有用户本人接受，并已增加 tenant/user 安全分页、未完成申请显式取消和 provider-neutral
-  终态回执接收基线；仓库不包含真实外部通知网关、邮件/短信供应商或真实最终送达证明，
-  tenant/user 禁用恢复等后续生命周期、tenant ownership transfer 和成员管理 UI 不在本切片。
-- 审计归档仍位于同一 PostgreSQL 数据库，没有 WORM/法律保留、外部不可变副本、生产 SIEM 消费者和告警路由。
-- 正式 CI、制品发布、备份恢复、经真实流量验证的 SLO 与商业授权交付尚未建立。
+- `0.1.0-rc.2` 是私有、受控的 release candidate，不是稳定版、公开发行版或生产就绪声明；
+  `0.1.0-rc.1` 已撤回且禁止消费。
+- Maven 4.0.0-rc-6 仍是 preview；Wrapper 已锁定 Maven Central 正式同步的发行包与 SHA-512，
+  Maven 3.9+ 只作为下游消费者门禁。稳定 producer toolchain 仍需在 `1.0` 前重新决策。
+- 文件元数据持久化以及字典、配置、通知、文件的服务端管理 API/OpenAPI 尚未完成，P3/G1 未关闭。
+- 授权当前只有端点粗粒度门禁；资源 target resolver、obligation executor、方法级 AOP 与 RFC 9470
+  challenge 仍未交付。
+- Organization/Workforce、Agent/Tool/Context/Evaluation、Knowledge/RAG 与任务调度仍为 Incubating，
+  不属于本 RC 的 Stable 契约。
+- 生产高可用、备份恢复、灾难演练、多实例容量、正式 SLO/告警路由、外部不可变审计和商业
+  entitlement 尚未完成。
+- 私有免费仓库不能启用 required review/branch protection，当前依赖 Draft PR、完整 CI 与 tag
+  只能指向默认分支头的补偿控制。
+- 稳定版仍要求 `xq-platform-next` 从远端 RC 完成真实纵向切片、migration replay、升级与回滚；
+  本仓库测试和 RC 发布不能替代产品证据。
 
-[Unreleased]: docs/project-status.md
+[Unreleased]: https://github.com/ainerlab/ainer-boot/compare/v0.1.0-rc.2...HEAD
+[0.1.0-rc.2]: https://github.com/ainerlab/ainer-boot/releases/tag/v0.1.0-rc.2
