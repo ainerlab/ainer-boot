@@ -132,6 +132,13 @@ fingerprint 为 `DC72A6994ABFA48B3D9B1DE145361DCB6F65F6FD`，已写入 repositor
 parentless BOM 与隔离签名 probe 均通过。该记录只证明签名身份配置完成，不替代 tag workflow 与远端
 制品证据。
 
+2026-08-13 annotated tag `v0.1.0-rc.2`、默认分支与 immutable GitHub Release 已精确绑定到 commit
+`0f99ee08f5d9145bc5bc72052eaf59774aad8054`。release run `31666957663` 完成 336/0/0/0、107 个
+主制品与 107 个签名远端读回、精确 fingerprint 验证、Maven 3/Maven 4 与 Initializer 空仓消费、
+签名 SBOM/checksum/107-subject provenance 和 16 个 immutable Release assets；发布后隔离回读的
+7 个 detached signatures 与 14 项 evidence checksums 也全部通过。该记录满足下方验收第 4 项，
+不替代第 5 项的真实产品消费、migration replay、升级与回滚。
+
 ## 验收方式
 
 1. `scripts/check-release-contracts.sh` 拒绝硬编码 `ab` 路径、GPG 命令行口令和非阻塞 attestation；
@@ -141,7 +148,8 @@ parentless BOM 与隔离签名 probe 均通过。该记录只证明签名身份�
    107/107 读回验签、SBOM/checksum/provenance 和 immutable GitHub Release；
 5. 产品从远端固定该 RC，完成 migration replay、升级与回滚后，G2 才可关闭。
 
-第 4、5 项必须由未来 `rc.2+` 的远端记录证明；本 ADR Accepted 和本地代码就绪本身不构成完成证据。
+第 4 项已由 `v0.1.0-rc.2` 的远端发布记录证明；第 5 项仍必须由真实产品消费记录证明。本 ADR
+Accepted、本地代码就绪或通用空仓 consumer 本身均不构成 G2 完成证据。
 
 ## 参考
 
