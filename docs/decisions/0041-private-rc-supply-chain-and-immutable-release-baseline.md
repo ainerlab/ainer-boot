@@ -124,6 +124,14 @@ fingerprint，再基于远端主制品生成 SHA-256 与 SHA-512 清单。reacto
 - GitHub Packages 认证失败、版本查询异常、签名 fingerprint 不匹配均失败关闭；
 - 对 deploy 后失败的版本保留事实记录，不通过删除远端证据制造“从未发布”的假象。
 
+## 实施记录
+
+2026-08-13 已生成 passphrase-protected RSA-3072 certification primary 与独立 signing subkey；CI secret
+只保存 signing subkey，完整加密备份保留在维护者受控本机，口令进入 macOS Keychain。正式 primary
+fingerprint 为 `DC72A6994ABFA48B3D9B1DE145361DCB6F65F6FD`，已写入 repository variable；根 reactor、
+parentless BOM 与隔离签名 probe 均通过。该记录只证明签名身份配置完成，不替代 tag workflow 与远端
+制品证据。
+
 ## 验收方式
 
 1. `scripts/check-release-contracts.sh` 拒绝硬编码 `ab` 路径、GPG 命令行口令和非阻塞 attestation；

@@ -257,8 +257,9 @@ SBOM/checksum/provenance 和最后创建 immutable GitHub Release；本地实现
   同版本重跑得到 409。ADR-0041 将其标记为 withdrawn/non-qualifying，禁止消费或复用。
 - **签名密钥收紧**：根 reactor 与 parentless BOM 恢复 Maven GPG Plugin `bestPractices=true` 和
   `MAVEN_GPG_PASSPHRASE` 绑定；workflow 拒绝空口令，在 deploy 前执行签名 probe，删除 CLI passphrase。
-  导入 key 还必须匹配 repository variable 固定的 40 位 fingerprint。当前 GitHub secret 中的无口令
-  key 必须轮换/重新导出，并同步设置 fingerprint 后才能发布 `rc.2+`。
+  导入 key 还必须匹配 repository variable 固定的 40 位 fingerprint。2026-08-13 已轮换为
+  passphrase-protected RSA-3072 certification primary + signing subkey；CI 只保存 signing subkey，正式
+  fingerprint 为 `DC72A6994ABFA48B3D9B1DE145361DCB6F65F6FD`，Secrets 与 repository variable 已更新。
 - **发布前门禁**：只接受与事件源码及默认分支头一致的 annotated SemVer tag；目标 BOM 版本存在即
   失败；GitHub Immutable Releases 已于 2026-08-13 远端启用（API readback `enabled=true`），workflow
   还要求 repository variable 声明并在 Release 创建后读回 `immutable=true`；shell 合同禁止再次硬编码
@@ -279,9 +280,10 @@ SBOM/checksum/provenance 和最后创建 immutable GitHub Release；本地实现
   的 GPG 配置；本地 HTTP registry 夹具完成 107 个主制品 + 107 个签名读回、精确 fingerprint 验证和
   107-subject provenance。shell/发布合同、严格 SemVer 正负例、版本存在性正负例、workflow YAML 与
   `git diff --check` 均通过。
-- **证据边界**：上述 registry/GPG 结果使用本地一次性夹具，不是 GitHub Packages 或正式发布 key
-  证据；本变更尚未推送，远端 CI、gitleaks、完整 2000-request matrix、`rc.2+` deploy、远端消费者与
-  immutable GitHub Release 均未发生。
+- **证据边界**：上述 registry 结果使用本地一次性夹具，不是 GitHub Packages 证据；正式 key 已在
+  隔离 keyring 完成签名 probe、根 reactor 与 parentless BOM Maven GPG 验证，但尚未执行 tag workflow。
+  release hardening commit `b65bc92` 已推送 PR #3，远端 CI/gitleaks/完整 matrix 正在等待终态；
+  `rc.2+` deploy、远端消费者与 immutable GitHub Release 均未发生。
 
 2026-08-12 历史 ADR-0038 批次：P4 范围精简与企业基建前置（已被 ADR-0040 取代）
 - **决策状态**：下列方向是当时记录；ADR-0038 后续被直接改写，现已由 ADR-0040 合规取代。当前
@@ -1103,17 +1105,15 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 
 `0.1` 主线按以下顺序推进：
 
-1. 将 signing key 轮换/重新导出为非空 passphrase 保护，更新 GitHub secrets，并设置
-   `AINER_RELEASE_GPG_FINGERPRINT`；Immutable Releases 与 `AINER_IMMUTABLE_RELEASES=true` 已启用；
-2. 推送本变更并取得最新 commit 的 CI/gitleaks/完整 virtual-thread matrix 结果，确认批准的
-   review/tag 补偿控制；
-3. 审核 Changelog 后创建全新
+1. 等待 PR #3 最新 commit 的 CI/gitleaks/完整 virtual-thread matrix 终态，完成范围评审后合并到默认
+   分支 `dev`；正式 signing key、fingerprint、Immutable Releases 与对应 variables 已配置；
+2. 审核 Changelog 后创建全新
    annotated `v0.1.0-rc.2` 或更高 tag，要求 workflow 完成 107/107 远端验签、空仓消费者、签名证据和
    immutable GitHub Release；
-4. 让 `xq-platform-next` 删除 `0.1.0-SNAPSHOT` 与本地仓库依赖，固定从合格远端 RC 消费，完成 JWT、
+3. 让 `xq-platform-next` 删除 `0.1.0-SNAPSHOT` 与本地仓库依赖，固定从合格远端 RC 消费，完成 JWT、
    Workspace/资源授权、PostgreSQL migration replay、真实 HTTP 错误和客户端 SDK 的产品所有纵向
    切片，同时演练升级与回滚；
-5. 只有上述消费证据通过后才评估提升 `0.1.0` 并开放给其他内部产品；
+4. 只有上述消费证据通过后才评估提升 `0.1.0` 并开放给其他内部产品；
    `python-learning-service` 保持版本化 BOM/Starter 接入，不绑定开发分支、不复制源码。
 
 Identity、安全与运维纵深继续修复明确的 P0/P1/P3 风险，但方法级授权、组织目录、真实设备矩阵、
