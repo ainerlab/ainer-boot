@@ -101,8 +101,8 @@ jobs:
             echo "tag 发布必须设置 repository variable AINER_RELEASE_SIGNING=true" >&2
             exit 1
           fi
-          if [[ -z "${SIGNING_KEY_BASE64:-}" || -z "${SIGNING_PASSPHRASE:-}" ]]; then
-            echo "缺少 AINER_GPG_KEY_BASE64/AINER_GPG_PASSPHRASE，签名无法进行" >&2
+          if [[ -z "${SIGNING_KEY_BASE64:-}" ]]; then
+            echo "缺少 AINER_GPG_KEY_BASE64，签名无法进行" >&2
             exit 1
           fi
           printenv SIGNING_KEY_BASE64 | base64 --decode > "$RUNNER_TEMP/signing.asc"
@@ -120,13 +120,14 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.AINER_GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
-          if [[ -z "${MAVEN_GPG_PASSPHRASE:-}" ]]; then
-            echo "缺少 AINER_GPG_PASSPHRASE，签名无法进行" >&2
-            exit 1
+          GPG_PASSPHRASE_OPT=""
+          if [[ -n "${MAVEN_GPG_PASSPHRASE:-}" ]]; then
+            GPG_PASSPHRASE_OPT="-Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE"
           fi
           ./mvnw --batch-mode --no-transfer-progress \
             -Drevision="$release_version" \
             -Dgpg.keyname="$gpg_key_id" \
+            $GPG_PASSPHRASE_OPT \
             -Prelease clean deploy
 
       - name: Require zero failed, errored, or skipped tests
