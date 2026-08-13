@@ -20,14 +20,15 @@ class JwtAuthenticatedServiceFactoryTest {
         Jwt jwt = new Jwt(
                 "token", Instant.now(), Instant.now().plusSeconds(60),
                 Map.of("alg", "none"),
-                Map.of("sub", "ainer-relay", "actor_type", "SERVICE", "tenant_id", "tenant:one"));
+                Map.of("sub", "ainer-relay", "actor_type", "SERVICE",
+                        "token_profile", "SERVICE_V1", "claim_contract_version", "1"));
         JwtAuthenticationToken authentication = new JwtAuthenticationToken(
                 jwt, List.of(() -> "SCOPE_identity.access-events.publish"));
 
         AuthenticatedService service = JwtAuthenticatedServiceFactory.from(authentication);
 
         assertThat(service.serviceId()).isEqualTo("ainer-relay");
-        assertThat(service.requireTenantId()).isEqualTo("tenant:one");
+        assertThat(service.serviceId()).isEqualTo("ainer-relay");
     }
 
     @Test

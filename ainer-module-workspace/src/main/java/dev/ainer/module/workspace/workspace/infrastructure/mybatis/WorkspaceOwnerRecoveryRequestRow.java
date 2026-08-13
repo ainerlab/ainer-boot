@@ -6,7 +6,6 @@ import java.util.UUID;
 public class WorkspaceOwnerRecoveryRequestRow {
 
     private UUID id;
-    private String tenantId;
     private UUID workspaceId;
     private String newOwnerSubjectId;
     private String requestedBy;
@@ -19,8 +18,6 @@ public class WorkspaceOwnerRecoveryRequestRow {
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public UUID getWorkspaceId() { return workspaceId; }
     public void setWorkspaceId(UUID workspaceId) { this.workspaceId = workspaceId; }
     public String getNewOwnerSubjectId() { return newOwnerSubjectId; }

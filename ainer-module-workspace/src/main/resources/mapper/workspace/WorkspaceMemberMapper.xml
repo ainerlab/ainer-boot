@@ -7,7 +7,6 @@
     <resultMap id="workspaceMemberRow"
                type="dev.ainer.module.workspace.workspace.infrastructure.mybatis.WorkspaceMemberRow">
         <id property="workspaceId" column="workspace_id"/>
-        <result property="tenantId" column="tenant_id"/>
         <result property="subjectId" column="subject_id"/>
         <result property="role" column="role"/>
         <result property="status" column="status"/>
@@ -19,20 +18,19 @@
 
     <insert id="insert">
         INSERT INTO ainer_workspace_member (
-            tenant_id, workspace_id, subject_id, role, status, invited_by,
+            workspace_id, subject_id, role, status, invited_by,
             created_at, activated_at, updated_at
         ) VALUES (
-            #{tenantId}, #{workspaceId}, #{subjectId}, #{role}, #{status}, #{invitedBy},
+            #{workspaceId}, #{subjectId}, #{role}, #{status}, #{invitedBy},
             #{createdAt}, #{activatedAt}, #{updatedAt}
         )
     </insert>
 
     <select id="selectByWorkspaceAndSubject" resultMap="workspaceMemberRow">
-        SELECT tenant_id, workspace_id, subject_id, role, status, invited_by,
+        SELECT workspace_id, subject_id, role, status, invited_by,
                created_at, activated_at, updated_at
         FROM ainer_workspace_member
-        WHERE tenant_id = #{tenantId}
-          AND workspace_id = #{workspaceId}
+        WHERE workspace_id = #{workspaceId}
           AND subject_id = #{subjectId}
     </select>
 
@@ -41,8 +39,7 @@
         SET status = 'ACTIVE',
             activated_at = #{activatedAt},
             updated_at = #{activatedAt}
-        WHERE tenant_id = #{tenantId}
-          AND workspace_id = #{workspaceId}
+        WHERE workspace_id = #{workspaceId}
           AND subject_id = #{subjectId}
           AND status = 'PENDING'
     </update>
@@ -51,8 +48,7 @@
         UPDATE ainer_workspace_member
         SET role = #{newRole},
             updated_at = #{updatedAt}
-        WHERE tenant_id = #{tenantId}
-          AND workspace_id = #{workspaceId}
+        WHERE workspace_id = #{workspaceId}
           AND subject_id = #{subjectId}
           AND role = #{expectedRole}
           AND role &lt;&gt; 'OWNER'
@@ -60,8 +56,7 @@
 
     <delete id="deleteNonOwner">
         DELETE FROM ainer_workspace_member
-        WHERE tenant_id = #{tenantId}
-          AND workspace_id = #{workspaceId}
+        WHERE workspace_id = #{workspaceId}
           AND subject_id = #{subjectId}
           AND role &lt;&gt; 'OWNER'
     </delete>
@@ -70,8 +65,7 @@
         UPDATE ainer_workspace_member
         SET role = 'ADMIN',
             updated_at = #{updatedAt}
-        WHERE tenant_id = #{tenantId}
-          AND workspace_id = #{workspaceId}
+        WHERE workspace_id = #{workspaceId}
           AND subject_id = #{ownerSubjectId}
           AND role = 'OWNER'
           AND status = 'ACTIVE'
@@ -81,8 +75,7 @@
         UPDATE ainer_workspace_member
         SET role = 'OWNER',
             updated_at = #{updatedAt}
-        WHERE tenant_id = #{tenantId}
-          AND workspace_id = #{workspaceId}
+        WHERE workspace_id = #{workspaceId}
           AND subject_id = #{subjectId}
           AND role = #{expectedRole}
           AND role &lt;&gt; 'OWNER'
@@ -93,8 +86,7 @@
         SELECT EXISTS (
             SELECT 1
             FROM ainer_workspace_member
-            WHERE tenant_id = #{tenantId}
-              AND workspace_id = #{workspaceId}
+            WHERE workspace_id = #{workspaceId}
               AND role = 'OWNER'
               AND status = 'ACTIVE'
         )
@@ -104,8 +96,7 @@
         SELECT EXISTS (
             SELECT 1
             FROM ainer_workspace_member
-            WHERE tenant_id = #{tenantId}
-              AND workspace_id = #{workspaceId}
+            WHERE workspace_id = #{workspaceId}
               AND role = 'OWNER'
               AND status = 'REVOKED'
         )

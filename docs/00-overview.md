@@ -1,6 +1,6 @@
 # Ainer 文档总览：从这里开始
 
-> 文档类型：统一入口 · 状态：生效 · 最近核对：2026-08-03 · 适用版本：`0.1.x`
+> 文档类型：统一入口 · 状态：生效 · 最近核对：2026-08-13 · 适用版本：`0.1.x`
 
 本文是 Ainer Boot 文档的唯一权威入口。它帮助开发者、架构师和 AI agent 先建立同一份项目心智
 模型，再进入具体规范。它不复制各专题文档的细节，也不替代当前状态、架构规范或 ADR。
@@ -26,8 +26,9 @@ AI-native、但不局限于 AI 的通用企业应用脚手架与平台底座。�
 - Project Initializer、通用企业模块、可选 AI runtime 与参考应用；
 - 未来社区版、企业版和行业产品的工程与商业交付基线。
 
-`xq-platform-next` 是规划中的首个外部产品消费者，不是 Ainer 源码副本；Ainer Studio 独立负责
-管理端模板、Blocks 与视觉交付。完整产品边界见
+`xq-platform-next` 是规划中的首个外部产品消费者，不是 Ainer 源码副本；`python-learning-service`
+已登记为第二个外部消费者（Version-based 升级接入，不绑定开发分支）。Ainer Studio 独立负责
+管理端模板、Blocks 与视觉交付。完整产品边界与消费者登记见
 [`design/ainer-scaffold-design.md`](design/ainer-scaffold-design.md)。
 
 当前优先做正确的模块化单体边界；服务化通过独立发行物、稳定契约、明确数据所有权和可靠事件
@@ -48,26 +49,37 @@ ainer-dependencies                    统一依赖版本
 
 ainer-framework/
 ├── ainer-core                        无 Spring 依赖的核心契约
-├── ainer-spring                      Spring 共性
+├── ainer-spring                      Spring 共性 + 文件存储 adapter
 ├── ainer-security                    可信主体与 authority 契约
 ├── ainer-starter-web                 HTTP、错误与请求追踪
 ├── ainer-starter-persistence         MyBatis-Plus/MyBatis、Flyway、PostgreSQL、UUID
-└── ainer-starter-security            JWT Resource Server 共性
+├── ainer-starter-security            JWT Resource Server 共性
+├── ainer-starter-cache               Spring Cache + Caffeine/Redis + 分布式锁（ADR-0039）
+└── ainer-test-support                集成测试基座（RestTestClient、Testcontainers、PostgreSQL）
 
 ainer-server                          业务 Resource Server
-├── ainer-module-workspace            tenant 资源、成员与授权审计
-└── ainer-module-ai-runtime           模型网关、策略、用量与费用审计
+├── ainer-module-workspace            membership 资源、成员与授权审计
+├── ainer-module-ai-runtime           模型网关、策略、用量与费用审计
+├── ainer-module-authorization        混合细粒度授权 + adapter + 审计（ADR-0037）
+├── ainer-module-dictionary           树形字典 + 多语言 + Spring Cache（ADR-0040）
+├── ainer-module-config               动态配置 + 类型安全 + 热更新 + 版本（ADR-0040）
+└── ainer-module-notification         多渠道通知 + PG SKIP LOCKED 队列（ADR-0040）
 
 ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管理面
-└── ainer-module-identity             tenant、user、membership 与安全事件
+└── ainer-module-identity             HumanAccount、ServicePrincipal、登录身份与 Credential
+
+ainer-offstate-app                    P1 最小可消费应用（无外部服务冒烟）
+
+ainer-initializer                     P2 离线确定性生成内核（Manifest v1，ADR-0035）
+ainer-initializer-cli                 P2 离线 CLI：preview / init / diff
 ```
 
 必须先理解的四条边界：
 
 1. `ainer-core` 不依赖 Spring，Starter 不依赖业务模块；
 2. 业务模块拥有自己的表、migration、端口和事务；
-3. Identity 与业务运行时不共享查询私有表，跨边界使用契约或可靠事件；
-4. tenant、subject 和 owner 来自可信身份上下文，不接受客户端自声明。
+3. Identity 与业务运行时不共享查询私有表，跨边界使用显式服务契约；
+4. subject 和 owner 来自可信身份上下文，不接受客户端自声明。
 
 完整依据见 [`architecture.md`](architecture.md) 和
 [ADR-0001](decisions/0001-independent-architecture-baseline.md)、
@@ -82,7 +94,7 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 | 长期规范 | 以后应当如何设计和实现 | `architecture.md`、`conventions.md` 等 | 代码与规范同一变更 |
 | ADR | 为什么选择这个不可轻易逆转的方案 | [`decisions/README.md`](decisions/README.md) | 接受后不改写结论，以新 ADR 取代 |
 | 专题手册 | 某一领域如何开发、验证和运行 | 数据库、安全、AI、运维等文档 | 对应能力变化时更新 |
-| 研究/设计 | 候选方案、兼容验证和未来路线 | `design/`、`migration/`、Boot 4 备忘 | 不得写成已交付事实 |
+| 研究/设计 | 候选方案、兼容验证和未来路线 | `design/`、`migration/`、Boot 4 备忘、`reviews/` 审计快照 | 不得写成已交付事实 |
 | 变更记录 | 用户可见版本变化 | [`../CHANGELOG.md`](../CHANGELOG.md) | 随功能和发布维护 |
 
 没有一条“代码永远高于文档”或“文档永远高于代码”的简单规则：
@@ -131,20 +143,24 @@ Foundation Roadmap 仍是 Proposed；其 mdpress-first 是有条件的路线建�
 4. [`testing.md`](testing.md)
 5. 所属模块的现有 migration、Mapper 和 PostgreSQL 集成测试
 
-### 4.5 身份、安全与 tenant 授权
+### 4.5 身份、安全与授权
 
 1. [`security.md`](security.md)
 2. [`architecture.md`](architecture.md) 的安全与数据边界
-3. 设计未来 Account、Workspace 与 Isolation 语义时阅读
+3. Account、Workspace 与 Isolation 语义以
    [ADR-0033 Greenfield](decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md)
    （Accepted 为目标基线，Option B：完全移除 Tenant；按 [Impact](architecture/ainer-foundation-greenfield-reset-impact.md)
-   Stage 0–8 执行）；[v2](decisions/0033-account-workspace-isolation-model-baseline-v2.md)、
+   Stage 0–8 执行）为准；[v2](decisions/0033-account-workspace-isolation-model-baseline-v2.md)、
    [v1](decisions/0033-account-workspace-isolation-model-baseline.md) 与
-   [对抗性审查](architecture/adr-0033-adversarial-review.md) 为决策历史。Reset 完成前，当前运行行为仍以
-   既有 Accepted ADR 为准
-4. [`decisions/README.md`](decisions/README.md) 中相关安全 ADR；平台 Identity 供应与通知回执
-   重点阅读 [ADR-0019](decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)
-   和 [ADR-0021](decisions/0021-provisioning-notification-delivery-receipts.md)
+   [对抗性审查](architecture/adr-0033-adversarial-review.md) 为决策历史。
+   Greenfield 替换脊柱的早期实施计划与验收见
+   [`architecture/identity-foundation-v1-implementation-plan.md`](architecture/identity-foundation-v1-implementation-plan.md)；
+   原子清零（C1–C4 合并）的完整施工序列、隐藏缺口与依赖图见
+   [`architecture/0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)，
+   S1–S8 已全部完成并验证（注意：此处的 S1–S8 指 Greenfield ADR-0033 的账号/主体隔离脊柱施工切片，
+   与 ADR-0030 通用授权的内部切片 S0–S3 是**两套不同的 S 编号**；ADR-0030 已被
+   [ADR-0037](decisions/0037-post-greenfield-authorization-baseline.md) 取代，13 项差距全闭合）
+4. [`decisions/README.md`](decisions/README.md) 中相关安全 ADR
 5. 集成官方参考管理应用时阅读
    [`ainer-admin-integration.md`](ainer-admin-integration.md) 与
    [ADR-0022](decisions/0022-ainer-admin-browser-integration-baseline.md)
@@ -196,6 +212,17 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 先区分 Ainer 的 Maven 4 生产者构建与 Maven 3.9+/Maven 4 外部 consumer 门禁。POM 4.1 和
 `packaging=bom` 尚未进入当前实施范围，不能因 XML 精简而绕过安装后 POM 与真实下游验证。
 
+### 4.10 Java 25 / Maven 4 / Spring Boot 4.1 能力利用
+
+1. [`reviews/java25-maven4-springboot41-capability-audit.md`](reviews/java25-maven4-springboot41-capability-audit.md)
+2. [ADR-0026](decisions/0026-maven-4-build-and-consumer-pom-baseline.md)
+3. [ADR-0029](decisions/0029-jdk25-boot4-modern-baseline.md)（Proposed）
+4. [`boot4-migration-notes.md`](boot4-migration-notes.md)
+5. [`project-status.md`](project-status.md) 中与 ADR-0029 / Maven 4 相关的缺口
+
+该审计是只读快照，回答“基线是否真正被利用、何处仍有遗留或重复基础设施”，不代替 ADR，也不
+把计划能力写成已交付。实施任何 finding 前先对照 ADR 与 `project-status.md`。
+
 ## 5. 完整文档地图
 
 ### 核心认知
@@ -210,6 +237,8 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 | [`architecture/ainer-foundation-v1-roadmap.md`](architecture/ainer-foundation-v1-roadmap.md) | Foundation v1 的能力盘点、FV1-P0～P3 施工顺序、产品验证和明确不做（Proposed） |
 | [`decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md`](decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md) | ADR-0033 Greenfield 基线（Accepted 为目标，Option B：完全移除 Tenant；按 Impact Stage 0–8 执行） |
 | [`architecture/ainer-foundation-greenfield-reset-impact.md`](architecture/ainer-foundation-greenfield-reset-impact.md) | Greenfield reset 的删除/重建范围、迁移 baseline、JWT/API/event reset 与 Stage 0–8 执行顺序 |
+| [`architecture/0033-greenfield-cutover-plan.md`](architecture/0033-greenfield-cutover-plan.md) | Greenfield cutover 早期执行计划（Historical：已被原子执行规划取代，S1–S8 已完成） |
+| [`architecture/0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md) | C1–C4 原子清零完整执行规划：隐藏缺口（password store/securityEpoch/workspace 去 tenant）、S2–S8 施工序列与依赖图（S1–S8 全部完成） |
 | [`decisions/0033-account-workspace-isolation-model-baseline.md`](decisions/0033-account-workspace-isolation-model-baseline.md) | ADR-0033 v1 历史草案（Historical，未生效） |
 | [`architecture/adr-0033-adversarial-review.md`](architecture/adr-0033-adversarial-review.md) | ADR-0033 v1 的对抗性审查与 Major Revision 依据 |
 | [`decisions/0033-account-workspace-isolation-model-baseline-v2.md`](decisions/0033-account-workspace-isolation-model-baseline-v2.md) | ADR-0033 v2 迁移路线草案（Historical，不采用，保留为迁移备选语境） |
@@ -234,7 +263,7 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 |---|---|
 | [`database-design-standard.md`](database-design-standard.md) | PostgreSQL 18 表、字段、类型、约束与索引设计规范 |
 | [`database.md`](database.md) | 数据库归属、当前表、Flyway 和 Migration 运行手册 |
-| [`security.md`](security.md) | OAuth、Identity、tenant、Passkey 和安全边界 |
+| [`security.md`](security.md) | OAuth、Identity、撤销 epoch、Passkey 和安全边界 |
 | [`ai-gateway.md`](ai-gateway.md) | 模型网关、SSE、策略、费用和安全基线 |
 | [`design/authorization-architecture-plan.md`](design/authorization-architecture-plan.md) | 通用混合授权、集合查询、Spring Security 适配与 Agent 代行详细方案（Proposed） |
 | [`design/organization-workforce-architecture-plan.md`](design/organization-workforce-architecture-plan.md) | 部门、员工任职、岗位、团队及 SubjectSet 授权集成详细方案（Proposed） |
@@ -251,6 +280,7 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 | [`releasing.md`](releasing.md) | 版本、制品、兼容、发布和回滚门禁 |
 | [`boot4-migration-notes.md`](boot4-migration-notes.md) | Spring Boot 4/JDK 25 兼容验证 |
 | [`migration/ainer-migration-plan.md`](migration/ainer-migration-plan.md) | 旧项目到 Ainer 的迁移路线 |
+| [`reviews/java25-maven4-springboot41-capability-audit.md`](reviews/java25-maven4-springboot41-capability-audit.md) | Java 25 / Maven 4 / Spring Boot 4.1 能力利用审计快照（只读，含 NO CHANGE） |
 
 仓库级协作规则见 [`../AGENTS.md`](../AGENTS.md)，贡献流程见
 [`../CONTRIBUTING.md`](../CONTRIBUTING.md)。
@@ -294,9 +324,11 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 | 表、字段、类型、约束、索引 | `database-design-standard.md` + `database.md` |
 | 测试命令、门禁、跳过行为 | `testing.md` |
 | 启停、诊断、备份、恢复 | `operations.md` |
+| 开发环境容器化、本地启动 | `docker-compose.yml` + `.env.example`（见 [`development.md`](development.md) §3） |
 | 版本、制品、发布或回滚 | `releasing.md` + `CHANGELOG.md` |
 | 新依赖、版本或许可证 | `dependencies.md` |
 | 文档新增、改名、取代 | 本文与所有入链 |
+| 基线能力利用审计快照 | `reviews/`（只读结论）；实施进度仍只写 `project-status.md` |
 
 ## 9. 文档完成定义
 

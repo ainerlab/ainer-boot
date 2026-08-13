@@ -18,3 +18,5 @@ application-local.yml
 application-local.yaml
 application-secrets.yml
 application-secrets.yaml
+
+.zcode/

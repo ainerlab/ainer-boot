@@ -11,21 +11,19 @@ public interface WorkspaceMapper {
     int insert(WorkspaceRow row);
 
     int updateName(
-            @Param("tenantId") String tenantId,
             @Param("id") UUID id,
             @Param("name") String name,
             @Param("updatedAt") Instant updatedAt,
             @Param("expectedVersion") long expectedVersion);
 
-    WorkspaceRow selectById(@Param("tenantId") String tenantId, @Param("id") UUID id);
+    WorkspaceRow selectById(@Param("id") UUID id);
 
-    WorkspaceRow selectByIdForUpdate(@Param("tenantId") String tenantId, @Param("id") UUID id);
+    WorkspaceRow selectByIdForUpdate(@Param("id") UUID id);
 
     List<WorkspaceRow> selectPage(
-            @Param("tenantId") String tenantId,
             @Param("subjectId") String subjectId,
             @Param("limit") int limit,
             @Param("offset") long offset);
 
-    long count(@Param("tenantId") String tenantId, @Param("subjectId") String subjectId);
+    long count(@Param("subjectId") String subjectId);
 }

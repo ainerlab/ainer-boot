@@ -8,14 +8,12 @@ import java.util.UUID;
 public interface WorkspaceOwnerRecoveryMapper {
 
     int expireOpenRequests(
-            @Param("tenantId") String tenantId,
             @Param("workspaceId") UUID workspaceId,
             @Param("now") Instant now);
 
     int insert(WorkspaceOwnerRecoveryRequestRow row);
 
-    WorkspaceOwnerRecoveryRequestRow selectForUpdate(
-            @Param("tenantId") String tenantId, @Param("requestId") UUID requestId);
+    WorkspaceOwnerRecoveryRequestRow selectForUpdate(@Param("requestId") UUID requestId);
 
     int markExecuted(
             @Param("requestId") UUID requestId,

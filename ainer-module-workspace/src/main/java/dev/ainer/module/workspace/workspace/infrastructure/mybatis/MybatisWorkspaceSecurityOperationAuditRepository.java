@@ -19,7 +19,6 @@ public class MybatisWorkspaceSecurityOperationAuditRepository
         WorkspaceSecurityOperationAuditRow row = new WorkspaceSecurityOperationAuditRow();
         row.setId(audit.id());
         row.setOperationId(audit.operationId());
-        row.setTenantId(audit.tenantId().value());
         row.setWorkspaceId(audit.workspaceId());
         row.setTargetSubjectId(audit.targetSubjectId() == null ? null : audit.targetSubjectId().value());
         row.setOperationType(audit.operationType());

@@ -11,7 +11,7 @@ import dev.ainer.module.ai.gateway.domain.TokenUsage;
 import dev.ainer.module.ai.gateway.policy.CostCalculator;
 import dev.ainer.module.ai.gateway.policy.PromptFingerprint;
 import dev.ainer.module.ai.gateway.policy.SensitiveDataPolicy;
-import dev.ainer.module.ai.gateway.policy.TenantRateLimiter;
+import dev.ainer.module.ai.gateway.policy.SubjectRateLimiter;
 import dev.ainer.module.ai.gateway.policy.TokenEstimator;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -36,7 +36,7 @@ public class AiGatewayApplicationService {
     private final CostCalculator costCalculator;
     private final PromptFingerprint promptFingerprint;
     private final SensitiveDataPolicy sensitiveDataPolicy;
-    private final TenantRateLimiter rateLimiter;
+    private final SubjectRateLimiter rateLimiter;
     private final ExecutorService streamExecutor;
     private final Clock clock;
 
@@ -48,7 +48,7 @@ public class AiGatewayApplicationService {
             CostCalculator costCalculator,
             PromptFingerprint promptFingerprint,
             SensitiveDataPolicy sensitiveDataPolicy,
-            TenantRateLimiter rateLimiter,
+            SubjectRateLimiter rateLimiter,
             @Qualifier("aiStreamExecutor") ExecutorService streamExecutor,
             Clock clock) {
         this.properties = properties;
@@ -88,8 +88,8 @@ public class AiGatewayApplicationService {
         return streamExecutor.submit(() -> executeStream(prepared, listener));
     }
 
-    public AiInvocation getInvocation(String tenantId, UUID id) {
-        return auditService.get(tenantId, id);
+    public AiInvocation getInvocation(String subjectId, UUID id) {
+        return auditService.get(subjectId, id);
     }
 
     private void executeStream(PreparedInvocation prepared, AiStreamListener listener) {
@@ -172,15 +172,15 @@ public class AiGatewayApplicationService {
             reject(id, command, requestedModel, resolvedModel, streaming, fingerprint, estimatedCost,
                     PolicyDecision.REJECTED_SENSITIVE_DATA, AiGatewayErrorCode.SENSITIVE_DATA_REJECTED, startedAt);
         }
-        if (!rateLimiter.tryAcquire(command.context().tenantId())) {
+        if (!rateLimiter.tryAcquire(command.context().subjectId())) {
             reject(id, command, requestedModel, resolvedModel, streaming, fingerprint, estimatedCost,
                     PolicyDecision.REJECTED_RATE_LIMIT, AiGatewayErrorCode.RATE_LIMITED, startedAt);
         }
 
         AiInvocation audit = AiInvocation.started(
-                id, command.context().tenantId(), command.context().subjectId(), command.context().requestId(),
+                id, command.context().subjectId(), command.context().requestId(),
                 provider.name(), requestedModel, resolvedModel, streaming, fingerprint, estimatedCost, startedAt);
-        if (!auditService.reserve(audit, properties.getLimits().getTenantDailyBudget())) {
+        if (!auditService.reserve(audit, properties.getLimits().getSubjectDailyBudget())) {
             throw new BusinessException(AiGatewayErrorCode.BUDGET_EXCEEDED);
         }
         return new PreparedInvocation(
@@ -201,7 +201,7 @@ public class AiGatewayApplicationService {
             AiGatewayErrorCode errorCode,
             Instant now) {
         auditService.reject(AiInvocation.rejected(
-                id, command.context().tenantId(), command.context().subjectId(), command.context().requestId(),
+                id, command.context().subjectId(), command.context().requestId(),
                 provider.name(), requestedModel, resolvedModel, streaming, decision, fingerprint,
                 estimatedCost, errorCode.code(), now));
         throw new BusinessException(errorCode);

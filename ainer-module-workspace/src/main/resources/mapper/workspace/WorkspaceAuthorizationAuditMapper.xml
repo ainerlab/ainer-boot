@@ -7,7 +7,6 @@
     <resultMap id="workspaceAuthorizationAuditRow"
                type="dev.ainer.module.workspace.workspace.infrastructure.mybatis.WorkspaceAuthorizationAuditRow">
         <id property="id" column="id"/>
-        <result property="tenantId" column="tenant_id"/>
         <result property="workspaceId" column="workspace_id"/>
         <result property="actorSubjectId" column="actor_subject_id"/>
         <result property="targetSubjectId" column="target_subject_id"/>
@@ -28,28 +27,27 @@
 
     <insert id="insert">
         INSERT INTO ainer_workspace_authorization_audit (
-            id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+            id, workspace_id, actor_subject_id, target_subject_id,
             action, decision, reason_code, occurred_at
         ) VALUES (
-            #{id}, #{tenantId}, #{workspaceId}, #{actorSubjectId}, #{targetSubjectId},
+            #{id}, #{workspaceId}, #{actorSubjectId}, #{targetSubjectId},
             #{action}, #{decision}, #{reasonCode}, #{occurredAt}
         )
     </insert>
 
     <select id="selectPage" resultMap="workspaceAuthorizationAuditRow">
-        SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+        SELECT id, workspace_id, actor_subject_id, target_subject_id,
                action, decision, reason_code, occurred_at
         FROM (
-            SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+            SELECT id, workspace_id, actor_subject_id, target_subject_id,
                    action, decision, reason_code, occurred_at
             FROM ainer_workspace_authorization_audit
             UNION ALL
-            SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+            SELECT id, workspace_id, actor_subject_id, target_subject_id,
                    action, decision, reason_code, occurred_at
             FROM ainer_workspace_authorization_audit_archive
         ) audit
-        WHERE tenant_id = #{tenantId}
-          AND workspace_id = #{workspaceId}
+        WHERE workspace_id = #{workspaceId}
         ORDER BY occurred_at DESC, id DESC
         LIMIT #{limit}
         OFFSET #{offset}
@@ -60,19 +58,17 @@
         FROM (
             SELECT COUNT(*) AS total
             FROM ainer_workspace_authorization_audit
-            WHERE tenant_id = #{tenantId}
-              AND workspace_id = #{workspaceId}
+            WHERE workspace_id = #{workspaceId}
             UNION ALL
             SELECT COUNT(*) AS total
             FROM ainer_workspace_authorization_audit_archive
-            WHERE tenant_id = #{tenantId}
-              AND workspace_id = #{workspaceId}
+            WHERE workspace_id = #{workspaceId}
         ) counts
     </select>
 
     <delete id="archiveBefore">
         WITH candidates AS MATERIALIZED (
-            SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+            SELECT id, workspace_id, actor_subject_id, target_subject_id,
                    action, decision, reason_code, occurred_at
             FROM ainer_workspace_authorization_audit
             WHERE occurred_at &lt; #{cutoff}
@@ -81,10 +77,10 @@
             FOR UPDATE SKIP LOCKED
         ), archived AS (
             INSERT INTO ainer_workspace_authorization_audit_archive (
-                id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+                id, workspace_id, actor_subject_id, target_subject_id,
                 action, decision, reason_code, occurred_at, archived_at
             )
-            SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+            SELECT id, workspace_id, actor_subject_id, target_subject_id,
                    action, decision, reason_code, occurred_at, #{archivedAt}
             FROM candidates
             ON CONFLICT (id) DO NOTHING
@@ -104,18 +100,18 @@
     </delete>
 
     <select id="exportAfter" resultMap="workspaceAuthorizationAuditRow">
-        SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+        SELECT id, workspace_id, actor_subject_id, target_subject_id,
                action, decision, reason_code, occurred_at
         FROM (
-            SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+            SELECT id, workspace_id, actor_subject_id, target_subject_id,
                    action, decision, reason_code, occurred_at
             FROM ainer_workspace_authorization_audit
             UNION ALL
-            SELECT id, tenant_id, workspace_id, actor_subject_id, target_subject_id,
+            SELECT id, workspace_id, actor_subject_id, target_subject_id,
                    action, decision, reason_code, occurred_at
             FROM ainer_workspace_authorization_audit_archive
         ) audit
-        WHERE tenant_id = #{tenantId}
+        WHERE workspace_id = #{workspaceId}
         <if test="afterOccurredAt != null and afterId != null">
           AND (occurred_at, id) &gt; (#{afterOccurredAt}, #{afterId})
         </if>
@@ -143,8 +139,7 @@
                 WHERE NOT EXISTS (
                     SELECT 1
                     FROM ainer_workspace_member member
-                    WHERE member.tenant_id = workspace.tenant_id
-                      AND member.workspace_id = workspace.id
+                    WHERE member.workspace_id = workspace.id
                       AND member.role = 'OWNER'
                       AND member.status = 'ACTIVE'
                 )

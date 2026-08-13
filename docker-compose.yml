@@ -1,0 +1,104 @@
+# Ainer Boot 开发环境 Docker Compose
+#
+# 默认只启动 PostgreSQL（开发者多数场景只需数据库，应用用 ./mvnw spring-boot:run 在宿主机跑）：
+#   docker compose up -d
+#
+# 完整环境（PostgreSQL + Authorization Server + 业务 Server）：
+#   cp .env.example .env
+#   bash scripts/generate-dev-keys.sh
+#   docker compose --profile full up -d --build
+#
+# 数据库连接（宿主机访问）：
+#   业务库:   jdbc:postgresql://localhost:5432/ainer      (用户 ainer)
+#   认证库:   jdbc:postgresql://localhost:5432/ainer_auth  (用户 ainer_auth)
+
+services:
+  postgres:
+    image: postgres:18.3-alpine
+    container_name: ainer-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-postgres}
+      POSTGRES_INITDB_ARGS: --data-checksums
+      AINER_DB_PASSWORD: ${AINER_DB_PASSWORD:-ainer}
+      AINER_AUTH_DB_PASSWORD: ${AINER_AUTH_DB_PASSWORD:-ainer_auth}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ainer-postgres-data:/var/lib/postgresql
+      - ./docker/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER:-postgres} -d ainer && pg_isready -U ${POSTGRES_SUPERUSER:-postgres} -d ainer_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ---- Authorization Server（实验性 full profile，需要 RSA 密钥，见 scripts/generate-dev-keys.sh）----
+  # ⚠️ 实验性限制：AS 的 issuer 在代码中强制要求 https://（AinerAuthorizationServerConfiguration:96），
+  # 但 Compose 内 AS 容器实际监听 HTTP。本地完整联调时 .env 设
+  # AINER_AUTHORIZATION_SERVER_ISSUER=https://localhost:9000，JWT 中的 issuer 字段为配置的 https:// 字符串，
+  # 而 RS 通过 Compose 内部网络（authorization-server:9000）访问 AS 的 JWK 端点（HTTP）。
+  # 这种「issuer 声明 https、实际 HTTP」的组合在以下情况会失败：
+  #   - RS 配置 issuer-uri 走 OIDC discovery 时，Spring Boot 会尝试 https 连接 AS 而失败；
+  #   - 自签 https 证书在本机不被信任时，RS 拉 JWK 失败。
+  # 如遇上述失败，推荐用 ./mvnw spring-boot:run 在宿主机分别启动两应用（见 docs/development.md §4-§5），
+  # 仅用 Compose 提供数据库。full profile 主要用于验证镜像构建与纯启动，而非完整联调。
+  # 生产部署仍走 ops/dev/（systemd + Let's Encrypt 真实 HTTPS）。
+  authorization-server:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        AINER_MODULE: ainer-authorization-server
+    image: ainer-authorization-server:dev
+    container_name: ainer-authorization-server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ainer_auth
+      SPRING_DATASOURCE_USERNAME: ainer_auth
+      SPRING_DATASOURCE_PASSWORD: ${AINER_AUTH_DB_PASSWORD:-ainer_auth}
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./secrets/dev-keys:/etc/ainer/dev-keys:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---- 业务 Resource Server（实验性 full profile）----
+  # ⚠️ issuer-uri 必须与 AS 签发 JWT 的 issuer claim 一致（https://localhost:9000），
+  # Spring Boot 会据此拼 /.well-known/openid-configuration 拉取 discovery 文档。
+  # 在 Compose 内部，ainer-server 容器访问 https://localhost:9000 会指向自身而非 AS 容器，
+  # 因此 full profile 的 RS↔AS 联调依赖宿主机端口映射（9000 映射到 AS 容器），
+  # 且需要 https 证书被信任。这通常无法在纯 Compose 环境下闭环——见上方 AS 服务的实验性说明。
+  ainer-server:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        AINER_MODULE: ainer-server
+    image: ainer-server:dev
+    container_name: ainer-server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ainer
+      SPRING_DATASOURCE_USERNAME: ainer
+      SPRING_DATASOURCE_PASSWORD: ${AINER_DB_PASSWORD:-ainer}
+      # 指向 Compose 内的 Authorization Server
+      AINER_SECURITY_ISSUER_URI: ${AINER_AUTHORIZATION_SERVER_ISSUER:-https://localhost:9000}
+      AINER_SECURITY_AUDIENCES: ${AINER_AUTHORIZATION_SERVER_AUDIENCE:-ainer-api}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      authorization-server:
+        condition: service_started
+
+volumes:
+  ainer-postgres-data:

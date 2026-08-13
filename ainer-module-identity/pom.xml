@@ -24,6 +24,10 @@
             <artifactId>ainer-security</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
+        <dependency>
             <groupId>dev.ainer</groupId>
             <artifactId>ainer-starter-persistence</artifactId>
         </dependency>

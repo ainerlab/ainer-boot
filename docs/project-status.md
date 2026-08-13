@@ -1,31 +1,64 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-02 · 工程版本：`0.1.0-SNAPSHOT`
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-13 · 工程版本：`0.1.0-SNAPSHOT`
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
 ## 1. 当前阶段
 
-Foundation 已完成 M4.8A 与 Ainer Admin 后端融合，并完成 M4.8B 租户上下文选择、M4.8C OWNER
-专用转移（含正常转移与丢失恢复）的代码基线。
-M4.7 tenant 成员管理与首租户严格 bootstrap 已落地，平台
-预配申请又具备幂等摘要、并发预留、短时一次性 grant、加密 notification outbox、已有用户本人
-接受、原子创建 ACTIVE tenant/OWNER、显式取消、tenant/user 安全分页，以及默认关闭的
-OAuth2/HTTPS 通知网关 relay 和 provider-neutral `DELIVERED|FAILED` 终态回执接收基线。
-固定 Ainer Admin 开发 browser client、开发身份、Token 自助撤销、成员 API active gate、
-OpenAPI/SDK 与完整浏览器链路测试也已纳入同一分支。
-M4.8B 已实现 `GET /api/me/tenants`、Authorization Code + PKCE 多租户选择流程与 JWT token
-customizer 实时重查 membership；M4.8C 已实现双自然人确认 OWNER 转移状态机、原子角色交换、
-审计与双方 access event 撤销链路、每 tenant 最多一个 ACTIVE OWNER 数据库不变量、OWNER 丢失
-恢复双 SERVICE request/approve 与 ownership-transfer step-up 门禁；M6 已实现由 Authorization
-Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并于 2026-07-29 部署 dev
-(release `e6cb0b44bb9e-20260729053046`)、通过真实 remote 联合 E2E,Studio 合同状态已升
-`implemented`。
-`REQUESTED` 仍不是可授权身份事实；真实外部通知网关/供应商联调、供应商回执映射、最终送达验证、
-生产限速/告警尚未完成，0-skipped 仍需在正式发布候选环境重复执行。当前工程是可编译、可运行、
-可用真实 PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到生产或商业发行就绪。
+`reset/0033-greenfield` 分支已按 ADR-0033（Option B：完全移除 Tenant）完成 S1–S8 全部施工序列
+并全绿验证（205 tests / 0 failure / 0 error / 0 skipped）：Identity 换为 HumanAccount/
+ServicePrincipal/LoginIdentity/Credential foundation，Token 使用 typed `token_profile`
+（`SERVICE_V1`/`USER_NEUTRAL_V1`）与 `claim_contract_version=1`，撤销通过
+`security_epoch`/`sec_epoch` claim 在线比对；Workspace 与 AI Runtime 已去 tenant 化，改为纯
+membership/subject 边界；legacy identity、tenant 上下文、access-event outbox/relay 消费链路与
+平台预配通知均已删除，migration 重建为 4 个可空库重放的 standalone baseline
+（identity=`V202608070300`、workspace=`V202608070310`、ai-runtime=`V202608070320`、
+authorization-server=`V202608070330`）。M6 品牌 `/login`（Studio 视觉合同 1.0.0）已由
+Authorization Server 承载并于 2026-07-29 部署 dev (release `e6cb0b44bb9e-20260729053046`)，
+真实 remote 联合 E2E 通过，Studio 合同状态 `implemented`。
 
-## 2. 已完成
+下文 M4.x 里程碑记录中涉及 tenant、access-event、relay、Directory 与平台预配的历史描述反映
+当时代码，已被 Greenfield S8 删除取代，不作为当前部署依据。真实外部通知网关/供应商联调、供应商
+回执映射、最终送达验证、生产限速/告警尚未完成，0-skipped 仍需在正式发布候选环境重复执行。
+当前工程是可编译、可运行、可用真实 PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到
+生产或商业发行就绪。
+
+P2 Create & Generate 已收口（2026-08-09）：`ainer-initializer`（Manifest v1 解析/校验 + 确定性
+生成内核）与 `ainer-initializer-cli`（preview/init/diff 离线命令）已交付并全量通过
+`verify-initializer-consumer.sh` 三通道门禁（两轮生成字节一致 diff、普通/postgres/CRUD 三个
+变体真实测试均 0 skipped、无 Ainer 框架源码副本、生成项目独立编译）；ADR-0035 与 ADR-0036 均
+Accepted。P2 退出门禁逐项验证：确定性（同 manifest 两轮 diff=0）、生成安全（preview 不落盘、
+非空目标拒绝覆盖、生成器无数据库/网络写入、默认不改菜单）、TTFR 实测 100s（门禁 600s）、
+TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden consumer 门禁。
+组织/行业模板与策略包是 ADR-0035 决策 7 明示的 v1 非目标，属 Studio/Enterprise 扩展
+（设计文档能力矩阵第 94 行），移交 P3+ 扩展清单，不再作为 P2 阻塞项。
+
+2026-08-12 P3 企业基建首批代码完成：文件存储 SPI、字典、配置、通知、缓存 starter、Spring Cache
+改造。新建 5 个模块（ainer-module-dictionary/config/notification + ainer-starter-cache + 文件存储
+SPI），全部装配到 ainer-server。ADR-0039 Accepted；ADR-0038 已因决策维护违规被 ADR-0040 合规取代。
+最近完整基线为 336 tests / 0 fail / 0 error / 0 skipped，23 模块全部 SUCCESS。G1 尚未关闭：文件
+元数据持久化、P3 服务端管理 API/OpenAPI 与对应安全/审计门禁仍需完成。
+
+2026-08-13 已确认按 ADR-0040/0041 分阶段推进 `0.1`。GitHub Packages 中存在签名的
+`0.1.0-rc.1` 制品：成功 deploy run `31658811613` 的源码为 `77342b6`，336 tests / 0 failure /
+0 error / 0 skipped；但当前 tag `v0.1.0-rc.1` 指向后续 workflow 修复 `e7c653f`，且没有完整远端
+读回、SBOM/checksum/provenance release assets、远端空仓 consumer 或 GitHub Release。因此该版本是
+**withdrawn / non-qualifying**，不能供产品消费，也不能移动/删除/覆盖后重发。
+
+工程版本保持 `0.1.0-SNAPSHOT`，下一候选必须使用 `0.1.0-rc.2` 或更高唯一版本。当前发布加固代码已
+加入 annotated tag/source 校验、版本存在性预检、passphrase-protected GPG 与 fingerprint 固定、远端
+Maven 3/4 与 Initializer 空仓消费、107 个主制品/107 个签名完整读回、签名
+SBOM/checksum/provenance 和最后创建 immutable GitHub Release；本地实现、验证与 PR #3 head CI
+已完成，最终代码门禁由 run `31664911800` 验证通过；尚需合并 commit 的默认分支 CI 与新 RC 实跑
+证据。许可状态仍为私有/专有；
+公开发行必须另行完成 LICENSE/NOTICE、品牌资产和对外许可决策。
+
+## 2. 当前已完成能力与历史施工记录
+
+本节保留既有施工轨迹，其中 pre-Greenfield 的 tenant、Directory、access-event/outbox 等条目只描述
+当时里程碑，已被 ADR-0033 S8 删除，不是 `0.1` 当前支持面。当前结论优先以上述阶段说明、ADR-0037
+和 §4/§5 为准。
 
 - JDK 25、Maven Reactor、独立 BOM 与 Spring Boot 4.1.0 基线；
 - 无 Spring 依赖的核心错误和身份参与者契约；
@@ -85,10 +118,11 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
   tenant claim + 实时 ACTIVE OWNER/ADMIN 四重门禁，所有实际写入同事务审计且不允许通用接口修改 OWNER；
 - 首个平台 tenant/OWNER 使用默认关闭、严格幂等、不覆盖密码且由 PostgreSQL transaction advisory
   lock 串行化的 Authorization Server bootstrap；业务 Server 不装配 Identity migration；
-- Ainer Admin `dev` public client、双用户 fixture、当前 access token 自助撤销、成员 API
-  active gate、`ainer-admin-v1.yaml` 与 TypeScript SDK 生成入口；
-- 同一 `ainer-admin-dev` browser session 的 PKCE → default tenant → 成员列表/添加/双向改角色/
-  软移除 → revoke → OIDC logout 真实 PostgreSQL 端到端门禁；
+- Ainer Admin `dev` public client、双用户 fixture、当前 access token 自助撤销、撤销端点
+  active gate、`ainer-admin-v1.yaml` 与 TypeScript SDK 生成入口；TenantMembers 契约与
+  tenant selector 已随 S8 删除，契约只保留 `POST /api/me/access-token-revocations`；
+- 同一 `ainer-admin-dev` browser session 的 PKCE → revoke → OIDC logout
+  真实 PostgreSQL 端到端门禁；成员列表/添加/改角色/软移除验证已随 S8 移除；
 - Ainer 品牌服务端登录页：Studio 合同与 Tokens 固定哈希、四种服务端状态、服务端 CSRF、
   SavedRequest、统一凭据错误、HTML 429/`Retry-After`、明确认证基础设施异常 503、精确 CSS
   代理，以及不改变 WebAuthn/MFA filter 的兼容基线；
@@ -113,11 +147,87 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
   loopback Authorization Server systemd、版本化 JAR/Studio/Admin、原子切换/校验回滚、
   Let's Encrypt 和精确同源 Nginx 配置；真实 Chromium 已完成 PKCE、成员治理、revoke、
   OIDC logout 和退出后重新登录门禁；
-- ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0020、ADR-0022、ADR-0024 至 ADR-0028 与 ADR-0033 Greenfield
-  已接受（0033 Greenfield 为目标基线，Option B：完全移除 Tenant；按
+- 通用混合细粒度授权以 ADR-0037 Accepted 为当前基线，ADR-0030 已 Superseded：
+  `ainer-module-authorization` 拥有 Spring-free 决策契约、6 张表 PostgreSQL 持久化与实时
+  `BindingResolver`、管理 REST API、防提权策略、类型化集合查询、参数绑定产品夹具、决策审计及
+  撤权后同 Token 写拒绝。Servlet Web 宿主还会装配 `AinerRequestAuthorizationManager` 与 MVC
+  interceptor，真实 JWT HTTP 门禁已证明 ALLOW/403/401 以及拒绝时 controller effect 不发生。
+  首版注解只支持 `resourceType=request` 的空-obligation 粗门禁；真实资源 target、字段投影、方法级
+  AOP 与生产授权失效 SLA 仍未交付，外部不可变制品门禁仍未关闭。
+- ADR-0001 至 ADR-0011、ADR-0015 至 ADR-0020、ADR-0022、ADR-0024 至 ADR-0028、
+  ADR-0033 Greenfield、ADR-0035、ADR-0036 与 ADR-0037 已接受（0033 Greenfield 为目标基线，
+  Option B：完全移除 Tenant；按
   [Impact](architecture/ainer-foundation-greenfield-reset-impact.md) Stage 0–8 执行，接受不授权
-  立即改代码）；ADR-0012 至 ADR-0014、ADR-0021、ADR-0023、ADR-0029 至 ADR-0032 与 ADR-0034 处于 Proposed；
+  立即改代码）；ADR-0030 已被 ADR-0037 取代；ADR-0012 至 ADR-0014、ADR-0021、ADR-0023、
+  ADR-0029、ADR-0031、ADR-0032 与 ADR-0034 处于 Proposed；
   ADR-0033 v1/v2 标记 Historical；架构、HTTP API、安全、数据、测试、运行与发布基础文档已建立。
+- Greenfield S1.2 加法脊柱在 `reset/0033-greenfield` 分支成型且已验证（principal/token-profile/Identity 领域+
+  服务+PostgreSQL 持久化+resolver 参考实现，共 identity 74 + security 26 tests / 0 fail），与 legacy 共存、
+  未接 runtime；破坏性 cutover 待执行，有序施工清单见 [`0033-greenfield-cutover-plan.md`](architecture/0033-greenfield-cutover-plan.md)。
+- Greenfield S2 foundation 能力补全（执行规划 缺口 A）已在 `reset/0033-greenfield` 分支完成：新建
+  `ainer_identity_credential`（PASSWORD/WEBAUTHN_PUBLIC_KEY/OIDC_SUBJECT，ACTIVE/REVOKED，部分唯一索引
+  `(account_id, type) WHERE status='ACTIVE'`）与 `ainer_identity_human_profile`（0:1 account）两张表；
+  `IdentityFoundationService` 扩展 `registerHumanAccountWithPassword` / `findPasswordCredentialForLogin` /
+  `rotatePassword` / `updateProfile`，密码经 Delegating PasswordEncoder 编码后入库、rotatedAt 标记轮换、
+  未知账号/缺 ACTIVE 凭据 fail-closed；identity 错误码补 CREDENTIAL_NOT_FOUND/CREDENTIAL_REVOKED/
+  INVALID_CREDENTIAL/PROFILE_NOT_FOUND。全 reactor 388 tests / 0 failure / 0 error / 0 skipped（Colima）。
+   施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
+- Greenfield S6 canonical Workspace 去 tenant 已在 `reset/0033-greenfield` 分支完成：当前
+  `Workspace`/`WorkspaceMember`/审计/recovery 使用 `workspace_id + ACTIVE membership` 边界，
+  业务 API 使用 S5 typed `AuthenticatedPrincipal` 并拒绝 Service principal 进入 Human membership；
+  MyBatis 查询与 owner 唯一约束已去 tenant，新增 `V202608070100` 从空库重放后删除 Workspace
+  schema 的 tenant 列。Identity Directory 改为 ACTIVE HumanAccount 查询，subject-only access event
+  只记录 receipt、不跨所有 Workspace 全局撤销 membership；owner recovery、审计导出改为 Workspace
+  scope。旧 tenant-first Workspace 测试已重写为 canonical membership/跨 Workspace DENY 门禁。
+  全 reactor 387 tests / 0 failure / 0 error / 0 skipped（Colima）。
+  施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
+- Greenfield S7 AI Runtime 去 tenant 已在 `reset/0033-greenfield` 分支完成：
+  `GovernedAiExecutionContext`、Invocation/Task/ContextSnapshot、AI audit/budget repository 与 API
+  改用 typed `AuthenticatedPrincipal` 的 subject/actor context；node-local limiter 更名为
+  `SubjectRateLimiter`，PostgreSQL daily budget/advisory lock 按 subject 绑定，模型调用、Task run、
+  SSE、审计读取与 cross-subject 404 回归保持通过。新增 AI migration 移除 invocation/task/snapshot 的
+  tenant 列，配置改为 `subject-daily-budget`。全 reactor 387 tests / 0 failure / 0 error / 0 skipped
+  （Colima）。
+  施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
+- Greenfield S8 原子删除 legacy + migration squash 已在 `reset/0033-greenfield` 分支完成（不可逆点）：
+  删除 legacy identity `account/` 领域/应用/基础设施约 50 文件、AuthServer legacy controllers 约 20
+  文件、`tenantcontext/` 与 tenant selection、`RevocationAwareOAuth2AuthorizationService` 的 legacy
+  tenant/user 在线状态依赖、legacy `AuthenticatedActor` 体系（被 typed `AuthenticatedPrincipal` 取代）、
+  `AinerResourceServerProperties.tenantClaim`/`AuthenticatedService` 的 tenantId，以及 legacy workspace
+  identity access-event 消费链路（subject-only 语义已由 canonical Workspace 覆盖）。`foundation/` 包
+  提升为 identity 主体包（`IdentityErrorCode` 收口至 foundation）。migration 重建为 4 个可空库重放的
+  standalone baseline：identity=`V202608070300`、workspace=`V202608070310`、ai-runtime=`V202608070320`、
+  authorization-server=`V202608070330`，旧库不可原地升级（ADR-0033 前提）。全仓 `tenant_id`/`tenantId`
+  grep 仅剩测试内"列不存在"负向断言与参数命名。全 reactor 205 tests / 0 failure / 0 error / 0 skipped
+  （Colima），0 skipped。
+  施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
+  `AinerUserDetails` 加性重设计（新增 nullable `accountId` + `securityEpoch`，legacy 字段保留），
+  customizer 抽为可测的 `AinerJwtTokenCustomizer`：client setting `ainer.token-profile` 选择轨道，
+  SERVICE_V1（ServicePrincipal sub + token_profile/claim_contract_version=1/actor_type=SERVICE +
+  sec_epoch，无 tenant_id）与 USER_NEUTRAL_V1（HumanAccount sub + profile claims + sec_epoch，
+  保留 amr/auth_time，无 tenant_id/roles）均 fail-closed（缺 principal/account、非 ACTIVE、未知
+  profile → OAuth2 400 access_denied，不回退 legacy）；无 setting 的 client 走原 legacy claims 零回归。
+  常量 `TOKEN_PROFILE_SETTING`/`SEC_EPOCH_CLAIM` 收口于配置类；JSON mixin 同步 accountId/securityEpoch
+   往返。全 reactor 401 tests / 0 failure / 0 error / 0 skipped（Colima）。
+   施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
+- Greenfield S4 登录链路与 Passkey foundation 接线已在 `reset/0033-greenfield` 分支完成：
+  `AinerUserDetailsService` foundation-first 读取 `HumanAccount + PASSWORD credential`，旧 tenant
+  账号保留 fallback/legacy context enrichment；foundation-only 账号可在无 Workspace 下完成密码+PKCE，
+  token 使用 `USER_NEUTRAL_V1`。平台 bootstrap 改为创建 foundation account/profile，dev fixture 在共存期
+  同时保留 legacy tenant 投影；Passkey credential、recovery code、enrollment grant、双人 recovery
+  增加 `account_id` 绑定与 account 控制面 API，legacy `(tenant_id, subject_id)` API 保留。新增两条
+  PostgreSQL migration，Authorization Server 从 23 增至 25 migrations；真实密码、WebAuthn ceremony、
+  account recovery/enrollment/admin recovery 均通过。全 reactor 407 tests / 0 failure / 0 error / 0 skipped
+  （Colima）。
+  施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
+- Greenfield S5 Resource Server typed profile resolver 已在 `reset/0033-greenfield` 分支完成：新增
+  `AuthenticatedPrincipalResolver` core port、Spring `Jwt` 到 `VerifiedJwtClaims` adapter，以及 starter
+  的 SecurityContext resolver；`USER_NEUTRAL_V1`/`SERVICE_V1` 分别解析为 Human/Service subject，
+  `sec_epoch` 解析为 optional typed epoch，SERVICE 无 `amr` 时使用 `client_credentials` assurance。
+  缺失、未知、版本不支持或 actor/profile 矛盾统一 fail-closed 为 401；legacy
+  `AuthenticatedActorResolver` 保持独立零回归。全 reactor 411 tests / 0 failure / 0 error / 0 skipped
+  （Colima）。
+  施工序列与决策表更新见 [`0033-greenfield-atomic-cutover-execution-plan.md`](architecture/0033-greenfield-atomic-cutover-execution-plan.md)。
 - M4.8B 租户上下文选择代码基线：`GET /api/me/tenants` 返回当前 USER 的 ACTIVE membership
   安全投影（tenant ID/code/name/role/is_default），LOCKED/DISABLED tenant/user/membership
   不返回；`AinerTenantSelectionFilter` 在 Authorization Code + PKCE 流程的 authorization
@@ -141,6 +251,478 @@ Server 承载的品牌 `/login`，固定消费 Studio 视觉合同 1.0.0，并�
   `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 
 ## 3. 最近验证记录
+
+2026-08-13 G2 发布事故复核与 release hardening（本地实现，远端 RC 待验证）
+- **`rc.1` 结论**：run `31658811613` 的 build/sign/deploy 与 336/0/0/0 成功，不等于合格发布；
+  provenance 因私有仓库计费限制失败，后续 tag/workflow 修复导致 tag/source 与已部署字节不一致，
+  同版本重跑得到 409。ADR-0041 将其标记为 withdrawn/non-qualifying，禁止消费或复用。
+- **签名密钥收紧**：根 reactor 与 parentless BOM 恢复 Maven GPG Plugin `bestPractices=true` 和
+  `MAVEN_GPG_PASSPHRASE` 绑定；workflow 拒绝空口令，在 deploy 前执行签名 probe，删除 CLI passphrase。
+  导入 key 还必须匹配 repository variable 固定的 40 位 fingerprint。2026-08-13 已轮换为
+  passphrase-protected RSA-3072 certification primary + signing subkey；CI 只保存 signing subkey，正式
+  fingerprint 为 `DC72A6994ABFA48B3D9B1DE145361DCB6F65F6FD`，Secrets 与 repository variable 已更新。
+- **发布前门禁**：只接受与事件源码及默认分支头一致的 annotated SemVer tag；目标 BOM 版本存在即
+  失败；GitHub Immutable Releases 已于 2026-08-13 远端启用（API readback `enabled=true`），workflow
+  还要求 repository variable 声明并在 Release 创建后读回 `immutable=true`；shell 合同禁止再次硬编码
+  `ab` 路径、拼错版本变量或放行 attestation。
+- **发布后门禁**：Maven 3/4 分别从空本地仓库消费远端 BOM/Starter，Initializer CLI 也从远端 classifier
+  获取；完整读回 23 个 project 的 build/consumer POM、20 组 main/sources/Javadoc 与 CLI classifier，
+  共 107 个主制品和 107 个 `.asc`，逐一验证精确 fingerprint。`scripts/release-artifacts.txt` 是唯一
+  制品清单，合同测试将它与实际 reactor POM 对照，避免新增模块静默漏验。
+- **证据策略**：CycloneDX SBOM、远端 SHA-256/SHA-512、Ainer 签名 provenance、公钥/fingerprint 和
+  证据签名是强制 release assets；GitHub Attestations 仅在显式启用且计费支持时作为附加失败关闭门禁，
+  不再 `continue-on-error`，也不把项目 provenance 宣称为 GitHub Attestation/SLSA 等级。
+- **虚拟线程矩阵**：修复 Ubuntu 上 `command -v ab` 检查后仍硬编码 `/usr/sbin/ab` 的 CI 失败，统一使用
+  实际解析路径，并修正 `AINNER_VERSION` 拼写。缩短版本地双模式矩阵通过：平台/虚拟两种模式的
+  JDBC 与等待接口各 40 请求。run `31664911800` 的完整矩阵四场景各完成 2000 请求，Non-2xx、
+  Connect、Receive、Exceptions 全为 0；Length-only 分别为 `2/0/4/0`。脚本现显式解析结果并对真实
+  HTTP/传输失败关闭，不再让 `ab ... || true` 掩盖故障；Length 差异只作为动态响应观测记录。
+- **本地验证**：JDK 25 + Maven 4.0.0-rc-6 `./mvnw clean verify` 为 23/23 SUCCESS，
+  **336 tests / 0 failure / 0 error / 0 skipped**；本地 Maven 3/4 Golden Consumer、Initializer
+  普通/PostgreSQL/CRUD 门禁通过。passphrase-protected 临时 key 已分别验证根 reactor 与 parentless BOM
+  的 GPG 配置；本地 HTTP registry 夹具完成 107 个主制品 + 107 个签名读回、精确 fingerprint 验证和
+  107-subject provenance。shell/发布合同、严格 SemVer 正负例、版本存在性正负例、workflow YAML 与
+  `git diff --check` 均通过。
+- **PR 远端验证**：最终代码 commit `1328d27` 的 run `31664911800` 全绿：quality、gitleaks、完整
+  virtual-thread matrix 成功；336/0/0/0，Maven 3/4 Consumer 与 Initializer 三通道通过，TTFR 48s、
+  TTCRUD 73s。该结果仍是 PR head 证据，合并 commit 必须由默认分支 CI 单独验证。
+- **证据边界**：本地 registry 结果使用一次性夹具，不是 GitHub Packages 证据；正式 key 已在隔离
+  keyring 完成签名 probe、根 reactor 与 parentless BOM Maven GPG 验证，但尚未执行 tag workflow。
+  `rc.2` deploy、远端消费者与 immutable GitHub Release 均未发生。
+
+2026-08-12 历史 ADR-0038 批次：P4 范围精简与企业基建前置（已被 ADR-0040 取代）
+- **决策状态**：下列方向是当时记录；ADR-0038 后续被直接改写，现已由 ADR-0040 合规取代。当前
+  Stable/Incubating/非目标与 G0–G4 路线只以 ADR-0040 为准，尤其“通知/任务/缓存只给端口”的结论
+  不再生效。
+- **文件存储 SPI**（首批 P3 基建代码）：`FileStoragePort` 端口 + `StoredFile` record +
+  `StorageErrorCode`（ainer-core）；`LocalFileStorageAdapter` 本地适配器 +
+  `LocalFileStorageAutoConfiguration`（ainer-spring，`@ConditionalOnMissingBean`，产品可覆盖）；
+  UUID 存储键、namespace 隔离、路径遍历防护；10 项单元测试全绿。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：**309 tests / 0 failure / 0 error /
+  0 skipped**。零回归。
+- **下一批**：字典/配置极简模块（`type-code-label` + `namespace-key-value`）。
+
+2026-08-11 P0 治理补齐：CODEOWNERS + 分支保护状态确认
+- 新增 `.github/CODEOWNERS`：按安全/身份、授权、数据库、AI、Workspace、构建发布、Initializer、
+  文档决策等领域定义默认 reviewer（`@codefitx`）。当前 private + GitHub 免费版分支保护受计费限制
+  （HTTP 403），CODEOWNERS 为 PR review 默认值与未来多协作者领域归属服务；仓库可见性或计费变更后
+  在 GitHub 设置启用 required review 即可生效。
+- gitleaks 已在 ci.yml `secret-scan` job（`gitleaks detect --config .gitleaks.toml`，docs allowlist）。
+- **P0 剩余**：分支保护（private + 免费版无法启用，待可见性/计费决策，非代码层面）。
+- **P1/G2 剩余**：`0.1.0-rc.1` 已撤回；等待 release hardening 合并、passphrase-protected signing key、
+  最新 CI/gitleaks 和全新 annotated `0.1.0-rc.2+` 实跑，验证远端空仓消费、107/107 签名读回、
+  SBOM/checksum/provenance 与 immutable GitHub Release。
+
+2026-08-11 `0.1.0-rc.1` 就绪批次 1：端点授权真实装配 + 签名发布 fail-closed
+- **端点授权进入真实运行路径**：Servlet Web 宿主在存在 `AuthenticatedPrincipalResolver` 时条件装配
+  `AinerRequestAuthorizationManager`、`AinerAuthorizeInterceptor` 与 MVC 注册器。MVC 完成
+  `HandlerMethod` 解析后，interceptor 在 controller effect 前执行 `AuthorizationService`；拒绝统一映射
+  为 `AINER.COMMON.FORBIDDEN`/HTTP 403。真实 RSA 签名 JWT 门禁覆盖匹配 scope 放行、缺 scope 403 且
+  effect 不发生、无 Bearer 401；PUBLIC 匿名投影已补单测，带未执行 obligation 仍保持 deny。
+- **发布工作流 fail-closed**：tag 只接受语义化非 SNAPSHOT 版本，锁定 Maven 3.9.16 并校验 SHA-512，
+  依次执行 Maven 3/4 Golden Consumer、Initializer consumer、`-Prelease clean deploy`、零跳过检查和
+  provenance。所有 tag 发布必须显式设置 `AINER_RELEASE_SIGNING=true` 并提供 GPG key/passphrase；
+  passphrase 只经环境变量传入。parentless `ainer-dependencies` BOM 已拥有独立签名 profile。
+- **本地签名能力彩排**：一次性 GPG home/临时密钥下，BOM 生成 2 个 `.asc`，`ainer-core` 生成主制品、
+  sources、Javadoc 与 POM 等 5 个 `.asc`；临时密钥目录已删除。该结果只证明配置可执行，不代表正式
+  signing key、远端 tag 或可信发布身份已经建立。
+- **非 SNAPSHOT 消费门禁**：以 `AINER_VERSION=0.1.0-rc.1` 在隔离仓库安装 19 个制品；修正消费者脚本
+  两次可重复性构建的 `gpg.skip` 参数不一致后，artifact comparison 全匹配，Maven 3.9+ 与 Maven 4
+  外部授权 Golden Consumer 均为 1 test / 0 failure / 0 error / 0 skipped。
+- **Initializer consumer**：同一 `0.1.0-rc.1` 坐标下，普通、PostgreSQL、CRUD 三个变体两轮生成一致，
+  独立编译成功；普通模板 2 tests，PostgreSQL/CRUD 使用 PostgreSQL 18.3 Testcontainers，CRUD 汇总
+  4 tests，均为 0 failure / 0 error / 0 skipped。
+- **全量验证**：仓库 Wrapper（Maven 4.0.0-rc-6 + JDK 25）执行 `./mvnw clean verify`，19 模块
+  BUILD SUCCESS；`scripts/check-surefire-results.sh` 为 **299 tests / 0 failure / 0 error / 0 skipped**。
+  release workflow YAML 可解析，`git diff --check` 通过。
+- **证据边界**：源码版本仍为 `0.1.0-SNAPSHOT`，本批尚未提交/推送，未产生最新 commit 的远端 CI/
+  gitleaks、正式签名 key、tag、GitHub Packages 制品、provenance 或产品回滚记录。Maven 4 reactor 内
+  BOM import 的 source-model 告警仍按 ADR-0026 作为待批准例外/后续模型决策处理。最后一项 principal
+  resolver fail-closed 收紧后，全 reactor 与 7 项 manager 单测已重跑通过；重复执行隔离 non-SNAPSHOT
+  consumer 时，Maven model builder 等待远端仓库 TLS 超过 7 分钟、尚未进入 reactor，人工终止并清理
+  临时目录，因此不能把这次重复运行计为新的 consumer 成功证据，仍以同轮前一次完整通过记录为准。
+
+2026-08-11 ADR-0037 post-Greenfield 授权基线 + AuthorizationManager 端点级适配器
+- **ADR-0037 Accepted**：正式取代 ADR-0030（标记 Superseded）。以 post-Greenfield Workspace 语义
+  重述（`Scope.Workspace/Resource/Global`、membership-independent `USER_NEUTRAL_V1`、
+  `workspaceId` 归属）。继承 ADR-0030 的 grant-path 真值表与 RBAC+ReBAC+ABAC 组合（不重复设计）。
+- **adapter 包归属决策**（解决边界矛盾）：adapter 首版放在 `ainer-module-authorization` 的 `spring/`
+  子包（适配边界）。`domain/`/`policy/`/`catalog/`/`application/` 保持 Spring-free（ArchUnit 守护）。
+  `ainer-starter-security` 不加 authorization 依赖（维持 §9.3）。第二个重复装配消费者后评估独立制品。
+  pom 新增 compile scope `spring-security-core` + `spring-security-web`。
+- **adapter 实现**：`AinerRequestAuthorizationManager`（`AuthorizationManager<RequestAuthorizationContext>`，
+  注入 `AuthorizationService` + `AuthenticatedPrincipalResolver`）、`AinerAuthorizationResult`（implements
+  Spring `AuthorizationResult`，ALLOW+空 obligations→grant，其余→deny）、`@AinerAuthorize` 注解 +
+  `AinerAuthorizeInterceptor`（设 request attribute）。5 项单元测试覆盖 ALLOW/DENY/未认证/PUBLIC+obligation/
+  无注解 fallthrough。
+- **首版限制**（标注后续切片）：方法级 AOP、RFC 9470 challenge handler、DecisionObligationExecutor、
+  AuthorizationTargetResolver 产品注册机制均未实现。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：**295 tests / 0 failure / 0 error /
+  0 skipped**（较上轮 290 + 5 新增 adapter 单元测试）。零回归。
+- 新增代码注册、版本化 `GrantAdministrationPolicy`：宿主显式声明精确可信 SERVICE 与 assignable
+  Permission/Scope/target；没有策略时 `GrantAdministrationGuard` 使用内建 deny-all，
+  `authorization.manage` scope 不再自动产生管理权。
+- Controller 的全部管理读取与写入先校验 guard；Role/Binding application service 在事务边界再次
+  校验，直接调用服务也不能绕过。硬性拒绝 system-only/策略外 Permission、GLOBAL/策略外 Scope、
+  越界 target、自建/自撤 Binding，以及修改自己的任一 ACTIVE Binding 所引用 Role。
+- 真实 RSA 签名 JWT + PostgreSQL 18.3 HTTP 矩阵新增 4 项：任意持 scope SERVICE 拒绝、不可授予与
+  system-only Permission 拒绝、GLOBAL 与越界 target 拒绝、自 Binding/自 Role 修改拒绝；另增 1 项
+  无宿主策略默认拒绝单测。
+- Greenfield 已移除 Tenant，未复活 ADR-0030 的 tenant OWNER bootstrap；生产管理主体、Ainer Admin
+  与产品 onboarding/bootstrap 仍需由 post-Greenfield 取代 ADR 定义。模块当前安全默认是“不可管理”，
+  不是“任意 SERVICE 可管理”。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：**278 tests / 0 failure / 0 error /
+  0 skipped**（较上轮 273 + 4 项 HTTP 防提权矩阵 + 1 项默认 deny-all 单测）。`git diff --check`
+  通过，缺陷 10 标记为模块级修复。
+
+2026-08-11 真实 JWT 端到端测试：替换 stub Principal（缺陷 9 修复）
+- **改造 `AuthorizationManagementHttpTest`**：删除 stub `AuthenticatedPrincipalResolver`，启用
+  `ainer.security.resource-server.enabled=true`。新增测试 `JwtDecoder` bean：测试生成 RSA 3072 密钥对，
+  `NimbusJwtDecoder.withPublicKey` 验签 + issuer/audience validator（issuer=`https://auth.ainer.test`，
+  audience=`ainer-api`）。用 Nimbus `SignedJWT` + `RSASSASigner` 签发 SERVICE_V1 JWT（带
+  `token_profile`/`claim_contract_version`/`actor_type`/`scope` claims），客户端注入 Bearer header。
+- **整条链路真实**：SecurityFilterChain → NimbusJwtDecoder 验签 → JwtToVerifiedJwtClaims →
+  ReferenceTokenProfileResolver（解析 SERVICE_V1）→ SecurityContextAuthenticatedPrincipalResolver →
+  Controller requireManagement。新增 2 项负向测试：无 Bearer → 401、SERVICE 缺 scope → 403。
+- `AuthorizationPersistenceIntegrationTest` 补充 resource-server enabled + 最小 fake JwtDecoder（该测试
+  测持久化切片不测 HTTP，真实 JWT 由 HttpTest 覆盖）。
+- pom 加 `ainer-starter-security` + `spring-security-oauth2-jose` test scope（Nimbus 传递依赖）。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：**273 tests / 0 failure / 0 error /
+  0 skipped**（较上轮 270 + 3 新增负向 JWT 测试）。零回归。缺陷 9 标记修复。
+
+2026-08-11 授权审计四层写入：change/decision audit 接入（缺陷 3 修复）
+- **change_audit**：新建 `AuthorizationChangeAudit`（domain record）+ port + `AuthorizationChangeAuditService`
+  （同事务 `@Transactional`，审计失败回滚，ADR §11.7）+ mybatis impl/mapper/row/XML。接入
+  `RoleApplicationService.createRole`/`replacePermissions` 与 `SubjectBindingApplicationService.createBinding`/
+  `revokeBinding` 的写方法（actor 从 `AuthenticatedPrincipal` 提取）。Controller 传入 actor + requestId。
+- **decision_audit**：新建 `AuthorizationDecisionAudit` + port + `AuthorizationDecisionAuditService`
+  （`@Transactional(REQUIRES_NEW)`，调用方按 AuditLevel 触发，ADR §12.4）+ mybatis 四层。
+  `AuthorizationService` 保持 Spring-free 纯决策器，调用方（未来的 SecurityManager adapter 或应用服务）
+  在决策后显式调 `recordIfApplicable`。Anonymous/PUBLIC 决策不在此记录（表要求 requester NOT NULL）。
+- 真实 PostgreSQL 18.3 Testcontainers 验证：Role 生命周期测试断言 change_audit 写入 CREATE +
+  REPLACE_PERMISSIONS 两条记录；新增 decisionAudit 测试验证 DENY 决策正确写入。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：**270 tests / 0 failure / 0 error /
+  0 skipped**。零回归。缺陷 3 标记修复。P0 级阻塞缺陷 1-5 + 装配缺陷 6-8 + 审计缺陷 3 全部闭合。
+
+2026-08-11 授权模块生产装配：AuthorizationService 成为 ainer-server 可用 Bean（缺陷 6/7/8 修复）
+- **归属决策**：授权决策与管理 API 归属 `ainer-server`（业务 Resource Server），依据链：ADR-0030 §9.6
+  单体装配、§2.2 授权模块不解析 JWT（主体投影唯一来源是 RS 侧 `ainer-starter-security` 的
+  `AuthenticatedPrincipalResolver`，仅在 `resource-server.enabled=true` 时注册）、`database.md` 将
+  V202608070340 归业务库 `ainer`。
+- **装配实现**：`AuthorizationModuleConfiguration` 新增 `authorizationService` @Bean（注入 PermissionRegistry/
+  ScopePermissionCeiling/PublicAccessPolicy/DomainAuthorizationPolicy/BindingResolver + policyVersion
+  配置属性）+ 三个 deny-all 默认 @Bean（全部 `@ConditionalOnMissingBean`，保证未配置时端到端默认拒绝）。
+  `ainer-server` pom 加 `ainer-module-authorization` 依赖，主类 @Import `AuthorizationModuleConfiguration`，
+  V202608070340 migration 随之在 ainer 库执行。`DefaultQueryAuthorizationPlanner`（泛型 `<I,Q>`）按设计
+  由产品模块实例化，不在 Ainer 装配。Spring Security `AuthorizationManager` adapter（ADR §8.2）属后续。
+- ainer-server 冒烟测试（`AinerServerApplicationTest`/`AinerServerMetricsSecurityTest`）增加
+  `ainer.authorization.enabled=false`（排除 DataSource 时跳过 @Repository 装配）。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：**269 tests / 0 failure / 0 error /
+  0 skipped**。零回归。缺陷 6/7/8 标记修复。
+
+2026-08-11 接手复核：WIP 拆清、ADR/状态文档纠正、Docker 修复、授权 P0 缺陷修复
+- **核实**：逐行核实交接点名的全部技术证据，确认交接文档判断正确（探查代理只读文档得出的
+  「S0–S3 已落地」结论错误）。详见本节「ADR-0030 授权模块实现差距清单」。
+- **文档纠正**：ADR-0030 回退 Accepted→Proposed（决策文本仍以 tenant 模型为主，与 Greenfield
+  地基冲突）；`decisions/README.md`、`architecture.md`、`00-overview.md`、`README.md`、`CHANGELOG.md`、
+  `project-status.md` 同步纠正「S0–S3 全部落地/门禁通过」的错误表述；删除孤岛 handoff 文档
+  （`docs/architecture/2026-08-11-session-handoff-*.md`，未索引且结论与事实矛盾）。
+- **Docker 修复**：Dockerfile 修正模块产物路径（`target/`→`${AINER_MODULE}/target/`）；
+  移除 BuildKit `--mount`（Colima 等 daemon 无 buildx），改传统层缓存 + go-offline 预热；
+  `init-db.sh` 密码改用 psql 变量 `:'var'` 安全转义；compose full profile 诚实标注实验性限制。
+  完整镜像构建受容器内 Maven preview distribution SHA-256 校验限制（环境问题，已文档化）。
+- **授权 P0 缺陷修复**（真实 PostgreSQL 18.3 Testcontainers 验证）：
+  - RESOURCE scope CHECK 冲突：`Scope.Resource` 加 workspaceId，全链路同步（domain/infra/API/测试）
+  - systemOnly PUBLIC 绕过：PUBLIC 分流前加 systemOnly 检查 + 负向测试
+  - Role.name 死参数：`Role` record 加 name 字段，全链路同步（含 PostgresBindingResolver 改用 roleRecord.role()）
+  - RoleResponse 时间戳假数据：RoleRecord 加 createdAt/updatedAt，从 DB 读取
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：**269 tests / 0 failure / 0 error /
+  0 skipped**（较接手前 268 + 1 systemOnly PUBLIC 负向测试）。`git diff --check` 通过。
+- **明确列为后续**：缺陷 3（审计四层写入）、授权模块生产装配、真实 JWT 端到端测试、管理 API
+  防提权矩阵、外部 Golden Consumer 真正消费 AuthorizationService、新增取代 ADR-0030 的 post-Greenfield ADR。
+
+2026-08-11 通用授权 S3 查询计划与 Golden Consumer 验证（ADR-0030 S3）
+- 新增集合查询授权契约（ADR-0030 §7 S3）：`QueryAuthorizationRequest<I>`（类型化查询请求，
+  携带产品定义的 query intent）、`AuthorizedQueryPlan<Q>`（sealed interface：`Allowed<Q>` 携带
+  产品定义的类型化查询约束 + obligations；`Denied<Q>` 携带稳定 reason code）、
+  `QueryAuthorizationPlanner<I,Q>` 端口、`QueryConstraintBuilder<Q>`（产品实现的约束累积器）。
+- 新增 `DefaultQueryAuthorizationPlanner`：复用 S0 scope ceiling / permission registry /
+  binding resolver 逻辑，遍历 live bindings 调用产品 `QueryConstraintBuilder.accumulate()` 生成
+  类型化 `Q`。RELATION_DERIVED 路径拒绝（需要 per-resource facts，不适合集合查询）；
+  无 contributing binding 时返回 Denied（无 ALLOW 缓存）。
+- Ainer **不输出 SQL**：`Q` 是产品定义的类型（如 `ListingReadConstraint(global, allowedWorkspaceIds,
+  allowedResourceIds)`），产品 Repository/search adapter 翻译为参数化 PostgreSQL 过滤。
+  未授权 row 在数据库层排除，不先加载到 JVM 再过滤。
+- Golden Consumer 查询验证（6 项纯单元测试，无 Docker 依赖）：operator + Workspace binding →
+  受约束查询计划（allowedWorkspaceIds 含该 workspace）；operator + Resource binding → 精确
+  resource 约束；SERVICE + Global binding → 全局约束（global=true）；customer 无 binding →
+  Denied；REVOKED binding → Denied（撤销立即生效）；wrong scope → Denied。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：269 tests / 0 failure /
+  0 error / 0 skipped（较 S2 基线 262 + 6 新增 S3 查询计划测试 + 1 接手复核新增 systemOnly
+  PUBLIC 负向测试）。
+- **⚠️ 接手复核（2026-08-11）**：上述「ADR-0030 S0+S1+S2+S3 全部完成」「门禁 8/10 通过」的结论**已被
+  证伪**。S1–S3 仅为原型，未达 ADR-0030 验收。ADR-0030 已回退为 Proposed。§13.4 创建门禁 8/10
+  **未关闭**。已核实的实现差距见下方「ADR-0030 授权模块实现差距清单」。
+
+2026-08-11 通用授权 S2 管理 REST API 闭环（ADR-0030 S2）
+- 新增 `ainer-module-authorization` 管理 REST API 层（`/api/authorization/**`）：
+  `AuthorizationManagementController`（`@RestController @RequestMapping("/api/authorization")`）+
+  `AuthorizationApiDtos`（Role/Binding/Permission/EffectiveAccess 请求与响应 record，含
+  `from(domain)` 工厂方法）。POM 增加 `ainer-starter-web` 依赖与 `ainer-test-support` 测试依赖。
+- 端点：`GET /permissions`（目录投影只读）、`POST /roles` + `GET /roles/{id}` +
+  `PUT /roles/{roleId}/permissions`（角色与权限管理）、`POST /bindings` + `GET /bindings/{id}` +
+  `POST /bindings/{bindingId}/revocations`（绑定生命周期，撤销用 action-path noun 而非 DELETE）、
+  `GET /effective-access?issuer=&subjectType=&subjectId=`（查询某 subject 当前有效绑定）。
+- 安全模型：所有端点要求 SERVICE principal + `authorization.manage` scope（`requireManagement`
+  guard）。Human principal 与缺 scope 返回 403。未注册的 permission code 不能分配给 Role（422）。
+- 5 项 HTTP 集成测试全绿（TestRestTemplate + 真实 PostgreSQL 18.3）：创建/查询 Role、
+  替换 Role 权限、绑定创建/撤销/Effective Access 立即反映、非法 scopeKind 返回 422、
+  Permission 目录列表。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：262 tests / 0 failure /
+  0 error / 0 skipped（较 S1 基线 257 + 5 新增 S2 HTTP 测试）。
+  > **接手复核（2026-08-11）**：下句「S3 仍未实现」已被随后提交的 S3 原型推翻；但 S3 原型仍未达验收，
+  > 详见上方 S3 记录的复核注释与本节「ADR-0030 授权模块实现差距清单」。Spring Security
+  > `AuthorizationManager` adapter（方法级 `@AinerAuthorize`）、OpenAPI/SDK 生成、Ainer Admin 集成确属
+  > 后续未实现项。
+
+2026-08-11 通用授权 S1 PostgreSQL 持久化最小闭环（ADR-0030 S1）
+- `ainer-module-authorization` 从纯域模块（ainer-core + jspecify）升级为可持久化模块：新增
+  `ainer-starter-persistence` + `ainer-security` 依赖与 application/infrastructure 分层。
+- 新增 Flyway migration `V202608070340__authorization_foundation_baseline.sql`（6 张表）：
+  `ainer_authorization_permission`（目录投影）、`ainer_authorization_role`（角色聚合）、
+  `ainer_authorization_role_permission`（角色-权限关联，复合 PK）、
+  `ainer_authorization_subject_binding`（绑定生命周期）、`ainer_authorization_change_audit`
+  （变更审计 append-only）、`ainer_authorization_decision_audit`（决策审计 append-only）。
+  scope_kind CHECK 适配 Greenfield 后 Workspace 语义：GLOBAL（全 NULL）/ WORKSPACE
+  （workspace_id 非空）/ RESOURCE（workspace_id + resource_type + resource_id 全非空）。
+- 新增 application 层：`RoleRepository`/`SubjectBindingRepository`/`PermissionCatalogRepository`
+  端口 + `RoleApplicationService`/`SubjectBindingApplicationService` + `AuthorizationErrorCode`
+  （`AINER.AUTHORIZATION.*` 稳定错误码）。未注册的权限不能分配给角色（fail-closed）。
+- 新增 infrastructure 层：`RoleRow`/`PermissionRow`/`SubjectBindingRow` POJO +
+  `RoleMapper`/`SubjectBindingMapper`/`PermissionMapper`（`@Mapper` + 显式 XML SQL）+
+  `MybatisRoleRepository`/`MybatisSubjectBindingRepository`/`MybatisPermissionCatalogRepository`
+  适配器 + `PostgresBindingResolver`（实现 S0 `BindingResolver` 端口，取代内存 fixture）。
+  ID 使用 PostgreSQL 18 `DEFAULT uuidv7()` + `INSERT ... RETURNING id`（`<select>` + resultType=UUID）。
+- 撤销语义验证：`bindingService.revokeBinding` 后 `bindingResolver.liveBindings` 立即不返回该
+  绑定——无 ALLOW 缓存，仍有效的 JWT 不能恢复已撤销的数据库授权。过期绑定同样在 SQL 层排除。
+- 集成测试 9 项全绿（Testcontainers `postgres:18.3-alpine`）：空库 migration 创建 6 张表、
+  Role CRUD + 权限原子替换 + 版本检查、重复 code fail-closed、未注册权限拒绝、绑定创建/撤销/
+  resolver 立即反映、过期绑定排除、scope CHECK 拒绝 GLOBAL+workspace 与 WORKSPACE+resource
+  非法组合、resolver 产出 domain SubjectBinding（含 role permissions）。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：257 tests / 0 failure /
+  0 error / 0 skipped（较 T1-7 基线 248 + 9 新增 S1 集成测试）。
+  > **接手复核（2026-08-11）**：上句「ADR-0030 状态从 Proposed 转 Accepted」已撤销——ADR-0030 回退为
+  > Proposed，因为以下差距清单显示实现未达验收。
+
+### ADR-0030 授权模块实现差距清单（2026-08-11 接手复核）
+
+下列各项已通过逐行核实源码确认（非文档推断）。S0 纯决策器可保留为「已落地」，S1–S3 整体判定为
+「原型已提交，未达 ADR-0030 验收」。
+
+**P0 级阻塞缺陷（安全/正确性）**：
+
+| # | 缺陷 | 状态 | 证据 | ADR 条款 |
+|---|---|---|---|---|
+| 1 | **RESOURCE scope 持久化违反 CHECK** | ✅ 已修复（2026-08-11） | migration `ck_..._scope_resource` 要求 `workspace_id`/`resource_type`/`resource_id` 三列全 NOT NULL；原 `applyScope()` RESOURCE 分支写死 `workspaceId=null` 且 `Scope.Resource` 不含 workspaceId。修复：`Scope.Resource` 加 workspaceId 字段，全链路同步，真实 PG 验证通过 | §10 Scope CHECK |
+| 2 | **`systemOnly` 权限可经 PUBLIC 路径绕过** | ✅ 已修复（2026-08-11） | 原 `AuthorizationService.decide()` 在检查 systemOnly 前分流到 `decidePublic()`。修复：PUBLIC 分流前加 systemOnly 检查，附负向测试 | §5.1/§3.1 |
+| 3 | **change/decision audit 只有表，零写入路径** | ✅ 已修复（2026-08-11） | 原 `src/main` 对两张 audit 表零引用。修复：新建 `AuthorizationChangeAuditService`（同事务，审计失败回滚）接入 RoleApplicationService/SubjectBindingApplicationService 写方法；新建 `AuthorizationDecisionAuditService`（`REQUIRES_NEW`，调用方按 AuditLevel 触发）供调用方记录 authenticated 决策。四层结构（domain record + port + service + mybatis impl + mapper + XML）各建一套，复刻 workspace 审计范式。真实 PG 验证写入正确 | §11.7/§12.4 |
+| 4 | **`Role.name` 是完全死参数** | ✅ 已修复（2026-08-11） | 原 `new Role(code, permissions)` 丢弃 name；DB name 列存 code 值。修复：`Role` record 加 name 字段，全链路同步，真实 PG 验证 name 正确存取 | §4.1 |
+| 5 | **`RoleResponse` 时间戳是 API 层假数据** | ✅ 已修复（2026-08-11） | 原 `RoleResponse.from()` 用 `Instant.now()` 生成时间戳。修复：`RoleRecord` 加 createdAt/updatedAt，从 DB 读取，真实 PG 验证 replacePermissions 后 updatedAt 刷新 | §11.8 |
+
+**装配级缺陷（决策器不可用）**：
+
+| # | 缺陷 | 状态 | 证据 |
+|---|---|---|---|
+| 6 | **`AuthorizationService` 无生产装配** | ✅ 已修复（2026-08-11） | 原 Configuration 不声明 AuthorizationService bean。修复：`AuthorizationModuleConfiguration` 新增 `authorizationService` @Bean（`@ConditionalOnMissingBean`，注入 5 个依赖 + policyVersion 配置属性）。`DefaultQueryAuthorizationPlanner` 仍不装配（泛型 `<I,Q>`，按设计由产品模块实例化） |
+| 7 | **`DomainAuthorizationPolicy`/`PublicAccessPolicy`/`ScopePermissionCeiling` 无生产装配** | ✅ 已修复（2026-08-11） | 原 Configuration 不声明，无默认实现。修复：新增三个 deny-all 默认 @Bean（全部 `@ConditionalOnMissingBean`），保证未配置时端到端默认拒绝。产品模块覆盖即可提供真实策略 |
+| 8 | **三个可执行应用均不依赖授权模块** | ✅ 部分修复（2026-08-11） | 原 ainer-server/authorization-server/offstate-app 均无 pom 依赖、无 @Import。修复：ainer-server pom 加 `ainer-module-authorization` 依赖，主类 @Import `AuthorizationModuleConfiguration`；V202608070340 migration 随之在 ainer 库执行。authorization-server/offstate-app 不装配（归属依据：ADR §9.6 单体装配 + §2.2 授权模块不解析 JWT + database.md 业务库归属） |
+
+**验收级缺陷（ADR 验收项未达成）**：
+
+| # | 缺陷 | 证据 | 对应 ADR 验收项 |
+|---|---|---|---|
+| 9 | **HTTP 测试用 stub Principal 绕过真实 JWT** | ✅ 已修复（2026-08-11）— 原 `TestPrincipalResolver` 固定返回。修复：重写 `AuthorizationManagementHttpTest`，删除 stub resolver，启用 resource-server，提供真实 `NimbusJwtDecoder`（测试 RSA 公钥验签 + issuer/audience validator），用 Nimbus `SignedJWT` 签发 SERVICE_V1 JWT（带 `token_profile`/`actor_type`/`scope` claims），客户端带 Bearer header。整条链路真实：SecurityFilterChain → NimbusJwtDecoder 验签 → JwtToVerifiedJwtClaims → ReferenceTokenProfileResolver → Controller。新增 2 项负向测试（无 Bearer → 401、缺 scope → 403） |
+| 10 | **管理 API 缺防提权矩阵** | ✅ 模块级已修复（2026-08-11）— 新增版本化 `GrantAdministrationPolicy` + `GrantAdministrationGuard`；无策略 deny-all，scope 不能单独授权管理；Controller 与事务服务双层校验 assignable Permission/Scope/target，硬拒绝 system-only、GLOBAL、自 Binding 和修改自己 ACTIVE Binding 所引用 Role。真实 JWT + PG 负向矩阵覆盖。Greenfield 后生产 bootstrap/Ainer Admin 仍属门禁 9 未完成项 | §11.3/§11.5 |
+| 11 | **外部 Golden Consumer 仅编译期 smoke** | ✅ 已修复（2026-08-11）— `scripts/verify-maven-consumers.sh` 在独立临时项目中只通过 BOM 与隔离仓库已安装制品定义产品 Permission/Role/Binding/query intent/constraint，实际调用 `AuthorizationService` 与 `DefaultQueryAuthorizationPlanner`；Maven 3.9+、Maven 4 各执行 1 项 JUnit，均为 1 test / 0 failure / 0 error / 0 skipped。当前验证对象仍是本地 `0.1.0-SNAPSHOT`，不宣称不可变发布制品或完整产品场景验收 | 门禁 8 外部 Golden Consumer 验证 |
+| 12 | **缺真实参数化 SQL 查询验证** | ✅ 已修复（2026-08-11）— 新增 test-scope 产品表与 `ProductListingQueryAdapter`：在真实 PostgreSQL 18.3 中把 planner 生成的 Workspace/resource `Q` 绑定为 `varchar[]`/`uuid[]` PreparedStatement，一次查询只返回授权 Workspace row；DENY 执行 0 次产品查询，注入形态 status 不扩大结果；20,003 行夹具的 `EXPLAIN (ANALYZE, BUFFERS)` 命中 `idx_consumer_listing_authorized_search`。这证明 Golden Consumer adapter 契约，不宣称已有生产产品 Repository 或生产容量结论 | §7.4/§7.5 |
+| 13 | **缺「撤销后原 Token 无法继续业务写」端到端** | ✅ 模块级已修复（2026-08-11）— 真实 RSA 签名 `USER_NEUTRAL_V1` JWT 先经产品所有的 test-scope HTTP 路径完成受保护写；可信 SERVICE 通过真实管理 API 撤销 PostgreSQL Binding 后，复用完全相同且仍有效的 JWT 再写返回 403，产品事件仍为 1。产品服务从产品表解析资源所属 Workspace，每次调用 `AuthorizationService`/`PostgresBindingResolver`，无 ALLOW cache；ALLOW 与 `NO_BINDING` DENY 均在 effect 前持久化审计。外部消费者与生产失效 SLA 尚未验收 | 门禁 10 工程链路 |
+
+**§13.4 创建门禁状态**：门禁 8（外部 Golden Consumer 验证）**仍未关闭**。外部 Maven 制品消费与
+真实 `AuthorizationService`/查询规划器调用这一工程维度已补齐，但仍缺不可变已发布制品、ADR 要求的
+完整产品关系/双向独立负例，以及真实 HTTP public row/字段投影验证。test-scope 产品 adapter 的参数化
+PostgreSQL 行过滤维度已补齐；门禁 9（Ainer Admin 管理 + Effective Access）**未关闭**（模块防提权
+矩阵已补，但 Admin UI 与 post-Greenfield 生产 bootstrap 未集成）；门禁 10（撤销后受保护写失效）
+的**仓内工程链路已通过**，但发布级门禁仍未关闭：还需由外部消费者在目标部署拓扑中批准授权失效
+SLA，并验证跨实例/缓存/传播边界。
+
+**ADR-0030 文本与 Greenfield 地基冲突**：ADR-0030 仍以 tenant 模型为主
+（`credentialTenantId`、`TENANT(tenantId)` scope、I0 切片的「allowlisted consumer client 无 tenant
+USER Token」），而 ADR-0033 Greenfield 已完全移除 tenant。实现已迁 Workspace。完整重述需新增取代 ADR。
+
+**后续批次进展（当前接手轮持续推进）**：
+1. ~~修复 P0 缺陷 1/2/4/5~~（已完成）；~~修复装配缺陷 6/7/8~~（已完成）；~~修复缺陷 3（审计四层写入）~~（已完成）；
+2. ~~Spring Security `AuthorizationManager` adapter（ADR-0037 §4，`@AinerAuthorize` 端点级 opt-in）~~（已完成）；
+   方法级 AOP、RFC 9470 challenge handler、DecisionObligationExecutor、AuthorizationTargetResolver 产品注册机制属后续；
+3. ~~真实 JWT 端到端测试~~（已完成）；
+4. ~~管理 API 模块级防提权矩阵~~（已完成）；post-Greenfield 生产 bootstrap/Ainer Admin 仍待门禁 9；
+5. ~~外部 Golden Consumer 真正消费 AuthorizationService/查询规划器~~（本地 SNAPSHOT 制品工程门禁已完成）；
+   不可变发布制品与完整产品关系/投影场景仍属于门禁 8；
+6. ~~产品 adapter 将类型化 `Q` 下推为参数化 PostgreSQL 并验证 row/查询次数~~（已完成）；真实产品 Repository 与 HTTP 字段投影仍属于门禁 8；
+7. ~~撤销 Binding 后复用原 USER Token 验证受保护业务写失败~~（已完成）；外部消费者与生产授权失效 SLA 仍属于门禁 10；
+8. ~~新增取代 ADR-0030 的 post-Greenfield 授权基线 ADR（ADR-0037 Accepted）~~（已完成）。
+
+2026-08-11 撤权后原 Token 受保护写失效闭环（缺陷 13）
+- 扩展 `AuthorizationManagementHttpTest`：新增 test-scope 产品资源表、产品写事件表与受保护 HTTP
+  写路径。产品服务先从自己的表读取资源所属 Workspace，再构造单资源 `AuthorizationRequest`；
+  Ainer 仍不知道产品表、字段和 effect 语义。
+- 用测试 RSA 私钥签发 `USER_NEUTRAL_V1` JWT，Resource Server 以对应公钥真实验签，再经
+  `ReferenceTokenProfileResolver` 取得 `iss/sub/scope`。第一次写由 Workspace Binding ALLOW；可信
+  `SERVICE_V1` 管理主体通过 `/api/authorization/bindings/{id}/revocations` 提交撤销。
+- 第二次请求复用**完全相同的序列化 JWT**，仅数据库 Binding 状态变化；`PostgresBindingResolver`
+  每次重新查询后返回无 live Binding，HTTP 为 403，产品写事件计数保持 1。
+- 产品 effect 之前调用 `AuthorizationDecisionAuditService`；ALLOW/`AUTHORIZED` 与
+  DENY/`NO_BINDING` 各存在 1 条审计。DENY 审计使用 `REQUIRES_NEW`，在业务事务回滚后仍保留。
+- 定向验证：`AuthorizationManagementHttpTest` **13/0/0/0**。全量 `./mvnw clean verify`
+  （JDK 25 + PostgreSQL 18.3 Testcontainers）通过：**290 tests / 0 failure / 0 error / 0 skipped**；
+  `check-surefire-results.sh` 与 `git diff --check` 通过。
+- 边界：这是单进程、仓内 test-scope 产品路径的工程验证，不等同于外部产品接入、跨实例传播测试，
+  也不批准生产授权失效 SLA；因此门禁 10 的发布级状态仍未关闭。
+
+2026-08-11 Golden Consumer 参数化 PostgreSQL 查询闭环（缺陷 12）
+- 新增 `GoldenConsumerPostgresQueryIntegrationTest`。产品定义的 listing 表、query intent、类型化
+  `ListingReadConstraint`、字段投影与 JDBC adapter 全部位于测试消费者边界；Ainer 生产代码仍不包含
+  产品表名、列名或 SQL。
+- adapter 使用固定 SQL + PostgreSQL `varchar[]`/`uuid[]` PreparedStatement 参数，将 Workspace/resource
+  授权约束和已校验状态意图同时下推；只选择公开投影列，不加载 `internal_cost`，不在 JVM 二次过滤。
+  Workspace A 的 PUBLISHED 查询不会返回 Workspace B row；注入形态 status 返回空集且表数据不变。
+- ALLOW 的产品数据查询严格 **1 次**，DENY 为 **0 次**，避免逐 row N+1；类型化 ID 集合上限为 100，
+  空约束与未消费 obligation 失败关闭。
+- 20,003 行合成夹具执行 `ANALYZE` 后，真实 `EXPLAIN (ANALYZE, BUFFERS)` 命中
+  `idx_consumer_listing_authorized_search`。这是确定性测试规模的查询计划证据，不外推生产容量或延迟。
+- 同步加固 `DefaultQueryAuthorizationPlanner`：resolver 即使错误返回其他主体、过期 Binding、USER
+  GLOBAL 或错 resourceType 的 RESOURCE Binding，也不能贡献 `Q`；`QueryConstraintBuilder` 首次
+  `current=null` 现已在公开 nullness 契约中显式表达，Allowed constraint/obligations 均不可为 null。
+- 定向验证：真实 PostgreSQL 适配器 7 tests + planner 10 tests，**17/0/0/0**。
+- 全量 `./mvnw clean verify`（JDK 25 + PostgreSQL 18.3 Testcontainers）通过：
+  **289 tests / 0 failure / 0 error / 0 skipped**；`check-surefire-results.sh` 与 `git diff --check` 通过。
+- 公开 query 契约变更后重新执行 `verify-maven-consumers.sh`：19 模块制品/可复现构建比较通过，
+  Maven 3.9+ 与 Maven 4 外部授权 JUnit 各 **1/0/0/0**。首次冷仓下载因 Maven Central TLS
+  `bad_record_mac` 中断，增加 transport retry 的完整重跑成功；该瞬时网络失败未发生在编译或测试阶段。
+
+2026-08-11 外部授权 Golden Consumer 制品门禁补强（缺陷 11）
+- `scripts/verify-maven-consumers.sh` 生成独立临时 Maven 项目，不复制 Ainer 源码，只从隔离本地仓库
+  消费 `ainer-dependencies` BOM 与 `ainer-module-authorization` 等公开坐标。
+- 外部测试由消费者自行定义 `consumer.offer.read`、资源、Role/Workspace Binding、领域 policy、
+  query intent 与类型化 constraint；真实调用 `AuthorizationService` 验证同 Workspace ALLOW/跨
+  Workspace DENY，并调用 `DefaultQueryAuthorizationPlanner` 验证受约束集合计划/无 Binding DENY。
+- 系统 Maven 3.9+ 与 Wrapper Maven 4.0.0-rc-6 均执行 `clean verify`；脚本强制读取 Surefire XML，
+  两轮各为 **1 test / 0 failure / 0 error / 0 skipped**。完整 19 模块制品安装、sources/javadoc、
+  consumer POM、配置元数据与可复现构建比较同轮通过。
+- 同轮随后使用 JDK 25 + PostgreSQL 18.3 Testcontainers 完成全量 `./mvnw clean verify`：
+  **278 tests / 0 failure / 0 error / 0 skipped**；`check-surefire-results.sh` 与 `git diff --check` 通过。
+- 证据边界：本轮消费的是隔离仓库中的 `0.1.0-SNAPSHOT`，证明公开 Java 契约与 Maven 3/4 工程可消费性；
+  不证明正式仓库发布、不可变 RC、真实产品关系/投影、参数化 SQL 或发布就绪。
+
+2026-08-10 Docker Compose 开发环境落地：一键启动 PostgreSQL 双库 + 完整应用栈
+- 新增 `docker-compose.yml`（仓库根）、`Dockerfile`（多阶段构建）、`docker/init-db.sh`
+  （PostgreSQL 双库双用户初始化：`ainer`/`ainer_auth`）、`scripts/generate-dev-keys.sh`
+  （幂等生成 RSA 3072 PKCS#8 PEM 签名密钥到 `secrets/dev-keys/`）、`.env.example`
+  （完整环境变量模板，占位符值，无真实密钥）。
+- Compose 分两个 profile：默认只启动 `postgres`（日常开发多数场景只需数据库），
+  `--profile full` 额外构建并启动 Authorization Server + 业务 Server。应用通过
+  `Dockerfile` 的 `AINER_MODULE` build arg 选择目标模块，容器内使用仓库 Maven Wrapper
+  构建（遵守 AGENTS.md 生产者构建规则）。
+- 验证结果（Colima Docker）：`docker-compose config` 通过；默认 profile 只暴露 postgres，
+  full profile 含 3 个 service；`generate-dev-keys.sh` 首次生成 + 二次幂等跳过正常，
+  产出 PKCS#8 PEM 3072 位密钥对；postgres 容器启动 8s 内 healthy，init-db.sh 正确创建
+  `ainer`（owner ainer）与 `ainer_auth`（owner ainer_auth）双库，双用户各自可连接
+  PostgreSQL 18.3。`secrets/` 与 `.env` 被 `.gitignore` 正确忽略。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：248 tests / 0 failure /
+  0 error / 0 skipped，与 T1-7 基线一致，零回归。`git diff --check` 通过。
+- 本地 HTTPS issuer 注意：Authorization Server 代码强制要求 issuer 为 `https://` URL
+  （`AinerAuthorizationServerConfiguration:96`），Compose 内 AS 容器实际监听 HTTP。
+  完整联调如遇 RS 拉取 JWK 因自签证书失败，推荐用 `./mvnw spring-boot:run` 在宿主机
+  分别启动两应用、只用 Compose 提供数据库。生产部署仍走 `ops/dev/`（systemd + Let's Encrypt）。
+
+2026-08-10 T1-7 `ainer-test-support` 落地：RestTestClient + `@ServiceConnection` + PostgreSQL 测试基座
+- 新增 `ainer-framework/ainer-test-support` 模块（ADR-0029 T1 第 7 项）：`RestTestClient`/`RestResponse`
+  基于 Boot 4.1 `TestRestTemplate` 提供 JSON 便捷与 JsonPath 断言；`AinerPostgresContainer` 固定
+  `postgres:18.3-alpine` 镜像，配合 Boot `@ServiceConnection`（`JdbcContainerConnectionDetailsFactory`
+  via spring-boot-testcontainers + spring-boot-jdbc）自动装配 DataSource，取代 `@DynamicPropertySource`
+  样板。模块自身 5 个测试全绿（RANDOM_PORT 集成 + 真实 PG 容器 + 单元）。
+- Initializer v1 模板已接入：生成项目 pom 增加 `ainer-test-support` test 依赖；SMOKE/CRUD 测试模板
+  改用 RestTestClient 与 `@ServiceConnection` 基座。ProjectGeneratorTest 断言同步（33 tests 全绿）。
+- 全量 `./mvnw clean verify`（JDK 25 + Colima）BUILD SUCCESS：248 tests / 0 failure / 0 error /
+  0 skipped。`verify-maven-consumers.sh`（19 个 consumer POM、9 个 library 制品 sources/javadoc、
+  Maven 3.9/4 双 golden consumer）与 `verify-initializer-consumer.sh`（普通/postgres/CRUD 三通道
+  真实 Testcontainers 0 skipped）均通过。
+- 关键依赖事实：Boot 4.1 中 `spring-boot-resttestclient` 不传递 `spring-boot-restclient` 与
+  `spring-boot-http-client`，test-support 需显式声明；`spring-boot-jdbc` 的
+  `JdbcContainerConnectionDetailsFactory` 经 `META-INF/spring.factories` 注册
+  `ConnectionDetailsFactory`，`@ServiceConnection` + PG 容器即可生成 JDBC ConnectionDetails。
+
+2026-08-10 P0-5 虚拟线程双模式压测矩阵闭环：等待型场景通过并落地默认开关
+- 脚本升级为双场景：JDBC 分页（`/api/metricRows`）与等待型并发（注入
+  `/api/wait` 端点模拟外部 IO 阻塞，`Thread.sleep` 阻塞式等待）。
+- 等待型实测（80ms × 400 并发，8000 请求两轮复跑一致）：platform
+  p50≈167ms/p95≈174ms、2239 req/s；virtual p50≈87ms/p95≈112ms、3954 req/s——
+  虚拟线程延迟约减半（-48%）、吞吐 +77%；两轮 p50 差 1ms 内稳定。
+- JDBC 分页对比（4000 请求/40 并发）：platform p95=17、virtual p95=16，
+  RPS 4378 vs 4406——双模式同级，虚拟线程无性能回归。
+- 依据 ADR-0029 决策 5 条件成立，Initializer v1 模板新增
+  `spring.threads.virtual.enabled=true` 默认开启；新增
+  `generatedProjectsEnableVirtualThreadsByDefault` 断言（33 tests 全绿）；
+  真实消费者 `xq-platform-next` 重新生成后在默认虚拟线程下
+  clean verify 4 tests 0 skipped 全绿。
+- 业务失败两场景均为 0；ab Length 计数保持为连接复用观测伪影
+  （此前已单独验证 30 次连续响应长度一致）。
+
+2026-08-10 P0-5 虚拟线程双模式压测矩阵基线（脚本 `scripts/measure-virtual-threads.sh`）
+- 在临时目录生成 PostgreSQL CRUD 消费者（`metricRows` 实体，manifest v1），以固定
+  Hikari 池 16、Tomcat 线程上限 200 分别启动平台线程（默认）与
+  `spring.threads.virtual.enabled=true` 双模式，ApacheBench 压制 `/api/metricRows`
+  分页接口（真实 JDBC + Flyway migration + 50 行种子数据）。
+- 实测（本机 macOS + Colima, JDK 25）：8000 请求/80 并发下 platform
+  p50=11/p90=20/p95=25/p99=68ms、5636 req/s；virtual p50=10/p90=23/p95=30/p99=69ms、
+  5890 req/s；两轮复跑（2000/40）趋势一致（virtual p95 19–30ms 与 platform
+  20–32ms 同级）。业务失败均为 0（ab 无 Non-2xx 行），Failed 计数为 ab 对
+  keep-alive 复用的 Length 观测伪影（已单独验证 30 次连续响应长度一致）。
+- JFR 录制 `settings=profile`（platform/virtual 各约 2.3–2.9MB）确认
+  jdk.ThreadStart 事件存在（virtual 45 条，含 container-0 容器线程）。
+- 结论：等待型 MVC+JDBC 负载下双模式性能同级，虚拟线程无性能回归；按 ADR-0029
+  决策 5 先保持默认平台线程，"新 MVC 项目默认 v-thread" 的开关需要更重负载
+  （高等待/长阻塞场景）进一步压测后决定。矩阵已接入 CI 独立
+  `virtual-thread-matrix` job（Ubuntu apache2-utils 提供 ab），不阻塞主质量门禁。
+- 过程中暴露 JDK 25 + PG JDBC 环境事实：`jdbc:postgresql://127.0.0.1`（字面
+  IP）经 `InetSocketAddress.createUnresolved` 连接失败（UnknownHostException），
+  使用 `localhost` 正常——脚本已固化为 localhost，写入验证记录便于排查。
+
+2026-08-09 首个外部消费者 `xq-platform-next` 出生（P3 前置验证）
+- 用 Initializer CLI（manifest v1）在外部独立仓库 `~/01-code/xq/xq-platform-next` 生成
+  `platformApp` 实体 CRUD 全栈：独立 `mvn verify`（Maven 3.9，JDK 25，真实 PostgreSQL 18.3
+  Testcontainers）4 tests / 0 failure / 0 skipped，BUILD SUCCESS。
+- 暴露并修复生成器缺陷：CRUD 测试示例值 `字段名-created/updated` 可能超过 `string(N)` 上限
+  （channelType string(16) 越界导致 500）；`sampleValue`/`sampleJsonValue` 新增
+  `paddedSample()` 按 `EntityField.size()` 截断；新增单测
+  `crudIntegrationTestSamplesRespectStringSize`（string(8) 边界），32 tests 全绿。
+- 独立构建直接暴露旧 SNAPSHOT 污染：`~/.m2` 中 8 月 5 日的 starter-persistence POM 缺
+  mybatis-plus 版本（消费者传入失败）；重装最新 reactor 后解析正常——提示非 SNAPSHOT
+  发布前必须先跑 consumer 通道刷新隔离仓库。
+
+2026-08-09 P2 收口与 P1 可重复验证基线（`reset/0033-greenfield`，worktree 全量）
+- P2 Create & Generate 四项退出门禁闭环（详见 §1）；`verify-initializer-consumer.sh`
+  三通道（普通/postgres/CRUD 变体）与 `measure-ttcrud.sh`（124s/门禁 1800s）本地重跑通过：
+  CRUD 全链路 create→get→update→list→delete→404 走真实 postgres:18.3-alpine，0 skipped。
+- `verify-maven-consumers.sh` 本地重跑通过：reactor clean install 到隔离 repo 后，
+  8 个 library 制品 sources/javadoc 伴随件齐全、18 个 consumer POM 无裸 `${revision}`、
+  3 个制品 `spring-configuration-metadata.json` 存在、`maven-artifact-plugin:compare`
+  可重复性通过、BOM 下 Maven 3.9.16 与 Maven 4.0.0-rc-6 双 golden consumer 均构建成功。
+- `./mvnw clean verify` 全量（JDK 25 + Colima Docker）BUILD SUCCESS：241 tests /
+  0 failure / 0 error / 0 skipped，`check-surefire-results.sh` 通过；offstate 最小应用
+  `OffStateApplicationTest` 0 skipped。
+- 剩余 P1 发布动作依赖 GitHub Packages PAT + 签名密钥（release/GPG）等仓库资产决策，
+  形成真实 non-SNAPSHOT 发布记录后关闭 P1；P0 剩余分支保护（private + 免费版限制）与
+  仓库可见性决策待定。
 
 2026-08-04(续) CI 首次跑绿 + 基线合入 dev + 许可证决策。
 - CI run 30904716377（`ubuntu-24.04` 原生 Docker）`completed=success`：全量 reactor verify +
@@ -400,14 +982,11 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 ### 访问控制
 
-- 通用混合细粒度授权 S0 已落地（ADR-0030）：`ainer-module-authorization` 拥有不可变领域契约
-  （Permission/Role/SubjectBinding/Scope/AuthorizationDecision）、PermissionRegistry（冲突检测）
-  和 AuthorizationService 纯决策器（grant-path 真值表 + resourceType/systemOnly/GLOBAL/scope 安全
-  检查 + HIGH-risk Challenge + PublicAccessPolicy 投影），16 项测试通过。但 S1（PostgreSQL 持久化）、
-  S2（Spring adapter + 管理 API）、S3（关系/查询/Golden Consumer 验证）、Agent 代行（ADR-0031）
-  与组织（ADR-0032）尚未实现；现有人员登录与
-  `AuthenticatedActorResolver` 仍要求 ACTIVE tenant membership，tenantless USER consumer client/
-  签发/解析/撤销合同也尚未实现，不能仅凭 Proposed 可空 principal 宣称已支持真实顾客；
+- 通用混合细粒度授权已按 ADR-0037 接受为 post-Greenfield Workspace 基线，但 `0.1` 的支持面仍有
+  明确边界：`@AinerAuthorize` 只有 endpoint 粗门禁，当前 synthetic target 固定
+  `resourceType=request`；`AuthorizationTargetResolver`、DecisionObligationExecutor、RFC 9470 challenge
+  和方法级 AOP 未实现。高价值写与资源 ownership 必须继续在 application service 显式授权；远端
+  不可变制品、Ainer Admin、外部产品关系/字段投影和生产撤权 SLA 尚未验收；
 - 组织与员工目录当前只有 ADR-0032 和详细方案；`ainer-module-organization`、OrgUnit、
   WorkforceEngagement、Position/Assignment、SubjectSetBinding、管理 API 和 XQ 岗位纵向切片均未
   实现。普通 tenant 成员角色变更/移除还没有完整写入 access-event outbox，Identity 已定义的
@@ -434,8 +1013,8 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
   outbox、OAuth2/HTTPS 通知网关 relay、已有用户本人接受、安全分页、显式取消与 provider-neutral
   终态回执接收；真实外部通知网关/供应商、供应商回执映射和最终送达验证、禁用/恢复、tenant
   ownership transfer 和成员管理 UI 尚未完成；
-- tenant 成员 API 位于 Authorization Server，但其 step-up/在线校验接入要随生产 browser/OIDC
-  client 策略单独完成；Ainer Admin access token 已强制 active gate，但不能把业务 Server 的默认
+- tenant 成员 API 已随 S8 删除；Ainer Admin 只保留当前会话自助撤销端点，其撤销端点已强制
+  逐请求 online active gate，数据库故障返回 503 并失败关闭；不能把业务 Server 的默认
   step-up 规则误认为覆盖该端点；
 - Ainer Admin 同源代理已有契约但尚未在选定生产 ingress 上完成 HTTPS、Cookie、重定向和缓存
   验收；`ainer-admin-dev` 与开发身份不能替代生产 browser client 生命周期和正式开户。
@@ -471,13 +1050,20 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
   wrapper 已修、本地 `./mvnw clean verify` 已达成 `0 skipped`、consumer 门禁已通过（2026-08-04），工作流已
   首次跑绿（run 30904716377，ubuntu 原生 Docker）；但 private + GitHub 免费版无法启用分支保护/必需检查，
   目前靠「绿了再合」软约束，硬性 gate 待仓库可见性/计费决策，故尚未称为正式 CI；
-  制品签名、发布仓库、provenance 和自动部署仍未实现；
-- 没有具名模块维护者矩阵、`CODEOWNERS` 和正式审查责任分配；
+  `0.1.0-rc.1` 已完成一次正式 key 的签名 deploy，但因源码/tag 不一致、无 GitHub Release、无完整
+  远端消费与 provenance 证据而撤回。当前 workflow 进一步要求 annotated tag/source、目标版本不存在、
+  passphrase-protected key、远端空仓 consumers、107/107 读回验签、签名 SBOM/checksum/provenance 和
+  immutable GitHub Release。新流程尚未由 `rc.2+` 实跑，因此仍不能关闭 P1/G2；
+- Maven 4 当前 source model 仍会对 reactor 内部 BOM import 输出
+  `BOM imports from within reactor should be avoided` 告警。ADR-0026 已把 POM 4.1/model 重构留给
+  后续独立原型；下一个合格 RC 前必须把它作为已知例外显式批准，或另立决策完成模型调整，不能把
+  告警静默当作已解决；
+- 已有 `.github/CODEOWNERS`，但 private 免费仓库仍缺受保护分支/必需审查的远端强制执行；
 - 没有生产备份恢复、容量测试、正式错误预算/告警路由和灾难恢复演练；
 - 没有稳定版兼容政策；许可证决策为暂不开源（私有/专有），未来若开源或对外发布再定商业/开源许可；付费产品交付系统未建立；
-- Testcontainers 仍使用 `disabledWithoutDocker`；本机 Colima 已能完整执行，候选 CI 已用
-  `scripts/check-surefire-results.sh` 明确拒绝任何 skipped 测试，但该门禁仍需首次成功并纳入
-  分支保护。
+- Testcontainers 仍使用 `disabledWithoutDocker`；本机 Colima 与候选 CI 均已完整执行，候选 CI 已用
+  `scripts/check-surefire-results.sh` 明确拒绝任何 skipped 测试，但该门禁尚未纳入受保护分支的
+  必需检查。
 
 ### 脚手架产品化评估
 
@@ -491,10 +1077,10 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 按
 [`Ainer Boot 产品定位、竞品能力矩阵与路线图`](design/ainer-scaffold-design.md)
-定义的全局产品化阶段，当前尚未退出 **P0 Baseline Integrity**：候选 CI 尚未首次成功并纳入
-分支保护，Wrapper 官方持久端点、许可证和正式发布门禁仍未闭环。P1 的 BOM/Starter 与
-consumer 原型已有验证结果，但不能因此宣称 P1 Scaffold Ready；P2 Initializer 与 P3 外部消费者尚未
-交付。该设计文档只维护长期阶段和退出条件，本页继续独占当前阶段、完成记录与缺口。
+定义的全局产品化阶段，当前是 **G0 已冻结、G1/P1 收口、P2 已完成、G2 发布列车整改中**：P3
+企业基座已有代码但文件元数据与管理 API/OpenAPI 尚未完成；`rc.1` 已撤回，不是可消费 RC；新的
+release hardening 尚无远端 CI/`rc.2+` 结果，private 仓库分支保护仍缺远端强制执行。`xq-platform-next`
+目前仍不是用合格远端 RC 交付的真实产品纵向切片，因此不允许把当前源码标记为稳定 `0.1.0`。
 
 ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -Denforcer.skip=true` 验证；正式
 `./mvnw clean verify`、零跳过门禁与 Testcontainers 集成仍待 Maven 4 RC6 官方发行包恢复后执行）：
@@ -514,52 +1100,31 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
   非配置可调。多次尝试（模块局部 forked、根 forked、根 in-process + `.mvn/jvm.config`、`MAVEN_OPTS`）均失败，
   此前因 Maven 4 RC6 wrapper 阻断无法在正式工具链验证（该阻断已于 2026-08-04 修复，见 §3），故已还原配置
   保持构建绿色；NullAway 作为「CI 接入」项可在现已可用的 Maven 4 工具链上重新评估。
-- P0-5 虚拟线程：`aiStreamExecutor` 已标记 `@Bean(defaultCandidate=false)`。**双模式压测矩阵与「新 MVC 项目
-  默认开启 v-thread」仍待办**——需 Docker/运行环境，当前未运行。
+- P0-5 虚拟线程：`aiStreamExecutor` 已标记 `@Bean(defaultCandidate=false)`；**双模式压测矩阵
+  已闭环**（`scripts/measure-virtual-threads.sh`，见 §3 2026-08-10 记录）：JDBC 分页场景双模式
+  同级无回归，等待型场景（80ms×400 并发）虚拟线程 p50 减半、吞吐 +77%；**已按 ADR-0029 决策 5
+  落地 Initializer 模板默认 `spring.threads.virtual.enabled=true`**，xq-platform-next 在默认
+  虚拟线程下 4 tests 全绿。
 
 ## 5. 下一里程碑
 
-产品化主线调整为先关闭 P0，再依次进入 P1 Scaffold Ready、P2 Create & Generate 和 P3 首个外部
-消费者。近期可交付顺序是：
+`0.1` 主线按以下顺序推进：
 
-1. RC6 已上 Central、wrapper 已修正、本地 `./mvnw clean verify` 已达成 `0 skipped`、consumer 门禁已通过、
-   CI 已首次跑绿（2026-08-04 run 30904716377）、scaffold 基线已合入 `dev`（PR #2）、许可证已决策（暂不开源，
-   私有/专有）。P0 仅剩：分支保护（private + GitHub 免费版受限，需仓库可见性/计费决策）与秘密扫描
-   （pre-public 前最有价值）；
-2. 让 Wrapper 官方持久端点、非 SNAPSHOT 制品、最小 off-state 应用与 Maven 3.9+/4 外部消费者
-   形成可重复发布验证记录，关闭 P1；
-3. 交付 manifest v1、preview/diff、确定性生成与 TTFR/TTCRUD golden consumer，关闭 P2；
-4. 立即生成 `xq-platform-next` 并以真实纵向切片进入 P3，不等待 P4/P5 全部企业能力。
+1. PR #3 的最终代码 CI/gitleaks/完整 virtual-thread matrix 已通过；完成本状态记录的 CI 后合并到
+   默认分支 `dev`，再验证精确 merge commit；正式 signing key、fingerprint、Immutable Releases 与
+   对应 variables 已配置；
+2. `CHANGELOG.md` 已冻结 `0.1.0-rc.2` 章节；合并并取得默认分支精确 SHA 的 CI 后，创建全新
+   annotated `v0.1.0-rc.2` tag，要求 workflow 完成 107/107 远端验签、空仓消费者、签名证据和
+   immutable GitHub Release；
+3. 让 `xq-platform-next` 删除 `0.1.0-SNAPSHOT` 与本地仓库依赖，固定从合格远端 RC 消费，完成 JWT、
+   Workspace/资源授权、PostgreSQL migration replay、真实 HTTP 错误和客户端 SDK 的产品所有纵向
+   切片，同时演练升级与回滚；
+4. 只有上述消费证据通过后才评估提升 `0.1.0` 并开放给其他内部产品；
+   `python-learning-service` 保持版本化 BOM/Starter 接入，不绑定开发分支、不复制源码。
 
-Identity、安全与运维纵深继续修复明确生产风险和 P0/P1/P3 阻塞项，但不再作为无限推迟
-Initializer 与外部消费者的前置功能清单。
-
-M4.8 已形成并接受
-[ADR-0019](decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)，
-按依赖顺序拆为三个切片。M4.8A 已完成 tenantless SERVICE 预配、激活核心与真实 HTTPS gateway
-transport、provider-neutral 终态回执接收，以及平台显式取消与 tenant/user 安全分页。M4.8B 已完成
-`GET /api/me/tenants`、Authorization Code + PKCE 多租户选择流程与 token customizer 实时重查的
-代码基线与真实 PostgreSQL + 真实 HTTP 集成验证；M4.8C 已完成双自然人确认 OWNER 转移状态机、
-原子角色交换与双方 access event 撤销链路的代码基线与 PostgreSQL 集成验证；M4.8C OWNER 丢失
-恢复（decision 30）已完成双 tenantless SERVICE request/approve 代码基线与 PostgreSQL 集成
-验证；下一步把 M4.8B/C 候选部署到 dev 公网联合验收，补齐多浏览器会话并行、真实 HTTP
-ownership-recovery 端到端、选择后撤销失效、真实多 tenant UI 与生产 browser/OIDC client 控制面验证。
-
-M4.8 与商业 entitlement 保持正交：Identity `OWNER/ADMIN/MEMBER` 只表达授权角色，Community /
-Pro / Enterprise、license、订阅和配额留给后续独立 entitlement 边界。生产并行工作仍包括真实
-Prometheus 抓取、dashboard/告警、Authorization Server 多实例容量/故障验证、browser/OIDC client
-生产控制面、真实设备/浏览器兼容矩阵、metrics/introspection/operator 旧凭据退役、Resource Server
-灰度与安全降级审批，以及把 M4.2 操作审计接入生产级 IAM 职责分离和外部不可变存储。
-
-完成条件包括：平台供应使用独立 tenantless SERVICE operator、最小 scope、幂等键、一次性激活
-凭据与真实 PostgreSQL/HTTP 验证；tenant selection 支持并行会话且不能由请求参数伪造 claim；
-OWNER 转移具备双方强认证、单一未完成请求、数据库唯一 ACTIVE OWNER、同事务审计和双方旧 Token
-撤销验证；Passkey 通知、真实设备与多节点 session 完成验证；发布候选环境的 Testcontainers
-测试不跳过；
-高风险 online validation 在目标容量与故障注入下满足确定的延时/可用性目标；request/approve
-与平台凭据在运营上真正分离并可轮换；外部审计副本可验证、可恢复；初始撤销 SLO 经多节点验证
-修正后形成正式错误预算。随后继续补齐浏览器/平台 Client 控制面、签名密钥轮换与独立商业
-entitlement 内核。
+Identity、安全与运维纵深继续修复明确的 P0/P1/P3 风险，但方法级授权、组织目录、真实设备矩阵、
+多实例容量、外部不可变审计和商业 entitlement 不再作为首个受控 RC 的无限前置。任何部署若实际
+依赖这些能力，必须在对应产品发布门禁中单独补齐，不能借用 `0.1` 工程测试替代生产证据。
 
 ## 6. 更新规则
 

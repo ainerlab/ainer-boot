@@ -37,8 +37,8 @@ class AinerAdminBrowserClientBootstrapRunnerTest {
         assertThat(client.getScopes()).containsExactlyInAnyOrder(
                 "openid",
                 "profile",
-                "tenant.members.read",
-                "tenant.members.write");
+                "workspace.read",
+                "workspace.write");
         assertThat(client.getClientSettings().isRequireProofKey()).isTrue();
         assertThat(client.getClientSettings().isRequireAuthorizationConsent()).isFalse();
     }

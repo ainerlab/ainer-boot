@@ -7,7 +7,6 @@ import java.util.UUID;
 
 public record AiInvocation(
         UUID id,
-        String tenantId,
         String subjectId,
         String requestId,
         String provider,
@@ -31,7 +30,6 @@ public record AiInvocation(
 
     public AiInvocation {
         Objects.requireNonNull(id, "id");
-        tenantId = requireText(tenantId, "tenantId");
         subjectId = requireText(subjectId, "subjectId");
         requestId = requireText(requestId, "requestId");
         provider = requireText(provider, "provider");
@@ -56,7 +54,6 @@ public record AiInvocation(
 
     public static AiInvocation started(
             UUID id,
-            String tenantId,
             String subjectId,
             String requestId,
             String provider,
@@ -67,7 +64,7 @@ public record AiInvocation(
             CostBreakdown estimatedCost,
             Instant startedAt) {
         return new AiInvocation(
-                id, tenantId, subjectId, requestId, provider, requestedModel, resolvedModel, streaming,
+                id, subjectId, requestId, provider, requestedModel, resolvedModel, streaming,
                 InvocationStatus.STARTED, PolicyDecision.ALLOWED, promptFingerprint,
                 null, null, false, estimatedCost.amount(), null, estimatedCost.currency(),
                 null, null, null, startedAt, null);
@@ -75,7 +72,6 @@ public record AiInvocation(
 
     public static AiInvocation rejected(
             UUID id,
-            String tenantId,
             String subjectId,
             String requestId,
             String provider,
@@ -88,7 +84,7 @@ public record AiInvocation(
             String errorCode,
             Instant now) {
         return new AiInvocation(
-                id, tenantId, subjectId, requestId, provider, requestedModel, resolvedModel, streaming,
+                id, subjectId, requestId, provider, requestedModel, resolvedModel, streaming,
                 InvocationStatus.REJECTED, decision, promptFingerprint,
                 null, null, false, estimatedCost.amount(), null, estimatedCost.currency(),
                 0L, null, errorCode, now, now);

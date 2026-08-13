@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AinerMetricsClientBootstrapRunnerTest {
 
     @Test
-    void createsDedicatedTenantlessClientWithOneMinuteToken() {
+    void createsDedicatedServiceClientWithOneMinuteToken() {
         AinerAuthorizationServerProperties properties = properties();
         InMemoryRepository repository = new InMemoryRepository();
         PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
@@ -34,7 +34,6 @@ class AinerMetricsClientBootstrapRunnerTest {
         assertThat(client.getScopes()).containsExactly(AinerSecurityScopes.PLATFORM_METRICS_READ);
         assertThat(client.getAuthorizationGrantTypes()).containsExactly(AuthorizationGrantType.CLIENT_CREDENTIALS);
         assertThat(client.getClientSettings().getSettings())
-                .doesNotContainKey(AinerAuthorizationServerConfiguration.CLIENT_TENANT_SETTING)
                 .doesNotContainKey(AinerAuthorizationServerConfiguration.CLIENT_INTROSPECTION_ALLOWED_SETTING);
         assertThat(client.getTokenSettings().getAccessTokenTimeToLive()).isEqualTo(Duration.ofMinutes(1));
         assertThat(encoder.matches("metrics-client-secret-2026", client.getClientSecret())).isTrue();
@@ -63,7 +62,7 @@ class AinerMetricsClientBootstrapRunnerTest {
     private static AinerAuthorizationServerProperties withMetricsClientBootstrap(
             AinerAuthorizationServerProperties.MetricsClientBootstrap bootstrap) {
         return new AinerAuthorizationServerProperties(
-                null, null, null, null, null, null, bootstrap, null, null, null, null, null);
+                null, null, null, null, null, null, bootstrap, null);
     }
 
     private static final class InMemoryRepository implements RegisteredClientRepository {

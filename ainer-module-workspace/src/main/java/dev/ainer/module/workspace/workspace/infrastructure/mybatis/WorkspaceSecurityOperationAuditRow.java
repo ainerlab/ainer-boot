@@ -6,7 +6,6 @@ import java.util.UUID;
 public class WorkspaceSecurityOperationAuditRow {
     private UUID id;
     private UUID operationId;
-    private String tenantId;
     private UUID workspaceId;
     private String targetSubjectId;
     private String operationType;
@@ -20,8 +19,6 @@ public class WorkspaceSecurityOperationAuditRow {
     public void setId(UUID id) { this.id = id; }
     public UUID getOperationId() { return operationId; }
     public void setOperationId(UUID operationId) { this.operationId = operationId; }
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public UUID getWorkspaceId() { return workspaceId; }
     public void setWorkspaceId(UUID workspaceId) { this.workspaceId = workspaceId; }
     public String getTargetSubjectId() { return targetSubjectId; }

@@ -10,7 +10,7 @@ import dev.ainer.module.ai.gateway.domain.AiTaskStatus;
 import dev.ainer.module.ai.gateway.domain.ContextSnapshot;
 import dev.ainer.module.ai.gateway.domain.MessageRole;
 import dev.ainer.module.ai.gateway.domain.ModelMessage;
-import dev.ainer.security.actor.AuthenticatedActor;
+import dev.ainer.security.token.AuthenticatedPrincipal;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -47,13 +47,13 @@ public class AiTaskRunService {
         this.clock = clock;
     }
 
-    public AiTaskRunResult executeTask(AiTaskCreateCommand command, AuthenticatedActor actor) {
+    public AiTaskRunResult executeTask(AiTaskCreateCommand command, AuthenticatedPrincipal principal) {
         Objects.requireNonNull(command, "command");
-        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(principal, "principal");
         String requestId = UUID.randomUUID().toString();
 
         // Phase 1: 创建 Task + Snapshot + TaskRun（独立事务提交，确保后续 Gateway 可见）
-        TaskRunCreated created = createTaskAndRun(command, actor, requestId);
+        TaskRunCreated created = createTaskAndRun(command, principal, requestId);
 
         // Phase 2: 调用 AI Gateway（无外层事务包裹，audit 的 REQUIRES_NEW 可见已提交行）
         try {
@@ -71,8 +71,8 @@ public class AiTaskRunService {
     }
 
     public TaskRunCreated createTaskAndRun(AiTaskCreateCommand command,
-                                            AuthenticatedActor actor, String requestId) {
-        GovernedAiExecutionContext governedCtx = contextResolver.resolve(actor, requestId);
+                                            AuthenticatedPrincipal principal, String requestId) {
+        GovernedAiExecutionContext governedCtx = contextResolver.resolve(principal, requestId);
         governedCtx = GovernedAiExecutionContextBuilder.from(governedCtx)
                 .purpose(command.purpose())
                 .taskType(command.taskType())
@@ -81,13 +81,12 @@ public class AiTaskRunService {
         Instant now = clock.instant();
         AiTask task = new AiTask(
                 UUID.randomUUID(),
-                UUID.fromString(actor.tenantId()),
                 governedCtx.workspaceId(),
                 command.taskType(),
                 command.targetIdentityId(),
                 AiTaskStatus.PENDING,
                 command.trigger(),
-                actor.subjectId(),
+                principal.subjectId(),
                 governedCtx.entitlementPolicyVersion(),
                 now,
                 now);
@@ -97,7 +96,6 @@ public class AiTaskRunService {
                 snapshotBuilder.build(task, governedCtx);
         ContextSnapshot snapshot = new ContextSnapshot(
                 UUID.randomUUID(),
-                task.tenantId(),
                 snapshotData.identityId(),
                 snapshotData.identityVersionId(),
                 snapshotData.evidenceRefsJson(),
@@ -155,7 +153,6 @@ public class AiTaskRunService {
                 new ModelMessage(MessageRole.SYSTEM, command.systemPrompt()),
                 new ModelMessage(MessageRole.USER, command.userPrompt()));
         InvocationContext invocationCtx = new InvocationContext(
-                ctx.tenantId().toString(),
                 ctx.actorId(),
                 ctx.requestId());
         return new ChatCompletionCommand(
@@ -168,9 +165,9 @@ public class AiTaskRunService {
 
     private static String serializeContext(GovernedAiExecutionContext ctx) {
         return """
-                {"tenantId":"%s","actorType":"%s","actorId":"%s","requestId":"%s",\
+                {"actorType":"%s","actorId":"%s","requestId":"%s",\
                 "purpose":"%s","taskType":"%s"}""".formatted(
-                ctx.tenantId(), ctx.actorType(), ctx.actorId(),
+                ctx.actorType(), ctx.actorId(),
                 ctx.requestId(),
                 ctx.purpose() != null ? ctx.purpose() : "",
                 ctx.taskType() != null ? ctx.taskType() : "");

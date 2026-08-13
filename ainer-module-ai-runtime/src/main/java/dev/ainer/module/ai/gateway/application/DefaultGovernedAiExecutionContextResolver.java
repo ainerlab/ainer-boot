@@ -1,15 +1,15 @@
 package dev.ainer.module.ai.gateway.application;
 
-import dev.ainer.security.actor.AuthenticatedActor;
+import dev.ainer.security.token.AuthenticatedPrincipal;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
 import java.util.UUID;
 
 /**
- * 默认实现：从 {@link AuthenticatedActor} 解析当前已有的身份字段。
+ * 默认实现：从 typed {@link AuthenticatedPrincipal} 解析当前身份字段。
  *
- * <p>tenantId, actorType, actorId, scopes 来自 JWT；workspaceId, memberId,
+ * <p>actorType, actorId, scopes 来自 JWT；workspaceId, memberId,
  * identityId 等字段待领域模型对接后由扩展实现填充。
  */
 @Component
@@ -17,18 +17,17 @@ public class DefaultGovernedAiExecutionContextResolver
         implements GovernedAiExecutionContextResolver {
 
     @Override
-    public GovernedAiExecutionContext resolve(AuthenticatedActor actor, String requestId) {
+    public GovernedAiExecutionContext resolve(AuthenticatedPrincipal principal, String requestId) {
         return new GovernedAiExecutionContext(
-                UUID.fromString(actor.tenantId()),
                 null,
-                actor.actorType(),
-                actor.subjectId(),
-                null,
+                principal.isHuman() ? "USER" : "SERVICE",
+                principal.subjectId(),
                 null,
                 null,
                 null,
                 null,
-                actor.authorities(),
+                null,
+                principal.scopes(),
                 null,
                 null,
                 null,

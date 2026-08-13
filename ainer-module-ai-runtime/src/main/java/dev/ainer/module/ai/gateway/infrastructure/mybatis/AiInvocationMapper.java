@@ -8,10 +8,10 @@ import java.util.UUID;
 
 public interface AiInvocationMapper {
 
-    String lockTenantBudget(@Param("tenantId") String tenantId);
+    String lockSubjectBudget(@Param("subjectId") String subjectId);
 
     BigDecimal sumDailyExposure(
-            @Param("tenantId") String tenantId,
+            @Param("subjectId") String subjectId,
             @Param("fromInclusive") Instant fromInclusive,
             @Param("toExclusive") Instant toExclusive);
 
@@ -34,5 +34,5 @@ public interface AiInvocationMapper {
             @Param("latencyMillis") long latencyMillis,
             @Param("completedAt") Instant completedAt);
 
-    AiInvocationRow selectByTenantAndId(@Param("tenantId") String tenantId, @Param("id") UUID id);
+    AiInvocationRow selectBySubjectAndId(@Param("subjectId") String subjectId, @Param("id") UUID id);
 }

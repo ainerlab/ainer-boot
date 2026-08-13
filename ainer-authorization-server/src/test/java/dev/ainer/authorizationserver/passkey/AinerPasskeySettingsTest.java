@@ -114,6 +114,6 @@ class AinerPasskeySettingsTest {
                 null,
                 new AinerAuthorizationServerProperties.Passkey(
                         true, rpId, "Ainer", allowedOrigins, allowInsecureHttp, ceremonyTimeout),
-                null, null, null, null, null, null, null, null);
+                null, null, null, null);
     }
 }

@@ -6,7 +6,6 @@ import java.util.UUID;
 
 public record WorkspaceAuthorizationAudit(
         UUID id,
-        String tenantId,
         UUID workspaceId,
         String actorSubjectId,
         String targetSubjectId,
@@ -17,7 +16,6 @@ public record WorkspaceAuthorizationAudit(
 
     public WorkspaceAuthorizationAudit {
         Objects.requireNonNull(id, "id");
-        tenantId = requireText(tenantId, "tenantId", 128);
         actorSubjectId = requireText(actorSubjectId, "actorSubjectId", 128);
         if (targetSubjectId != null) {
             targetSubjectId = requireText(targetSubjectId, "targetSubjectId", 128);

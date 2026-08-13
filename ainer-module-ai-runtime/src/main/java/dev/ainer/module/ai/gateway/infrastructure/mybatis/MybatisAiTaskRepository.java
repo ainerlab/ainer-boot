@@ -28,7 +28,6 @@ public class MybatisAiTaskRepository implements AiTaskRepository {
     public void insertTask(AiTask task) {
         AiTaskRow row = new AiTaskRow();
         row.setId(task.id());
-        row.setTenantId(task.tenantId());
         row.setWorkspaceId(task.workspaceId());
         row.setTaskType(task.taskType());
         row.setTargetIdentityId(task.targetIdentityId());
@@ -55,7 +54,6 @@ public class MybatisAiTaskRepository implements AiTaskRepository {
     public void insertContextSnapshot(ContextSnapshot snapshot) {
         AiContextSnapshotRow row = new AiContextSnapshotRow();
         row.setId(snapshot.id());
-        row.setTenantId(snapshot.tenantId());
         row.setIdentityId(snapshot.identityId());
         row.setIdentityVersionId(snapshot.identityVersionId());
         row.setEvidenceRefs(snapshot.evidenceRefsJson());
@@ -124,7 +122,7 @@ public class MybatisAiTaskRepository implements AiTaskRepository {
 
     private AiTask toTask(AiTaskRow row) {
         return new AiTask(
-                row.getId(), row.getTenantId(), row.getWorkspaceId(),
+                row.getId(), row.getWorkspaceId(),
                 row.getTaskType(), row.getTargetIdentityId(),
                 AiTaskStatus.valueOf(row.getStatus()),
                 row.getTrigger(), row.getTriggeredBy(),

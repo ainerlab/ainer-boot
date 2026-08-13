@@ -8,7 +8,7 @@
 
 - 非流式与 SSE 流式调用；
 - 默认模型和模型白名单；
-- 提示长度、常见密钥模式、租户速率和当日预算策略；
+- 提示长度、常见密钥模式、subject 速率和当日预算策略；
 - Token、费用、耗时、状态和策略审计；
 - 供应商超时、限流、不可用和协议错误的稳定映射；
 - 不保存 prompt 与输出正文。
@@ -34,8 +34,8 @@ AI runtime 默认关闭。生产环境至少提供：
 | `AINER_AI_ALLOWED_MODELS` | 逗号分隔的允许模型；必须包含默认模型 | 默认模型 |
 | `AINER_AI_CONNECT_TIMEOUT` | 建连超时 | `5s` |
 | `AINER_AI_REQUEST_TIMEOUT` | 单次请求超时 | `60s` |
-| `AINER_AI_REQUESTS_PER_MINUTE` | 每租户、每节点分钟限流 | `60` |
-| `AINER_AI_TENANT_DAILY_BUDGET` | 每租户 UTC 日预算 | `10.00` |
+| `AINER_AI_REQUESTS_PER_MINUTE` | 每 subject、每节点分钟限流 | `60` |
+| `AINER_AI_SUBJECT_DAILY_BUDGET` | 每 subject UTC 日预算 | `10.00` |
 | `AINER_AI_MAX_PROMPT_CHARACTERS` | 所有消息内容字符总上限 | `100000` |
 | `AINER_AI_CURRENCY` | 三位大写币种代码 | `USD` |
 | `AINER_AI_INPUT_PER_MILLION_TOKENS` | 每百万输入 Token 单价 | `0` |
@@ -103,7 +103,7 @@ GET /api/ai/invocations/{invocationId}
 Authorization: Bearer <access-token-with-ai.invoke-scope>
 ```
 
-查询按 JWT 中经过验证的 `tenant_id` 隔离。不存在或属于其他租户都返回 404，不返回 prompt fingerprint 与正文。客户端自报的 tenant/subject 请求头会被忽略。
+查询按已验证 typed principal 的 `sub` 隔离。不存在或属于其他 subject 都返回 404，不返回 prompt fingerprint 与正文。客户端自报的 subject 请求头会被忽略。
 
 ## 4. 策略顺序
 
@@ -113,8 +113,8 @@ Authorization: Bearer <access-token-with-ai.invoke-scope>
 模型白名单
   -> 提示字符上限
   -> 敏感凭据模式
-  -> 节点级租户分钟限流
-  -> PostgreSQL 租户日预算预占
+   -> 节点级 subject 分钟限流
+   -> PostgreSQL subject 日预算预占
   -> Provider
   -> 实际 Token/费用回写
 ```
@@ -129,7 +129,7 @@ Authorization: Bearer <access-token-with-ai.invoke-scope>
 | `AINER.AI.PROMPT_TOO_LARGE` | 413 | 提示字符总量超限 |
 | `AINER.AI.MODEL_NOT_ALLOWED` | 422 | 模型不在白名单 |
 | `AINER.AI.SENSITIVE_DATA_REJECTED` | 422 | 命中禁止出网的敏感模式 |
-| `AINER.AI.RATE_LIMITED` | 429 | 本节点租户分钟限流 |
+| `AINER.AI.RATE_LIMITED` | 429 | 本节点账户分钟限流 |
 | `AINER.AI.BUDGET_EXCEEDED` | 429 | PostgreSQL 权威日预算不足 |
 | `AINER.AI.PROVIDER_PROTOCOL_ERROR` | 502 | 供应商响应不符合协议 |
 | `AINER.AI.PROVIDER_RATE_LIMITED` / `PROVIDER_UNAVAILABLE` | 503 | 供应商限流或不可用 |
@@ -139,10 +139,10 @@ Authorization: Bearer <access-token-with-ai.invoke-scope>
 
 ## 6. 生产安全要求
 
-- AI 身份只允许来自 Resource Server 验证后的 `sub`、`tenant_id` 和 `ai.invoke` scope；不要在代理层重新发明身份请求头协议。
+- AI 身份只允许来自 Resource Server 验证后的 `USER_NEUTRAL_V1` typed `sub` 和 `ai.invoke` scope；不要在代理层重新发明身份请求头协议。
 - API key 使用 Vault/KMS/平台 secret，不写入 Git、镜像、日志或普通配置中心明文。
 - 默认敏感模式只拦截少量高风险 key/私钥格式，不能替代数据分类、DLP、prompt injection 防护和输出审查。
-- 多实例部署不能把当前 node-local limiter 当成全局限额；预算因共享 PostgreSQL 和租户 advisory lock 是数据库范围内的权威控制。
+- 多实例部署不能把当前 node-local limiter 当成全局限额；预算因共享 PostgreSQL 和 subject advisory lock 是数据库范围内的权威控制。
 - 监控 provider 超时、协议错误、estimated usage 比例、预算拒绝率与长时间 `STARTED` 记录。M2 尚未内置这些指标的完整 dashboard。
 - 不在日志中增加请求/响应 body。问题定位使用 `requestId`、`invocationId` 和 provider request ID。
 

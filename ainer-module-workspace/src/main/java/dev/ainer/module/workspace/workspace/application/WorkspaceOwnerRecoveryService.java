@@ -2,7 +2,6 @@ package dev.ainer.module.workspace.workspace.application;
 
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.module.workspace.workspace.domain.SubjectId;
-import dev.ainer.module.workspace.workspace.domain.TenantId;
 import dev.ainer.module.workspace.workspace.domain.Workspace;
 import dev.ainer.module.workspace.workspace.domain.WorkspaceMember;
 import dev.ainer.module.workspace.workspace.domain.WorkspaceRole;
@@ -43,7 +42,6 @@ public class WorkspaceOwnerRecoveryService {
     @Transactional
     public WorkspaceOwnerRecoveryRequest requestRecovery(
             String requesterServiceId,
-            TenantId tenantId,
             UUID workspaceId,
             SubjectId newOwnerSubjectId,
             String incidentReference,
@@ -52,10 +50,10 @@ public class WorkspaceOwnerRecoveryService {
         incidentReference = requireSafe(incidentReference);
         requireTtl(approvalTtl);
         Instant now = clock.instant();
-        recoveryRepository.expireOpenRequests(tenantId, workspaceId, now);
-        requireRecoverable(tenantId, workspaceId, newOwnerSubjectId);
+        recoveryRepository.expireOpenRequests(workspaceId, now);
+        requireRecoverable(workspaceId, newOwnerSubjectId);
         WorkspaceOwnerRecoveryRequest request = new WorkspaceOwnerRecoveryRequest(
-                UUID.randomUUID(), tenantId, workspaceId, newOwnerSubjectId,
+                UUID.randomUUID(), workspaceId, newOwnerSubjectId,
                 requesterServiceId, null, incidentReference, "REQUESTED",
                 now, now.plus(approvalTtl), null);
         recoveryRepository.insert(request);
@@ -65,9 +63,9 @@ public class WorkspaceOwnerRecoveryService {
 
     @Transactional
     public WorkspaceOwnerRecoveryRequest approveAndExecute(
-            String approverServiceId, TenantId tenantId, UUID requestId) {
+            String approverServiceId, UUID requestId) {
         approverServiceId = requireSafe(approverServiceId);
-        WorkspaceOwnerRecoveryRequest request = recoveryRepository.findForUpdate(tenantId, requestId)
+        WorkspaceOwnerRecoveryRequest request = recoveryRepository.findForUpdate(requestId)
                 .orElseThrow(() -> new BusinessException(WorkspaceErrorCode.OWNER_RECOVERY_NOT_FOUND));
         if (!"REQUESTED".equals(request.status())) {
             throw new BusinessException(WorkspaceErrorCode.OWNER_RECOVERY_CONFLICT);
@@ -80,32 +78,31 @@ public class WorkspaceOwnerRecoveryService {
             throw new BusinessException(WorkspaceErrorCode.OWNER_RECOVERY_EXPIRED);
         }
         WorkspaceMember target = requireRecoverable(
-                tenantId, request.workspaceId(), request.newOwnerSubjectId());
+                request.workspaceId(), request.newOwnerSubjectId());
         if (!memberRepository.promoteActiveMemberToOwner(
-                tenantId, request.workspaceId(), request.newOwnerSubjectId(), target.role(), now)
+                request.workspaceId(), request.newOwnerSubjectId(), target.role(), now)
                 || !recoveryRepository.markExecuted(request.id(), approverServiceId, now)) {
             throw new BusinessException(WorkspaceErrorCode.OWNER_RECOVERY_CONFLICT);
         }
         record(request, "EXECUTED", approverServiceId, now);
         return new WorkspaceOwnerRecoveryRequest(
-                request.id(), request.tenantId(), request.workspaceId(), request.newOwnerSubjectId(),
+                request.id(), request.workspaceId(), request.newOwnerSubjectId(),
                 request.requestedBy(), approverServiceId, request.incidentReference(), "EXECUTED",
                 request.requestedAt(), request.expiresAt(), now);
     }
 
     private WorkspaceMember requireRecoverable(
-            TenantId tenantId, UUID workspaceId, SubjectId newOwnerSubjectId) {
-        Objects.requireNonNull(tenantId, "tenantId");
+            UUID workspaceId, SubjectId newOwnerSubjectId) {
         Objects.requireNonNull(workspaceId, "workspaceId");
         Objects.requireNonNull(newOwnerSubjectId, "newOwnerSubjectId");
-        Workspace workspace = workspaceRepository.findByIdForUpdate(tenantId, workspaceId)
+        Workspace workspace = workspaceRepository.findByIdForUpdate(workspaceId)
                 .orElseThrow(() -> new BusinessException(WorkspaceErrorCode.OWNER_RECOVERY_NOT_FOUND));
-        if (memberRepository.hasActiveOwner(workspace.tenantId(), workspace.id())
-                || !memberRepository.hasRevokedOwner(workspace.tenantId(), workspace.id())) {
+        if (memberRepository.hasActiveOwner(workspace.id())
+                || !memberRepository.hasRevokedOwner(workspace.id())) {
             throw new BusinessException(WorkspaceErrorCode.OWNER_RECOVERY_NOT_REQUIRED);
         }
         WorkspaceMember target = memberRepository.findByWorkspaceAndSubject(
-                        workspace.tenantId(), workspace.id(), newOwnerSubjectId)
+                        workspace.id(), newOwnerSubjectId)
                 .filter(WorkspaceMember::isActive)
                 .orElseThrow(() -> new BusinessException(WorkspaceErrorCode.OWNER_RECOVERY_TARGET_NOT_ACTIVE));
         if (target.role() == WorkspaceRole.OWNER) {
@@ -120,7 +117,7 @@ public class WorkspaceOwnerRecoveryService {
             String actorServiceId,
             Instant occurredAt) {
         operationAuditRepository.insert(new WorkspaceSecurityOperationAudit(
-                UUID.randomUUID(), request.id(), request.tenantId(), request.workspaceId(),
+                UUID.randomUUID(), request.id(), request.workspaceId(),
                 request.newOwnerSubjectId(), "OWNER_RECOVERY", phase, actorServiceId,
                 request.incidentReference(), null, occurredAt));
     }

@@ -1,0 +1,14 @@
+schemaVersion: v1
+project:
+  name: Postgres Sample
+  groupId: dev.ainer.consumer
+  artifactId: pg-sample
+  version: 1.0.0
+spring-boot: 4.1.0
+ainner: 0.1.0
+java: 25
+package: dev.ainer.consumer.pg
+database: postgresql
+owner:
+  displayName: Ainer Team
+  email: team@example.com

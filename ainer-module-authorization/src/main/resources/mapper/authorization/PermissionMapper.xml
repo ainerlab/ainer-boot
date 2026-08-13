@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.authorization.infrastructure.PermissionMapper">
+
+    <resultMap id="PermissionRowMap" type="dev.ainer.authorization.infrastructure.PermissionRow">
+        <id property="code" column="code"/>
+        <result property="action" column="action"/>
+        <result property="resourceType" column="resource_type"/>
+        <result property="riskTier" column="risk_tier"/>
+        <result property="auditLevel" column="audit_level"/>
+        <result property="systemOnly" column="system_only"/>
+        <result property="agentDelegable" column="agent_delegable"/>
+        <result property="sourceModule" column="source_module"/>
+        <result property="definitionVersion" column="definition_version"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <insert id="upsert">
+        INSERT INTO ainer_authorization_permission (
+            code, action, resource_type, risk_tier, audit_level,
+            system_only, agent_delegable, source_module, definition_version,
+            created_at, updated_at
+        ) VALUES (
+            #{row.code}, #{row.action}, #{row.resourceType}, #{row.riskTier}, #{row.auditLevel},
+            #{row.systemOnly}, #{row.agentDelegable}, #{row.sourceModule}, #{row.definitionVersion},
+            #{now}, #{now}
+        )
+        ON CONFLICT (code) DO UPDATE SET
+            action = EXCLUDED.action,
+            resource_type = EXCLUDED.resource_type,
+            risk_tier = EXCLUDED.risk_tier,
+            audit_level = EXCLUDED.audit_level,
+            system_only = EXCLUDED.system_only,
+            agent_delegable = EXCLUDED.agent_delegable,
+            source_module = EXCLUDED.source_module,
+            definition_version = ainer_authorization_permission.definition_version + 1,
+            updated_at = EXCLUDED.updated_at
+    </insert>
+
+    <select id="selectAll" resultMap="PermissionRowMap">
+        SELECT code, action, resource_type, risk_tier, audit_level,
+               system_only, agent_delegable, source_module, definition_version,
+               created_at, updated_at
+        FROM ainer_authorization_permission
+        ORDER BY code
+    </select>
+
+</mapper>

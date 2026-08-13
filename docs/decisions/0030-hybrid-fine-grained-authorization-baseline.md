@@ -1,12 +1,34 @@
 # ADR-0030：通用混合细粒度授权基线
 
-- 状态：Proposed
-- 日期：2026-08-02
+- 状态：Superseded by [ADR-0037](0037-post-greenfield-authorization-baseline.md)（2026-08-11）
+- 日期：2026-08-02（Proposed）
 - 决策者：Ainer 项目维护者
 - 取代：无
 - 局部修订（接受后）：ADR-0005 决策 3、4，仅限 opt-in 通用授权端点的 tenant-optional 认证投影；
   现有 tenant-bound 用例不变
-- 被取代：无
+- 被取代：[ADR-0037](0037-post-greenfield-authorization-baseline.md)
+
+> ⚠️ **Greenfield 后状态注释（2026-08-11 复核）**
+>
+> 本 ADR 文本以 pre-Greenfield 的 tenant 模型为主（`credentialTenantId`、`TENANT(tenantId)`
+> scope、tenant-owned 资源、I0 切片的「allowlisted consumer client 无 tenant USER Token」）。
+> ADR-0033 Greenfield（Option B）已被接受为地基并完成 S1–S8 施工，**完全移除 tenant 概念**。
+> 当前 `ainer-module-authorization` 的实现已随之迁移到 Workspace 语义（`Scope.Workspace/Resource/Global`、
+> `workspace_id` 列）。
+>
+> 因此本 ADR 处于「决策文本与当前地基不一致」状态：
+> - **仍有效的核心决策**：grant-path 真值表、RBAC+ReBAC+ABAC 组合语义、默认拒绝、
+>   Permission/Role/Binding/Scope 分层、Spring Security 作为适配器而非策略源、审计数据最小化。
+> - **已被 Greenfield 推翻的前提**：任何 tenant 绑定、tenant-owned 资源、tenant-bound USER Token、
+>   tenant 成员关系作为授权事实的表述。
+>
+> 截至 2026-08-11，`ainer-module-authorization` 仅有部分原型实现，**未满足本 ADR「验收记录」段所列
+> 的任一验收项**。已核实的实现差距见 `docs/project-status.md` §3 差距清单（含 RESOURCE scope CHECK
+> 冲突、systemOnly PUBLIC 绕过、change/decision audit 零写入、决策器无生产装配、三应用未依赖授权
+> 模块、管理 API 缺防提权矩阵、无真实 JWT 端到端测试、外部 consumer 仅 PermissionCode 编译期 smoke）。
+>
+> 完整重述本 ADR（以 post-Greenfield Workspace 模型替换 tenant 表述）需新增取代 ADR，不在当前
+> 接手批次内完成。本 ADR 状态从 Accepted 回退为 Proposed，以如实反映「核心决策待重述、实现未达验收」。
 
 ## 背景
 

@@ -1,0 +1,44 @@
+# CODEOWNERS for ainer-boot.
+#
+# 每个领域默认由 @codefitx 审查。仓库当前为 private + GitHub 免费版，分支保护受计费限制
+# （HTTP 403）；此文件为 PR review 默认 reviewer 与未来多协作者领域归属服务。
+# 仓库可见性或计费变更后，在 GitHub 设置中启用 required review 即可生效。
+
+# 默认（所有未匹配路径）
+*                        @codefitx
+
+# 安全与身份
+ainer-framework/ainer-security/        @codefitx
+ainer-framework/ainer-starter-security/ @codefitx
+ainer-module-identity/                 @codefitx
+ainer-authorization-server/            @codefitx
+
+# 授权
+ainer-module-authorization/            @codefitx
+
+# 数据库与持久化
+ainer-framework/ainer-starter-persistence/ @codefitx
+docs/database*.md                      @codefitx
+
+# AI 网关
+ainer-module-ai-runtime/               @codefitx
+
+# Workspace
+ainer-module-workspace/                @codefitx
+
+# 构建与发布
+ainer-dependencies/                    @codefitx
+pom.xml                                @codefitx
+.github/workflows/                     @codefitx
+Dockerfile                             @codefitx
+docker-compose.yml                     @codefitx
+
+# Initializer
+ainer-initializer/                     @codefitx
+ainer-initializer-cli/                 @codefitx
+
+# 文档与决策
+docs/decisions/                        @codefitx
+docs/00-overview.md                    @codefitx
+docs/project-status.md                 @codefitx
+AGENTS.md                              @codefitx

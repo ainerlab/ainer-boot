@@ -12,8 +12,8 @@ import java.util.UUID;
 
 public final class AinerUserDetails implements UserDetails, CredentialsContainer {
 
-    private final UUID subjectId;
-    private final UUID tenantId;
+    private final UUID accountId;
+    private final long securityEpoch;
     private final String username;
     private String password;
     private final boolean enabled;
@@ -21,15 +21,15 @@ public final class AinerUserDetails implements UserDetails, CredentialsContainer
     private final List<GrantedAuthority> authorities;
 
     public AinerUserDetails(
-            UUID subjectId,
-            UUID tenantId,
+            UUID accountId,
+            long securityEpoch,
             String username,
             String password,
             boolean enabled,
             boolean accountNonLocked,
             Collection<? extends GrantedAuthority> authorities) {
-        this.subjectId = Objects.requireNonNull(subjectId, "subjectId");
-        this.tenantId = Objects.requireNonNull(tenantId, "tenantId");
+        this.accountId = Objects.requireNonNull(accountId, "accountId");
+        this.securityEpoch = securityEpoch;
         this.username = Objects.requireNonNull(username, "username");
         this.password = password;
         this.enabled = enabled;
@@ -37,12 +37,12 @@ public final class AinerUserDetails implements UserDetails, CredentialsContainer
         this.authorities = List.copyOf(authorities);
     }
 
-    public UUID subjectId() {
-        return subjectId;
+    public UUID accountId() {
+        return accountId;
     }
 
-    public UUID tenantId() {
-        return tenantId;
+    public long securityEpoch() {
+        return securityEpoch;
     }
 
     @Override

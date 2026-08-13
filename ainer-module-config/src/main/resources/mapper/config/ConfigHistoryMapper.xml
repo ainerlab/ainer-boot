@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.config.config.infrastructure.ConfigHistoryMapper">
+
+    <resultMap id="HistoryRowMap" type="dev.ainer.module.config.config.infrastructure.ConfigHistoryRow">
+        <id property="id" column="id"/>
+        <result property="entryId" column="entry_id"/>
+        <result property="namespace" column="namespace"/>
+        <result property="configKey" column="config_key"/>
+        <result property="oldValue" column="old_value"/>
+        <result property="newValue" column="new_value"/>
+        <result property="oldVersion" column="old_version"/>
+        <result property="newVersion" column="new_version"/>
+        <result property="changedByIssuer" column="changed_by_issuer"/>
+        <result property="changedByType" column="changed_by_type"/>
+        <result property="changedById" column="changed_by_id"/>
+        <result property="changedAt" column="changed_at"/>
+    </resultMap>
+
+    <insert id="insert">
+        INSERT INTO ainer_config_history (
+            id, entry_id, namespace, config_key, old_value, new_value, old_version, new_version,
+            changed_by_issuer, changed_by_type, changed_by_id, changed_at
+        ) VALUES (
+            #{row.id}, #{row.entryId}, #{row.namespace}, #{row.configKey},
+            #{row.oldValue}, #{row.newValue}, #{row.oldVersion}, #{row.newVersion},
+            #{row.changedByIssuer}, #{row.changedByType}, #{row.changedById}, #{row.changedAt}
+        )
+    </insert>
+
+    <select id="selectByEntryId" resultMap="HistoryRowMap">
+        SELECT id, entry_id, namespace, config_key, old_value, new_value, old_version, new_version,
+               changed_by_issuer, changed_by_type, changed_by_id, changed_at
+        FROM ainer_config_history
+        WHERE entry_id = #{entryId}
+        ORDER BY changed_at DESC, id DESC
+    </select>
+
+</mapper>

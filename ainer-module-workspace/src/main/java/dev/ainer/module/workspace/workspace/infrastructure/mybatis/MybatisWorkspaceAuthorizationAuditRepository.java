@@ -7,7 +7,6 @@ import dev.ainer.module.workspace.workspace.application.WorkspaceAuthorizationAu
 import dev.ainer.module.workspace.workspace.application.WorkspaceAuthorizationAuditPage;
 import dev.ainer.module.workspace.workspace.application.WorkspaceAuthorizationDecision;
 import dev.ainer.module.workspace.workspace.application.WorkspaceAuthorizationAuditRepository;
-import dev.ainer.module.workspace.workspace.domain.TenantId;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -28,7 +27,6 @@ public class MybatisWorkspaceAuthorizationAuditRepository
     public void insert(WorkspaceAuthorizationAudit audit) {
         WorkspaceAuthorizationAuditRow row = new WorkspaceAuthorizationAuditRow();
         row.setId(audit.id());
-        row.setTenantId(audit.tenantId());
         row.setWorkspaceId(audit.workspaceId());
         row.setActorSubjectId(audit.actorSubjectId());
         row.setTargetSubjectId(audit.targetSubjectId());
@@ -43,13 +41,13 @@ public class MybatisWorkspaceAuthorizationAuditRepository
 
     @Override
     public WorkspaceAuthorizationAuditPage findPage(
-            TenantId tenantId, UUID workspaceId, int page, int size, long offset) {
+            UUID workspaceId, int page, int size, long offset) {
         return new WorkspaceAuthorizationAuditPage(
-                mapper.selectPage(tenantId.value(), workspaceId, size, offset)
+                mapper.selectPage(workspaceId, size, offset)
                         .stream().map(this::toDomain).toList(),
                 page,
                 size,
-                mapper.count(tenantId.value(), workspaceId));
+                mapper.count(workspaceId));
     }
 
     @Override
@@ -59,9 +57,9 @@ public class MybatisWorkspaceAuthorizationAuditRepository
 
     @Override
     public List<WorkspaceAuthorizationAudit> exportAfter(
-            TenantId tenantId, WorkspaceAuthorizationAuditCursor cursor, int limit) {
+            UUID workspaceId, WorkspaceAuthorizationAuditCursor cursor, int limit) {
         return mapper.exportAfter(
-                        tenantId.value(),
+                        workspaceId,
                         cursor == null ? null : cursor.occurredAt(),
                         cursor == null ? null : cursor.id(),
                         limit)
@@ -79,7 +77,6 @@ public class MybatisWorkspaceAuthorizationAuditRepository
     private WorkspaceAuthorizationAudit toDomain(WorkspaceAuthorizationAuditRow row) {
         return new WorkspaceAuthorizationAudit(
                 row.getId(),
-                row.getTenantId(),
                 row.getWorkspaceId(),
                 row.getActorSubjectId(),
                 row.getTargetSubjectId(),

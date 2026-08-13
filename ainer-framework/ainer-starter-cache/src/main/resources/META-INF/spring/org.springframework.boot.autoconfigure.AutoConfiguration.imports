@@ -1,0 +1,2 @@
+dev.ainer.cache.autoconfigure.AinerLocalCacheAutoConfiguration
+dev.ainer.cache.autoconfigure.AinerRedisCacheAutoConfiguration

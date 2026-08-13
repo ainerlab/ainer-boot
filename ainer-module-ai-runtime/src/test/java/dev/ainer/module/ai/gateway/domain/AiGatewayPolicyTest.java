@@ -4,7 +4,7 @@ import dev.ainer.module.ai.AiRuntimeProperties;
 import dev.ainer.module.ai.gateway.policy.CostCalculator;
 import dev.ainer.module.ai.gateway.policy.PromptFingerprint;
 import dev.ainer.module.ai.gateway.policy.SensitiveDataPolicy;
-import dev.ainer.module.ai.gateway.policy.TenantRateLimiter;
+import dev.ainer.module.ai.gateway.policy.SubjectRateLimiter;
 import dev.ainer.module.ai.gateway.policy.TokenEstimator;
 import org.junit.jupiter.api.Test;
 
@@ -58,14 +58,14 @@ class AiGatewayPolicyTest {
     }
 
     @Test
-    void limitsRequestsPerTenantWithinTheMinuteWindow() {
-        TenantRateLimiter limiter = new TenantRateLimiter(
+    void limitsRequestsPerSubjectWithinTheMinuteWindow() {
+        SubjectRateLimiter limiter = new SubjectRateLimiter(
                 2, Clock.fixed(Instant.parse("2026-07-22T10:00:00Z"), ZoneOffset.UTC));
 
-        assertThat(limiter.tryAcquire("tenant-a")).isTrue();
-        assertThat(limiter.tryAcquire("tenant-a")).isTrue();
-        assertThat(limiter.tryAcquire("tenant-a")).isFalse();
-        assertThat(limiter.tryAcquire("tenant-b")).isTrue();
+        assertThat(limiter.tryAcquire("subject-a")).isTrue();
+        assertThat(limiter.tryAcquire("subject-a")).isTrue();
+        assertThat(limiter.tryAcquire("subject-a")).isFalse();
+        assertThat(limiter.tryAcquire("subject-b")).isTrue();
     }
 
     @Test

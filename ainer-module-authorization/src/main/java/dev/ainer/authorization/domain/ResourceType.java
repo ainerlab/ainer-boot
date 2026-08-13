@@ -3,7 +3,7 @@ package dev.ainer.authorization.domain;
 import java.util.Objects;
 
 /**
- * Stable resource type identifier (ADR-0030 §3.1), e.g. {@code tenant}, {@code merchant.listing},
+ * Stable resource type identifier (ADR-0030 §3.1), e.g. {@code workspace}, {@code merchant.listing},
  * {@code consumer.order}. Resource types and their relationships are owned by product/domain modules.
  */
 public record ResourceType(String value) {

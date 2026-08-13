@@ -122,11 +122,11 @@ public enum WorkspaceErrorCode implements ErrorCode {
 
 ## 8. 数据库
 
-- 表、字段、类型、约束、索引、tenant 完整性和 AI 数据设计必须遵守
+- 表、字段、类型、约束、索引、资源归属完整性和 AI 数据设计必须遵守
   [`database-design-standard.md`](database-design-standard.md)；本节只保留工程层速查。
 - PostgreSQL 是真实测试目标。
-- PostgreSQL 18 是唯一数据方言；新 Ainer 持久化 ID 默认 UUIDv7，`tenant_id` 全链路使用 UUID。
-  不为当前 UUIDv4/字符串 tenant 实现保留兼容模式。
+- PostgreSQL 18 是唯一数据方言；新 Ainer 持久化 ID 默认 UUIDv7，所有身份与资源归属键都是 UUID。
+  Greenfield（ADR-0033）后不再有 `tenant_id` claim，不为旧 tenant 实现保留兼容层。
 - migration 使用 `VyyyyMMddHHmm__description.sql`，一个文件做一件事；已发布 migration 不修改。
 - SQL 使用参数绑定。权限条件不得通过字符串拼接进入 SQL。
 - `CREATE INDEX CONCURRENTLY` 与事务 migration 分开执行。
@@ -135,14 +135,14 @@ public enum WorkspaceErrorCode implements ErrorCode {
   Wrapper、MyBatis-Plus Page 或 ORM 注解。
 - 简单单表 CRUD 与分页可以在 infrastructure 使用 `BaseMapper`、Wrapper 和 Page；不得默认
   继承 `IService` / `ServiceImpl`、使用 ActiveRecord 或生成通用 CRUD Controller。
-- CTE、锁、`RETURNING`、advisory lock、outbox、审计、稳定游标等复杂或安全敏感路径继续使用
+- CTE、锁、`RETURNING`、advisory lock、审计、稳定游标等复杂或安全敏感路径继续使用
   显式 Mapper 方法和 XML，不为统一框架 API 改写。
 - `ainer-starter-persistence` 只提供 MyBatis-Plus/MyBatis/Flyway/PostgreSQL/UUID 共性装配，
   不放业务 Row、Mapper、Repository 或 migration。
 - 全局 ID 类型使用 `IdType.AUTO`，让 PostgreSQL `DEFAULT uuidv7()` 生成并回填 ID；禁止使用
   `ASSIGN_ID` / `ASSIGN_UUID` 生成 Ainer 持久化身份。
-- tenant interceptor 当前不启用。Repository 与 SQL/Wrapper 必须显式绑定可信 tenant；未来即使
-  启用也只可作为纵深防御，不能替代授权。
+- 无 tenant 多租户拦截器。Repository 与 SQL/Wrapper 必须显式绑定可信资源归属键
+  （`workspace_id`/`account_id` 等）；未来即使引入拦截器也只可作为纵深防御，不能替代授权。
 - 不默认启用逻辑删除和 MetaObject 自动填充。分页固定 PostgreSQL 方言、`maxLimit=100`，且在
   interceptor 链尾。
 - PostgreSQL UUID 使用显式 TypeHandler 并以 `Types.OTHER` 绑定，不能假设驱动或框架自动完成转换。
@@ -157,29 +157,32 @@ public enum WorkspaceErrorCode implements ErrorCode {
 - 密钥来自 KMS/Vault/环境注入，不进入源码和默认 YAML。
 - 字段加密采用带认证的加密模式，每条记录使用唯一 nonce，并携带 key version。
 - 权限拒绝默认关闭，不能因为用户上下文缺失而静默放行。
-- 资源 tenant/owner 只来自 `AuthenticatedActor`，不能由请求体、查询参数或普通请求头指定。
-- 所有租户资源 Repository 方法和 SQL 必须显式接收并绑定 tenant；scope 不能替代资源成员关系与所有权校验。
-- 跨租户或非成员查询优先返回 404 防止资源枚举；已确认成员但操作权限不足返回 403。
-- 邀请记录不能直接获得资源访问权；目标主体必须使用同 tenant 的可信身份完成激活，授权查询只认 ACTIVE 成员。
+- 资源 owner 只来自 typed principal（`USER_NEUTRAL_V1` `sub` 是 HumanAccount、`SERVICE_V1` `sub`
+  是 ServicePrincipal），不能由请求体、查询参数或普通请求头指定。
+- 所有资源 Repository 方法和 SQL 必须显式接收并绑定资源归属键（`workspace_id` 等）；scope 不能
+  替代资源成员关系与所有权校验。
+- 非成员查询优先返回 404 防止资源枚举；已确认成员但操作权限不足返回 403。
+- 邀请记录不能直接获得资源访问权；目标主体必须使用本人可信身份完成激活，授权查询只认 ACTIVE 成员。
 - OWNER 的授予、降级和移除必须通过具有锁、回滚与数据库唯一约束的专用所有权用例，不能复用通用成员更新。
 - 高价值授权变更必须记录允许与拒绝决策。审计记录与业务访问日志分离；受保护写操作不能吞掉审计失败。
-- 审计查询必须有独立 scope、资源管理员校验以及 tenant/resource 双条件；读取审计本身也需要审计。
-- Identity Directory 只允许返回显式安全投影，禁止复用包含 password hash、锁定状态或 OAuth 协议字段的账号对象。
-- 跨运行时撤销使用同事务 outbox 与幂等消费者。普通 `@Async`/`@TransactionalEventListener` 不能单独承担不可丢失通知。
-- 自包含 JWT 不得被描述为数据库状态变化后立即失效；实时撤销必须有在线校验机制。
+- 审计查询必须有独立 scope、资源管理员校验以及资源绑定条件；读取审计本身也需要审计。
+- Identity 只允许返回显式安全投影，禁止复用包含 password hash、锁定状态或 OAuth 协议字段的账号对象。
+- 自包含 JWT 不得被描述为数据库状态变化后立即失效；账号撤销通过 `sec_epoch`/`security_epoch`
+  在线比对实时生效（`RevocationAwareOAuth2AuthorizationService`），普通 `@Async`/
+  `@TransactionalEventListener` 不能承担可靠撤销通知。
 
 ## 10. AI
 
 - 业务模块通过 `ModelProvider` / 应用服务等 Ainer 端口调用 AI，不直接依赖厂商 SDK或供应商 DTO。
-- 每次调用记录租户、主体、请求 ID、模型、Token/费用、耗时、状态和策略决策。
+- 每次调用记录主体（typed `sub`）、请求 ID、模型、Token/费用、耗时、状态和策略决策。
 - Prompt 和模型输出正文默认不落库、不写日志；只允许记录不可逆 fingerprint 与治理元数据。
 - Provider API key 只通过 secret 注入，默认 URL 必须为 HTTPS；原始供应商错误正文不得向外传播。
 - 流式调用必须有明确的最终 usage/完成语义；没有供应商 usage 时必须标记估算，不能伪装成实际计量。
 - 预算预占必须在调用 provider 前完成。集群级预算使用共享存储作为权威账本；进程内限流必须明确标注 node-local。
 - 价格是受控运维配置，必须记录币种与每百万输入/输出 Token 单价；不能把某个供应商的临时价格硬编码到领域层。
-- 外部 tenant/subject header 不能充当身份凭证；应用上下文最终来自已认证 principal 与可信租户解析。
+- 外部 subject header 不能充当身份凭证；应用上下文最终来自 Resource Server 验证后的 typed principal。
 - 工具必须声明权限、输入 schema、超时和幂等策略。
-- RAG 检索必须执行租户和资源权限过滤，不能在生成答案后再补权限。
+- RAG 检索必须执行资源权限过滤，不能在生成答案后再补权限。
 
 ## 11. 测试
 

@@ -1,6 +1,6 @@
 # Ainer 测试与质量门禁
 
-> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-07-31 · 适用版本：`0.1.x`
+> 文档类型：长期规范 · 状态：生效 · 最近核对：2026-08-07 · 适用版本：`0.1.x`
 
 ## 1. 目标
 
@@ -17,7 +17,7 @@
 | PostgreSQL integration | Flyway、MyBatis-Plus/MyBatis、约束、锁和事务回滚 | 各模块 `*IntegrationTest` |
 | Executable smoke | 发行物启动、健康端点和自动装配 | `AinerServerApplicationTest`、Authorization Server 集成测试 |
 
-新增能力至少覆盖正常路径、边界输入、权限拒绝和基础设施失败。并发所有权、预算扣减、outbox 等事务敏感行为必须在真实 PostgreSQL 上验证。
+新增能力至少覆盖正常路径、边界输入、权限拒绝和基础设施失败。并发所有权、预算扣减、撤销 epoch 等事务敏感行为必须在真实 PostgreSQL 上验证。
 
 ## 3. 标准命令
 
@@ -76,8 +76,20 @@ runtime 和 socket。最终仍以 Surefire 报告中的 `skipped=0` 为准，不
 
 修改 `ainer-starter-persistence`、MyBatis-Plus 或 JSqlParser 时，除完整 Reactor 外还必须执行
 starter 的真实 PostgreSQL 兼容测试，覆盖 `BaseMapper`、数据库 UUIDv7 生成键回填、自定义 XML、
-显式 tenant 条件和分页；既有锁、CTE、`RETURNING`、outbox 与审计 XML 也必须由所属模块集成
-测试回归。tenant interceptor、H2 或只检查应用上下文都不能替代这些门禁。
+显式资源归属 SQL 和分页；既有锁、CTE、`RETURNING` 与审计 XML 也必须由所属模块集成
+测试回归。H2 或只检查应用上下文都不能替代这些门禁。
+
+授权集合查询的 Golden Consumer 还必须在真实 PostgreSQL 18 上证明：产品 adapter 只接受
+`AuthorizedQueryPlan.Allowed<Q>` 的类型化约束，以 PreparedStatement 参数绑定资源归属和用户筛选，
+未授权 row 在 SQL 层排除；ALLOW 产品查询次数为 1、DENY 为 0，并以确定性代表夹具执行
+`EXPLAIN (ANALYZE, BUFFERS)`。测试规模的索引计划只属于工程回归证据，不得外推生产容量或延迟；
+生产 Repository 仍需按真实基数、倾斜和分页重新验收。
+
+Binding 撤销回归必须复用撤销前已经签发的同一序列化 JWT，经真实 Resource Server 验签和管理 API
+撤销 PostgreSQL Binding；下一次受保护业务写必须重新查询授权事实、返回 403 且不新增产品 effect。
+高价值写的 ALLOW/DENY 决策都要在 effect 前成功落审计，DENY 即使使业务事务回滚也必须保留。
+仓内 test-scope 产品路径只能证明模块请求时重评估，不替代外部消费者、跨实例传播或生产授权失效
+SLA 验收。
 
 出现 Testcontainers 失败时依次检查：
 
@@ -96,29 +108,30 @@ starter 的真实 PostgreSQL 兼容测试，覆盖 `BaseMapper`、数据库 UUID
 - `X-Request-Id` 与响应 `requestId`；
 - 未知异常不泄露堆栈、SQL、密钥或供应商正文。
 
-### 安全与租户
+### 安全与资源
 
 - 无 Token、无效签名、issuer/audience 不匹配；
-- 缺失 `sub` 或 `tenant_id`；
+- 缺失 `sub`、错误 `token_profile` 或错误 `claim_contract_version`；
 - scope 允许但资源成员关系拒绝；
-- 跨 tenant 读取、更新和审计查询被拒绝；
+- 跨 Workspace 读取、更新和审计查询被拒绝；
 - OWNER、PENDING/ACTIVE/REVOKED、禁用和撤销状态转换；
-- 服务与人员 `actor_type` 隔离、tenant-bound 与平台级 Directory scope；
-- outbox lease owner/过期、重试上限、发布确认和耗尽指标；
-- 事件重复、乱序、跨 tenant、后建 membership 保护和消费事务回滚。
-- 重放与 OWNER 恢复的 request/approve scope 分离、不同 SERVICE `sub`、tenant 二次绑定、过期和重复审批拒绝；
+- 服务与人员 `token_profile` 隔离、精确 scope 与 claim 版本约束；
+- 重放与 OWNER 恢复的 request/approve scope 分离、不同 SERVICE `sub`、过期和重复审批拒绝；
 - OWNER 恢复必须保留原 REVOKED OWNER，存在 ACTIVE OWNER 或目标非 ACTIVE 时失败关闭；
 - 内部控制面默认关闭，SERVICE/USER、最小 scope 和精确 trusted subject 拒绝路径。
 - 低风险请求不得调用 introspection；每次高风险请求都必须在线校验且不缓存 active；
 - inactive 返回 401，在线依赖失败返回 503，二者都不能泄漏 Token 或原始响应；
-- introspection client 必须显式受信、只有 `token.introspect`，携带 tenant、业务 scope 或普通 client 身份时拒绝；
-- RFC 7009 撤销后 inactive；Identity user/tenant/membership 非 ACTIVE 与 `issuedAt <= latestRevokedAt` 均 inactive，事件后新 Token 可恢复。
-- `/actuator/prometheus` 无 Token 401，USER、tenant-bound SERVICE 与缺 `platform.metrics.read` 403，只有 tenantless SERVICE 成功；业务 Resource Server 显式关闭时也不得公开指标。
-- metrics bootstrap 只能创建无 tenant、单一 `platform.metrics.read`、一分钟 Token 的 Client Credentials client，不得带 introspection 标记，并验证幂等与弱 secret 失败关闭。
+- introspection client 必须显式受信、只有 `token.introspect`，携带业务 scope 或普通 client 身份时拒绝；
+- RFC 7009 撤销后 inactive；账号/主体禁用或 `sec_epoch` 不匹配均 inactive；
+- `/actuator/prometheus` 无 Token 401，USER、缺 `platform.metrics.read` 403，只有最小 scope 的
+  SERVICE 成功；业务 Resource Server 显式关闭时也不得公开指标。
+- metrics bootstrap 只能创建无业务 scope、单一 `platform.metrics.read`、一分钟 Token 的 Client
+  Credentials client，不得带 introspection 标记，并验证幂等与弱 secret 失败关闭。
 - Authorization Code public client 必须强制 PKCE S256，覆盖 cookie/CSRF 登录、授权码单次交换、
   错误 verifier、缺失/`plain` challenge 和未注册 redirect URI；
-- public client 不得出现 refresh token；人员 access token 必须包含稳定 `sub`、`tenant_id` 与
-  `roles`，JDBC authorization 不得保存 password 属性或凭证。
+- public client 不得出现 refresh token；人员 access token 必须包含稳定 `sub`（HumanAccount UUID）、
+  `token_profile=USER_NEUTRAL_V1`、`claim_contract_version=1` 与 `roles`，JDBC authorization
+  不得保存 password 属性或凭证。
 - 品牌 `GET /login` 必须由服务端生成 CSRF、保持 SavedRequest，并覆盖 normal、凭据错误、
   HTTP 429 和认证基础设施 HTTP 503 四种状态；普通认证失败不得区分未知账号与错误密码，
   不得回显用户名、密码或底层异常。
@@ -131,42 +144,19 @@ starter 的真实 PostgreSQL 兼容测试，覆盖 `BaseMapper`、数据库 UUID
   ACTIVE Passkey 时仅密码不得取得 authorization code；
 - Passkey 协议记录、ACTIVE 生命周期和 REGISTERED 审计同事务；计数器/last-used 更新不产生
   重复登记审计；replacement 后旧凭证软撤销，并发撤销不能移除最后一个 ACTIVE 凭证。
-- 恢复/enrollment 管理端必须把目标 `(tenant_id, subject_id)` 绑定到 ACTIVE default Identity membership，
-  跨 tenant 目标即使 subject 存在也必须拒绝；登录限流 HTTP 429 使用统一 envelope、`Retry-After`
+- Passkey 恢复/enrollment 管理端必须把目标 `account_id` 绑定到当前 ACTIVE HumanAccount，不能借
+  外部 subject 头推断归属；登录限流 HTTP 429 使用统一 envelope、`Retry-After`
   与 no-store，并且只匹配配置的 POST 路径。
 - step-up 对匿名请求保留 Resource Server 401，对 SERVICE、缺/旧 `auth_time`、缺强因子和超出
   clock skew 的未来时间返回稳定 403；边界时间使用可注入 `Clock`。
-- tenant 成员管理 HTTP/应用/真实 PostgreSQL 测试必须覆盖 USER scope + ACTIVE OWNER/ADMIN、
-  SERVICE/MEMBER/跨 tenant 拒绝、OWNER 不可由通用接口修改、重激活和同事务审计。
-- 平台 Identity 预配必须覆盖 tenantless SERVICE、tenant/user 成对 read/write scope、精确
-  operator 白名单、缺失 `Idempotency-Key`、相同摘要重放与不同摘要冲突、tenant code 并发预留、
-  已有 ACTIVE/非 ACTIVE 用户、惰性过期、与首租户 bootstrap 的共享锁，以及核心
-  tenant/user/membership 零污染。
-- 预配 HTTP 成功与错误响应必须 `no-store`，不得返回 request fingerprint、幂等键、密码、激活
-  Token 或 secret；request 与 phase audit 必须同事务，数据库 schema 也不得出现认证明文列。
-- 新用户激活必须覆盖：outbox 密文可由正确 key version 解密、数据库只存 secret 摘要、错误 secret
-  尝试跨事务持久化、达到上限锁定、过期、成功单次消费、重放 401、用户本人设置的密码哈希，以及
-  tenant/user/默认 OWNER/状态/审计任一步失败时整体回滚。
-- 已有用户接受必须覆盖：通知不含激活材料、匿名 401、缺 scope/SERVICE/错误 subject 403、目标
-  ACTIVE USER 成功、不会复制 user、不会覆盖原默认 tenant，新 OWNER membership 为非默认。
-- notification relay 必须覆盖租约领取、provider 失败延迟重试、正确 key rotation 读取、
-  tamper/未知 key 拒绝、成功确认后 `PUBLISHED`、payload 销毁和最大尝试后不再自动领取；HTTP
-  合约还必须覆盖独立 Client Credentials Bearer、稳定 `Idempotency-Key`、版本化 envelope、
-  已有用户无 secret 投影、HTTPS/URI 失败关闭和下游鉴权拒绝。测试 publisher 不得把明文打印到
-  日志。
-- notification receipt 必须覆盖独立 tenantless SERVICE credential、专用 write scope、精确 gateway
-  client 白名单、默认关闭与空白名单失败关闭；HTTP 负向矩阵包含匿名、错误 scope、tenant-bound
-  SERVICE 和未知 gateway client。只有 `PUBLISHED` notification 可登记，`DELIVERED` 不得有
-  failure code，`FAILED` 必须有受限稳定码，未来时间只允许五分钟 clock skew。
-- receipt 幂等测试必须覆盖相同 gateway event 重放、同 notification 的不同 event 但相同终态、
-  相同事件不同内容和矛盾终态；前两者返回原事实且不重复计数，后两者返回 409。数据库 schema
-  必须证明不存在正文、联系地址、secret、Token 或供应商原始 body 列。
-- 平台显式取消必须覆盖成对 write scope、精确 operator、`REQUESTED -> CANCELLED`、重复调用
-  幂等、新用户 grant 同步取消、已有用户无 grant、预期 grant 缺失时整笔回滚、通知 payload
-  销毁，以及取消 `changeReference` 只进入唯一阶段审计。
-- 平台 tenant/user 分页必须覆盖各自独立 read scope、tenantless SERVICE、白名单、`page >= 1`、
-  `size <= 100`、稳定排序和正确 total；HTTP 响应不得出现 password hash、OAuth secret、激活
-  材料或通知目标，尚未激活的 reservation 不得混入核心列表。
+- Workspace HTTP/应用/真实 PostgreSQL 测试必须覆盖 scope + ACTIVE OWNER/ADMIN、USER/MEMBER/
+  跨 Workspace 拒绝、OWNER 不可由通用接口修改、邀请接受只认 `sub` 和同事务审计。
+- Identity foundation 测试必须覆盖 HumanAccount/ServicePrincipal 的状态与 `security_epoch`
+  单调约束、`sec_epoch` claim 与账号状态联合判定（禁用即时 401），以及 SERVICE 门禁对
+  `actor_type`/`token_profile`/`claim_contract_version` 的失败关闭。
+- browser client 控制面测试必须覆盖 SERVICE operator 白名单、`oauth.browser-clients.manage`
+  最小 scope、PKCE 强制、无 secret 投影、蓝绿轮换、退役后新 Token 401 与
+  `CREATED/ROTATED/RETIRED` 同事务审计。
 
 ### 数据与事务
 
@@ -174,11 +164,11 @@ starter 的真实 PostgreSQL 兼容测试，覆盖 `BaseMapper`、数据库 UUID
 - 唯一、外键、check constraint 和索引支持预期行为；
 - 事务中的第二步失败时完整回滚；
 - 重复请求或重复事件具有定义好的幂等结果；
-- tenant 条件存在于查询与更新，而不只存在于 Controller。
-- 耗尽重放保留原 event ID/内容/发生时间，仅重置可重试状态，且原 receipt 幂等不失效；
+- 资源归属条件存在于查询与更新，而不只存在于 Controller。
+- OWNER 恢复申请保留原 REVOKED OWNER、原申请 ID/发生时间，重复审批不重复提升；
 - 归档的插入与热表删除在一事务中，反复执行不丢数、统一查询不重数；
 - SIEM 以 `(occurredAt, id)` 稳定升序续传，跨热/归档边界不漏读，消费者可按 audit ID 去重；
-- 撤销传播 Timer 只记录首次成功消费，重复 receipt 不重复计时，负时钟偏差按 0 处理。
+- `findByToken` 在线检查在账号禁用或 `sec_epoch` 不匹配时立即 inactive，撤销不依赖进程内事件。
 
 ### AI provider
 
@@ -209,12 +199,22 @@ AINER_REPRO_REPOSITORY="$(mktemp -d)"
 ```
 
 两次构建使用同一个隔离本地仓库，避免既有缓存成为参考。consumer 脚本必须证明 Maven 4 与
-系统 Maven 3.9+ 外部项目都能只通过 BOM 和公开坐标完成构建；同时检查 14 个标准 Consumer
+系统 Maven 3.9+ 外部项目都能只通过 BOM 和公开坐标完成构建；同时检查 23 个标准 Consumer
 POM 中的 `${revision}` 都有当前安装版本属性可解析，并检查 `ainer-spring` JAR 含
-`META-INF/spring-configuration-metadata.json`。这些门禁是发布前本地/自动化要求，不表示当前已经
-存在正式制品仓库发布流程。候选 CI 已编排上述命令，但在 Maven 4 RC6 官方持久发行包可下载并首次
-完整成功前，不能称为生效的正式 CI。脚本默认读取根 POM 的 `revision`；发布过程通过
-`AINER_VERSION=<目标版本>` 覆盖时，该值也会作为 `-Drevision` 传给两次生产者构建和两个
-consumer。
+`META-INF/spring-configuration-metadata.json`。脚本中的独立授权 Golden Consumer 还必须在两套 Maven
+下真实执行 JUnit：由外部项目定义产品 Permission/policy/query constraint，调用
+`AuthorizationService` 与 `DefaultQueryAuthorizationPlanner`，并强制 Surefire 报告为 1 test、零
+failure/error/skipped。这些门禁是本地/自动化工程要求；消费本地 SNAPSHOT 不表示已经存在正式制品
+仓库发布流程，也不替代真实产品的参数化 SQL、row/字段投影与关系矩阵。候选 CI 已编排并至少成功
+执行过上述命令；最新提交是否具备远端结果、以及分支保护是否把它设为必需检查，以
+[`project-status.md`](project-status.md) 的当前记录为准。脚本默认读取根 POM 的 `revision`；发布过程通过
+`AINER_VERSION=<目标版本>` 覆盖。默认 `AINER_ARTIFACT_SOURCE=local` 会在隔离仓库构建 producer；
+`AINER_ARTIFACT_SOURCE=remote` 则要求 non-SNAPSHOT 版本和 `AINER_MAVEN_SETTINGS`，Maven 3、Maven 4
+分别从空本地仓库解析远端制品，禁止借用 reactor install 作为远端消费证据。
 
-此外还必须确认：数据库测试未因 Docker 缺失而跳过、两个可执行发行物均能启动、Flyway 从空库成功、升级 migration 在备份副本成功、关键鉴权与健康检查通过。M4.2 还要在可运行 Testcontainers 的环境执行双人审批、锁定重检、归档回滚和游标边界集成测试。M4.3 还要在真实 PostgreSQL 上执行 Authorization Server 协议 smoke，证明专用/普通 introspection client 隔离、active、RFC 7009 撤销和 Identity epoch，并用接近真实规模数据检查 epoch 查询计划；M4.5 还要执行真实浏览器 HTTP 会话的 PKCE S256 正反门禁，并检查 JDBC authorization 不落凭证。M4.6 当前还必须执行 Passkey options、条件门禁、虚拟 authenticator 签名 ceremony、恢复/enrollment、登录限流和 step-up 门禁；M6 品牌登录发布候选还必须用真实 Chromium 验证四种合同状态的桌面/移动布局、axe-core、CSRF/SavedRequest、通用错误语义和精确静态代理。在宣称生产 MFA 前，必须另补主流真实设备的 registration/authentication、丢失/被盗/同步凭证、恢复通知和多节点 session 验证。M4.7 还要执行 tenant 成员管理的真实 PostgreSQL + Bearer HTTP 正反门禁，并确认 API 与 migration 只存在于 Identity 权威运行时。M4.8A 必须执行平台预配与激活的真实 PostgreSQL 并发、Bearer HTTP 正反门禁、默认关闭/错误配置、operator bootstrap、通知重试、终态回执幂等/冲突、过期/回放和无孤儿 ACTIVE tenant 测试；本机临时 schema smoke 只能补充 DDL/事务验证，不能替代发布候选环境中 0 skipped 的完整 Testcontainers 门禁。真实送达声明还必须使用真实外部网关与供应商沙箱或正式通道，覆盖 credential、供应商事件映射、重放和失败演练；本地 stub、数据库回执或合成 `DELIVERED` 都不能替代。生产可观测性切片还要用独立 metrics client 抓取两个真实 exporter，并验证多节点、Token endpoint/数据库故障和告警路由。当前验证快照见 [`project-status.md`](project-status.md)。
+授权端点适配器的发布门禁不能只直接实例化 manager。至少要用真实 Servlet Web、真实签名 JWT 和
+真实 HTTP 验证：匹配 scope/policy 的 `@AinerAuthorize` handler 在 controller 前放行；缺 scope
+返回统一 403 且 controller effect 不发生；无 Bearer Token 返回 401；未注解 endpoint 不被该
+interceptor 接管。资源级业务写仍需单独验证 application-service 授权、审计和撤权后同 Token 失效。
+
+此外还必须确认：数据库测试未因 Docker 缺失而跳过、两个可执行发行物均能启动、Flyway 从空库成功、升级 migration 在备份副本成功、关键鉴权与健康检查通过。M4.2 还要在可运行 Testcontainers 的环境执行双人审批、锁定重检、归档回滚和游标边界集成测试。M4.3 还要在真实 PostgreSQL 上执行 Authorization Server 协议 smoke，证明专用/普通 introspection client 隔离、active、RFC 7009 撤销和 Identity `sec_epoch`，并用接近真实规模数据检查 epoch 查询计划；M4.5 还要执行真实浏览器 HTTP 会话的 PKCE S256 正反门禁，并检查 JDBC authorization 不落凭证。M4.6 当前还必须执行 Passkey options、条件门禁、虚拟 authenticator 签名 ceremony、恢复/enrollment、登录限流和 step-up 门禁；M6 品牌登录发布候选还必须用真实 Chromium 验证四种合同状态的桌面/移动布局、axe-core、CSRF/SavedRequest、通用错误语义和精确静态代理。在宣称生产 MFA 前，必须另补主流真实设备的 registration/authentication、丢失/被盗/同步凭证、恢复通知和多节点 session 验证。生产可观测性切片还要用独立 metrics client 抓取两个真实 exporter，并验证多节点、Token endpoint/数据库故障和告警路由。当前验证快照见 [`project-status.md`](project-status.md)。

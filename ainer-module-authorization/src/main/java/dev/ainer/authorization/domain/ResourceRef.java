@@ -7,11 +7,11 @@ import java.util.UUID;
 
 /**
  * Reference to a concrete resource targeted by an authorization request (ADR-0030 §4.6, §6.2).
- * {@code authoritativeTenantId} is non-null for tenant-owned resources and may be null only for explicit
- * platform-global resources; tenant-owned resources never use a nullable tenant to bypass scope checks.
+ * {@code workspaceId} is an optional access-context fact. Product ownership/home remains authoritative in
+ * the owning module and is not reconstructed from this reference.
  */
 public record ResourceRef(
-        @Nullable UUID authoritativeTenantId,
+        @Nullable UUID workspaceId,
         ResourceType resourceType,
         UUID resourceId) {
 

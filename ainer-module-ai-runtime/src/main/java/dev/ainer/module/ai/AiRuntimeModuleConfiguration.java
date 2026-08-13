@@ -9,7 +9,7 @@ import dev.ainer.module.ai.gateway.infrastructure.openai.OpenAiCompatibleModelPr
 import dev.ainer.module.ai.gateway.policy.CostCalculator;
 import dev.ainer.module.ai.gateway.policy.PromptFingerprint;
 import dev.ainer.module.ai.gateway.policy.SensitiveDataPolicy;
-import dev.ainer.module.ai.gateway.policy.TenantRateLimiter;
+import dev.ainer.module.ai.gateway.policy.SubjectRateLimiter;
 import dev.ainer.module.ai.gateway.policy.TokenEstimator;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -78,9 +78,9 @@ public class AiRuntimeModuleConfiguration {
     }
 
     @Bean
-    TenantRateLimiter aiTenantRateLimiter(AiRuntimeProperties properties, Clock clock) {
+    SubjectRateLimiter aiSubjectRateLimiter(AiRuntimeProperties properties, Clock clock) {
         properties.validate();
-        return new TenantRateLimiter(properties.getLimits().getRequestsPerMinute(), clock);
+        return new SubjectRateLimiter(properties.getLimits().getRequestsPerMinute(), clock);
     }
 
     // 仅用于 AI SSE 流式任务，按名显式注入；标记 defaultCandidate=false 避免被当作 Boot 通用

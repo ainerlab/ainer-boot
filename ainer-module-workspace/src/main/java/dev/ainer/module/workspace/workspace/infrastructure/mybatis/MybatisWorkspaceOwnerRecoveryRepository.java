@@ -5,7 +5,6 @@ import dev.ainer.module.workspace.workspace.application.WorkspaceOwnerRecoveryRe
 import dev.ainer.module.workspace.workspace.application.WorkspaceErrorCode;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.module.workspace.workspace.domain.SubjectId;
-import dev.ainer.module.workspace.workspace.domain.TenantId;
 import org.springframework.stereotype.Repository;
 import org.springframework.dao.DuplicateKeyException;
 
@@ -23,15 +22,14 @@ public class MybatisWorkspaceOwnerRecoveryRepository implements WorkspaceOwnerRe
     }
 
     @Override
-    public void expireOpenRequests(TenantId tenantId, UUID workspaceId, Instant now) {
-        mapper.expireOpenRequests(tenantId.value(), workspaceId, now);
+    public void expireOpenRequests(UUID workspaceId, Instant now) {
+        mapper.expireOpenRequests(workspaceId, now);
     }
 
     @Override
     public void insert(WorkspaceOwnerRecoveryRequest request) {
         WorkspaceOwnerRecoveryRequestRow row = new WorkspaceOwnerRecoveryRequestRow();
         row.setId(request.id());
-        row.setTenantId(request.tenantId().value());
         row.setWorkspaceId(request.workspaceId());
         row.setNewOwnerSubjectId(request.newOwnerSubjectId().value());
         row.setRequestedBy(request.requestedBy());
@@ -51,8 +49,8 @@ public class MybatisWorkspaceOwnerRecoveryRepository implements WorkspaceOwnerRe
     }
 
     @Override
-    public Optional<WorkspaceOwnerRecoveryRequest> findForUpdate(TenantId tenantId, UUID requestId) {
-        return Optional.ofNullable(mapper.selectForUpdate(tenantId.value(), requestId))
+    public Optional<WorkspaceOwnerRecoveryRequest> findForUpdate(UUID requestId) {
+        return Optional.ofNullable(mapper.selectForUpdate(requestId))
                 .map(this::toDomain);
     }
 
@@ -63,7 +61,7 @@ public class MybatisWorkspaceOwnerRecoveryRepository implements WorkspaceOwnerRe
 
     private WorkspaceOwnerRecoveryRequest toDomain(WorkspaceOwnerRecoveryRequestRow row) {
         return new WorkspaceOwnerRecoveryRequest(
-                row.getId(), new TenantId(row.getTenantId()), row.getWorkspaceId(),
+                row.getId(), row.getWorkspaceId(),
                 new SubjectId(row.getNewOwnerSubjectId()), row.getRequestedBy(), row.getApprovedBy(),
                 row.getIncidentReference(), row.getStatus(), row.getRequestedAt(),
                 row.getExpiresAt(), row.getExecutedAt());

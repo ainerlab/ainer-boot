@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.config.config.infrastructure.ConfigEntryMapper">
+
+    <resultMap id="EntryRowMap" type="dev.ainer.module.config.config.infrastructure.ConfigEntryRow">
+        <id property="id" column="id"/>
+        <result property="namespace" column="namespace"/>
+        <result property="configKey" column="config_key"/>
+        <result property="configValue" column="config_value"/>
+        <result property="valueType" column="value_type"/>
+        <result property="isSecret" column="is_secret"/>
+        <result property="encryptedValue" column="encrypted_value"/>
+        <result property="description" column="description"/>
+        <result property="version" column="version"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="entryColumns">
+        id, namespace, config_key, config_value, value_type, is_secret, encrypted_value,
+        description, version, created_at, updated_at
+    </sql>
+
+    <select id="insertReturningId" resultType="java.util.UUID">
+        INSERT INTO ainer_config_entry (
+            id, namespace, config_key, config_value, value_type, is_secret, encrypted_value,
+            description, version, created_at, updated_at
+        ) VALUES (
+            #{row.id}, #{row.namespace}, #{row.configKey}, #{row.configValue}, #{row.valueType},
+            #{row.isSecret}, #{row.encryptedValue}, #{row.description}, #{row.version}, #{now}, #{now}
+        )
+        RETURNING id
+    </select>
+
+    <select id="selectByNamespaceAndKey" resultMap="EntryRowMap">
+        SELECT <include refid="entryColumns"/>
+        FROM ainer_config_entry
+        WHERE namespace = #{namespace} AND config_key = #{key}
+    </select>
+
+    <select id="selectByNamespace" resultMap="EntryRowMap">
+        SELECT <include refid="entryColumns"/>
+        FROM ainer_config_entry
+        WHERE namespace = #{namespace}
+        ORDER BY config_key
+    </select>
+
+    <update id="updateValue">
+        UPDATE ainer_config_entry
+        SET config_value = #{configValue},
+            encrypted_value = #{encryptedValue},
+            version = #{newVersion},
+            updated_at = #{now}
+        WHERE id = #{id} AND version = #{expectedVersion}
+    </update>
+
+</mapper>

@@ -13,7 +13,7 @@
 
     <artifactId>ainer-module-authorization</artifactId>
     <name>Ainer Module Authorization</name>
-    <description>Generic hybrid fine-grained authorization domain contracts and pure decision core (ADR-0030/0031)</description>
+    <description>Generic hybrid fine-grained authorization domain contracts, pure decision core and PostgreSQL persistence (ADR-0030/0031)</description>
 
     <dependencies>
         <dependency>
@@ -21,10 +21,42 @@
             <artifactId>ainer-core</artifactId>
         </dependency>
         <dependency>
+            <groupId>dev.ainer</groupId>
+            <artifactId>ainer-security</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.jspecify</groupId>
             <artifactId>jspecify</artifactId>
         </dependency>
+        <dependency>
+            <groupId>dev.ainer</groupId>
+            <artifactId>ainer-starter-persistence</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>dev.ainer</groupId>
+            <artifactId>ainer-starter-web</artifactId>
+        </dependency>
+        <!-- Spring Security adapter（spring/ 子包）：AuthorizationManager/RequestAuthorizationContext/AuthorizationResult。
+             仅 spring/ 子包使用；domain/policy/catalog/application 保持 Spring-free（ArchUnit 守护）。 -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-web</artifactId>
+        </dependency>
 
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -33,6 +65,32 @@
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>dev.ainer</groupId>
+            <artifactId>ainer-test-support</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 真实签名 JWT 端到端测试：resource-server auto-config + NimbusJwtDecoder/SignedJWT -->
+        <dependency>
+            <groupId>dev.ainer</groupId>
+            <artifactId>ainer-starter-security</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

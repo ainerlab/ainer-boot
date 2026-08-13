@@ -9,6 +9,15 @@
     <version>${revision}</version>
     <packaging>pom</packaging>
     <name>Ainer Dependencies</name>
+    <description>Version alignment for Ainer Boot framework, starters and modules</description>
+    <url>https://github.com/ainerlab/ainer-boot</url>
+
+    <scm>
+        <connection>scm:git:https://github.com/ainerlab/ainer-boot.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/ainerlab/ainer-boot.git</developerConnection>
+        <tag>HEAD</tag>
+        <url>https://github.com/ainerlab/ainer-boot</url>
+    </scm>
 
     <!-- The BOM is deliberately parentless so the root project can import it without a model cycle. -->
     <properties>
@@ -22,6 +31,8 @@
         <maven.install.plugin.version>3.1.4</maven.install.plugin.version>
         <maven.deploy.plugin.version>3.1.4</maven.deploy.plugin.version>
         <maven.enforcer.plugin.version>3.6.2</maven.enforcer.plugin.version>
+        <maven.gpg.plugin.version>3.2.7</maven.gpg.plugin.version>
+        <gpg.skip>false</gpg.skip>
     </properties>
 
     <dependencyManagement>
@@ -66,6 +77,16 @@
             </dependency>
             <dependency>
                 <groupId>dev.ainer</groupId>
+                <artifactId>ainer-starter-cache</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.ainer</groupId>
+                <artifactId>ainer-test-support</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.ainer</groupId>
                 <artifactId>ainer-module-identity</artifactId>
                 <version>${revision}</version>
             </dependency>
@@ -82,6 +103,31 @@
             <dependency>
                 <groupId>dev.ainer</groupId>
                 <artifactId>ainer-module-authorization</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.ainer</groupId>
+                <artifactId>ainer-module-dictionary</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.ainer</groupId>
+                <artifactId>ainer-module-config</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.ainer</groupId>
+                <artifactId>ainer-module-notification</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.ainer</groupId>
+                <artifactId>ainer-initializer</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.ainer</groupId>
+                <artifactId>ainer-initializer-cli</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
@@ -148,6 +194,11 @@
                     <artifactId>maven-deploy-plugin</artifactId>
                     <version>${maven.deploy.plugin.version}</version>
                 </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-gpg-plugin</artifactId>
+                    <version>${maven.gpg.plugin.version}</version>
+                </plugin>
             </plugins>
         </pluginManagement>
         <plugins>
@@ -176,4 +227,39 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>sign-release-bom</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <skip>${gpg.skip}</skip>
+                            <keyname>${gpg.keyname}</keyname>
+                            <bestPractices>true</bestPractices>
+                            <passphraseEnvName>MAVEN_GPG_PASSPHRASE</passphraseEnvName>
+                            <useAgent>false</useAgent>
+                            <gpgArguments>
+                                <arg>--batch</arg>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

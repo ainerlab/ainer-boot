@@ -6,7 +6,6 @@ import java.util.UUID;
 
 public record AiTask(
         UUID id,
-        UUID tenantId,
         UUID workspaceId,
         String taskType,
         UUID targetIdentityId,
@@ -19,7 +18,6 @@ public record AiTask(
 
     public AiTask {
         Objects.requireNonNull(id, "id");
-        Objects.requireNonNull(tenantId, "tenantId");
         Objects.requireNonNull(taskType, "taskType");
         Objects.requireNonNull(status, "status");
         Objects.requireNonNull(trigger, "trigger");

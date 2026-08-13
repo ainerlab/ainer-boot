@@ -18,15 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Passkey 恢复码签发与自助赎回。见 ADR-0015。
- *
- * <p>签发：在已验证的浏览器会话里生成一组高熵一次性码，明文只返回一次，数据库只保存 bcrypt
- * 哈希；新签发会令上一组 ACTIVE 码失效。赎回：密码登录本人提交一枚明文码，校验通过则吊销该
- * subject 全部 ACTIVE Passkey（越过最后凭证保护），用户随后可重新 bootstrap。
- *
- * <p>失败次数按 subject 累计；超过上限后该组恢复码锁定，只能走管理员双人恢复。
- */
+/** Account-scoped Passkey recovery codes. Plaintext is returned only at issuance. */
 public final class AinerPasskeyRecoveryCodeService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -34,9 +26,7 @@ public final class AinerPasskeyRecoveryCodeService {
     private static final int CODE_BYTES = 15;
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final Duration LOCKOUT_DURATION = Duration.ofMinutes(15);
-    // 去掉易混字符（0/O/1/I/L）的 32 字符表
-    private static final char[] ALPHABET =
-            "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
+    private static final char[] ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
 
     private final JdbcTemplate jdbcTemplate;
     private final PasswordEncoder passwordEncoder;
@@ -57,19 +47,18 @@ public final class AinerPasskeyRecoveryCodeService {
         this.clock = clock;
     }
 
-    public RecoveryCodeIssuance issue(UUID tenantId, UUID subjectId) {
-        Assert.notNull(tenantId, "tenantId cannot be null");
-        Assert.notNull(subjectId, "subjectId cannot be null");
+    public RecoveryCodeIssuance issueForAccount(UUID accountId) {
+        Assert.notNull(accountId, "accountId cannot be null");
         return transactionTemplate.execute(status -> {
             Instant now = clock.instant();
-            UUID operationId = UUID.randomUUID();
+            UUID operationId = nextUuidV7();
             jdbcTemplate.update(
                     """
                     UPDATE ainer_passkey_recovery_code
                     SET status = 'SUPERSEDED', used_at = ?
-                    WHERE subject_id = ? AND status = 'ACTIVE'
+                    WHERE account_id = ? AND status = 'ACTIVE'
                     """,
-                    Timestamp.from(now), subjectId);
+                    Timestamp.from(now), accountId);
             List<String> plaintextCodes = new ArrayList<>(CODE_COUNT);
             for (int i = 0; i < CODE_COUNT; i++) {
                 String plaintext = generateCode();
@@ -77,40 +66,34 @@ public final class AinerPasskeyRecoveryCodeService {
                 jdbcTemplate.update(
                         """
                         INSERT INTO ainer_passkey_recovery_code(
-                            id, subject_id, tenant_id, code_hash, status, issued_at, used_at
-                        ) VALUES (?, ?, ?, ?, 'ACTIVE', ?, NULL)
+                            id, account_id, code_hash, status, issued_at, used_at
+                        ) VALUES (?, ?, ?, 'ACTIVE', ?, NULL)
                         """,
-                        UUID.randomUUID(), subjectId, tenantId,
-                        passwordEncoder.encode(plaintext), Timestamp.from(now));
+                        nextUuidV7(), accountId, passwordEncoder.encode(plaintext), Timestamp.from(now));
             }
-            securityAudit(operationId, tenantId, subjectId,
-                    "RECOVERY_CODE_ISSUED", "ISSUED", "USER", subjectId.toString(), null, now);
+            securityAudit(operationId, accountId, "RECOVERY_CODE_ISSUED", "ISSUED", "USER", now);
             return new RecoveryCodeIssuance(operationId, List.copyOf(plaintextCodes));
         });
     }
 
-    /**
-     * 赎回一枚明文恢复码。成功返回 true（已吊销全部 ACTIVE Passkey 并写审计）；
-     * 码不匹配返回 false；锁定中抛 {@link PasskeyErrorCode#RECOVERY_LOCKED_OUT}。
-     */
-    public boolean redeem(UUID tenantId, UUID subjectId, String plaintextCode) {
-        Assert.notNull(subjectId, "subjectId cannot be null");
+    public boolean redeemForAccount(UUID accountId, String plaintextCode) {
+        Assert.notNull(accountId, "accountId cannot be null");
         Assert.hasText(plaintextCode, "plaintextCode cannot be empty");
         return transactionTemplate.execute(status -> {
             Instant now = clock.instant();
-            if (isLocked(subjectId, now)) {
+            if (isLocked(accountId, now)) {
                 throw new BusinessException(PasskeyErrorCode.RECOVERY_LOCKED_OUT);
             }
             List<RecoveryCodeRow> activeCodes = jdbcTemplate.query(
                     """
                     SELECT id, code_hash
                     FROM ainer_passkey_recovery_code
-                    WHERE subject_id = ? AND status = 'ACTIVE'
+                    WHERE account_id = ? AND status = 'ACTIVE'
                     FOR UPDATE
                     """,
                     (resultSet, rowNumber) -> new RecoveryCodeRow(
                             resultSet.getString("id"), resultSet.getString("code_hash")),
-                    subjectId);
+                    accountId);
             UUID matchedId = null;
             for (RecoveryCodeRow code : activeCodes) {
                 if (passwordEncoder.matches(plaintextCode, code.codeHash())) {
@@ -119,7 +102,7 @@ public final class AinerPasskeyRecoveryCodeService {
                 }
             }
             if (matchedId == null) {
-                registerFailedAttempt(tenantId, subjectId, now);
+                registerFailedAttempt(accountId, now);
                 return false;
             }
             jdbcTemplate.update(
@@ -129,64 +112,61 @@ public final class AinerPasskeyRecoveryCodeService {
                     WHERE id = ? AND status = 'ACTIVE'
                     """,
                     Timestamp.from(now), matchedId);
-            // 成功后清空失败计数
-            jdbcTemplate.update(
-                    "DELETE FROM ainer_passkey_recovery_lockout WHERE subject_id = ?", subjectId);
-            int revoked = credentialRepository.revokeAllActiveForSubject(subjectId);
-            UUID operationId = UUID.randomUUID();
-            securityAudit(operationId, tenantId, subjectId,
-                    "SELF_RECOVERY", "REDEEMED", "USER", subjectId.toString(), null, now);
+            jdbcTemplate.update("DELETE FROM ainer_passkey_recovery_lockout WHERE account_id = ?", accountId);
+            credentialRepository.revokeAllActiveForAccount(accountId);
+            securityAudit(nextUuidV7(), accountId, "SELF_RECOVERY", "REDEEMED", "USER", now);
             return true;
         });
     }
 
-    private boolean isLocked(UUID subjectId, Instant now) {
+    private boolean isLocked(UUID accountId, Instant now) {
         List<Timestamp> lockedUntil = jdbcTemplate.query(
-                "SELECT locked_until FROM ainer_passkey_recovery_lockout WHERE subject_id = ?",
-                (resultSet, rowNumber) -> resultSet.getTimestamp("locked_until"),
-                subjectId);
+                "SELECT locked_until FROM ainer_passkey_recovery_lockout WHERE account_id = ?",
+                (resultSet, rowNumber) -> resultSet.getTimestamp("locked_until"), accountId);
         return !lockedUntil.isEmpty()
                 && lockedUntil.getFirst() != null
                 && lockedUntil.getFirst().toInstant().isAfter(now);
     }
 
-    private void registerFailedAttempt(UUID tenantId, UUID subjectId, Instant now) {
+    private void registerFailedAttempt(UUID accountId, Instant now) {
         Integer attempts = jdbcTemplate.queryForObject(
                 """
                 INSERT INTO ainer_passkey_recovery_lockout(
-                    subject_id, tenant_id, failed_attempts, locked_until, updated_at
-                ) VALUES (?, ?, 1, NULL, ?)
-                ON CONFLICT (subject_id) DO UPDATE
+                    account_id, failed_attempts, locked_until, updated_at
+                ) VALUES (?, 1, NULL, ?)
+                ON CONFLICT (account_id) DO UPDATE
                     SET failed_attempts = ainer_passkey_recovery_lockout.failed_attempts + 1,
                         updated_at = EXCLUDED.updated_at
                 RETURNING failed_attempts
                 """,
-                Integer.class, subjectId, tenantId, Timestamp.from(now));
+                Integer.class, accountId, Timestamp.from(now));
         if (attempts != null && attempts >= MAX_FAILED_ATTEMPTS) {
             jdbcTemplate.update(
                     """
                     UPDATE ainer_passkey_recovery_lockout
                     SET locked_until = ?, updated_at = ?
-                    WHERE subject_id = ? AND locked_until IS NULL
+                    WHERE account_id = ? AND locked_until IS NULL
                     """,
-                    Timestamp.from(now.plus(LOCKOUT_DURATION)), Timestamp.from(now), subjectId);
+                    Timestamp.from(now.plus(LOCKOUT_DURATION)), Timestamp.from(now), accountId);
         }
     }
 
     private void securityAudit(
-            UUID operationId, UUID tenantId, UUID subjectId,
-            String operationType, String phase,
-            String actorType, String actorId, String incidentReference, Instant occurredAt) {
+            UUID operationId, UUID accountId, String operationType, String phase,
+            String actorType, Instant occurredAt) {
         jdbcTemplate.update(
                 """
                 INSERT INTO ainer_passkey_security_operation_audit(
-                    id, operation_id, tenant_id, subject_id, operation_type, phase,
+                    id, operation_id, account_id, operation_type, phase,
                     actor_type, actor_id, incident_reference, request_id, occurred_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
                 """,
-                UUID.randomUUID(), operationId, tenantId, subjectId, operationType, phase,
-                actorType, actorId, incidentReference, MDC.get(RequestIdFilter.MDC_KEY),
-                Timestamp.from(occurredAt));
+                nextUuidV7(), operationId, accountId, operationType, phase, actorType,
+                accountId.toString(), MDC.get(RequestIdFilter.MDC_KEY), Timestamp.from(occurredAt));
+    }
+
+    private UUID nextUuidV7() {
+        return jdbcTemplate.queryForObject("SELECT uuidv7()", UUID.class);
     }
 
     private static String generateCode() {

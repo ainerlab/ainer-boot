@@ -47,13 +47,12 @@ class AinerTokenIntrospectionAuthenticationProviderTest {
     }
 
     @Test
-    void trustedClientCannotCarryTenantOrBusinessScopes() {
+    void trustedClientCannotCarryBusinessScopes() {
         AtomicInteger delegateCalls = new AtomicInteger();
         AinerTokenIntrospectionAuthenticationProvider provider = new AinerTokenIntrospectionAuthenticationProvider(
                 trackingDelegate(delegateCalls));
 
-        assertInvalidClient(provider, request(client(true, true, false)));
-        assertInvalidClient(provider, request(client(true, false, true)));
+        assertInvalidClient(provider, request(client(true, true)));
         assertThat(delegateCalls).hasValue(0);
     }
 
@@ -88,13 +87,12 @@ class AinerTokenIntrospectionAuthenticationProviderTest {
     }
 
     private RegisteredClient client(boolean introspectionAllowed) {
-        return client(introspectionAllowed, false, false);
+        return client(introspectionAllowed, false);
     }
 
     private RegisteredClient client(
             boolean introspectionAllowed,
-            boolean businessScope,
-            boolean tenantBound) {
+            boolean businessScope) {
         RegisteredClient.Builder client = RegisteredClient.withId(UUID.randomUUID().toString())
                 .clientId("introspection-client")
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
@@ -107,9 +105,6 @@ class AinerTokenIntrospectionAuthenticationProviderTest {
                         .setting(
                                 AinerAuthorizationServerConfiguration.CLIENT_INTROSPECTION_ALLOWED_SETTING,
                                 introspectionAllowed);
-        if (tenantBound) {
-            settings.setting(AinerAuthorizationServerConfiguration.CLIENT_TENANT_SETTING, "tenant:test");
-        }
         return client.clientSettings(settings.build()).build();
     }
 }

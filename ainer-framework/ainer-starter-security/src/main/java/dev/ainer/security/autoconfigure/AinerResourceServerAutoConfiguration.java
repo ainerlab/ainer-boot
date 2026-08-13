@@ -3,10 +3,12 @@ package dev.ainer.security.autoconfigure;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.core.error.ErrorCodeContributor;
 import dev.ainer.security.AinerSecurityScopes;
-import dev.ainer.security.actor.AuthenticatedActorResolver;
 import dev.ainer.security.authorization.PrometheusEndpointRequestMatcher;
-import dev.ainer.security.authorization.TenantlessServiceScopeAuthorizationManager;
+import dev.ainer.security.authorization.ServiceScopeAuthorizationManager;
 import dev.ainer.security.error.AinerSecurityErrorCode;
+import dev.ainer.security.token.AuthenticatedPrincipalResolver;
+import dev.ainer.security.token.ReferenceTokenProfileResolver;
+import dev.ainer.security.token.TokenProfileResolver;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -43,9 +45,16 @@ import java.util.List;
 public class AinerResourceServerAutoConfiguration {
 
     @Bean
-    @ConditionalOnMissingBean
-    public AuthenticatedActorResolver authenticatedActorResolver(AinerResourceServerProperties properties) {
-        return new SecurityContextAuthenticatedActorResolver(properties);
+    @ConditionalOnMissingBean(TokenProfileResolver.class)
+    public TokenProfileResolver tokenProfileResolver() {
+        return new ReferenceTokenProfileResolver();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(AuthenticatedPrincipalResolver.class)
+    public AuthenticatedPrincipalResolver authenticatedPrincipalResolver(
+            TokenProfileResolver tokenProfileResolver) {
+        return new SecurityContextAuthenticatedPrincipalResolver(tokenProfileResolver);
     }
 
     @Bean
@@ -128,7 +137,7 @@ public class AinerResourceServerAutoConfiguration {
 
         http.authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(new PrometheusEndpointRequestMatcher(environment))
-                        .access(new TenantlessServiceScopeAuthorizationManager(
+                        .access(new ServiceScopeAuthorizationManager(
                                 AinerSecurityScopes.PLATFORM_METRICS_READ))
                         .requestMatchers(publicPaths).permitAll()
                         .anyRequest().authenticated())

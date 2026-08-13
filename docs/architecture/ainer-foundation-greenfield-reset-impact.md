@@ -3,6 +3,7 @@
 ## Document Status
 
 - 状态：Accepted impact plan（Stage 0 决策门已于 2026-08-04 通过；执行仍按 Stage 1–8 gated，不授权立即改代码）
+- 执行计划：S1.2 加法脊柱已落地（`reset@900d7cb`），破坏性 cutover 的有序施工清单见 [0033-greenfield-cutover-plan.md](0033-greenfield-cutover-plan.md)
 - 日期：2026-08-03（初稿）· 2026-08-04（Stage 0 通过）
 - 决策来源：[ADR-0033 Greenfield：Account、Workspace、Subject 与 Isolation 基线](../decisions/0033-account-workspace-subject-isolation-greenfield-baseline.md)
 - 性质：开发阶段 baseline reset 影响分析；不是 production migration runbook

@@ -15,7 +15,6 @@ import java.util.UUID;
  */
 public final class GovernedAiExecutionContextBuilder {
 
-    private UUID tenantId;
     private UUID workspaceId;
     private String actorType;
     private String actorId;
@@ -34,7 +33,6 @@ public final class GovernedAiExecutionContextBuilder {
 
     public static GovernedAiExecutionContextBuilder from(GovernedAiExecutionContext ctx) {
         GovernedAiExecutionContextBuilder b = new GovernedAiExecutionContextBuilder();
-        b.tenantId = ctx.tenantId();
         b.workspaceId = ctx.workspaceId();
         b.actorType = ctx.actorType();
         b.actorId = ctx.actorId();
@@ -90,7 +88,7 @@ public final class GovernedAiExecutionContextBuilder {
 
     public GovernedAiExecutionContext build() {
         return new GovernedAiExecutionContext(
-                tenantId, workspaceId, actorType, actorId, memberId,
+                workspaceId, actorType, actorId, memberId,
                 identityId, identityVersionId, purpose, taskType, scopes,
                 dataScope, dataClassification, entitlementPolicyVersion,
                 retentionPolicy, traceId, requestId);

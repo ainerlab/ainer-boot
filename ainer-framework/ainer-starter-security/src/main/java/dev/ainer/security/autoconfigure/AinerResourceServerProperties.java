@@ -13,7 +13,6 @@ public class AinerResourceServerProperties {
 
     private final boolean enabled;
     private final String subjectClaim;
-    private final String tenantClaim;
     private final OnlineValidation onlineValidation;
     private final StepUp stepUp;
     private final List<String> publicPaths;
@@ -21,13 +20,11 @@ public class AinerResourceServerProperties {
     public AinerResourceServerProperties(
             boolean enabled,
             String subjectClaim,
-            String tenantClaim,
             OnlineValidation onlineValidation,
             StepUp stepUp,
             List<String> publicPaths) {
         this.enabled = enabled;
         this.subjectClaim = subjectClaim != null ? subjectClaim : "sub";
-        this.tenantClaim = tenantClaim != null ? tenantClaim : "tenant_id";
         this.onlineValidation = onlineValidation != null
                 ? onlineValidation
                 : new OnlineValidation(false, null, null, null, null, null, false, null, null, null);
@@ -43,10 +40,6 @@ public class AinerResourceServerProperties {
 
     public String getSubjectClaim() {
         return subjectClaim;
-    }
-
-    public String getTenantClaim() {
-        return tenantClaim;
     }
 
     public OnlineValidation getOnlineValidation() {

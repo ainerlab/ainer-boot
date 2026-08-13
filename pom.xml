@@ -11,6 +11,14 @@
 
     <name>Ainer Boot</name>
     <description>AI-native enterprise application platform based on Spring Boot 4</description>
+    <url>https://github.com/ainerlab/ainer-boot</url>
+
+    <scm>
+        <connection>scm:git:https://github.com/ainerlab/ainer-boot.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/ainerlab/ainer-boot.git</developerConnection>
+        <tag>HEAD</tag>
+        <url>https://github.com/ainerlab/ainer-boot</url>
+    </scm>
 
     <modules>
         <module>ainer-dependencies</module>
@@ -19,9 +27,14 @@
         <module>ainer-module-workspace</module>
         <module>ainer-module-ai-runtime</module>
         <module>ainer-module-authorization</module>
+        <module>ainer-module-dictionary</module>
+        <module>ainer-module-config</module>
+        <module>ainer-module-notification</module>
         <module>ainer-server</module>
         <module>ainer-authorization-server</module>
         <module>ainer-offstate-app</module>
+        <module>ainer-initializer</module>
+        <module>ainer-initializer-cli</module>
     </modules>
 
     <properties>
@@ -43,6 +56,11 @@
         <maven.artifact.plugin.version>3.6.1</maven.artifact.plugin.version>
         <maven.enforcer.plugin.version>3.6.2</maven.enforcer.plugin.version>
         <maven.surefire.plugin.version>3.5.3</maven.surefire.plugin.version>
+        <maven.source.plugin.version>3.3.1</maven.source.plugin.version>
+        <maven.javadoc.plugin.version>3.12.0</maven.javadoc.plugin.version>
+        <maven.gpg.plugin.version>3.2.7</maven.gpg.plugin.version>
+        <gpg.skip>false</gpg.skip>
+        <maven.shade.plugin.version>3.6.0</maven.shade.plugin.version>
         <openapi.generator.maven.plugin.version>7.24.0</openapi.generator.maven.plugin.version>
     </properties>
 
@@ -129,6 +147,31 @@
                     <version>${maven.artifact.plugin.version}</version>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>${maven.source.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>${maven.javadoc.plugin.version}</version>
+                    <configuration>
+                        <release>${maven.compiler.release}</release>
+                        <doclint>none</doclint>
+                        <notimestamp>true</notimestamp>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-gpg-plugin</artifactId>
+                    <version>${maven.gpg.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <version>${maven.shade.plugin.version}</version>
+                </plugin>
+                <plugin>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <version>${spring.boot.version}</version>
@@ -161,4 +204,65 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>sign-release-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <skip>${gpg.skip}</skip>
+                            <keyname>${gpg.keyname}</keyname>
+                            <bestPractices>true</bestPractices>
+                            <passphraseEnvName>MAVEN_GPG_PASSPHRASE</passphraseEnvName>
+                            <useAgent>false</useAgent>
+                            <gpgArguments>
+                                <arg>--batch</arg>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

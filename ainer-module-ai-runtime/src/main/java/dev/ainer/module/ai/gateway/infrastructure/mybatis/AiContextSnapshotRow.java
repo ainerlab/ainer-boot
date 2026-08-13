@@ -5,7 +5,6 @@ import java.util.UUID;
 
 public class AiContextSnapshotRow {
     private UUID id;
-    private UUID tenantId;
     private UUID identityId;
     private UUID identityVersionId;
     private String evidenceRefs;
@@ -16,8 +15,6 @@ public class AiContextSnapshotRow {
 
     public UUID getId() { return id; }
     public void setId(UUID v) { this.id = v; }
-    public UUID getTenantId() { return tenantId; }
-    public void setTenantId(UUID v) { this.tenantId = v; }
     public UUID getIdentityId() { return identityId; }
     public void setIdentityId(UUID v) { this.identityId = v; }
     public UUID getIdentityVersionId() { return identityVersionId; }

@@ -7,7 +7,6 @@ import dev.ainer.module.workspace.workspace.application.WorkspaceRepository;
 import dev.ainer.module.workspace.workspace.domain.Workspace;
 import dev.ainer.module.workspace.workspace.domain.WorkspaceName;
 import dev.ainer.module.workspace.workspace.domain.SubjectId;
-import dev.ainer.module.workspace.workspace.domain.TenantId;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 
@@ -37,7 +36,6 @@ public class MybatisWorkspaceRepository implements WorkspaceRepository {
     @Override
     public boolean update(Workspace workspace, long expectedVersion) {
         return mapper.updateName(
-                workspace.tenantId().value(),
                 workspace.id(),
                 workspace.name().value(),
                 workspace.updatedAt(),
@@ -45,30 +43,28 @@ public class MybatisWorkspaceRepository implements WorkspaceRepository {
     }
 
     @Override
-    public Optional<Workspace> findById(TenantId tenantId, UUID id) {
-        return Optional.ofNullable(mapper.selectById(tenantId.value(), id)).map(this::toDomain);
+    public Optional<Workspace> findById(UUID id) {
+        return Optional.ofNullable(mapper.selectById(id)).map(this::toDomain);
     }
 
     @Override
-    public Optional<Workspace> findByIdForUpdate(TenantId tenantId, UUID id) {
-        return Optional.ofNullable(mapper.selectByIdForUpdate(tenantId.value(), id)).map(this::toDomain);
+    public Optional<Workspace> findByIdForUpdate(UUID id) {
+        return Optional.ofNullable(mapper.selectByIdForUpdate(id)).map(this::toDomain);
     }
 
     @Override
-    public WorkspacePage findPage(
-            TenantId tenantId, SubjectId subjectId, int page, int size, long offset) {
+    public WorkspacePage findPage(SubjectId subjectId, int page, int size, long offset) {
         return new WorkspacePage(
-                mapper.selectPage(tenantId.value(), subjectId.value(), size, offset)
+                mapper.selectPage(subjectId.value(), size, offset)
                         .stream().map(this::toDomain).toList(),
                 page,
                 size,
-                mapper.count(tenantId.value(), subjectId.value()));
+                mapper.count(subjectId.value()));
     }
 
     private WorkspaceRow toRow(Workspace workspace) {
         WorkspaceRow row = new WorkspaceRow();
         row.setId(workspace.id());
-        row.setTenantId(workspace.tenantId().value());
         row.setName(workspace.name().value());
         row.setVersion(workspace.version());
         row.setCreatedAt(workspace.createdAt());
@@ -79,7 +75,6 @@ public class MybatisWorkspaceRepository implements WorkspaceRepository {
     private Workspace toDomain(WorkspaceRow row) {
         return new Workspace(
                 row.getId(),
-                new TenantId(row.getTenantId()),
                 new WorkspaceName(row.getName()),
                 row.getVersion(),
                 row.getCreatedAt(),

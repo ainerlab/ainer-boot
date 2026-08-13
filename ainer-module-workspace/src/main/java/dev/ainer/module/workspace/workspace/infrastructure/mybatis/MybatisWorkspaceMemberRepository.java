@@ -7,7 +7,6 @@ import dev.ainer.module.workspace.workspace.domain.WorkspaceMember;
 import dev.ainer.module.workspace.workspace.domain.WorkspaceMemberStatus;
 import dev.ainer.module.workspace.workspace.domain.WorkspaceRole;
 import dev.ainer.module.workspace.workspace.domain.SubjectId;
-import dev.ainer.module.workspace.workspace.domain.TenantId;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 
@@ -37,67 +36,64 @@ public class MybatisWorkspaceMemberRepository implements WorkspaceMemberReposito
 
     @Override
     public Optional<WorkspaceMember> findByWorkspaceAndSubject(
-            TenantId tenantId, UUID workspaceId, SubjectId subjectId) {
+            UUID workspaceId, SubjectId subjectId) {
         return Optional.ofNullable(mapper.selectByWorkspaceAndSubject(
-                        tenantId.value(), workspaceId, subjectId.value()))
+                        workspaceId, subjectId.value()))
                 .map(this::toDomain);
     }
 
     @Override
     public boolean activatePending(
-            TenantId tenantId, UUID workspaceId, SubjectId subjectId, Instant activatedAt) {
+            UUID workspaceId, SubjectId subjectId, Instant activatedAt) {
         return mapper.activatePending(
-                tenantId.value(), workspaceId, subjectId.value(), activatedAt) == 1;
+                workspaceId, subjectId.value(), activatedAt) == 1;
     }
 
     @Override
     public boolean updateRole(
-            TenantId tenantId,
             UUID workspaceId,
             SubjectId subjectId,
             WorkspaceRole expectedRole,
             WorkspaceRole newRole,
             Instant updatedAt) {
         return mapper.updateRole(
-                tenantId.value(), workspaceId, subjectId.value(), expectedRole, newRole, updatedAt) == 1;
+                workspaceId, subjectId.value(), expectedRole, newRole, updatedAt) == 1;
     }
 
     @Override
-    public boolean deleteNonOwner(TenantId tenantId, UUID workspaceId, SubjectId subjectId) {
-        return mapper.deleteNonOwner(tenantId.value(), workspaceId, subjectId.value()) == 1;
+    public boolean deleteNonOwner(UUID workspaceId, SubjectId subjectId) {
+        return mapper.deleteNonOwner(workspaceId, subjectId.value()) == 1;
     }
 
     @Override
     public boolean demoteOwner(
-            TenantId tenantId, UUID workspaceId, SubjectId ownerSubjectId, Instant updatedAt) {
+            UUID workspaceId, SubjectId ownerSubjectId, Instant updatedAt) {
         return mapper.demoteOwner(
-                tenantId.value(), workspaceId, ownerSubjectId.value(), updatedAt) == 1;
+                workspaceId, ownerSubjectId.value(), updatedAt) == 1;
     }
 
     @Override
     public boolean promoteActiveMemberToOwner(
-            TenantId tenantId,
             UUID workspaceId,
             SubjectId subjectId,
             WorkspaceRole expectedRole,
             Instant updatedAt) {
         return mapper.promoteActiveMemberToOwner(
-                tenantId.value(), workspaceId, subjectId.value(), expectedRole, updatedAt) == 1;
+                workspaceId, subjectId.value(), expectedRole, updatedAt) == 1;
     }
 
     @Override
-    public boolean hasActiveOwner(TenantId tenantId, UUID workspaceId) {
-        return mapper.hasActiveOwner(tenantId.value(), workspaceId);
+    public boolean hasActiveOwner(UUID workspaceId) {
+        return mapper.hasActiveOwner(workspaceId);
     }
 
     @Override
-    public boolean hasRevokedOwner(TenantId tenantId, UUID workspaceId) {
-        return mapper.hasRevokedOwner(tenantId.value(), workspaceId);
+    public boolean hasRevokedOwner(UUID workspaceId) {
+        return mapper.hasRevokedOwner(workspaceId);
     }
 
     private WorkspaceMemberRow toRow(WorkspaceMember member) {
         WorkspaceMemberRow row = new WorkspaceMemberRow();
-        row.setTenantId(member.tenantId().value());
         row.setWorkspaceId(member.workspaceId());
         row.setSubjectId(member.subjectId().value());
         row.setRole(member.role().name());
@@ -111,7 +107,6 @@ public class MybatisWorkspaceMemberRepository implements WorkspaceMemberReposito
 
     private WorkspaceMember toDomain(WorkspaceMemberRow row) {
         return new WorkspaceMember(
-                new TenantId(row.getTenantId()),
                 row.getWorkspaceId(),
                 new SubjectId(row.getSubjectId()),
                 WorkspaceRole.valueOf(row.getRole()),

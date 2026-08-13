@@ -1,5 +1,8 @@
 package dev.ainer.authorizationserver.config;
 
+import dev.ainer.module.identity.foundation.ServicePrincipal;
+import dev.ainer.module.identity.foundation.ServicePrincipalFoundationService;
+import dev.ainer.security.principal.IdentityAuthorityRef;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,14 +28,17 @@ final class AinerMachineClientBootstrapRunner implements ApplicationRunner {
     private final AinerAuthorizationServerProperties properties;
     private final RegisteredClientRepository repository;
     private final PasswordEncoder passwordEncoder;
+    private final ServicePrincipalFoundationService servicePrincipalFoundationService;
 
     AinerMachineClientBootstrapRunner(
             AinerAuthorizationServerProperties properties,
             RegisteredClientRepository repository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            ServicePrincipalFoundationService servicePrincipalFoundationService) {
         this.properties = properties;
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
+        this.servicePrincipalFoundationService = servicePrincipalFoundationService;
     }
 
     @Override
@@ -47,7 +53,6 @@ final class AinerMachineClientBootstrapRunner implements ApplicationRunner {
         if (repository.findByClientId(clientId) != null) {
             return;
         }
-        String tenantId = requireIdentifier(bootstrap.getTenantId(), "tenant id");
         String secret = bootstrap.getClientSecret();
         if (secret == null || secret.length() < 24 || secret.length() > 128) {
             throw new IllegalStateException("Ainer bootstrap machine client secret must contain 24 to 128 characters");
@@ -57,6 +62,9 @@ final class AinerMachineClientBootstrapRunner implements ApplicationRunner {
             throw new IllegalStateException("Ainer bootstrap machine client scopes are invalid");
         }
 
+        ServicePrincipal principal = servicePrincipalFoundationService.registerServicePrincipal(
+                new IdentityAuthorityRef(properties.getIssuer()));
+        servicePrincipalFoundationService.bindClient(principal.principalId(), clientId);
         RegisteredClient.Builder client = RegisteredClient.withId(UUID.randomUUID().toString())
                 .clientId(clientId)
                 .clientSecret(passwordEncoder.encode(secret))
@@ -64,7 +72,8 @@ final class AinerMachineClientBootstrapRunner implements ApplicationRunner {
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
                 .clientSettings(ClientSettings.builder()
-                        .setting(AinerAuthorizationServerConfiguration.CLIENT_TENANT_SETTING, tenantId)
+                        .setting(AinerAuthorizationServerConfiguration.TOKEN_PROFILE_SETTING,
+                                "SERVICE_V1")
                         .build())
                 .tokenSettings(TokenSettings.builder()
                         .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED)

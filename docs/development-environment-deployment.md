@@ -22,7 +22,6 @@ https://ainer-dev.xiaoqu99.com
 ├── /error
 ├── /connect/logout
 ├── /api/me/access-token-revocations
-└── /api/tenants/{tenantId}/members/**
                         127.0.0.1:19000                   Authorization Server
 
 ainer-authorization-server-dev.service

@@ -5,7 +5,6 @@ import java.util.UUID;
 
 public class AiTaskRow {
     private UUID id;
-    private UUID tenantId;
     private UUID workspaceId;
     private String taskType;
     private UUID targetIdentityId;
@@ -18,8 +17,6 @@ public class AiTaskRow {
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
-    public UUID getTenantId() { return tenantId; }
-    public void setTenantId(UUID v) { this.tenantId = v; }
     public UUID getWorkspaceId() { return workspaceId; }
     public void setWorkspaceId(UUID v) { this.workspaceId = v; }
     public String getTaskType() { return taskType; }

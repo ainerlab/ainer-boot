@@ -9,8 +9,8 @@ import dev.ainer.module.ai.gateway.application.AiStreamListener;
 import dev.ainer.module.ai.gateway.application.ChatCompletionCommand;
 import dev.ainer.module.ai.gateway.application.CompletionResult;
 import dev.ainer.module.ai.gateway.application.InvocationContext;
-import dev.ainer.security.actor.AuthenticatedActor;
-import dev.ainer.security.actor.AuthenticatedActorResolver;
+import dev.ainer.security.token.AuthenticatedPrincipal;
+import dev.ainer.security.token.AuthenticatedPrincipalResolver;
 import dev.ainer.web.request.RequestIds;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -39,15 +39,15 @@ public class AiGatewayController {
 
     private final AiGatewayApplicationService service;
     private final AiRuntimeProperties properties;
-    private final AuthenticatedActorResolver actorResolver;
+    private final AuthenticatedPrincipalResolver principalResolver;
 
     public AiGatewayController(
             AiGatewayApplicationService service,
             AiRuntimeProperties properties,
-            AuthenticatedActorResolver actorResolver) {
+            AuthenticatedPrincipalResolver principalResolver) {
         this.service = service;
         this.properties = properties;
-        this.actorResolver = actorResolver;
+        this.principalResolver = principalResolver;
     }
 
     @PostMapping("/chat/completions")
@@ -55,9 +55,9 @@ public class AiGatewayController {
             @Valid @RequestBody ChatCompletionRequest request,
             HttpServletRequest servletRequest) {
         String requestId = RequestIds.currentOrCreate(servletRequest);
-        AuthenticatedActor actor = actorResolver.requireCurrent();
-        actor.requireAuthority(AI_INVOKE_AUTHORITY);
-        CompletionResult result = service.complete(command(actor, requestId, request));
+        AuthenticatedPrincipal principal = principalResolver.requireCurrent();
+        requireScope(principal);
+        CompletionResult result = service.complete(command(principal, requestId, request));
         return ApiResponse.success(ChatCompletionResponse.from(result), requestId);
     }
 
@@ -66,12 +66,12 @@ public class AiGatewayController {
             @Valid @RequestBody ChatCompletionRequest request,
             HttpServletRequest servletRequest) {
         String requestId = RequestIds.currentOrCreate(servletRequest);
-        AuthenticatedActor actor = actorResolver.requireCurrent();
-        actor.requireAuthority(AI_INVOKE_AUTHORITY);
+        AuthenticatedPrincipal principal = principalResolver.requireCurrent();
+        requireScope(principal);
         SseEmitter emitter = new SseEmitter(properties.getProvider().getRequestTimeout().plusSeconds(5).toMillis());
         AtomicReference<Future<?>> task = new AtomicReference<>();
         AtomicBoolean completed = new AtomicBoolean();
-        task.set(service.stream(command(actor, requestId, request), new AiStreamListener() {
+        task.set(service.stream(command(principal, requestId, request), new AiStreamListener() {
             @Override
             public void onDelta(UUID invocationId, String delta) {
                 send(emitter, "delta", new AiStreamDeltaEvent(invocationId, delta));
@@ -110,25 +110,31 @@ public class AiGatewayController {
     public ApiResponse<AiInvocationResponse> invocation(
             @PathVariable UUID id,
         HttpServletRequest servletRequest) {
-        AuthenticatedActor actor = actorResolver.requireCurrent();
-        actor.requireAuthority(AI_INVOKE_AUTHORITY);
+        AuthenticatedPrincipal principal = principalResolver.requireCurrent();
+        requireScope(principal);
         return ApiResponse.success(
-                AiInvocationResponse.from(service.getInvocation(actor.tenantId(), id)),
+                AiInvocationResponse.from(service.getInvocation(principal.subjectId(), id)),
                 RequestIds.currentOrCreate(servletRequest));
     }
 
     private ChatCompletionCommand command(
-            AuthenticatedActor actor,
+            AuthenticatedPrincipal principal,
             String requestId,
             ChatCompletionRequest request) {
         try {
             return new ChatCompletionCommand(
-                    new InvocationContext(actor.tenantId(), actor.subjectId(), requestId),
+                    new InvocationContext(principal.subjectId(), requestId),
                     request.model(),
                     request.messages().stream().map(ChatMessageRequest::toDomain).toList(),
                     request.effectiveMaxOutputTokens(),
                     request.effectiveTemperature());
         } catch (IllegalArgumentException exception) {
+            throw new BusinessException(AiGatewayErrorCode.INVALID_CONTEXT);
+        }
+    }
+
+    private void requireScope(AuthenticatedPrincipal principal) {
+        if (!principal.hasScope("ai.invoke")) {
             throw new BusinessException(AiGatewayErrorCode.INVALID_CONTEXT);
         }
     }

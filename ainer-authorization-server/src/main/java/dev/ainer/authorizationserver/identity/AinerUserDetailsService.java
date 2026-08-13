@@ -1,31 +1,49 @@
 package dev.ainer.authorizationserver.identity;
 
-import dev.ainer.module.identity.account.application.IdentityAccount;
-import dev.ainer.module.identity.account.application.IdentityApplicationService;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import dev.ainer.module.identity.foundation.IdentityFoundationService;
+import dev.ainer.module.identity.foundation.LoginIdentityType;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
+import java.util.Locale;
+import java.util.Objects;
+
 public final class AinerUserDetailsService implements UserDetailsService {
 
-    private final IdentityApplicationService identityService;
+    private final IdentityFoundationService foundationService;
+    private final String providerAuthority;
 
-    public AinerUserDetailsService(IdentityApplicationService identityService) {
-        this.identityService = identityService;
+    public AinerUserDetailsService(
+            IdentityFoundationService foundationService,
+            String providerAuthority) {
+        this.foundationService = Objects.requireNonNull(foundationService, "foundationService");
+        this.providerAuthority = Objects.requireNonNull(providerAuthority, "providerAuthority");
     }
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        IdentityAccount account = identityService.findAccountByUsername(username)
+        String normalizedUsername = normalize(username);
+        IdentityFoundationService.CredentialLookup credential = foundationService
+                .findPasswordCredentialForLogin(
+                        LoginIdentityType.USERNAME,
+                        providerAuthority,
+                        normalizedUsername)
                 .orElseThrow(() -> new UsernameNotFoundException("Identity account not found"));
         return new AinerUserDetails(
-                account.subjectId(),
-                account.tenantId(),
-                account.username(),
-                account.passwordHash(),
-                account.enabled(),
-                account.accountNonLocked(),
-                account.roles().stream().map(SimpleGrantedAuthority::new).toList());
+                credential.account().accountId(),
+                credential.account().securityEpoch(),
+                normalizedUsername,
+                credential.credential().credentialData(),
+                credential.account().status().canAuthenticate(),
+                credential.account().status().canAuthenticate(),
+                java.util.List.of());
+    }
+
+    private static String normalize(String username) {
+        if (username == null || username.isBlank()) {
+            throw new UsernameNotFoundException("Identity account not found");
+        }
+        return username.trim().toLowerCase(Locale.ROOT);
     }
 }

@@ -1,6 +1,6 @@
 # Ainer HTTP API 契约
 
-> 文档类型：接口基线 · 状态：生效 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
+> 文档类型：接口基线 · 状态：生效 · 最近核对：2026-08-07 · 适用版本：`0.1.x`
 
 本文记录当前 HTTP 契约和兼容规则。Ainer Admin 的机器可读子集位于
 `ainer-authorization-server/src/main/openapi/ainer-admin-v1.yaml`，由固定 Maven profile
@@ -26,11 +26,13 @@ HTTP status 是传输层权威语义。`code` 是稳定业务错误标识，客�
 
 ## 2. 身份上下文
 
-受保护 API 使用 Bearer JWT。Resource Server 验证签名、issuer、有效期和 audience，并从 `sub`、
-`tenant_id` 与必需的 `actor_type` 构建 `AuthenticatedActor`。`actor_type` 只允许 `USER` 或
-`SERVICE`；缺失或未知值失败关闭。OAuth scope 投影为 `SCOPE_<scope>`。
+受保护 API 使用 Bearer JWT。Resource Server 验证签名、issuer、有效期和 audience，并把
+`token_profile`（`SERVICE_V1`/`USER_NEUTRAL_V1`，`claim_contract_version=1`）解析为 typed
+`AuthenticatedPrincipal`。`USER_NEUTRAL_V1` 的 `sub` 是 HumanAccount ID，`SERVICE_V1` 的 `sub`
+是 ServicePrincipal ID；缺失或未知 profile/actor 组合失败关闭。OAuth scope 投影为 `SCOPE_<scope>`。
 
-请求参数、请求体或外部请求头不能覆盖 tenant 与 subject。scope 只表示调用能力，Workspace 仍检查同 tenant 的 ACTIVE membership 和角色。
+请求参数、请求体或外部请求头不能覆盖 principal 与 subject。scope 只表示调用能力，Workspace
+仍检查 ACTIVE membership 和角色。
 
 ## 3. 公共端点
 
@@ -45,7 +47,7 @@ HTTP status 是传输层权威语义。`code` 是稳定业务错误标识，客�
 ## 4. Workspace API
 
 | Method | Path | 成功状态 | Scope | 资源角色/状态 |
-|---|---|---:|---|---|
+|---|---|---|---:|---|
 | POST | `/api/workspaces` | 201 | `workspace.write` | 创建者成为 ACTIVE OWNER |
 | GET | `/api/workspaces/{id}` | 200 | `workspace.read` | ACTIVE member |
 | GET | `/api/workspaces?page=1&size=20` | 200 | `workspace.read` | 只返回当前主体可访问资源 |
@@ -57,31 +59,9 @@ HTTP status 是传输层权威语义。`code` 是稳定业务错误标识，客�
 | POST | `/api/workspaces/{id}/ownership-transfers` | 200 | `workspace.write` | 仅当前 OWNER；目标必须为 ACTIVE member |
 | GET | `/api/workspaces/{id}/authorization-audits?page=1&size=20` | 200 | `workspace.audit.read` | OWNER 或 ADMIN |
 
-分页从 1 开始，`size` 范围为 1 到 100。跨 tenant、非成员和不可见资源拒绝应避免泄露资源是否存在。
+分页从 1 开始，`size` 范围为 1 到 100。跨 Workspace、非成员和不可见资源拒绝应避免泄露资源是否存在。
 
-## 5. Identity 租户成员 API
-
-以下接口位于 Identity 数据所属的 `ainer-authorization-server`，仅接受 `actor_type=USER`。
-路径 `tenantId` 必须等于 JWT
-`tenant_id`，调用者还必须是数据库中的 ACTIVE `OWNER`/`ADMIN`；scope 与资源角色缺一不可。
-
-| Method | Path | Scope | 资源角色/状态 | 说明 |
-|---|---|---|---|---|
-| GET | `/api/tenants/{tenantId}/members?page=1&size=20` | `tenant.members.read` | ACTIVE OWNER/ADMIN | 只返回 ACTIVE tenant/user/membership 的安全投影 |
-| POST | `/api/tenants/{tenantId}/members` | `tenant.members.write` | ACTIVE OWNER/ADMIN | 把已存在用户加入 tenant；`username`/`subjectId` 二选一，角色只允许 ADMIN/MEMBER |
-| PATCH | `/api/tenants/{tenantId}/members/{subjectId}` | `tenant.members.write` | ACTIVE OWNER/ADMIN | 在 ADMIN/MEMBER 间调整；通用接口不能修改 OWNER |
-| DELETE | `/api/tenants/{tenantId}/members/{subjectId}?reasonCode=...` | `tenant.members.write` | ACTIVE OWNER/ADMIN | 软移除非 OWNER 成员 |
-
-POST 请求还包含 `role` 与安全格式 `reasonCode`；PATCH 包含 `role`、`reasonCode`。已 DISABLED
-的非 OWNER membership 再次添加会显式重新激活，ACTIVE 重复关系、LOCKED/OWNER 状态冲突返回
-409。每次成功写操作与 `reasonCode`、request ID 一起进入同事务成员安全审计。分页从 1 开始，
-`size=1..100`。
-
-以上每个请求在 JWT 验证之后还会查询 Authorization Server 官方 authorization，确认当前
-access token 仍为 active；未知、过期、显式撤销或 Identity 当前状态失效统一返回 401，
-查询依赖失败返回 503 `AINER.SECURITY.ONLINE_VALIDATION_UNAVAILABLE`，不会退回仅凭 JWT 放行。
-
-## 6. 当前 access token 自助撤销
+## 5. 当前 access token 自助撤销
 
 | Method | Path | Scope | Actor | 说明 |
 |---|---|---|---|---|
@@ -105,13 +85,13 @@ Server 官方 JDBC authorization，不建立 Ainer 自定义 Token 表，也不�
 `typescript-fetch` 生成器输出到
 `ainer-authorization-server/target/generated-sources/ainer-admin-typescript/`。生成目录属于
 构建产物，不提交到 Ainer Boot；Ainer Studio 按已批准的前端目录与包管理策略消费该输出。
-SDK 只覆盖成员 JSON API 与当前 token 自助撤销，OAuth/OIDC 登录和 logout 继续使用标准协议客户端。
+SDK 只覆盖当前 token 自助撤销，OAuth/OIDC 登录和 logout 继续使用标准协议客户端。
 OpenAPI 使用相对 `/` 表达同源入口；由于生成器会为该合法相对地址写入 `http://localhost`
 兜底值，Ainer Admin 必须在 SDK `Configuration` 中显式传入 `window.location.origin`，
 并通过 `accessToken` 回调读取内存中的当前 access token。登录、退出、SDK 装配和反向代理的
 完整运行契约见 [`ainer-admin-integration.md`](ainer-admin-integration.md)。
 
-## 7. AI API
+## 6. AI API
 
 AI runtime 默认关闭；启用后所有端点要求 `ai.invoke` scope。
 
@@ -119,11 +99,11 @@ AI runtime 默认关闭；启用后所有端点要求 `ai.invoke` scope。
 |---|---|---|---|
 | POST | `/api/ai/chat/completions` | JSON | 非流式 completion |
 | POST | `/api/ai/chat/completions/stream` | `text/event-stream` | `delta`、`usage`、`done` 或 `error` 事件 |
-| GET | `/api/ai/invocations/{id}` | JSON | 只读取当前 tenant 的调用审计 |
+| GET | `/api/ai/invocations/{id}` | JSON | 只读取当前 subject 的调用审计 |
 
 请求、SSE payload、错误和审计字段见 [`ai-gateway.md`](ai-gateway.md)。Ainer 的内部契约不是对 OpenAI API 的完整字段兼容承诺。
 
-## 8. Authorization Server 与内部 Identity API
+## 7. Authorization Server 与内部 Identity API
 
 `ainer-authorization-server` 暴露 Spring Authorization Server 的标准 OAuth 2.1/OIDC 端点，具体启用能力和密钥要求见 [`security.md`](security.md)。协议端点遵循标准响应，不套 Ainer JSON envelope。
 
@@ -149,305 +129,36 @@ Passkey 显式启用后还装配以下 Spring Security WebAuthn 端点；它们�
 credential ID 是可关联安全元数据，不应出现在普通日志。启用自助恢复后，
 `POST /passkey/recovery-codes` 由已登记且完成 WebAuthn 条件门禁的人员签发 8 枚明文只返回一次的
 恢复码；`POST /passkey/recovery-codes/redeem` 由密码会话中的本人提交一枚恢复码，成功后吊销该
-subject 全部 ACTIVE Passkey。完整边界见 ADR-0014/0015。
+account 全部 ACTIVE Passkey。完整边界见 ADR-0014/0015。
 
-Authorization Code + PKCE 当前由自动化测试专用 registered client 证明，生产没有默认 browser client，
-也没有 browser/OIDC client 创建 API。不得把测试 client、测试 issuer 或测试 RSA key 带入发行环境。
+Authorization Code + PKCE 当前由自动化测试专用 registered client 证明，生产 browser client
+通过默认关闭的 browser client 控制面创建。不得把测试 client、测试 issuer 或测试 RSA key 带入
+发行环境。
 
-人员 Token 的 introspection 还检查 Identity tenant/user/membership 当前状态和最新 revocation epoch。inactive 原因不向调用方细分。Resource Server 对匹配高风险规则的 inactive 返回 Ainer 401；introspection 依赖失败返回 503 `AINER.SECURITY.ONLINE_VALIDATION_UNAVAILABLE`。保护规则和配置见 [`configuration.md`](configuration.md)。
+人员 Token 的 introspection 还检查 Identity 当前状态和最新 revocation epoch（`sec_epoch` 不符即失效）。inactive 原因不向调用方细分。Resource Server 对匹配高风险规则的 inactive 返回 Ainer 401；introspection 依赖失败返回 503 `AINER.SECURITY.ONLINE_VALIDATION_UNAVAILABLE`。保护规则和配置见 [`configuration.md`](configuration.md)。
 
-以下是默认关闭的系统间接口，不属于公网或租户客户端 API：
+以下是默认关闭的系统间接口，不属于公网或租户客户端 API。所有系统间接口都要求类型化
+SERVICE Token：`token_profile=SERVICE_V1`、`claim_contract_version=1`、`actor_type=SERVICE`，
+再叠加表中列出的 scope：
 
 | 发行物 | Method | Path | 必需服务权限 | 说明 |
 |---|---|---|---|---|
-| Authorization Server | GET | `/internal/identity/directory/tenants/{tenantId}/members/{subjectId}` | `actor_type=SERVICE` + `identity.directory.read` 或 `.read.all` | 精确查询 ACTIVE 安全投影 |
-| Authorization Server | GET | `/internal/identity/directory/tenants/{tenantId}/members?query=&limit=20` | 同上 | 搜索 ACTIVE 成员，`limit=1..50` |
-| `ainer-server` | POST | `/internal/identity/access-events` | `actor_type=SERVICE` + `identity.access-events.publish` + 可信 publisher `sub` | 幂等收敛 Workspace membership |
-| Authorization Server | GET | `/internal/identity/access-event-recovery/tenants/{tenantId}/exhausted?page=1&size=20` | `actor_type=SERVICE` + `identity.access-events.replay.read` 或 `.read.all` | 查询无有效 lease 的真正耗尽事件 |
-| Authorization Server | POST | `/internal/identity/access-event-recovery/tenants/{tenantId}/replay-requests` | `actor_type=SERVICE` + `identity.access-events.replay.request` 或 `.request.all` | 创建 15 分钟默认有效的重放申请 |
-| Authorization Server | POST | `/internal/identity/access-event-recovery/tenants/{tenantId}/replay-requests/{requestId}/approvals` | `actor_type=SERVICE` + `identity.access-events.replay.approve` 或 `.approve.all` | 由不同服务批准并重置原事件 |
-| Authorization Server | POST | `/internal/passkey-recovery/tenants/{tenantId}/recovery-requests` | `actor_type=SERVICE` + `passkey.recovery.request` 或 `.request.all` | 为属于该 ACTIVE tenant 的 ACTIVE subject 建立双人恢复申请 |
-| Authorization Server | POST | `/internal/passkey-recovery/tenants/{tenantId}/recovery-requests/{requestId}/approvals` | `actor_type=SERVICE` + `passkey.recovery.approve` 或 `.approve.all` | 不同服务批准并吊销目标全部 ACTIVE Passkey |
-| Authorization Server | GET/POST | `/internal/passkey-enrollment/tenants/{tenantId}/grants` | `actor_type=SERVICE` + `passkey.enrollment.manage` 或 `.manage.all` | 查询或授予目标 ACTIVE tenant subject 的首枚 Passkey enrollment |
-| Authorization Server | DELETE | `/internal/passkey-enrollment/tenants/{tenantId}/grants/{subjectId}` | 同上 | 撤销未消费的 enrollment grant |
-| Authorization Server | POST | `/internal/oauth-service-clients` | tenantless `actor_type=SERVICE` + `oauth.clients.manage` + operator ID 白名单 | 创建 tenant-bound Client Credentials client，secret 只返回一次 |
-| Authorization Server | GET | `/internal/oauth-service-clients/{clientId}` | 同上 | 查询安全生命周期投影，不返回 secret/hash |
-| Authorization Server | POST | `/internal/oauth-service-clients/{clientId}/rotations` | 同上 | 以新 client ID 创建并行 replacement |
-| Authorization Server | POST | `/internal/oauth-service-clients/{clientId}/retirement` | 同上 | 显式退役，阻止新 Token 并让在线 Token 查询 inactive |
-| Authorization Server | POST | `/internal/platform/identity/tenant-provisioning-requests` | tenantless `actor_type=SERVICE` + `platform.tenants.write` + `platform.users.write` + operator ID 白名单 | 幂等预留 tenant/OWNER；创建 grant/加密通知但不创建核心身份、不返回激活材料 |
-| Authorization Server | GET | `/internal/platform/identity/tenant-provisioning-requests/{id}` | tenantless `actor_type=SERVICE` + `platform.tenants.read` + `platform.users.read` + operator ID 白名单 | 查询安全状态投影并惰性收口过期请求 |
-| Authorization Server | POST | `/internal/platform/identity/tenant-provisioning-requests/{id}/cancellations` | tenantless `actor_type=SERVICE` + `platform.tenants.write` + `platform.users.write` + operator ID 白名单 | 显式、幂等地关闭未完成申请并销毁仍可解密的通知 payload |
-| Authorization Server | GET | `/internal/platform/identity/tenants?page=1&size=20` | tenantless `actor_type=SERVICE` + `platform.tenants.read` + operator ID 白名单 | 分页读取 tenant 安全投影；`size=1..100` |
-| Authorization Server | GET | `/internal/platform/identity/users?page=1&size=20` | tenantless `actor_type=SERVICE` + `platform.users.read` + operator ID 白名单 | 分页读取用户安全投影；`size=1..100`，不返回 password hash |
-| Authorization Server | POST | `/internal/identity/tenant-provisioning-notification-receipts` | tenantless `actor_type=SERVICE` + `identity.provisioning-notifications.receipts.write` + gateway client ID 白名单 | 为已 `PUBLISHED` 通知登记唯一 `DELIVERED|FAILED` 终态 |
-| Authorization Server | POST | `/api/identity/tenant-activations/{grantId}/consumptions` | 一次性激活 secret；无需既有登录 | 新用户设置首个长期密码，原子创建 ACTIVE tenant/user/OWNER |
-| Authorization Server | POST | `/api/me/tenant-provisioning-requests/{id}/acceptances` | `actor_type=USER` + `identity.provisioning.accept` + 目标 subject 本人 | 已有 ACTIVE 用户接受新 tenant，原子创建 tenant/OWNER，不生成新密码 |
-| `ainer-server` | POST | `/internal/workspace-owner-recovery/tenants/{tenantId}/requests` | `actor_type=SERVICE` + `workspace.owner-recovery.request` 或 `.request.all` | 为无 ACTIVE OWNER 的 Workspace 申请恢复 |
-| `ainer-server` | POST | `/internal/workspace-owner-recovery/tenants/{tenantId}/requests/{requestId}/approvals` | `actor_type=SERVICE` + `workspace.owner-recovery.approve` 或 `.approve.all` | 不同服务批准并提升现有 ACTIVE 成员 |
-| `ainer-server` | GET | `/internal/workspace-authorization-audits/tenants/{tenantId}/exports` | `actor_type=SERVICE` + `workspace.audit.export` 或 `.export.all` + 可信 exporter `sub` | SIEM 按稳定游标拉取热/冷审计并集 |
+| Authorization Server | POST | `/internal/passkey-recovery/accounts/{accountId}/recovery-requests` | `actor_type=SERVICE` + `passkey.recovery.request.all` | 为指定 ACTIVE account 建立双人恢复申请 |
+| Authorization Server | POST | `/internal/passkey-recovery/accounts/{accountId}/recovery-requests/{requestId}/approvals` | `actor_type=SERVICE` + `passkey.recovery.approve.all` | 不同服务批准并吊销目标全部 ACTIVE Passkey |
+| Authorization Server | GET/POST | `/internal/passkey-enrollment/accounts/{accountId}/grants` | `actor_type=SERVICE` + `passkey.enrollment.manage.all` | 查询或授予目标 account 的首枚 Passkey enrollment |
+| Authorization Server | POST | `/internal/oauth-browser-clients` | `actor_type=SERVICE` + `oauth.browser-clients.manage` + operator ID 白名单 | 创建生产 browser Authorization Code + PKCE client |
+| Authorization Server | GET | `/internal/oauth-browser-clients` | 同上 | 分页查询安全生命周期投影 |
+| Authorization Server | GET | `/internal/oauth-browser-clients/{clientId}` | 同上 | 查询单个 client 生命周期投影 |
+| Authorization Server | POST | `/internal/oauth-browser-clients/{clientId}/rotations` | 同上 | 以新 client ID 创建并行 replacement |
+| Authorization Server | POST | `/internal/oauth-browser-clients/{clientId}/retirement` | 同上 | 显式退役，阻止新 Token 并让在线 Token 查询 inactive |
+| `ainer-server` | POST | `/internal/workspace-owner-recovery/workspaces/{workspaceId}/requests` | `actor_type=SERVICE` + `workspace.owner-recovery.request.all` | 为无 ACTIVE OWNER 的 Workspace 申请恢复 |
+| `ainer-server` | POST | `/internal/workspace-owner-recovery/workspaces/{workspaceId}/requests/{requestId}/approvals` | `actor_type=SERVICE` + `workspace.owner-recovery.approve.all` | 不同服务批准并提升现有 ACTIVE 成员 |
+| `ainer-server` | GET | `/internal/workspace-authorization-audits/workspaces/{workspaceId}/exports` | `actor_type=SERVICE` + `workspace.audit.export.all` + 可信 exporter `sub` | SIEM 按 Workspace 稳定游标拉取热/冷审计并集 |
 
-Authorization Server 还会向配置的通知网关 URI 发起出站 POST。该网关不是 Identity 私有表的读取者，
-而是独立通知域；请求使用无 tenant 的 Client Credentials Token，唯一 scope 为
-`identity.provisioning-notifications.publish`，并把 UUIDv7 `notificationId` 同时写入
-`Idempotency-Key`。网关必须校验 issuer/audience、`actor_type=SERVICE`、无 tenant、该 scope 和
-精确 relay client subject。版本 1 envelope 示例：
-
-```json
-{
-  "notificationId": "019c0000-0000-7000-8000-000000000010",
-  "notificationType": "NEW_USER_ACTIVATION",
-  "templateVersion": 1,
-  "provisioningRequestId": "019c0000-0000-7000-8000-000000000001",
-  "tenantId": "019c0000-0000-7000-8000-000000000002",
-  "subjectId": "019c0000-0000-7000-8000-000000000003",
-  "deliveryTarget": {
-    "channel": "EMAIL",
-    "recipientReference": "owner@acme.example"
-  },
-  "activation": {
-    "grantId": "019c0000-0000-7000-8000-000000000004",
-    "secret": "<一次性高熵激活值>"
-  },
-  "expiresAt": "2026-07-27T04:00:00Z"
-}
-```
-
-已有用户通知的 channel 是 `IDENTITY_SUBJECT`，`recipientReference` 为目标 subject UUID，
-`activation` 为 `null`。网关必须在返回 2xx 前持久化请求并按 `notificationId` 去重；重复请求也
-返回成功。2xx 只表示通知域已接管，不能解释为最终邮件/短信送达。Identity 随后销毁本地可解密
-payload；网关若未先持久化，就无法要求 Identity 再次取回激活明文。
-
-通知网关取得供应商终态后，可通过另一组独立 Client Credentials credential 回传最小回执：
-
-```json
-{
-  "eventId": "provider-event-20260726-001",
-  "notificationId": "019c0000-0000-7000-8000-000000000010",
-  "status": "FAILED",
-  "occurredAt": "2026-07-26T05:10:00Z",
-  "failureCode": "MAILBOX_UNAVAILABLE"
-}
-```
-
-第一版只接受 `DELIVERED` 和 `FAILED`。`DELIVERED` 的 `failureCode` 必须为空，`FAILED` 必须携带
-1..96 字符的受限稳定码；回调不接受正文、联系地址、供应商原始 payload、Token、secret 或自由
-文本错误。`occurredAt` 最多可比 Ainer 接收时间晚五分钟。只有 outbox 已经是 `PUBLISHED` 且
-`publishedAt` 已写入时才可登记；回调抢先到达会返回 409，网关应稍后用同一事件重试。
-
-首次成功响应示例：
-
-```json
-{
-  "id": "019c0000-0000-7000-8000-000000000020",
-  "notificationId": "019c0000-0000-7000-8000-000000000010",
-  "eventId": "provider-event-20260726-001",
-  "status": "FAILED",
-  "failureCode": "MAILBOX_UNAVAILABLE",
-  "occurredAt": "2026-07-26T05:10:00Z",
-  "receivedAt": "2026-07-26T05:10:02Z",
-  "created": true
-}
-```
-
-`(gateway client ID,eventId)` 和 `notificationId` 都是幂等边界。相同事实回放返回原回执并令
-`created=false`；相同事件对应不同 payload、或同一 notification 出现矛盾终态返回 409。HTTP
-成功和数据库回执只证明外部网关提供了规范化供应商事实；`DELIVERED` 不证明自然人阅读、邮箱所有权
-或商业开户完成。稳定错误包括：
-
-| HTTP | code | 语义 |
-|---:|---|---|
-| 400 | `AINER.COMMON.INVALID_REQUEST` | JSON、枚举、UUID 文本或 Bean Validation 不合法 |
-| 422 | `AINER.IDENTITY.INVALID_NOTIFICATION_RECEIPT` | UUID 不是 v7、终态与失败码关系错误或时间越界 |
-| 404 | `AINER.IDENTITY.NOTIFICATION_RECEIPT_NOT_FOUND` | notification 不存在 |
-| 409 | `AINER.IDENTITY.NOTIFICATION_RECEIPT_STATE_CONFLICT` | notification 尚未被网关持久接收 |
-| 409 | `AINER.IDENTITY.NOTIFICATION_RECEIPT_IDEMPOTENCY_CONFLICT` | 事件重放内容不同或 notification 已有不同终态 |
-
-平台预配控制面默认关闭。POST 必须携带 1..128 字符安全格式的 `Idempotency-Key`，请求示例：
-
-```json
-{
-  "tenantCode": "acme-next",
-  "tenantName": "Acme Next",
-  "ownerUsername": "owner@acme.example",
-  "ownerDisplayName": "Acme Owner",
-  "deliveryChannel": "EMAIL",
-  "deliveryAddress": "owner@acme.example",
-  "changeReference": "ORDER-2026-001"
-}
-```
-
-同一 operator 与幂等键、同一规范化业务请求返回原 request，`data.created=false`；相同键但
-tenant/name/owner/change reference 任一规范化值不同返回 409。首次成功和幂等重放都返回 200，
-安全投影示例：
-
-```json
-{
-  "id": "019c0000-0000-7000-8000-000000000001",
-  "tenantId": "019c0000-0000-7000-8000-000000000002",
-  "tenantCode": "acme-next",
-  "tenantName": "Acme Next",
-  "ownerSubjectId": "019c0000-0000-7000-8000-000000000003",
-  "ownerUsername": "owner@acme.example",
-  "ownerDisplayName": "Acme Owner",
-  "ownerUserExists": false,
-  "status": "REQUESTED",
-  "requestedByServiceId": "platform-identity-operator",
-  "changeReference": "ORDER-2026-001",
-  "requestedAt": "2026-07-26T04:00:00Z",
-  "expiresAt": "2026-07-27T04:00:00Z",
-  "completedAt": null,
-  "created": true
-}
-```
-
-`REQUESTED` 只是不可授权的预留，不表示 tenant/user/membership 已存在。新用户请求的有效期采用
-较短的 activation TTL；已有用户采用 request TTL。到期请求在读取、接受或后续冲突检查时惰性转为
-`EXPIRED`；使用原幂等键仍返回原请求，重新申请必须使用新键。响应不包含 `idempotencyKey`、
-request fingerprint、联系地址、密码、激活 secret 或密文。新用户的 secret 由通知 publisher
-消费 outbox 后送达，API 不提供读取或补查端点。
-
-取消使用显式子资源，不提供通用 PATCH：
-
-```json
-{
-  "changeReference": "ORDER-2026-001-CANCEL"
-}
-```
-
-只有 `REQUESTED` 会迁移为 `CANCELLED`。新用户 request 必须同时把唯一 ACTIVE grant 迁移为
-`CANCELLED`，否则整个事务失败关闭；PENDING/FAILED 通知进入 `CANCELLED` 并立即销毁可解密
-payload。通知若已经 `PUBLISHED`，其 payload 已销毁但下游通知无法召回，grant 仍会失效。重复取消
-已 `CANCELLED` 的 request 返回同一终态且不重复审计；`EXPIRED` 同样保持终态，`ACTIVATED` 返回
-409。响应中的 `changeReference` 仍是原申请引用，取消引用只进入唯一 `CANCELLED` 阶段审计。
-
-tenant/user 列表沿用统一 `items/page/size/total` 结构，页码从 1 开始、单页最大 100，并分别按
-`code,id` 与 `username,id` 稳定排序。tenant item 只含 `id/code/name/status/createdAt/updatedAt`；
-user item 只含 `subjectId/username/displayName/status/createdAt/updatedAt`。列表读取 Identity
-核心事实，不包含尚未激活的 provisioning reservation，也不返回 membership、密码哈希、OAuth
-协议记录、通知目标或激活材料。
-
-新用户消费请求：
-
-```json
-{
-  "activationSecret": "<43 字符以上的一次性高熵值>",
-  "password": "<用户本人选择的长期密码>"
-}
-```
-
-成功后返回 request/tenant/subject 与 `ACTIVATED` 状态。secret 错误会增加该 grant 的失败次数；
-达到上限后 grant 进入 `LOCKED`、request 进入 `CANCELLED`，且不创建核心 Identity。成功消费后
-同一 secret 重放返回 401。已有 ACTIVE 用户不使用 secret，必须用其本人 USER Token 调用接受端点；
-新 membership 不覆盖该用户原有 `is_default=true` tenant。
-
-稳定错误包括：
-
-| HTTP | code | 语义 |
-|---:|---|---|
-| 400 | `AINER.COMMON.INVALID_REQUEST` | 缺少必填 header/body 或传输层校验失败 |
-| 422 | `AINER.IDENTITY.INVALID_TENANT_PROVISIONING_REQUEST` | 字段规范化后的业务输入不合法 |
-| 404 | `AINER.IDENTITY.TENANT_PROVISIONING_NOT_FOUND` | request ID 不存在 |
-| 409 | `AINER.IDENTITY.TENANT_PROVISIONING_IDEMPOTENCY_CONFLICT` | 相同 operator/幂等键对应不同请求 |
-| 409 | `AINER.IDENTITY.TENANT_PROVISIONING_CONFLICT` | tenant code 或开放的新用户标识预留冲突 |
-| 409 | `AINER.IDENTITY.TENANT_PROVISIONING_USER_CONFLICT` | 已有用户不是 ACTIVE |
-| 409 | `AINER.IDENTITY.TENANT_PROVISIONING_STATE_CONFLICT` | 并发状态变化导致请求无法按预期收口 |
-| 401 | `AINER.IDENTITY.TENANT_ACTIVATION_CREDENTIAL_INVALID` | grant/secret 无效、过期、锁定或已消费 |
-| 422 | `AINER.IDENTITY.TENANT_ACTIVATION_PASSWORD_INVALID` | 新用户初始密码不符合当前最小策略 |
-| 403 | `AINER.IDENTITY.TENANT_PROVISIONING_ACCEPTANCE_FORBIDDEN` | 非预留目标 USER 尝试接受 |
-
-`identity.directory.read` 必须由 Token `tenant_id` 绑定路径 tenant；只有 `identity.directory.read.all` 可以跨 tenant 选择。Directory 响应只含 `tenantId`、`subjectId`、`username`、`displayName`、`role`。非 ACTIVE 精确查询返回 404 `AINER.IDENTITY.DIRECTORY_MEMBER_NOT_FOUND`，不得暴露密码哈希、锁定细节或 OAuth 数据。
-
-OAuth 服务客户端控制面默认关闭。它只接收 tenant UUID、`client_credentials` 服务 client 和配置
-白名单内 scope，不接受 redirect URI、Authorization Code、public client、平台 scope 或 `.all`
-scope。创建请求示例：
-
-```json
-{
-  "clientId": "orders-agent-v1",
-  "clientName": "Orders Agent",
-  "tenantId": "50000000-0000-0000-0000-000000000001",
-  "scopes": ["ai.invoke"],
-  "changeReference": "CHG-2026-1001"
-}
-```
-
-成功响应 `data` 结构如下；`clientSecret` 只在本次创建或轮换响应出现：
-
-```json
-{
-  "client": {
-    "clientId": "orders-agent-v1",
-    "clientName": "Orders Agent",
-    "tenantId": "50000000-0000-0000-0000-000000000001",
-    "scopes": ["ai.invoke"],
-    "status": "ACTIVE",
-    "replacesClientId": null,
-    "clientIdIssuedAt": "2026-07-23T00:00:00Z",
-    "clientSecretExpiresAt": "2026-10-21T00:00:00Z",
-    "createdAt": "2026-07-23T00:00:00Z",
-    "retiredAt": null
-  },
-  "clientSecret": "returned-once-and-never-queryable"
-}
-```
-
-轮换请求必须指定不同且未使用的新 ID：
-
-```json
-{
-  "replacementClientId": "orders-agent-v2",
-  "replacementClientName": "Orders Agent v2",
-  "changeReference": "CHG-2026-1002"
-}
-```
-
-轮换不自动退役旧 ID；调用方先把新 secret 写入 secret store、灰度部署并验证，再向
-`/{oldClientId}/retirement` 发送 `{"changeReference":"CHG-2026-1003"}`。退役不可逆，不提供
-DELETE 或重新激活。
-
-稳定模块错误码包括：
-
-| HTTP | code | 语义 |
-|---:|---|---|
-| 422 | `AINER.AUTHORIZATION.OAUTH_CLIENT_INVALID_REQUEST` | client ID/name、tenant、scope 数量或变更引用不合法 |
-| 422 | `AINER.AUTHORIZATION.OAUTH_CLIENT_SCOPE_NOT_ALLOWED` | 请求 scope 不在启动白名单 |
-| 404 | `AINER.AUTHORIZATION.OAUTH_CLIENT_NOT_FOUND` | 不是该控制面创建的 managed client |
-| 409 | `AINER.AUTHORIZATION.OAUTH_CLIENT_ALREADY_EXISTS` | 新 client ID 已存在 |
-| 409 | `AINER.AUTHORIZATION.OAUTH_CLIENT_NOT_ACTIVE` | 源 client 已退役 |
-| 409 | `AINER.AUTHORIZATION.OAUTH_CLIENT_STATE_CONFLICT` | 并发状态变化或协议记录不一致 |
-
-401/403 继续使用通用安全错误。完整密钥与离线 JWT 限制见 [`security.md`](security.md) 和
-[ADR-0013](decisions/0013-audited-oauth-service-client-lifecycle.md)。
-
-事件请求为版本化 JSON：
-
-```json
-{
-  "eventId": "70000000-0000-0000-0000-000000000001",
-  "eventType": "IDENTITY_USER_DISABLED",
-  "tenantId": "50000000-0000-0000-0000-000000000001",
-  "subjectId": "60000000-0000-0000-0000-000000000001",
-  "payloadVersion": 1,
-  "occurredAt": "2026-07-23T00:00:00Z"
-}
-```
-
-`eventType` 当前只有 `IDENTITY_USER_DISABLED`、`IDENTITY_MEMBERSHIP_REVOKED`。成功响应的 `data` 含 `eventId`、`duplicate`、`affectedMemberships`；重复 event ID 返回 200 且不重复修改。超过允许未来时钟偏差的事件返回 400。该端点不提供恢复语义，也不允许普通人员 Token 调用。
-
-账号禁用仍是 Identity 应用用例，尚未开放远程管理 HTTP API；tenant membership 的租户内管理
-已经通过第 5 节 USER API 开放。平台级跨租户能力当前包含预配申请/查询/显式取消、tenant/user
-安全分页及随后由用户本人完成的激活，不包含禁用、恢复或直接修改。
-
-重放申请请求体：
-
-```json
-{
-  "eventId": "70000000-0000-0000-0000-000000000001",
-  "incidentReference": "INC-2026-0042"
-}
-```
-
-只有 `attempt_count >= AINER_IDENTITY_ACCESS_EVENT_MAX_ATTEMPTS`、状态为 PENDING/FAILED 且无有效 lease 的事件可申请。批准者 `sub` 必须与申请者不同；批准成功保留原 event ID、payload 与 occurredAt，只把投递状态重置为 PENDING。重复批准、过期、同人批准和跨 tenant 操作返回稳定 4xx，不创建新事件。
+browser client 控制面默认关闭，只管理生产的 public Authorization Code + PKCE client：
+创建、查询、轮换（以新 ID 创建 replacement）与显式退役（阻止新 Token、历史在线 Token 查询
+inactive）。public client 无事前 secret，只返回生命周期投影。退役不可逆，不提供 DELETE 或
+重新激活。
 
 OWNER 恢复请求体：
 
@@ -459,11 +170,69 @@ OWNER 恢复请求体：
 }
 ```
 
-批准时再次锁定 Workspace；必须没有 ACTIVE OWNER、至少有一个 REVOKED OWNER，且目标是同 Workspace 的 ACTIVE 非 OWNER 成员。旧 REVOKED OWNER 不被重新激活。request/approve Client 必须不同，不能把两个 scope 授给同一个运维 Client。
+批准时再次锁定 Workspace；必须没有 ACTIVE OWNER、至少有一个 REVOKED OWNER，且目标是同
+Workspace 的 ACTIVE 非 OWNER 成员。旧 REVOKED OWNER 不被重新激活。request/approve Client
+必须不同，不能把两个 scope 授给同一个运维 Client。
 
 SIEM 导出参数 `afterOccurredAt` 与 `afterId` 必须同时提供或同时省略，`limit=1..1000`。结果按 `occurredAt,id` 升序，返回 `nextOccurredAt`、`nextId` 和 `hasMore`。消费者持久化这对游标并按 audit ID 去重；每次导出批次本身也写入安全操作审计。
 
-## 8. 兼容与变更
+## 8. 通用授权 API（ADR-0037；ADR-0030 已被取代）
+
+### `@AinerAuthorize` 端点门禁
+
+产品 controller 可以在方法上声明 `@AinerAuthorize(permission="...")`。该注解是 controller 执行前
+的粗粒度门禁，不新增 HTTP endpoint，也不替代应用服务中的资源级授权。当前 permission 的
+`resourceType` 必须是 `request`，ALLOW 只有在 obligation 为空时才继续；DENY、CHALLENGE 或未处理
+obligation 返回统一 403。未认证请求仍返回 401。路径/请求体 target 解析、字段投影与方法级 AOP
+尚未进入 `0.1` 支持面。`PUBLIC_PROJECTION` 也不会绕过 Resource Server：宿主必须另行配置
+`public-paths`；即使路径开放，当前 projection obligation 尚无 executor，仍会失败关闭为 403。
+
+### 管理 API
+
+所有 `/api/authorization/**` 端点要求 SERVICE principal + `authorization.manage` scope，并且该精确
+`issuer + sub` 必须由宿主代码注册的版本化 `GrantAdministrationPolicy` 判定为可信管理主体。
+仅持有 scope 不产生授权管理权；未注册策略时全部管理端点失败关闭为 403。响应使用统一
+`ApiResponse` 信封。
+
+通用管理面只处理策略声明的 assignable Permission、Scope 和目标主体，不从管理者自己的
+Effective Access 推导分配权。Role 不能包含 `systemOnly` 或策略未列入的权限；通用 Binding API
+不能创建 GLOBAL scope，也不能创建、撤销自己的 Binding；管理者任一 ACTIVE Binding 引用的 Role 不能由其
+本人扩大或替换权限。产品 onboarding/bootstrap 如需创建初始业务授权，必须走独立关系校验与审计路径。
+
+### Permission 目录（只读）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `GET` | `/api/authorization/permissions` | 返回所有已注册权限定义（code、action、resourceType、riskTier、auditLevel、systemOnly、agentDelegable） |
+
+### Role 管理
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/authorization/roles` | 创建角色（code、name、permissions）。未注册或不可授予/system-only permission 返回 422。重复 code 返回 409 |
+| `GET` | `/api/authorization/roles/{roleId}` | 查询角色（含 permissions） |
+| `PUT` | `/api/authorization/roles/{roleId}/permissions` | 原子替换角色权限（乐观版本检查）。自己的 ACTIVE Binding 引用该 Role 时返回 403；版本冲突返回 409 |
+
+### Binding 生命周期
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/authorization/bindings` | 创建绑定（issuer、subjectType、subjectId、roleId、scopeKind、可选 workspaceId/resourceType/resourceId/validUntil）。GLOBAL/不可授予 scope 返回 422，越界目标或自授予返回 403 |
+| `GET` | `/api/authorization/bindings/{bindingId}` | 查询绑定 |
+| `POST` | `/api/authorization/bindings/{bindingId}/revocations` | 逻辑撤销绑定（reason）。撤销后 liveBindings 立即不返回——无 ALLOW 缓存 |
+
+### Effective Access
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `GET` | `/api/authorization/effective-access?issuer=&subjectType=&subjectId=` | 查询某 subject 当前所有有效绑定（ACTIVE + 有效期内） |
+
+Scope kind 与底层 CHECK 约束：`GLOBAL`（workspace_id/resource_type/resource_id 全 NULL）、
+`WORKSPACE`（workspace_id 非空）、`RESOURCE`（workspace_id + resource_type + resource_id 全非空）。
+通用管理 API 不创建 GLOBAL Binding；受控平台路径若建立 GLOBAL Binding，决策器仍只允许 SERVICE
+subject 使用。
+
+## 9. 兼容与变更
 
 - 新增可选响应字段通常向后兼容，客户端必须容忍未知字段；
 - 删除、改名、改变字段类型、收紧枚举或改变 status/error code 都需要发布说明；

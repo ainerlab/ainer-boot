@@ -7,7 +7,6 @@
     <resultMap id="recoveryRequestRow"
                type="dev.ainer.module.workspace.workspace.infrastructure.mybatis.WorkspaceOwnerRecoveryRequestRow">
         <id property="id" column="id"/>
-        <result property="tenantId" column="tenant_id"/>
         <result property="workspaceId" column="workspace_id"/>
         <result property="newOwnerSubjectId" column="new_owner_subject_id"/>
         <result property="requestedBy" column="requested_by"/>
@@ -22,28 +21,26 @@
     <update id="expireOpenRequests">
         UPDATE ainer_workspace_owner_recovery_request
         SET status = 'EXPIRED'
-        WHERE tenant_id = #{tenantId}
-          AND workspace_id = #{workspaceId}
+        WHERE workspace_id = #{workspaceId}
           AND status = 'REQUESTED'
           AND expires_at &lt;= #{now}
     </update>
 
     <insert id="insert">
         INSERT INTO ainer_workspace_owner_recovery_request (
-            id, tenant_id, workspace_id, new_owner_subject_id, requested_by, approved_by,
+            id, workspace_id, new_owner_subject_id, requested_by, approved_by,
             incident_reference, status, requested_at, expires_at, executed_at
         ) VALUES (
-            #{id}, #{tenantId}, #{workspaceId}, #{newOwnerSubjectId}, #{requestedBy}, #{approvedBy},
+            #{id}, #{workspaceId}, #{newOwnerSubjectId}, #{requestedBy}, #{approvedBy},
             #{incidentReference}, #{status}, #{requestedAt}, #{expiresAt}, #{executedAt}
         )
     </insert>
 
     <select id="selectForUpdate" resultMap="recoveryRequestRow">
-        SELECT id, tenant_id, workspace_id, new_owner_subject_id, requested_by, approved_by,
+        SELECT id, workspace_id, new_owner_subject_id, requested_by, approved_by,
                incident_reference, status, requested_at, expires_at, executed_at
         FROM ainer_workspace_owner_recovery_request
-        WHERE tenant_id = #{tenantId}
-          AND id = #{requestId}
+        WHERE id = #{requestId}
         FOR UPDATE
     </select>
 

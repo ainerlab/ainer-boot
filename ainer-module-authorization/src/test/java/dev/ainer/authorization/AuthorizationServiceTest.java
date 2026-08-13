@@ -43,11 +43,11 @@ class AuthorizationServiceTest {
     private static final PermissionCode PUBLISH = new PermissionCode("doc.publish");
     private static final PermissionCode SYS_ADMIN = new PermissionCode("sys.admin");
     private static final ResourceType DOC = new ResourceType("doc");
-    private static final ResourceType TENANT = new ResourceType("tenant");
+    private static final ResourceType WORKSPACE = new ResourceType("workspace");
     private static final String DOCS_SCOPE = "docs";
     private static final Instant NOW = Instant.parse("2026-08-02T00:00:00Z");
 
-    private final UUID tenant = UUID.fromString("019c1000-0000-7000-8000-000000000001");
+    private final UUID workspace = UUID.fromString("019c1000-0000-7000-8000-000000000001");
     private final UUID publicDocId = UUID.fromString("019c1000-0000-7000-8000-0000000000a0");
     private final UUID ownedDocId = UUID.fromString("019c1000-0000-7000-8000-0000000000b0");
     private final UUID otherDocId = UUID.fromString("019c1000-0000-7000-8000-0000000000c0");
@@ -57,7 +57,7 @@ class AuthorizationServiceTest {
     private final PermissionRegistry registry = new PermissionRegistry().register(() -> Set.of(
             new Permission(READ, "read", DOC, RiskTier.LOW, AuditLevel.ON_DECISION, false, false),
             new Permission(PUBLISH, "publish", DOC, RiskTier.HIGH, AuditLevel.ALWAYS, false, true),
-            new Permission(SYS_ADMIN, "admin", TENANT, RiskTier.HIGH, AuditLevel.ALWAYS, true, false)));
+                new Permission(SYS_ADMIN, "admin", WORKSPACE, RiskTier.HIGH, AuditLevel.ALWAYS, true, false)));
 
     private AuthorizationService service(PublicAccessPolicy publicPolicy, DomainAuthorizationPolicy domainPolicy,
                                          BindingResolver bindings) {
@@ -80,12 +80,12 @@ class AuthorizationServiceTest {
                                        PermissionCode permission, ResourceType resourceType, UUID docId,
                                        AuthorizationContext.Assurance assurance) {
         return svc.authorize(new AuthorizationRequest(
-                requester, mode, permission, new ResourceRef(tenant, resourceType, docId),
+                requester, mode, permission, new ResourceRef(workspace, resourceType, docId),
                 new AuthorizationContext(NOW, assurance, null, null, null)));
     }
 
     private Requester.Authenticated authenticated(SubjectRef ref) {
-        return new Requester.Authenticated(ref, tenant, Set.of(DOCS_SCOPE), Set.of("ainer"), "client-1");
+        return new Requester.Authenticated(ref, Set.of(DOCS_SCOPE), Set.of("ainer"), "client-1");
     }
 
     // ---- P1 startup + basic pipeline ----
@@ -100,21 +100,21 @@ class AuthorizationServiceTest {
     @Test
     void resourceTypeMismatchDenies() {
         var svc = service((p, r) -> java.util.Optional.empty(), alwaysBinding(READ), none());
-        assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, READ, TENANT, ownedDocId)
+        assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, READ, WORKSPACE, ownedDocId)
                 .outcome()).isEqualTo(AuthorizationOutcome.DENY);
     }
 
     @Test
     void systemOnlyPermissionDeniesForUser() {
         var svc = service((p, r) -> java.util.Optional.empty(), alwaysBinding(SYS_ADMIN), none());
-        assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, SYS_ADMIN, TENANT, ownedDocId)
+        assertThat(auth(svc, authenticated(user), AccessMode.AUTHENTICATED, SYS_ADMIN, WORKSPACE, ownedDocId)
                 .outcome()).isEqualTo(AuthorizationOutcome.DENY);
     }
 
     @Test
     void globalScopeBindingDeniedForNonServiceSubject() {
         SubjectBinding globalBinding = new SubjectBinding(
-                user, new Role("r", Set.of(READ)), new Scope.Global(),
+                user, new Role("r", "Test Role", Set.of(READ)), new Scope.Global(),
                 BindingStatus.ACTIVE, NOW.minusSeconds(3600), null, 1L);
         var svc = service((p, r) -> java.util.Optional.empty(), bindingRequiredWithState(READ, true),
                 subject -> Set.of(globalBinding));
@@ -126,7 +126,7 @@ class AuthorizationServiceTest {
     void bindingFromDifferentSubjectFilteredOut() {
         SubjectRef otherUser = new SubjectRef("ainer", "user-2", SubjectType.USER);
         SubjectBinding othersBinding = new SubjectBinding(
-                otherUser, new Role("r", Set.of(READ)), new Scope.Resource(tenant, DOC, ownedDocId),
+                otherUser, new Role("r", "Test Role", Set.of(READ)), new Scope.Resource(workspace, DOC, ownedDocId),
                 BindingStatus.ACTIVE, NOW.minusSeconds(3600), null, 1L);
         var svc = service((p, r) -> java.util.Optional.empty(), bindingRequiredWithState(READ, true),
                 subject -> Set.of(othersBinding));
@@ -145,6 +145,18 @@ class AuthorizationServiceTest {
     void publicProjectionDeniesWithoutPolicy() {
         var svc = service((p, r) -> java.util.Optional.empty(), alwaysBinding(READ), none());
         assertThat(auth(svc, new Requester.Anonymous(), AccessMode.PUBLIC_PROJECTION, READ, DOC, publicDocId)
+                .outcome()).isEqualTo(AuthorizationOutcome.DENY);
+    }
+
+    @Test
+    void systemOnlyPermissionDeniedOnPublicPathEvenWithPolicy() {
+        // ADR-0030 §3.1/§5.1 defense-in-depth: systemOnly permissions must never be served via PUBLIC
+        // path, even when a PublicAccessPolicy would match. The PUBLIC branch is short-circuited before
+        // decidePublic() is reached.
+        var svc = service(
+                (p, r) -> java.util.Optional.of(new PublicProjection("public")),
+                alwaysBinding(SYS_ADMIN), none());
+        assertThat(auth(svc, new Requester.Anonymous(), AccessMode.PUBLIC_PROJECTION, SYS_ADMIN, WORKSPACE, ownedDocId)
                 .outcome()).isEqualTo(AuthorizationOutcome.DENY);
     }
 
@@ -248,7 +260,7 @@ class AuthorizationServiceTest {
 
     private SubjectBinding binding(PermissionCode permission, UUID docId) {
         return new SubjectBinding(
-                user, new Role("r", Set.of(permission)), new Scope.Resource(tenant, DOC, docId),
+                user, new Role("r", "Test Role", Set.of(permission)), new Scope.Resource(workspace, DOC, docId),
                 BindingStatus.ACTIVE, NOW.minusSeconds(3600), null, 1L);
     }
 }

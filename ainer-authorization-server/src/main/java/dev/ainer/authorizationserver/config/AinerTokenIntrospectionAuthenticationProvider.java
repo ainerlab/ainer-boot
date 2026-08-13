@@ -51,8 +51,6 @@ final class AinerTokenIntrospectionAuthenticationProvider implements Authenticat
                 && Boolean.TRUE.equals(client.getClientSettings().getSetting(
                         AinerAuthorizationServerConfiguration.CLIENT_INTROSPECTION_ALLOWED_SETTING))
                 && client.getScopes().equals(Set.of(
-                        AinerAuthorizationServerConfiguration.INTROSPECTION_CLIENT_SCOPE))
-                && client.getClientSettings().getSetting(
-                        AinerAuthorizationServerConfiguration.CLIENT_TENANT_SETTING) == null;
+                        AinerAuthorizationServerConfiguration.INTROSPECTION_CLIENT_SCOPE));
     }
 }

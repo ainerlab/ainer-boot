@@ -1,8 +1,9 @@
 package dev.ainer.authorizationserver.admin;
 
-import dev.ainer.module.identity.account.application.IdentityApplicationService;
-import dev.ainer.module.identity.account.application.ProvisionTenantOwnerCommand;
-import dev.ainer.module.identity.account.application.TenantOwnerBootstrapResult;
+import dev.ainer.authorizationserver.config.AinerAuthorizationServerProperties;
+import dev.ainer.module.identity.foundation.IdentityFoundationService;
+import dev.ainer.module.identity.foundation.LoginIdentityType;
+import dev.ainer.security.principal.IdentityAuthorityRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -13,21 +14,18 @@ import java.util.Locale;
 
 class AinerAdminDevFixtureRunner implements ApplicationRunner {
 
-    static final String ADMIN_TENANT_CODE = "ainer-admin-dev";
-    static final String ADMIN_TENANT_NAME = "Ainer Admin Development";
-    static final String MEMBER_HOME_TENANT_CODE = "ainer-admin-member-home";
-    static final String MEMBER_HOME_TENANT_NAME = "Ainer Admin Member Home";
-
     private static final Logger log = LoggerFactory.getLogger(AinerAdminDevFixtureRunner.class);
 
     private final AinerAdminDevBootstrapProperties properties;
-    private final IdentityApplicationService identityService;
-
+    private final AinerAuthorizationServerProperties authorizationProperties;
+    private final IdentityFoundationService foundationService;
     AinerAdminDevFixtureRunner(
             AinerAdminDevBootstrapProperties properties,
-            IdentityApplicationService identityService) {
+            AinerAuthorizationServerProperties authorizationProperties,
+            IdentityFoundationService foundationService) {
         this.properties = properties;
-        this.identityService = identityService;
+        this.authorizationProperties = authorizationProperties;
+        this.foundationService = foundationService;
     }
 
     @Override
@@ -47,27 +45,47 @@ class AinerAdminDevFixtureRunner implements ApplicationRunner {
                     "Ainer Admin dev fixture owner and member usernames must be different");
         }
 
-        TenantOwnerBootstrapResult owner = identityService.ensureTenantOwner(
-                new ProvisionTenantOwnerCommand(
-                        ADMIN_TENANT_CODE,
-                        ADMIN_TENANT_NAME,
-                        properties.getOwnerUsername(),
-                        properties.getOwnerPassword(),
-                        properties.getOwnerDisplayName()));
-        TenantOwnerBootstrapResult member = identityService.ensureTenantOwner(
-                new ProvisionTenantOwnerCommand(
-                        MEMBER_HOME_TENANT_CODE,
-                        MEMBER_HOME_TENANT_NAME,
-                        properties.getMemberUsername(),
-                        properties.getMemberPassword(),
-                        properties.getMemberDisplayName()));
+        String issuer = authorizationProperties.getIssuer();
+        if (issuer == null || issuer.isBlank()) {
+            throw new IllegalStateException("Ainer Admin dev fixture authorization server issuer is required");
+        }
+        IdentityAuthorityRef authority = new IdentityAuthorityRef(issuer);
+        IdentityFoundationService.RegisteredAccount owner = ensureAccount(
+                authority, issuer, properties.getOwnerUsername(), properties.getOwnerPassword(),
+                properties.getOwnerDisplayName());
+        IdentityFoundationService.RegisteredAccount member = ensureAccount(
+                authority, issuer, properties.getMemberUsername(), properties.getMemberPassword(),
+                properties.getMemberDisplayName());
         log.info(
-                "Ainer Admin dev fixture ready (admin tenant={}, owner subject={}, member home tenant={}, "
-                        + "member subject={})",
-                owner.identity().tenantId(),
-                owner.identity().subjectId(),
-                member.identity().tenantId(),
-                member.identity().subjectId());
+                "Ainer Admin dev foundation fixture ready (owner account={}, member account={})",
+                owner.account().accountId(), member.account().accountId());
+    }
+
+    private IdentityFoundationService.RegisteredAccount ensureAccount(
+            IdentityAuthorityRef authority,
+            String issuer,
+            String rawUsername,
+            String password,
+            String displayName) {
+        String username = normalize(rawUsername);
+        IdentityFoundationService.CredentialLookup existing = foundationService
+                .findPasswordCredentialForLogin(LoginIdentityType.USERNAME, issuer, username)
+                .orElse(null);
+        if (existing != null) {
+            foundationService.updateProfile(existing.account().accountId(), displayName, null);
+            return new IdentityFoundationService.RegisteredAccount(
+                    existing.account(),
+                    foundationService.findLogin(LoginIdentityType.USERNAME, issuer, username).orElseThrow());
+        }
+        if (foundationService.findLogin(LoginIdentityType.USERNAME, issuer, username).isPresent()) {
+            throw new IllegalStateException(
+                    "Ainer Admin dev fixture found an incomplete username binding");
+        }
+        IdentityFoundationService.RegisteredAccount registered = foundationService
+                .registerHumanAccountWithPassword(
+                        authority, LoginIdentityType.USERNAME, issuer, username, password);
+        foundationService.updateProfile(registered.account().accountId(), displayName, null);
+        return registered;
     }
 
     private static void requireText(String value, String name) {

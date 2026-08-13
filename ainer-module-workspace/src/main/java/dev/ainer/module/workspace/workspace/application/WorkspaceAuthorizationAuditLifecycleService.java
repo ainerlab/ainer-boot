@@ -1,7 +1,6 @@
 package dev.ainer.module.workspace.workspace.application;
 
 import dev.ainer.core.error.BusinessException;
-import dev.ainer.module.workspace.workspace.domain.TenantId;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,16 +38,16 @@ public class WorkspaceAuthorizationAuditLifecycleService {
     @Transactional
     public WorkspaceAuthorizationAuditExportBatch export(
             String exporterServiceId,
-            TenantId tenantId,
+            UUID workspaceId,
             WorkspaceAuthorizationAuditCursor cursor,
             int limit) {
         Objects.requireNonNull(exporterServiceId, "exporterServiceId");
-        Objects.requireNonNull(tenantId, "tenantId");
+        Objects.requireNonNull(workspaceId, "workspaceId");
         if (limit < 1 || limit > 1000) {
             throw new BusinessException(WorkspaceErrorCode.INVALID_AUDIT_EXPORT_REQUEST);
         }
         List<WorkspaceAuthorizationAudit> rows = repository.exportAfter(
-                tenantId, cursor, limit + 1);
+                workspaceId, cursor, limit + 1);
         boolean hasMore = rows.size() > limit;
         List<WorkspaceAuthorizationAudit> items = hasMore
                 ? List.copyOf(rows.subList(0, limit))
@@ -59,7 +58,7 @@ public class WorkspaceAuthorizationAuditLifecycleService {
                         items.getLast().occurredAt(), items.getLast().id());
         UUID operationId = UUID.randomUUID();
         operationAuditRepository.insert(new WorkspaceSecurityOperationAudit(
-                UUID.randomUUID(), operationId, tenantId, null, null,
+                UUID.randomUUID(), operationId, workspaceId, null,
                 "AUTHORIZATION_AUDIT_EXPORT", "EXPORTED", exporterServiceId,
                 null, items.size(), clock.instant()));
         return new WorkspaceAuthorizationAuditExportBatch(items, nextCursor, hasMore);

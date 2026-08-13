@@ -1,6 +1,7 @@
 package dev.ainer.authorizationserver.passkey;
 
 import dev.ainer.core.error.BusinessException;
+import dev.ainer.module.identity.foundation.HumanAccountRepository;
 import dev.ainer.web.request.RequestIdFilter;
 import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -14,115 +15,118 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Passkey enrollment 授权控制面（默认关闭）。见 ADR-0016。操作员预登记“某 subject 允许登记首枚
- * Passkey”的授权行；首枚 Passkey 登记成功后由凭证仓库同事务置 CONSUMED。
- */
+/** Account-bound authorization for the first Passkey enrollment. */
 public final class AinerPasskeyEnrollmentGrantService {
 
     private static final String ACTIVE = "ACTIVE";
     private static final String REVOKED = "REVOKED";
 
     private final JdbcTemplate jdbcTemplate;
-    private final AinerPasskeyTenantSubjectGuard tenantSubjectGuard;
+    private final HumanAccountRepository humanAccountRepository;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
 
     public AinerPasskeyEnrollmentGrantService(
             JdbcTemplate jdbcTemplate,
-            AinerPasskeyTenantSubjectGuard tenantSubjectGuard,
+            HumanAccountRepository humanAccountRepository,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         this.jdbcTemplate = jdbcTemplate;
-        this.tenantSubjectGuard = tenantSubjectGuard;
+        this.humanAccountRepository = humanAccountRepository;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
 
-    public EnrollmentGrant grant(
-            String grantedBy, UUID tenantId, UUID subjectId, String incidentReference) {
+    public AccountEnrollmentGrant grant(String grantedBy, UUID accountId, String incidentReference) {
         requireSafe(grantedBy, "grantedBy");
         requireSafe(incidentReference, "incidentReference");
-        Assert.notNull(tenantId, "tenantId cannot be null");
-        Assert.notNull(subjectId, "subjectId cannot be null");
+        Assert.notNull(accountId, "accountId cannot be null");
         return transactionTemplate.execute(status -> {
-            tenantSubjectGuard.requireActiveHomeTenantSubject(tenantId, subjectId);
+            requireActiveAccount(accountId);
             Instant now = clock.instant();
             int upserted = jdbcTemplate.update(
                     """
                     INSERT INTO ainer_passkey_enrollment_grant(
-                        subject_id, tenant_id, granted_by, incident_reference, status, granted_at, consumed_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, NULL)
-                    ON CONFLICT (subject_id) DO UPDATE
-                        SET tenant_id = EXCLUDED.tenant_id,
-                            granted_by = EXCLUDED.granted_by,
+                        account_id, granted_by, incident_reference, status, granted_at, consumed_at
+                    ) VALUES (?, ?, ?, ?, ?, NULL)
+                    ON CONFLICT (account_id) DO UPDATE
+                        SET granted_by = EXCLUDED.granted_by,
                             incident_reference = EXCLUDED.incident_reference,
-                            status = 'ACTIVE',
-                            granted_at = EXCLUDED.granted_at,
-                            consumed_at = NULL
+                            status = 'ACTIVE', granted_at = EXCLUDED.granted_at, consumed_at = NULL
                     WHERE ainer_passkey_enrollment_grant.status <> 'ACTIVE'
                     """,
-                    subjectId, tenantId, grantedBy, incidentReference, ACTIVE, Timestamp.from(now));
+                    accountId, grantedBy, incidentReference, ACTIVE, Timestamp.from(now));
             if (upserted == 0) {
                 throw new BusinessException(PasskeyErrorCode.ENROLLMENT_GRANT_CONFLICT);
             }
-            securityAudit(subjectId, tenantId, grantedBy, incidentReference, "GRANTED", now);
-            return new EnrollmentGrant(subjectId, tenantId, grantedBy, incidentReference, ACTIVE, now, null);
+            securityAudit(accountId, grantedBy, incidentReference, "GRANTED", now);
+            return new AccountEnrollmentGrant(accountId, grantedBy, incidentReference, ACTIVE, now, null);
         });
     }
 
-    public EnrollmentGrant revoke(String revokedBy, UUID tenantId, UUID subjectId) {
+    public AccountEnrollmentGrant revoke(String revokedBy, UUID accountId) {
         requireSafe(revokedBy, "revokedBy");
+        Assert.notNull(accountId, "accountId cannot be null");
         return transactionTemplate.execute(status -> {
             Instant now = clock.instant();
             int changed = jdbcTemplate.update(
                     """
                     UPDATE ainer_passkey_enrollment_grant
-                    SET status = ?
-                    WHERE subject_id = ? AND tenant_id = ? AND status = 'ACTIVE'
+                    SET status = 'REVOKED'
+                    WHERE account_id = ? AND status = 'ACTIVE'
                     """,
-                    REVOKED, subjectId, tenantId);
+                    accountId);
             if (changed != 1) {
                 throw new BusinessException(PasskeyErrorCode.ENROLLMENT_GRANT_NOT_FOUND);
             }
-            securityAudit(subjectId, tenantId, revokedBy, "revoke", "REVOKED", now);
-            return new EnrollmentGrant(subjectId, tenantId, revokedBy, "revoked", REVOKED, now, null);
+            securityAudit(accountId, revokedBy, "revoked", REVOKED, now);
+            return new AccountEnrollmentGrant(accountId, revokedBy, "revoked", REVOKED, now, null);
         });
     }
 
-    public List<EnrollmentGrant> findGrants(UUID tenantId) {
+    public List<AccountEnrollmentGrant> findGrantsForAccount(UUID accountId) {
         return jdbcTemplate.query(
                 """
-                SELECT subject_id, tenant_id, granted_by, incident_reference, status, granted_at, consumed_at
+                SELECT account_id, granted_by, incident_reference, status, granted_at, consumed_at
                 FROM ainer_passkey_enrollment_grant
-                WHERE tenant_id = ?
-                ORDER BY granted_at DESC, subject_id
+                WHERE account_id = ?
+                ORDER BY granted_at DESC
                 """,
-                (resultSet, rowNumber) -> new EnrollmentGrant(
-                        UUID.fromString(resultSet.getString("subject_id")),
-                        UUID.fromString(resultSet.getString("tenant_id")),
+                (resultSet, rowNumber) -> new AccountEnrollmentGrant(
+                        resultSet.getObject("account_id", UUID.class),
                         resultSet.getString("granted_by"),
                         resultSet.getString("incident_reference"),
                         resultSet.getString("status"),
                         resultSet.getTimestamp("granted_at").toInstant(),
                         resultSet.getTimestamp("consumed_at") == null
                                 ? null : resultSet.getTimestamp("consumed_at").toInstant()),
-                tenantId);
+                accountId);
+    }
+
+    private void requireActiveAccount(UUID accountId) {
+        if (humanAccountRepository.findByAccountId(accountId)
+                .filter(account -> account.status().canAuthenticate())
+                .isEmpty()) {
+            throw new BusinessException(PasskeyErrorCode.ACCOUNT_NOT_FOUND);
+        }
     }
 
     private void securityAudit(
-            UUID subjectId, UUID tenantId, String actorServiceId,
-            String incidentReference, String phase, Instant occurredAt) {
+            UUID accountId, String actorServiceId, String incidentReference,
+            String phase, Instant occurredAt) {
         jdbcTemplate.update(
                 """
                 INSERT INTO ainer_passkey_security_operation_audit(
-                    id, operation_id, tenant_id, subject_id, operation_type, phase,
+                    id, operation_id, account_id, operation_type, phase,
                     actor_type, actor_id, incident_reference, request_id, occurred_at
-                ) VALUES (?, ?, ?, ?, 'ENROLLMENT_GRANT', ?, 'SERVICE', ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, 'ENROLLMENT_GRANT', ?, 'SERVICE', ?, ?, ?, ?)
                 """,
-                UUID.randomUUID(), UUID.randomUUID(), tenantId, subjectId, phase,
-                actorServiceId, incidentReference, MDC.get(RequestIdFilter.MDC_KEY),
-                Timestamp.from(occurredAt));
+                nextUuidV7(), nextUuidV7(), accountId, phase, actorServiceId,
+                incidentReference, MDC.get(RequestIdFilter.MDC_KEY), Timestamp.from(occurredAt));
+    }
+
+    private UUID nextUuidV7() {
+        return jdbcTemplate.queryForObject("SELECT uuidv7()", UUID.class);
     }
 
     private static void requireSafe(String value, String name) {
@@ -131,8 +135,8 @@ public final class AinerPasskeyEnrollmentGrantService {
         }
     }
 
-    public record EnrollmentGrant(
-            UUID subjectId, UUID tenantId, String grantedBy, String incidentReference,
+    public record AccountEnrollmentGrant(
+            UUID accountId, String grantedBy, String incidentReference,
             String status, Instant grantedAt, Instant consumedAt) {
     }
 }

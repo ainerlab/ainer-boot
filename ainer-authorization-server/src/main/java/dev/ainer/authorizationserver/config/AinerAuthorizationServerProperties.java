@@ -16,13 +16,7 @@ public class AinerAuthorizationServerProperties {
     private final MachineClientBootstrap machineClientBootstrap;
     private final IntrospectionClientBootstrap introspectionClientBootstrap;
     private final MetricsClientBootstrap metricsClientBootstrap;
-    private final ClientControlOperatorBootstrap clientControlOperatorBootstrap;
     private final BrowserClientControlOperatorBootstrap browserClientControlOperatorBootstrap;
-    private final PlatformIdentityOperatorBootstrap platformIdentityOperatorBootstrap;
-    private final ProvisioningNotificationRelayClientBootstrap
-            provisioningNotificationRelayClientBootstrap;
-    private final ProvisioningNotificationReceiptClientBootstrap
-            provisioningNotificationReceiptClientBootstrap;
 
     public AinerAuthorizationServerProperties(
             String issuer,
@@ -32,39 +26,23 @@ public class AinerAuthorizationServerProperties {
             MachineClientBootstrap machineClientBootstrap,
             IntrospectionClientBootstrap introspectionClientBootstrap,
             MetricsClientBootstrap metricsClientBootstrap,
-            ClientControlOperatorBootstrap clientControlOperatorBootstrap,
-            BrowserClientControlOperatorBootstrap browserClientControlOperatorBootstrap,
-            PlatformIdentityOperatorBootstrap platformIdentityOperatorBootstrap,
-            ProvisioningNotificationRelayClientBootstrap provisioningNotificationRelayClientBootstrap,
-            ProvisioningNotificationReceiptClientBootstrap provisioningNotificationReceiptClientBootstrap) {
+            BrowserClientControlOperatorBootstrap browserClientControlOperatorBootstrap) {
         this.issuer = issuer;
         this.audience = audience != null ? audience : "ainer-api";
         this.signingKey = signingKey != null ? signingKey : new SigningKey(null, null, null);
         this.passkey = passkey != null ? passkey : new Passkey(false, null, null, null, false, null);
         this.machineClientBootstrap = machineClientBootstrap != null
                 ? machineClientBootstrap
-                : new MachineClientBootstrap(false, null, null, null, null);
+                : new MachineClientBootstrap(false, null, null, null);
         this.introspectionClientBootstrap = introspectionClientBootstrap != null
                 ? introspectionClientBootstrap
                 : new IntrospectionClientBootstrap(false, null, null);
         this.metricsClientBootstrap = metricsClientBootstrap != null
                 ? metricsClientBootstrap
                 : new MetricsClientBootstrap(false, null, null);
-        this.clientControlOperatorBootstrap = clientControlOperatorBootstrap != null
-                ? clientControlOperatorBootstrap
-                : new ClientControlOperatorBootstrap(false, null, null);
         this.browserClientControlOperatorBootstrap = browserClientControlOperatorBootstrap != null
                 ? browserClientControlOperatorBootstrap
                 : new BrowserClientControlOperatorBootstrap(false, null, null);
-        this.platformIdentityOperatorBootstrap = platformIdentityOperatorBootstrap != null
-                ? platformIdentityOperatorBootstrap
-                : new PlatformIdentityOperatorBootstrap(false, null, null);
-        this.provisioningNotificationRelayClientBootstrap = provisioningNotificationRelayClientBootstrap != null
-                ? provisioningNotificationRelayClientBootstrap
-                : new ProvisioningNotificationRelayClientBootstrap(false, null, null);
-        this.provisioningNotificationReceiptClientBootstrap = provisioningNotificationReceiptClientBootstrap != null
-                ? provisioningNotificationReceiptClientBootstrap
-                : new ProvisioningNotificationReceiptClientBootstrap(false, null, null);
     }
 
     public String getIssuer() {
@@ -95,26 +73,8 @@ public class AinerAuthorizationServerProperties {
         return metricsClientBootstrap;
     }
 
-    public ClientControlOperatorBootstrap getClientControlOperatorBootstrap() {
-        return clientControlOperatorBootstrap;
-    }
-
     public BrowserClientControlOperatorBootstrap getBrowserClientControlOperatorBootstrap() {
         return browserClientControlOperatorBootstrap;
-    }
-
-    public PlatformIdentityOperatorBootstrap getPlatformIdentityOperatorBootstrap() {
-        return platformIdentityOperatorBootstrap;
-    }
-
-    public ProvisioningNotificationRelayClientBootstrap
-            getProvisioningNotificationRelayClientBootstrap() {
-        return provisioningNotificationRelayClientBootstrap;
-    }
-
-    public ProvisioningNotificationReceiptClientBootstrap
-            getProvisioningNotificationReceiptClientBootstrap() {
-        return provisioningNotificationReceiptClientBootstrap;
     }
 
     public static final class SigningKey {
@@ -196,15 +156,13 @@ public class AinerAuthorizationServerProperties {
         private final boolean enabled;
         private final String clientId;
         private final String clientSecret;
-        private final String tenantId;
         private final List<String> scopes;
 
         public MachineClientBootstrap(
-                boolean enabled, String clientId, String clientSecret, String tenantId, List<String> scopes) {
+                boolean enabled, String clientId, String clientSecret, List<String> scopes) {
             this.enabled = enabled;
             this.clientId = clientId;
             this.clientSecret = clientSecret;
-            this.tenantId = tenantId;
             this.scopes = scopes != null ? new ArrayList<>(scopes) : new ArrayList<>(List.of("ai.invoke"));
         }
 
@@ -218,10 +176,6 @@ public class AinerAuthorizationServerProperties {
 
         public String getClientSecret() {
             return clientSecret;
-        }
-
-        public String getTenantId() {
-            return tenantId;
         }
 
         public List<String> getScopes() {
@@ -279,31 +233,6 @@ public class AinerAuthorizationServerProperties {
         }
     }
 
-    public static final class ClientControlOperatorBootstrap {
-
-        private final boolean enabled;
-        private final String clientId;
-        private final String clientSecret;
-
-        public ClientControlOperatorBootstrap(boolean enabled, String clientId, String clientSecret) {
-            this.enabled = enabled;
-            this.clientId = clientId;
-            this.clientSecret = clientSecret;
-        }
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public String getClientId() {
-            return clientId;
-        }
-
-        public String getClientSecret() {
-            return clientSecret;
-        }
-    }
-
     public static final class BrowserClientControlOperatorBootstrap {
 
         private final boolean enabled;
@@ -329,78 +258,4 @@ public class AinerAuthorizationServerProperties {
         }
     }
 
-    public static final class PlatformIdentityOperatorBootstrap {
-
-        private final boolean enabled;
-        private final String clientId;
-        private final String clientSecret;
-
-        public PlatformIdentityOperatorBootstrap(boolean enabled, String clientId, String clientSecret) {
-            this.enabled = enabled;
-            this.clientId = clientId;
-            this.clientSecret = clientSecret;
-        }
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public String getClientId() {
-            return clientId;
-        }
-
-        public String getClientSecret() {
-            return clientSecret;
-        }
-    }
-
-    public static final class ProvisioningNotificationRelayClientBootstrap {
-
-        private final boolean enabled;
-        private final String clientId;
-        private final String clientSecret;
-
-        public ProvisioningNotificationRelayClientBootstrap(boolean enabled, String clientId, String clientSecret) {
-            this.enabled = enabled;
-            this.clientId = clientId;
-            this.clientSecret = clientSecret;
-        }
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public String getClientId() {
-            return clientId;
-        }
-
-        public String getClientSecret() {
-            return clientSecret;
-        }
-    }
-
-    public static final class ProvisioningNotificationReceiptClientBootstrap {
-
-        private final boolean enabled;
-        private final String clientId;
-        private final String clientSecret;
-
-        public ProvisioningNotificationReceiptClientBootstrap(boolean enabled, String clientId, String clientSecret) {
-            this.enabled = enabled;
-            this.clientId = clientId;
-            this.clientSecret = clientSecret;
-        }
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public String getClientId() {
-            return clientId;
-        }
-
-        public String getClientSecret() {
-            return clientSecret;
-        }
-    }
 }
