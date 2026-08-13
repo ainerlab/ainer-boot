@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-11 · 工程版本：`0.1.0-SNAPSHOT`
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-13 · 工程版本：`0.1.0-SNAPSHOT`
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -34,20 +34,24 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 组织/行业模板与策略包是 ADR-0035 决策 7 明示的 v1 非目标，属 Studio/Enterprise 扩展
 （设计文档能力矩阵第 94 行），移交 P3+ 扩展清单，不再作为 P2 阻塞项。
 
-2026-08-12 P3 企业基建批次完成：文件存储 SPI、字典、配置、通知、缓存 starter、Spring Cache 改造。
-新建 5 个模块（ainer-module-dictionary/config/notification + ainer-starter-cache + 文件存储 SPI），
-全部装配到 ainer-server。ADR-0038（P4 范围精简）+ ADR-0039（缓存基础设施）Accepted。
-验证基线：336 tests / 0 fail / 0 error / 0 skipped，23 模块全部 SUCCESS。
+2026-08-12 P3 企业基建首批代码完成：文件存储 SPI、字典、配置、通知、缓存 starter、Spring Cache
+改造。新建 5 个模块（ainer-module-dictionary/config/notification + ainer-starter-cache + 文件存储
+SPI），全部装配到 ainer-server。ADR-0039 Accepted；ADR-0038 已因决策维护违规被 ADR-0040 合规取代。
+最近完整基线为 336 tests / 0 fail / 0 error / 0 skipped，23 模块全部 SUCCESS。G1 尚未关闭：文件
+元数据持久化、P3 服务端管理 API/OpenAPI 与对应安全/审计门禁仍需完成。
 
-2026-08-11 已确认按分阶段方式推进 `0.1`：先形成只供 `xq-platform-next` 使用的受控
-`0.1.0-rc.1`，再以远端不可变制品完成一个真实产品纵向切片、升级和回滚验证，之后才决定提升为
-`0.1.0` 并开放给其他内部产品。方法级 AOP、RFC 9470、完整 obligation executor、组织目录、RAG/
-Agent 与高可用不作为首个 RC 的无限前置；未完成能力必须从支持面明确排除。
+2026-08-13 已确认按 ADR-0040/0041 分阶段推进 `0.1`。GitHub Packages 中存在签名的
+`0.1.0-rc.1` 制品：成功 deploy run `31658811613` 的源码为 `77342b6`，336 tests / 0 failure /
+0 error / 0 skipped；但当前 tag `v0.1.0-rc.1` 指向后续 workflow 修复 `e7c653f`，且没有完整远端
+读回、SBOM/checksum/provenance release assets、远端空仓 consumer 或 GitHub Release。因此该版本是
+**withdrawn / non-qualifying**，不能供产品消费，也不能移动/删除/覆盖后重发。
 
-当前仍未产生远端 RC：工程版本保持 `0.1.0-SNAPSHOT`。RC 前的硬门禁是最新提交通过远端 CI/
-gitleaks、私有分支控制形成批准的补偿措施、签名 key/secret 实际配置、GitHub Packages tag 发布、
-远端制品独立消费和回滚记录。许可状态仍为私有/专有；公开发行必须另行完成 LICENSE/NOTICE、品牌
-资产和对外许可决策，不得因内部 RC 自动宣称已经开源。
+工程版本保持 `0.1.0-SNAPSHOT`，下一候选必须使用 `0.1.0-rc.2` 或更高唯一版本。当前发布加固代码已
+加入 annotated tag/source 校验、版本存在性预检、passphrase-protected GPG 与 fingerprint 固定、远端
+Maven 3/4 与 Initializer 空仓消费、107 个主制品/107 个签名完整读回、签名
+SBOM/checksum/provenance 和最后创建 immutable GitHub Release；本地实现与验证已完成，尚需远端 CI
+与新 RC 实跑证据。许可状态仍为私有/专有；
+公开发行必须另行完成 LICENSE/NOTICE、品牌资产和对外许可决策。
 
 ## 2. 当前已完成能力与历史施工记录
 
@@ -247,14 +251,42 @@ gitleaks、私有分支控制形成批准的补偿措施、签名 key/secret 实
 
 ## 3. 最近验证记录
 
-2026-08-12 ADR-0038：P4 范围精简与企业基建前置
-- **产品方向决策**：基于 Ainer-Boot 核心思想（AI-native 平台内核，非万能企业后台），重新定义 P3/P4：
-  - **P3 扩展**：纳入文件存储 SPI、字典/配置极简模块（开发任何产品后台的阻塞基座）
-  - **P4 收窄**：聚焦 AI 治理深化（Agent 代行 ADR-0031、Knowledge ADR-0034、Evaluation/Guardrails）
-  - **通知/任务/缓存等改为端口 + 文档**：业务语义高度产品特定，Ainer 提供端口契约与最佳实践文档，
-    产品自实现，避免脚手架膨胀为万能工具包
-  - **组织目录（ADR-0032）精简为 P3 可选**：扁平组织 + 任职，复杂层级推迟
-- scaffold-design §13 P3/P4 验收标准已同步更新。
+2026-08-13 G2 发布事故复核与 release hardening（本地实现，远端 RC 待验证）
+- **`rc.1` 结论**：run `31658811613` 的 build/sign/deploy 与 336/0/0/0 成功，不等于合格发布；
+  provenance 因私有仓库计费限制失败，后续 tag/workflow 修复导致 tag/source 与已部署字节不一致，
+  同版本重跑得到 409。ADR-0041 将其标记为 withdrawn/non-qualifying，禁止消费或复用。
+- **签名密钥收紧**：根 reactor 与 parentless BOM 恢复 Maven GPG Plugin `bestPractices=true` 和
+  `MAVEN_GPG_PASSPHRASE` 绑定；workflow 拒绝空口令，在 deploy 前执行签名 probe，删除 CLI passphrase。
+  导入 key 还必须匹配 repository variable 固定的 40 位 fingerprint。当前 GitHub secret 中的无口令
+  key 必须轮换/重新导出，并同步设置 fingerprint 后才能发布 `rc.2+`。
+- **发布前门禁**：只接受与事件源码及默认分支头一致的 annotated SemVer tag；目标 BOM 版本存在即
+  失败；GitHub Immutable Releases 已于 2026-08-13 远端启用（API readback `enabled=true`），workflow
+  还要求 repository variable 声明并在 Release 创建后读回 `immutable=true`；shell 合同禁止再次硬编码
+  `ab` 路径、拼错版本变量或放行 attestation。
+- **发布后门禁**：Maven 3/4 分别从空本地仓库消费远端 BOM/Starter，Initializer CLI 也从远端 classifier
+  获取；完整读回 23 个 project 的 build/consumer POM、20 组 main/sources/Javadoc 与 CLI classifier，
+  共 107 个主制品和 107 个 `.asc`，逐一验证精确 fingerprint。`scripts/release-artifacts.txt` 是唯一
+  制品清单，合同测试将它与实际 reactor POM 对照，避免新增模块静默漏验。
+- **证据策略**：CycloneDX SBOM、远端 SHA-256/SHA-512、Ainer 签名 provenance、公钥/fingerprint 和
+  证据签名是强制 release assets；GitHub Attestations 仅在显式启用且计费支持时作为附加失败关闭门禁，
+  不再 `continue-on-error`，也不把项目 provenance 宣称为 GitHub Attestation/SLSA 等级。
+- **虚拟线程矩阵**：修复 Ubuntu 上 `command -v ab` 检查后仍硬编码 `/usr/sbin/ab` 的 CI 失败，统一使用
+  实际解析路径，并修正 `AINNER_VERSION` 拼写。缩短版本地双模式矩阵通过：平台/虚拟两种模式的
+  JDBC 与等待接口各 40 请求，合计 160 请求、0 failed；完整 matrix 数值须由本变更远端 CI 重新产生。
+- **本地验证**：JDK 25 + Maven 4.0.0-rc-6 `./mvnw clean verify` 为 23/23 SUCCESS，
+  **336 tests / 0 failure / 0 error / 0 skipped**；本地 Maven 3/4 Golden Consumer、Initializer
+  普通/PostgreSQL/CRUD 门禁通过。passphrase-protected 临时 key 已分别验证根 reactor 与 parentless BOM
+  的 GPG 配置；本地 HTTP registry 夹具完成 107 个主制品 + 107 个签名读回、精确 fingerprint 验证和
+  107-subject provenance。shell/发布合同、严格 SemVer 正负例、版本存在性正负例、workflow YAML 与
+  `git diff --check` 均通过。
+- **证据边界**：上述 registry/GPG 结果使用本地一次性夹具，不是 GitHub Packages 或正式发布 key
+  证据；本变更尚未推送，远端 CI、gitleaks、完整 2000-request matrix、`rc.2+` deploy、远端消费者与
+  immutable GitHub Release 均未发生。
+
+2026-08-12 历史 ADR-0038 批次：P4 范围精简与企业基建前置（已被 ADR-0040 取代）
+- **决策状态**：下列方向是当时记录；ADR-0038 后续被直接改写，现已由 ADR-0040 合规取代。当前
+  Stable/Incubating/非目标与 G0–G4 路线只以 ADR-0040 为准，尤其“通知/任务/缓存只给端口”的结论
+  不再生效。
 - **文件存储 SPI**（首批 P3 基建代码）：`FileStoragePort` 端口 + `StoredFile` record +
   `StorageErrorCode`（ainer-core）；`LocalFileStorageAdapter` 本地适配器 +
   `LocalFileStorageAutoConfiguration`（ainer-spring，`@ConditionalOnMissingBean`，产品可覆盖）；
@@ -270,8 +302,9 @@ gitleaks、私有分支控制形成批准的补偿措施、签名 key/secret 实
   在 GitHub 设置启用 required review 即可生效。
 - gitleaks 已在 ci.yml `secret-scan` job（`gitleaks detect --config .gitleaks.toml`，docs allowlist）。
 - **P0 剩余**：分支保护（private + 免费版无法启用，待可见性/计费决策，非代码层面）。
-- **P1 剩余**：真实 non-SNAPSHOT `0.1.0-rc.1` 远端发布（GPG 签名 + GitHub Packages tag + provenance），
-  发布基础设施已就绪（release.yml + SCM + GPG 配置），等待实际执行远端发布。
+- **P1/G2 剩余**：`0.1.0-rc.1` 已撤回；等待 release hardening 合并、passphrase-protected signing key、
+  最新 CI/gitleaks 和全新 annotated `0.1.0-rc.2+` 实跑，验证远端空仓消费、107/107 签名读回、
+  SBOM/checksum/provenance 与 immutable GitHub Release。
 
 2026-08-11 `0.1.0-rc.1` 就绪批次 1：端点授权真实装配 + 签名发布 fail-closed
 - **端点授权进入真实运行路径**：Servlet Web 宿主在存在 `AuthenticatedPrincipalResolver` 时条件装配
@@ -1010,16 +1043,15 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
   wrapper 已修、本地 `./mvnw clean verify` 已达成 `0 skipped`、consumer 门禁已通过（2026-08-04），工作流已
   首次跑绿（run 30904716377，ubuntu 原生 Docker）；但 private + GitHub 免费版无法启用分支保护/必需检查，
   目前靠「绿了再合」软约束，硬性 gate 待仓库可见性/计费决策，故尚未称为正式 CI；
-  制品发布代码已加固但真实发布仍未闭环：tag workflow 强制语义化非 SNAPSHOT 版本、Docker、锁定
-  Maven 3.9.16、Maven 3/4 Golden Consumer、Initializer consumer、`clean deploy` 和零跳过检查；所有
-  tag 发布必须显式开启签名并提供 key/passphrase，passphrase 只走环境变量，parentless BOM 拥有独立
-  POM 签名 profile。尚未配置正式 key/secret、未推送真实 tag、未验证 GitHub Packages 远端制品与
-  provenance，因此当前仍不能关闭 P1；
+  `0.1.0-rc.1` 已完成一次正式 key 的签名 deploy，但因源码/tag 不一致、无 GitHub Release、无完整
+  远端消费与 provenance 证据而撤回。当前 workflow 进一步要求 annotated tag/source、目标版本不存在、
+  passphrase-protected key、远端空仓 consumers、107/107 读回验签、签名 SBOM/checksum/provenance 和
+  immutable GitHub Release。新流程尚未由 `rc.2+` 实跑，因此仍不能关闭 P1/G2；
 - Maven 4 当前 source model 仍会对 reactor 内部 BOM import 输出
   `BOM imports from within reactor should be avoided` 告警。ADR-0026 已把 POM 4.1/model 重构留给
-  后续独立原型；`0.1.0-rc.1` 前必须把它作为已知例外显式批准，或另立决策完成模型调整，不能把
+  后续独立原型；下一个合格 RC 前必须把它作为已知例外显式批准，或另立决策完成模型调整，不能把
   告警静默当作已解决；
-- 没有具名模块维护者矩阵、`CODEOWNERS` 和正式审查责任分配；
+- 已有 `.github/CODEOWNERS`，但 private 免费仓库仍缺受保护分支/必需审查的远端强制执行；
 - 没有生产备份恢复、容量测试、正式错误预算/告警路由和灾难恢复演练；
 - 没有稳定版兼容政策；许可证决策为暂不开源（私有/专有），未来若开源或对外发布再定商业/开源许可；付费产品交付系统未建立；
 - Testcontainers 仍使用 `disabledWithoutDocker`；本机 Colima 与候选 CI 均已完整执行，候选 CI 已用
@@ -1038,12 +1070,10 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 按
 [`Ainer Boot 产品定位、竞品能力矩阵与路线图`](design/ainer-scaffold-design.md)
-定义的全局产品化阶段，当前仍处于 **P0/P1 收口、P2 已完成、P3 前置消费者已生成**：最新分支尚未
-推送并取得远端 CI/gitleaks 证据，private 仓库的分支保护仍需批准的补偿措施；正式 signing key、
-GitHub Packages 非 SNAPSHOT tag、远端独立消费、LICENSE/NOTICE 对外决策与回滚记录均未闭环。
-P2 的 manifest/preview/diff/CRUD 与量化门禁已经完成；`xq-platform-next` 目前只是消费 SNAPSHOT 的生成
-骨架，还不是用远端 RC 交付的真实产品纵向切片。因此允许推进 `0.1.0-rc.1` 准备，不允许把当前
-源码标记为稳定 `0.1.0`。
+定义的全局产品化阶段，当前是 **G0 已冻结、G1/P1 收口、P2 已完成、G2 发布列车整改中**：P3
+企业基座已有代码但文件元数据与管理 API/OpenAPI 尚未完成；`rc.1` 已撤回，不是可消费 RC；新的
+release hardening 尚无远端 CI/`rc.2+` 结果，private 仓库分支保护仍缺远端强制执行。`xq-platform-next`
+目前仍不是用合格远端 RC 交付的真实产品纵向切片，因此不允许把当前源码标记为稳定 `0.1.0`。
 
 ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -Denforcer.skip=true` 验证；正式
 `./mvnw clean verify`、零跳过门禁与 Testcontainers 集成仍待 Maven 4 RC6 官方发行包恢复后执行）：
@@ -1073,15 +1103,16 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 
 `0.1` 主线按以下顺序推进：
 
-1. 完成本批端点授权真实装配、文档真值、签名发布 fail-closed 与 parentless BOM 签名验证，并保持
-   `./mvnw clean verify`、Maven 3/4 consumer、Initializer consumer 全绿；
-2. 推送当前领先远端的提交，取得最新 commit 的 CI 与 gitleaks 结果；对 private 仓库无法开启分支
-   保护形成书面、可执行的 review/tag 补偿控制；
-3. 生成并配置正式 signing key/secret，审核 `0.1.0-rc.1` Changelog，在批准后创建并推送 tag，验证
-   GitHub Packages、sources/Javadoc、BOM/JAR/POM `.asc`、SBOM、checksum 与 provenance；
-4. 让 `xq-platform-next` 删除 `0.1.0-SNAPSHOT` 与本地仓库依赖，固定从远端消费
-   `0.1.0-rc.1`，完成 JWT、Workspace/资源授权、PostgreSQL migration、真实 HTTP 错误和客户端 SDK
-   的产品所有纵向切片，同时演练回滚；
+1. 将 signing key 轮换/重新导出为非空 passphrase 保护，更新 GitHub secrets，并设置
+   `AINER_RELEASE_GPG_FINGERPRINT`；Immutable Releases 与 `AINER_IMMUTABLE_RELEASES=true` 已启用；
+2. 推送本变更并取得最新 commit 的 CI/gitleaks/完整 virtual-thread matrix 结果，确认批准的
+   review/tag 补偿控制；
+3. 审核 Changelog 后创建全新
+   annotated `v0.1.0-rc.2` 或更高 tag，要求 workflow 完成 107/107 远端验签、空仓消费者、签名证据和
+   immutable GitHub Release；
+4. 让 `xq-platform-next` 删除 `0.1.0-SNAPSHOT` 与本地仓库依赖，固定从合格远端 RC 消费，完成 JWT、
+   Workspace/资源授权、PostgreSQL migration replay、真实 HTTP 错误和客户端 SDK 的产品所有纵向
+   切片，同时演练升级与回滚；
 5. 只有上述消费证据通过后才评估提升 `0.1.0` 并开放给其他内部产品；
    `python-learning-service` 保持版本化 BOM/Starter 接入，不绑定开发分支、不复制源码。
 

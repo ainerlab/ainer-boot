@@ -44,11 +44,12 @@ fail() {
 configured_version="$(
   sed -n 's:.*<revision>\([^<]*\)</revision>.*:\1:p' "$boot_root/pom.xml" | sed -n '1p'
 )"
-ainner_version="${AINNER_VERSION:-$configured_version}"
+ainner_version="${AINER_VERSION:-$configured_version}"
 [[ -n "$ainner_version" ]] || fail "cannot determine Ainer version; set AINER_VERSION"
 
 [[ -x "$wrapper" ]] || fail "Maven Wrapper missing: $wrapper"
-command -v ab >/dev/null || fail "ApacheBench (ab) is required for the load generator"
+ab_command="$(command -v ab || true)"
+[[ -n "$ab_command" ]] || fail "ApacheBench (ab) is required for the load generator"
 
 rm -rf "$target_dir"
 mkdir -p "$target_dir"
@@ -180,13 +181,13 @@ run_mode() {
   done
 
   # 压测分页接口（真实 JDBC 查询 + Flyway 初始化的表）。
-  /usr/sbin/ab -n "$requests" -c "$concurrency" \
+  "$ab_command" -n "$requests" -c "$concurrency" \
     -g "$target_dir/$mode.jdbc.tsv" \
     "http://127.0.0.1:$port/api/metricRows?page=1&size=10" >"$target_dir/$mode.jdbc.ab" 2>&1 || true
 
   # 压测等待型接口（模拟外部 IO 阻塞；高等待并发是虚拟线程的收益区，
   # 也是 ADR-0029 决策 5 决定「新 MVC 项目默认 v-thread」的判据之一）。
-  /usr/sbin/ab -n "$requests" -c "$wait_concurrency" \
+  "$ab_command" -n "$requests" -c "$wait_concurrency" \
     -g "$target_dir/$mode.wait.tsv" \
     "http://127.0.0.1:$port/api/wait?ms=$wait_ms" >"$target_dir/$mode.wait.ab" 2>&1 || true
 

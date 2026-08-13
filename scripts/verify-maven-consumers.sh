@@ -4,6 +4,8 @@ set -euo pipefail
 boot_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 wrapper="$boot_root/mvnw"
 maven3_command="${MAVEN3_COMMAND:-mvn}"
+artifact_source="${AINER_ARTIFACT_SOURCE:-local}"
+maven_settings="${AINER_MAVEN_SETTINGS:-}"
 
 fail() {
   echo "[ainer-maven-consumer] ERROR: $*" >&2
@@ -17,6 +19,22 @@ configured_version="$(
 ainer_version="${AINER_VERSION:-$configured_version}"
 [[ -n "$ainer_version" ]] \
   || fail "cannot determine the Ainer version; set AINER_VERSION explicitly"
+
+case "$artifact_source" in
+  local|remote) ;;
+  *) fail "AINER_ARTIFACT_SOURCE must be local or remote (got: $artifact_source)" ;;
+esac
+if [[ "$artifact_source" == "remote" && "$ainer_version" == *-SNAPSHOT ]]; then
+  fail "remote consumer verification requires a non-SNAPSHOT AINER_VERSION"
+fi
+
+maven_settings_args=()
+if [[ -n "$maven_settings" ]]; then
+  [[ -f "$maven_settings" ]] || fail "Maven settings file is missing: $maven_settings"
+  maven_settings_args=(--settings "$maven_settings")
+elif [[ "$artifact_source" == "remote" ]]; then
+  fail "remote consumer verification requires AINER_MAVEN_SETTINGS"
+fi
 
 [[ -x "$wrapper" ]] || fail "Maven Wrapper is missing or not executable: $wrapper"
 command -v "$maven3_command" >/dev/null 2>&1 \
@@ -33,7 +51,12 @@ fi
 temporary_parent="${TMPDIR:-/tmp}"
 temporary_dir="$(mktemp -d "$temporary_parent/ainer-maven-consumer.XXXXXX")"
 local_repository="$temporary_dir/repository"
+maven4_repository="$local_repository"
 consumer_dir="$temporary_dir/consumer"
+
+if [[ "$artifact_source" == "remote" ]]; then
+  maven4_repository="$temporary_dir/repository-maven4"
+fi
 
 cleanup() {
   case "$temporary_dir" in
@@ -47,62 +70,71 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$local_repository" \
+mkdir -p "$local_repository" "$maven4_repository" \
   "$consumer_dir/src/main/java/dev/ainer/consumer" \
   "$consumer_dir/src/test/java/dev/ainer/consumer"
 
-cd "$boot_root"
-"$wrapper" --batch-mode --no-transfer-progress \
-  -Dmaven.repo.local="$local_repository" \
-  -Drevision="$ainer_version" \
-  -Dgpg.skip=true \
-  -Prelease \
-  -DskipTests \
-  clean install
+if [[ "$artifact_source" == "local" ]]; then
+  cd "$boot_root"
+  "$wrapper" --batch-mode --no-transfer-progress \
+    "${maven_settings_args[@]}" \
+    -Dmaven.repo.local="$local_repository" \
+    -Drevision="$ainer_version" \
+    -Dgpg.skip=true \
+    -Prelease \
+    -DskipTests \
+    clean install
 
-installed_root="$local_repository/dev/ainer"
-[[ -d "$installed_root" ]] || fail "Ainer artifacts were not installed"
+  installed_root="$local_repository/dev/ainer"
+  [[ -d "$installed_root" ]] || fail "Ainer artifacts were not installed"
 
-# P1 发布门禁：library 制品必须附带 sources/javadoc 与 spring-configuration-metadata
-# （signature 由 release.yml 真实密钥门禁覆盖，consumer 门禁只验证伴随制品存在）。
-publish_artifacts=(ainer-spring ainer-starter-web ainer-starter-persistence ainer-starter-security \
-  ainer-test-support ainer-module-identity ainer-module-workspace ainer-module-ai-runtime ainer-module-authorization)
-for artifact in "${publish_artifacts[@]}"; do
-  base="$installed_root/$artifact/$ainer_version/$artifact-$ainer_version"
-  [[ -f "$base-sources.jar" ]] || fail "$artifact sources JAR missing"
-  [[ -f "$base-javadoc.jar" ]] || fail "$artifact javadoc JAR missing"
-done
+  # P1 发布门禁：library 制品必须附带 sources/javadoc 与 spring-configuration-metadata
+  # （signature 由 release.yml 真实密钥门禁覆盖，consumer 门禁只验证伴随制品存在）。
+  publish_artifacts=(ainer-spring ainer-starter-web ainer-starter-persistence ainer-starter-security \
+    ainer-test-support ainer-module-identity ainer-module-workspace ainer-module-ai-runtime ainer-module-authorization)
+  for artifact in "${publish_artifacts[@]}"; do
+    base="$installed_root/$artifact/$ainer_version/$artifact-$ainer_version"
+    [[ -f "$base-sources.jar" ]] || fail "$artifact sources JAR missing"
+    [[ -f "$base-javadoc.jar" ]] || fail "$artifact javadoc JAR missing"
+  done
 
-installed_poms=()
-while IFS= read -r -d '' installed_pom; do
-  installed_poms+=("$installed_pom")
-  if grep -Fq '${revision}' "$installed_pom" \
-    && ! grep -Fq "<revision>$ainer_version</revision>" "$installed_pom"; then
-    fail "consumer POM contains revision without the installed version property: $installed_pom"
-  fi
-done < <(find "$installed_root" -type f -name '*.pom' ! -name '*-build.pom' -print0)
+  installed_poms=()
+  while IFS= read -r -d '' installed_pom; do
+    installed_poms+=("$installed_pom")
+    if grep -Fq '${revision}' "$installed_pom" \
+      && ! grep -Fq "<revision>$ainer_version</revision>" "$installed_pom"; then
+      fail "consumer POM contains revision without the installed version property: $installed_pom"
+    fi
+  done < <(find "$installed_root" -type f -name '*.pom' ! -name '*-build.pom' -print0)
 
-[[ "${#installed_poms[@]}" -eq 23 ]] \
-  || fail "expected 23 installed Ainer consumer POMs, found ${#installed_poms[@]}"
+  [[ "${#installed_poms[@]}" -eq 23 ]] \
+    || fail "expected 23 installed Ainer consumer POMs, found ${#installed_poms[@]}"
 
-# Ainer 的公开配置类（含 @ConfigurationProperties 的 library/module 制品）必须随 JAR
-# 生成 spring-configuration-metadata.json（ADR-0029 P0-3）。应用可执行 JAR（ainer-server、
-# ainer-authorization-server）经 spring-boot 重打包后元数据位于 BOOT-INF/classes，不在此校验。
-config_artifacts=(ainer-spring ainer-starter-security ainer-module-ai-runtime)
-for artifact in "${config_artifacts[@]}"; do
-  jar_path="$installed_root/$artifact/$ainer_version/$artifact-$ainer_version.jar"
-  [[ -f "$jar_path" ]] || fail "$artifact JAR was not installed: $jar_path"
-  jar tf "$jar_path" | grep -Fxq 'META-INF/spring-configuration-metadata.json' \
-    || fail "$artifact JAR is missing configuration metadata"
-done
+  # Ainer 的公开配置类（含 @ConfigurationProperties 的 library/module 制品）必须随 JAR
+  # 生成 spring-configuration-metadata.json（ADR-0029 P0-3）。应用可执行 JAR（ainer-server、
+  # ainer-authorization-server）经 spring-boot 重打包后元数据位于 BOOT-INF/classes，不在此校验。
+  config_artifacts=(ainer-spring ainer-starter-security ainer-module-ai-runtime)
+  for artifact in "${config_artifacts[@]}"; do
+    jar_path="$installed_root/$artifact/$ainer_version/$artifact-$ainer_version.jar"
+    [[ -f "$jar_path" ]] || fail "$artifact JAR was not installed: $jar_path"
+    jar tf "$jar_path" | grep -Fxq 'META-INF/spring-configuration-metadata.json' \
+      || fail "$artifact JAR is missing configuration metadata"
+  done
 
-"$wrapper" --batch-mode --no-transfer-progress \
-  -Dmaven.repo.local="$local_repository" \
-  -Drevision="$ainer_version" \
-  -Dgpg.skip=true \
-  -DskipTests \
-  clean verify \
-  org.apache.maven.plugins:maven-artifact-plugin:3.6.1:compare
+  "$wrapper" --batch-mode --no-transfer-progress \
+    "${maven_settings_args[@]}" \
+    -Dmaven.repo.local="$local_repository" \
+    -Drevision="$ainer_version" \
+    -Dgpg.skip=true \
+    -DskipTests \
+    clean verify \
+    org.apache.maven.plugins:maven-artifact-plugin:3.6.1:compare
+else
+  [[ ! -e "$local_repository/dev/ainer" ]] \
+    || fail "remote Maven 3 repository must start without Ainer artifacts"
+  [[ ! -e "$maven4_repository/dev/ainer" ]] \
+    || fail "remote Maven 4 repository must start without Ainer artifacts"
+fi
 
 cat >"$consumer_dir/pom.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -395,15 +427,24 @@ verify_authorization_consumer_test() {
 }
 
 "$maven3_command" --batch-mode --no-transfer-progress \
+  "${maven_settings_args[@]}" \
   --file "$consumer_dir/pom.xml" \
   -Dmaven.repo.local="$local_repository" \
   clean verify
 verify_authorization_consumer_test "Maven 3.9+"
 
 "$wrapper" --batch-mode --no-transfer-progress \
+  "${maven_settings_args[@]}" \
   --file "$consumer_dir/pom.xml" \
-  -Dmaven.repo.local="$local_repository" \
+  -Dmaven.repo.local="$maven4_repository" \
   clean verify
 verify_authorization_consumer_test "Maven 4"
 
-echo "[ainer-maven-consumer] Maven 3.9+ and Maven 4 consumer checks passed"
+if [[ "$artifact_source" == "remote" ]]; then
+  [[ -f "$local_repository/dev/ainer/ainer-dependencies/$ainer_version/ainer-dependencies-$ainer_version.pom" ]] \
+    || fail "Maven 3 did not resolve the remote Ainer BOM"
+  [[ -f "$maven4_repository/dev/ainer/ainer-dependencies/$ainer_version/ainer-dependencies-$ainer_version.pom" ]] \
+    || fail "Maven 4 did not resolve the remote Ainer BOM"
+fi
+
+echo "[ainer-maven-consumer] Maven 3.9+ and Maven 4 $artifact_source consumer checks passed"

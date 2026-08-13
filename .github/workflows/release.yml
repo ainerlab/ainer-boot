@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: read
+  contents: write
   packages: write
   id-token: write
   attestations: write
@@ -17,13 +17,14 @@ concurrency:
 
 jobs:
   publish:
-    name: Publish to GitHub Packages
+    name: Verify, publish and read back release
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 150
     steps:
-      - name: Check out source
+      - name: Check out source and annotated tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up JDK 25
@@ -35,6 +36,26 @@ jobs:
 
       - name: Verify locked Maven 4 distribution
         run: ./mvnw --version
+
+      - name: Verify release ref and source identity
+        env:
+          AINER_RELEASE_TAG: ${{ github.ref_name }}
+          AINER_RELEASE_SHA: ${{ github.sha }}
+          AINER_RELEASE_BASE_REF: origin/${{ github.event.repository.default_branch }}
+        run: ./scripts/verify-release-ref.sh >> "$GITHUB_ENV"
+
+      - name: Verify release workflow contracts
+        run: ./scripts/check-release-contracts.sh
+
+      - name: Verify immutable release policy declaration
+        env:
+          AINER_IMMUTABLE_RELEASES: ${{ vars.AINER_IMMUTABLE_RELEASES }}
+        run: |
+          set -euo pipefail
+          if [[ "${AINER_IMMUTABLE_RELEASES:-}" != "true" ]]; then
+            echo "repository variable AINER_IMMUTABLE_RELEASES=true is required" >&2
+            exit 1
+          fi
 
       - name: Verify Docker runtime
         run: docker info
@@ -68,73 +89,193 @@ jobs:
                 <password>${env.GITHUB_TOKEN}</password>
               </server>
             </servers>
+            <profiles>
+              <profile>
+                <id>github-packages-consumer</id>
+                <repositories>
+                  <repository>
+                    <id>github-packages</id>
+                    <url>https://maven.pkg.github.com/ainerlab/ainer-boot</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                  </repository>
+                </repositories>
+              </profile>
+            </profiles>
+            <activeProfiles>
+              <activeProfile>github-packages-consumer</activeProfile>
+            </activeProfiles>
           </settings>
           SETTINGS
 
-      - name: Resolve release version from tag
-        run: |
-          set -euo pipefail
-          release_version="${GITHUB_REF_NAME#v}"
-          if [[ ! "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "发布 tag 不是受支持的语义化版本: $GITHUB_REF_NAME" >&2
-            exit 1
-          fi
-          if [[ "$release_version" == *-SNAPSHOT ]]; then
-            echo "tag 发布禁止 SNAPSHOT 版本: $release_version" >&2
-            exit 1
-          fi
-          echo "release_version=$release_version" >> "$GITHUB_ENV"
+      - name: Reject an existing package version
+        env:
+          AINER_PACKAGE_USERNAME: ${{ github.actor }}
+          AINER_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: AINER_VERSION="$release_version" ./scripts/check-package-version-absent.sh
 
-      - name: Verify non-SNAPSHOT consumers and initializer
+      - name: Verify non-SNAPSHOT local consumers and initializer
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           AINER_VERSION="$release_version" ./scripts/verify-maven-consumers.sh
           AINER_VERSION="$release_version" ./scripts/verify-initializer-consumer.sh
 
-      - name: Import signing key
+      - name: Import and probe passphrase-protected signing key
         env:
           AINER_RELEASE_SIGNING: ${{ vars.AINER_RELEASE_SIGNING }}
+          AINER_RELEASE_GPG_FINGERPRINT: ${{ vars.AINER_RELEASE_GPG_FINGERPRINT }}
           SIGNING_KEY_BASE64: ${{ secrets.AINER_GPG_KEY_BASE64 }}
           SIGNING_PASSPHRASE: ${{ secrets.AINER_GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
           if [[ "${AINER_RELEASE_SIGNING:-}" != "true" ]]; then
-            echo "tag 发布必须设置 repository variable AINER_RELEASE_SIGNING=true" >&2
+            echo "tag publishing requires repository variable AINER_RELEASE_SIGNING=true" >&2
             exit 1
           fi
           if [[ -z "${SIGNING_KEY_BASE64:-}" ]]; then
-            echo "缺少 AINER_GPG_KEY_BASE64，签名无法进行" >&2
+            echo "AINER_GPG_KEY_BASE64 is required" >&2
             exit 1
           fi
-          printenv SIGNING_KEY_BASE64 | base64 --decode > "$RUNNER_TEMP/signing.asc"
-          gpg --batch --import "$RUNNER_TEMP/signing.asc"
-          gpg_key_id="$(gpg --batch --with-colons --list-secret-keys | awk -F: '/^sec:/{print $5; exit}')"
-          if [[ -z "$gpg_key_id" ]]; then
-            echo "导入后未找到 GPG 私钥" >&2
+          if [[ -z "${SIGNING_PASSPHRASE:-}" ]]; then
+            echo "AINER_GPG_PASSPHRASE is required; unprotected release keys are rejected" >&2
             exit 1
           fi
-          echo "gpg_key_id=$gpg_key_id" >> "$GITHUB_ENV"
+          expected_fingerprint="${AINER_RELEASE_GPG_FINGERPRINT^^}"
+          if [[ ! "$expected_fingerprint" =~ ^[0-9A-F]{40}$ ]]; then
+            echo "AINER_RELEASE_GPG_FINGERPRINT must be a 40-character repository variable" >&2
+            exit 1
+          fi
+
+          signing_key="$RUNNER_TEMP/signing.asc"
+          probe="$RUNNER_TEMP/signing-probe.txt"
+          probe_signature="$probe.asc"
+          printf '%s' "$SIGNING_KEY_BASE64" | base64 --decode >"$signing_key"
+          gpg --batch --import "$signing_key"
+          gpg_fingerprint="$(gpg --batch --with-colons --list-secret-keys \
+            | awk -F: '/^fpr:/{print $10; exit}')"
+          if [[ ! "$gpg_fingerprint" =~ ^[0-9A-Fa-f]{40}$ ]]; then
+            echo "no usable OpenPGP secret key fingerprint was found after import" >&2
+            exit 1
+          fi
+          if [[ "${gpg_fingerprint^^}" != "$expected_fingerprint" ]]; then
+            echo "imported signing key does not match AINER_RELEASE_GPG_FINGERPRINT" >&2
+            exit 1
+          fi
+
+          printf 'Ainer release signing probe for %s\n' "$release_source_sha" >"$probe"
+          printf '%s' "$SIGNING_PASSPHRASE" \
+            | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+              --local-user "$gpg_fingerprint" --armor --detach-sign \
+              --output "$probe_signature" "$probe"
+          gpg --batch --verify "$probe_signature" "$probe"
+          rm -f -- "$signing_key" "$probe" "$probe_signature"
+          printf 'gpg_fingerprint=%s\n' "$gpg_fingerprint" >>"$GITHUB_ENV"
 
       - name: Build, sign and publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.AINER_GPG_PASSPHRASE }}
         run: |
-          set -euo pipefail
-          GPG_PASSPHRASE_OPT=""
-          if [[ -n "${MAVEN_GPG_PASSPHRASE:-}" ]]; then
-            GPG_PASSPHRASE_OPT="-Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE"
-          fi
           ./mvnw --batch-mode --no-transfer-progress \
             -Drevision="$release_version" \
-            -Dgpg.keyname="$gpg_key_id" \
-            $GPG_PASSPHRASE_OPT \
+            -Dgpg.keyname="$gpg_fingerprint" \
             -Prelease clean deploy
 
       - name: Require zero failed, errored, or skipped tests
         run: ./scripts/check-surefire-results.sh
 
+      - name: Prepare release evidence directory
+        run: |
+          release_assets_dir="$RUNNER_TEMP/release-assets"
+          mkdir -p "$release_assets_dir"
+          printf 'release_assets_dir=%s\n' "$release_assets_dir" >>"$GITHUB_ENV"
+
+      - name: Generate CycloneDX release SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: .
+          format: cyclonedx-json
+          artifact-name: ainer-boot-${{ github.ref_name }}.cdx.json
+          output-file: ${{ runner.temp }}/release-assets/ainer-boot-${{ github.ref_name }}.cdx.json
+          dependency-snapshot: false
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Read back and verify every Maven artifact signature
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AINER_RELEASE_TAG: ${{ github.ref_name }}
+          AINER_PACKAGE_USERNAME: ${{ github.actor }}
+          AINER_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.AINER_GPG_PASSPHRASE }}
+        run: |
+          AINER_VERSION="$release_version" \
+          AINER_RELEASE_SOURCE_SHA="$release_source_sha" \
+          AINER_RELEASE_OUTPUT_DIR="$release_assets_dir" \
+          AINER_SBOM_PATH="$release_assets_dir/ainer-boot-$GITHUB_REF_NAME.cdx.json" \
+          AINER_GPG_FINGERPRINT="$gpg_fingerprint" \
+          ./scripts/verify-remote-release-artifacts.sh
+
+      - name: Verify remote Maven 3 and Maven 4 consumers
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AINER_ARTIFACT_SOURCE: remote
+          AINER_MAVEN_SETTINGS: /home/runner/.m2/settings.xml
+        run: AINER_VERSION="$release_version" ./scripts/verify-maven-consumers.sh
+
+      - name: Verify remote Project Initializer consumer
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AINER_ARTIFACT_SOURCE: remote
+          AINER_MAVEN_SETTINGS: /home/runner/.m2/settings.xml
+        run: AINER_VERSION="$release_version" ./scripts/verify-initializer-consumer.sh
+
       - name: Attest build provenance
-        continue-on-error: true
+        if: ${{ vars.AINER_GITHUB_ATTESTATIONS == 'true' }}
         uses: actions/attest-build-provenance@1c608d11d69870c2092266b3f9a6f3abbf17002c # v1.4.3
         with:
-          subject-path: "**/target/*.jar"
+          subject-path: |
+            ${{ runner.temp }}/release-assets/maven-artifacts/**/*.pom
+            ${{ runner.temp }}/release-assets/maven-artifacts/**/*.jar
+
+      - name: Upload signed release evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ainer-boot-${{ github.ref_name }}-release-evidence
+          path: |
+            ${{ runner.temp }}/release-assets/*
+            !${{ runner.temp }}/release-assets/maven-artifacts/**
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Create immutable GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          release_flags=()
+          if [[ "$release_version" == *-* ]]; then
+            release_flags+=(--prerelease --latest=false)
+          fi
+          mapfile -d '' assets < <(
+            find "$release_assets_dir" -maxdepth 1 -type f -print0 | sort -z
+          )
+          if [[ "${#assets[@]}" -eq 0 ]]; then
+            echo "no release evidence assets were generated" >&2
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --target "$release_source_sha" \
+            --title "Ainer Boot $release_version" \
+            --notes-file "$release_assets_dir/release-evidence.md" \
+            "${release_flags[@]}"
+          release_immutable="$(
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" --jq .immutable
+          )"
+          if [[ "$release_immutable" != "true" ]]; then
+            echo "published GitHub Release is not immutable" >&2
+            exit 1
+          fi

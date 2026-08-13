@@ -251,6 +251,8 @@
                         <configuration>
                             <skip>${gpg.skip}</skip>
                             <keyname>${gpg.keyname}</keyname>
+                            <bestPractices>true</bestPractices>
+                            <passphraseEnvName>MAVEN_GPG_PASSPHRASE</passphraseEnvName>
                             <useAgent>false</useAgent>
                             <gpgArguments>
                                 <arg>--batch</arg>

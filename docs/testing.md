@@ -199,7 +199,7 @@ AINER_REPRO_REPOSITORY="$(mktemp -d)"
 ```
 
 两次构建使用同一个隔离本地仓库，避免既有缓存成为参考。consumer 脚本必须证明 Maven 4 与
-系统 Maven 3.9+ 外部项目都能只通过 BOM 和公开坐标完成构建；同时检查 19 个标准 Consumer
+系统 Maven 3.9+ 外部项目都能只通过 BOM 和公开坐标完成构建；同时检查 23 个标准 Consumer
 POM 中的 `${revision}` 都有当前安装版本属性可解析，并检查 `ainer-spring` JAR 含
 `META-INF/spring-configuration-metadata.json`。脚本中的独立授权 Golden Consumer 还必须在两套 Maven
 下真实执行 JUnit：由外部项目定义产品 Permission/policy/query constraint，调用
@@ -208,8 +208,9 @@ failure/error/skipped。这些门禁是本地/自动化工程要求；消费本�
 仓库发布流程，也不替代真实产品的参数化 SQL、row/字段投影与关系矩阵。候选 CI 已编排并至少成功
 执行过上述命令；最新提交是否具备远端结果、以及分支保护是否把它设为必需检查，以
 [`project-status.md`](project-status.md) 的当前记录为准。脚本默认读取根 POM 的 `revision`；发布过程通过
-`AINER_VERSION=<目标版本>` 覆盖时，该值也会作为 `-Drevision` 传给两次生产者构建和两个
-consumer。
+`AINER_VERSION=<目标版本>` 覆盖。默认 `AINER_ARTIFACT_SOURCE=local` 会在隔离仓库构建 producer；
+`AINER_ARTIFACT_SOURCE=remote` 则要求 non-SNAPSHOT 版本和 `AINER_MAVEN_SETTINGS`，Maven 3、Maven 4
+分别从空本地仓库解析远端制品，禁止借用 reactor install 作为远端消费证据。
 
 授权端点适配器的发布门禁不能只直接实例化 manager。至少要用真实 Servlet Web、真实签名 JWT 和
 真实 HTTP 验证：匹配 scope/policy 的 `@AinerAuthorize` handler 在 controller 前放行；缺 scope

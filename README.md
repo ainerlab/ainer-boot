@@ -33,10 +33,11 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 
 当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
 
-当前推进目标是受控发布 `0.1.0-rc.1`：先发布不可变、签名的 BOM/Starter 给
-`xq-platform-next` 验证，再根据真实业务纵向切片和回滚记录决定是否提升为 `0.1.0`。当前源码仍是
-`0.1.0-SNAPSHOT`，尚未产生远端 RC 制品；动态门禁只以 [`docs/project-status.md`](docs/project-status.md)
-为准。
+当前推进目标是形成第一个**合格**的受控 RC，再交给 `xq-platform-next` 完成真实业务纵向切片、
+升级和回滚验证。`0.1.0-rc.1` 虽已向 GitHub Packages 部署签名制品，但其制品源码与后续移动后的
+tag 不一致，且缺少完整远端读回、发布证据和 GitHub Release，已按 ADR-0041 标记为
+withdrawn/non-qualifying，禁止消费或复用。当前源码仍是 `0.1.0-SNAPSHOT`，下一候选必须使用
+`0.1.0-rc.2` 或更高唯一版本；动态门禁只以 [`docs/project-status.md`](docs/project-status.md) 为准。
 
 ## 架构立场
 

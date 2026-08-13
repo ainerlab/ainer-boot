@@ -1,6 +1,6 @@
 # Ainer 架构决策记录
 
-> 文档类型：决策索引 · 状态：生效 · 最近核对：2026-08-04
+> 文档类型：决策索引 · 状态：生效 · 最近核对：2026-08-13
 
 ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是实现日志，也不替代 API 或运行手册。
 
@@ -48,8 +48,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0038](0038-p4-scope-refinement-and-enterprise-base.md) | Superseded by [0040](0040-p3-enterprise-base-and-1.0-product-contract.md) | P4 范围精简与企业基建前置（结论被违反维护规则改写，由 ADR-0040 合规取代） |
 | [0039](0039-cache-and-distributed-coordination-baseline.md) | Accepted | 缓存与分布式协调基础设施基线（引入 Valkey/Redis 可选缓存 + 分布式锁 + Spring Cache 抽象） |
 | [0040](0040-p3-enterprise-base-and-1.0-product-contract.md) | Accepted | P3 企业基座与 1.0 产品契约（取代 ADR-0038，Stable/Incubating/非目标 + G0–G4 路线） |
-
-## 历史草案与审查记录
+| [0041](0041-private-rc-supply-chain-and-immutable-release-baseline.md) | Accepted | 私有 RC 供应链、远端完整读回、项目签名 provenance 与不可变 GitHub Release 基线 |
 
 ## 历史草案与审查记录
 

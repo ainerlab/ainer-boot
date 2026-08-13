@@ -3,6 +3,8 @@ set -euo pipefail
 
 boot_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 wrapper="$boot_root/mvnw"
+artifact_source="${AINER_ARTIFACT_SOURCE:-local}"
+maven_settings="${AINER_MAVEN_SETTINGS:-}"
 
 fail() {
   echo "[ainer-initializer-consumer] ERROR: $*" >&2
@@ -16,6 +18,22 @@ configured_version="$(
 ainner_version="${AINER_VERSION:-$configured_version}"
 [[ -n "$ainner_version" ]] \
   || fail "cannot determine the Ainer version; set AINER_VERSION explicitly"
+
+case "$artifact_source" in
+  local|remote) ;;
+  *) fail "AINER_ARTIFACT_SOURCE must be local or remote (got: $artifact_source)" ;;
+esac
+if [[ "$artifact_source" == "remote" && "$ainner_version" == *-SNAPSHOT ]]; then
+  fail "remote initializer verification requires a non-SNAPSHOT AINER_VERSION"
+fi
+
+maven_settings_args=()
+if [[ -n "$maven_settings" ]]; then
+  [[ -f "$maven_settings" ]] || fail "Maven settings file is missing: $maven_settings"
+  maven_settings_args=(--settings "$maven_settings")
+elif [[ "$artifact_source" == "remote" ]]; then
+  fail "remote initializer verification requires AINER_MAVEN_SETTINGS"
+fi
 
 [[ -x "$wrapper" ]] || fail "Maven Wrapper is missing or not executable: $wrapper"
 
@@ -39,12 +57,24 @@ cleanup() {
 trap cleanup EXIT
 
 cd "$boot_root"
-"$wrapper" --batch-mode --no-transfer-progress \
-  -Dmaven.repo.local="$local_repository" \
-  -Drevision="$ainner_version" \
-  -Dgpg.skip=true \
-  -DskipTests \
-  clean install
+if [[ "$artifact_source" == "local" ]]; then
+  "$wrapper" --batch-mode --no-transfer-progress \
+    "${maven_settings_args[@]}" \
+    -Dmaven.repo.local="$local_repository" \
+    -Drevision="$ainner_version" \
+    -Dgpg.skip=true \
+    -DskipTests \
+    clean install
+else
+  [[ ! -e "$local_repository/dev/ainer" ]] \
+    || fail "remote initializer repository must start without Ainer artifacts"
+  "$wrapper" --batch-mode --no-transfer-progress \
+    "${maven_settings_args[@]}" \
+    -Dmaven.repo.local="$local_repository" \
+    org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy \
+    -Dartifact="dev.ainer:ainer-initializer-cli:$ainner_version:jar:cli" \
+    -DoutputDirectory="$temporary_dir"
+fi
 
 # 1. Deterministic generation: the same manifest must produce byte-identical output twice.
 cat >"$manifest" <<EOF
@@ -65,8 +95,12 @@ if [[ "$ainner_version" == *-SNAPSHOT ]]; then
   printf 'allowSnapshot: true\n' >>"$manifest"
 fi
 
-cli_jar="$(find "$local_repository/dev/ainer/ainer-initializer-cli" -name '*-cli.jar' | head -n 1)"
-[[ -n "$cli_jar" ]] || fail "ainner-initializer-cli shaded JAR was not installed"
+if [[ "$artifact_source" == "local" ]]; then
+  cli_jar="$(find "$local_repository/dev/ainer/ainer-initializer-cli" -name '*-cli.jar' | head -n 1)"
+else
+  cli_jar="$(find "$temporary_dir" -maxdepth 1 -name '*-cli.jar' | head -n 1)"
+fi
+[[ -n "$cli_jar" ]] || fail "ainner-initializer-cli shaded JAR was not resolved"
 
 run_cli() {
   java -jar "$cli_jar" "$@"
@@ -98,12 +132,14 @@ done
 #    endpoint, with 0 skipped tests) as an independent consumer (Maven 4 wrapper).
 cd "$generated_dir"
 "$wrapper" --batch-mode --no-transfer-progress \
+  "${maven_settings_args[@]}" \
   -Dmaven.repo.local="$local_repository" \
   -DskipTests \
   clean compile \
   || fail "generated consumer project failed to compile"
 
 "$wrapper" --batch-mode --no-transfer-progress \
+  "${maven_settings_args[@]}" \
   -Dmaven.repo.local="$local_repository" \
   test \
   || fail "generated consumer smoke test failed"
@@ -160,12 +196,14 @@ grep -q "ainer-test-support" "$pg_dir/pom.xml" \
 
 cd "$pg_dir"
 "$wrapper" --batch-mode --no-transfer-progress \
+  "${maven_settings_args[@]}" \
   -Dmaven.repo.local="$local_repository" \
   -DskipTests \
   clean compile \
   || fail "generated postgres consumer project failed to compile"
 
 "$wrapper" --batch-mode --no-transfer-progress \
+  "${maven_settings_args[@]}" \
   -Dmaven.repo.local="$local_repository" \
   test \
   || fail "generated postgres consumer integration tests failed"
@@ -241,12 +279,14 @@ grep -q "CrudIntegrationTest" $(find "$crud_dir/src/test" -name '*.java') \
 
 cd "$crud_dir"
 "$wrapper" --batch-mode --no-transfer-progress \
+  "${maven_settings_args[@]}" \
   -Dmaven.repo.local="$local_repository" \
   -DskipTests \
   clean compile \
   || fail "generated CRUD consumer project failed to compile"
 
 "$wrapper" --batch-mode --no-transfer-progress \
+  "${maven_settings_args[@]}" \
   -Dmaven.repo.local="$local_repository" \
   test \
   || fail "generated CRUD consumer integration tests failed"
@@ -256,4 +296,4 @@ crud_skipped=$(find "$crud_report" -name '*.txt' -exec grep -h 'Tests run:' {} \
   | awk -F, '{for (i=1; i<=NF; i++) if ($i ~ /Skipped/) {gsub(/[^0-9]/, "", $i); s += $i}} END {print s+0}')
 [[ "$crud_skipped" == "0" ]] || fail "CRUD consumer integration tests must run with 0 skipped (got $crud_skipped)"
 
-echo "[ainer-initializer-consumer] initializer generation + consumer compile + postgres/CRUD Testcontainers gate passed"
+echo "[ainer-initializer-consumer] $artifact_source initializer generation + consumer compile + postgres/CRUD Testcontainers gate passed"

@@ -400,8 +400,8 @@ Industry Products
 | **P0 Baseline Integrity** | 让代码、文档、测试、数据与许可证事实可信 | PostgreSQL 18 正式门禁 0 skipped；未验收能力保持 Proposed 或默认关闭；秘密扫描与依赖许可证无未处置问题；权威文档与 ADR 无冲突 |
 | **P1 Scaffold Ready** | 把平台内核变成可发布、可独立消费的制品 | 非 SNAPSHOT BOM/Starter 发布；Maven 3.9+ 与 Maven 4 独立消费者通过；最小应用关闭全部可选模块仍能启动；source/Javadoc、LICENSE/NOTICE、SBOM、checksum/signature/provenance 和兼容政策齐全 |
 | **P2 Create & Generate** | 安全、确定性地创建项目和纵向 CRUD | manifest v1、preview/diff、默认不覆盖/不改菜单/不写数据库；同版本同 manifest 生成无差异；TTFR 与 TTCRUD 目标通过；生成物通过 PostgreSQL 与 golden consumer 门禁 |
-| **P3 Minimum Admin & First Consumer** | 用可用管理面、商业级企业基座和真实产品证明脚手架边界 | Identity、组织/任职/岗位（ADR-0032）、RBAC/数据范围、**文件存储（SPI+元数据）**、**字典（树形+多语言+缓存）**、**配置（类型安全+热更新+版本）**、**通知（多渠道+模板+重试）**、菜单与审计形成关键 E2E；Initializer 生成 `xq-platform-next`；不含 Ainer 源码副本或 SNAPSHOT；两个小程序 SDK 可编译；至少一个真实纵向切片和一次 Ainer minor 升级通过（ADR-0038） |
-| **P4 AI Governance Deepening** | AI 治理深化 + 任务/幂等补齐 | Agent/Tool/RAG/Evaluation 具备身份、权限、预算、数据治理、人工反馈和回归门禁；任务调度管理面闭环；AI 模块关闭时企业应用不受影响（ADR-0038） |
+| **P3 Enterprise Base & First Consumer** | 用商业级 Stable 企业基座和真实产品证明脚手架边界 | Identity/Workspace/Authorization/AI Runtime 与**文件元数据**、**字典**、**配置**、**通知**、**缓存**的服务端管理 API、审计和安全门禁闭环；Initializer 生成的 `xq-platform-next` 不含 Ainer 源码副本或 SNAPSHOT；至少一个真实纵向切片和一次 Ainer minor 升级/回滚通过。组织目录、菜单和前端管理面不阻塞本阶段（ADR-0040） |
+| **P4 Incubating Product Core** | 验证 AI-native 产品核心并收敛 Incubating 契约 | Agent/Tool/Context/Evaluation 具备身份、权限、预算、数据治理、人工反馈和回归门禁；Knowledge 完成两个语义切片；组织目录与任务调度达到可用但可演进的 Incubating 水平；AI/Incubating 模块关闭时 Stable 企业应用不受影响（ADR-0040） |
 | **P5 Ecosystem & Commercial Delivery** | 建立生态、升级、LTS 和商业交付闭环 | 至少两个独立消费者；模块安装/移除不改 core；连续两个 minor 完成升级验证；兼容清单、升级助手、entitlement、LTS/补丁与行业模块交付流程落地 |
 
 P3 不等待 P4 或 P5。否则 Ainer 会继续成为只被自身使用的平台，而不是经过外部产品验证的
@@ -416,7 +416,7 @@ P3 不等待 P4 或 P5。否则 Ainer 会继续成为只被自身使用的平台
 | 指标 | 目标与口径 |
 |---|---|
 | TTFR（Time to First Run） | 在官方参考环境、前置工具已安装且制品仓库可达时，从空目录到 `/actuator/health=UP` 不超过 10 分钟 |
-| TTCRUD | 从 manifest 到含 PostgreSQL migration、tenant 授权、API、测试、OpenAPI 与管理页面的可运行纵向 CRUD 不超过 30 分钟 |
+| TTCRUD | 从 manifest 到含 PostgreSQL migration、Workspace/资源授权、API、测试与 OpenAPI 的可运行纵向 CRUD 不超过 30 分钟 |
 | 独立消费 | 外部消费者中的 Ainer 源码副本为 0，进入 P3 后 SNAPSHOT Ainer 依赖为 0 |
 | 生成确定性 | 同一 Ainer 版本、同一 manifest 和同一规范化环境重复生成，文件差异为 0 |
 | 生成安全 | 默认覆盖既有源码、修改运行中菜单、连接或写入数据库的行为均为 0 |
@@ -539,8 +539,8 @@ port 和 local adapter；只有满足 ADR-0024 的拆分条件后再增加 remot
 7. 开发 Compose、秘密注入、许可证、SBOM、版本与升级政策形成可重复验证；
 8. 通用 Permission、Role、Role Permission、Subject Binding、结构化 Scope 与 Authorization
    Decision 最小闭环已被外部 Golden Consumer 验证；
-9. Ainer Admin 能通过 OpenAPI/SDK 管理最小 Role/Binding 并展示 Effective Access，隐藏菜单或
-   修改前端状态不能绕过服务端；
+9. 服务端管理 API 与 OpenAPI/SDK 能管理最小 Role/Binding 并查询 Effective Access；前端管理面和
+   菜单引擎属于 1.0 非目标，任何客户端状态都不能绕过服务端；
 10. 撤销 binding 后，仍有效 Token 在批准的授权失效 SLA 内不能继续执行受保护业务写。
 
 满足这些门禁后立即创建首个消费者，并通过真实纵向切片继续校验脚手架；不得把“所有企业功能

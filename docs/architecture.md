@@ -84,9 +84,9 @@ ainer-boot/
 │   └── ainer-starter-test/
 ├── ainer-module-identity/                # HumanAccount/ServicePrincipal/Credential foundation（去租户化）
 ├── ainer-module-authorization/           # ADR-0037：决策器、6 表持久化、管理/查询与 Spring 端点适配
-├── ainer-module-dictionary/              # 树形字典 + 多语言 + Spring Cache（ADR-0038）
-├── ainer-module-config/                  # 动态配置 + 类型安全 + 热更新 + 版本历史 + secret（ADR-0038）
-├── ainer-module-notification/            # 多渠道通知 + PG SKIP LOCKED 队列 + virtual thread（ADR-0038）
+├── ainer-module-dictionary/              # 树形字典 + 多语言 + Spring Cache（ADR-0040）
+├── ainer-module-config/                  # 动态配置 + 类型安全 + 热更新 + 版本历史 + secret（ADR-0040）
+├── ainer-module-notification/            # 多渠道通知 + PG SKIP LOCKED 队列 + virtual thread（ADR-0040）
 ├── ainer-module-organization/            # Proposed：可选组织、员工任职、岗位与团队目录
 ├── ainer-module-workspace/               # 去租户化的资源授权参考切片（仅 workspace_id/成员关系）
 ├── ainer-module-ai-runtime/              # 模型网关、调用与费用审计
@@ -112,9 +112,10 @@ Spring 适配只位于 `dev.ainer.authorization.spring`。Servlet 安全过滤�
 必须在应用服务显式授权。`AuthorizationTargetResolver`、`DecisionObligationExecutor`、RFC 9470 与
 方法级 AOP 是后续切片，不阻塞受控 RC，但不得宣称已支持。
 
-本地隔离制品已由 Maven 3.9+ 与 Maven 4 Golden Consumer 验证；不可变远端制品、Ainer Admin、
-外部产品纵向切片与生产授权失效 SLA 仍按 [`docs/project-status.md`](project-status.md) 推进。该模块
-不会接管 Identity、WorkspaceRole 或产品领域关系。
+本地隔离制品已由 Maven 3.9+ 与 Maven 4 Golden Consumer 验证。`0.1.0-rc.1` 只有一次远端签名
+deploy 记录，因 tag/source 不一致和证据不完整已撤回；合格的 immutable RC、远端空仓消费、外部
+产品纵向切片与生产授权失效 SLA 仍按 [`docs/project-status.md`](project-status.md) 推进。该模块不会
+接管 Identity、WorkspaceRole 或产品领域关系。
 
 `ainer-module-organization` 当前同样尚未创建。它作为可选模块装配在 `ainer-server`，不并入
 Identity 或 Authorization Server；Tenant、OrganizationDirectory、Company、Merchant、OrgUnit 与

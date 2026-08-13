@@ -16,6 +16,14 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Fixed
 
+- **`0.1` 发布列车失败关闭加固（2026-08-13）**：修复虚拟线程矩阵在 Ubuntu 上先从 `PATH`
+  发现 `ab`、执行时却硬编码 `/usr/sbin/ab` 的失败，并修正 `AINER_VERSION` 拼写。发布 workflow
+  现在要求 annotated tag/source 一致、目标 package 版本不存在、GitHub Immutable Releases 已启用；
+  GPG 恢复 best-practices + passphrase 环境变量模式，拒绝无口令私钥、非预期 fingerprint 和 Maven
+  CLI 口令。发布后按与 reactor POM 对照的唯一清单逐一读回 107 个主制品与 107 个 `.asc` 验证精确
+  fingerprint，再从两个空仓执行远端 Maven 3/4 Golden Consumer 并远端获取 Initializer CLI。
+  `0.1.0-rc.1` 因制品源码/tag 不一致且证据不完整标记为
+  withdrawn/non-qualifying，禁止覆盖或消费，下一候选使用 `rc.2+`。
 - **`0.1` 端点授权真实装配（2026-08-11）**：修正 `HandlerInterceptor` 与 servlet security filter
   顺序假设。`AuthorizationModuleConfiguration` 现在在 Servlet Web + verified principal resolver
   存在时注册 manager、interceptor 与 MVC wiring；MVC 解析 `HandlerMethod` 后，由 interceptor 在
@@ -32,6 +40,12 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **私有 RC 签名证据与不可变 Release（2026-08-13）**：接受 ADR-0041；release workflow 生成
+  CycloneDX SBOM、远端 Maven SHA-256/SHA-512 清单、记录精确 source/tag/run/107 个 artifact digest
+  的项目签名 provenance、签名制品清单、公钥/fingerprint 与证据签名，全部门禁通过后才创建
+  GitHub Release。
+  GitHub Attestations 改为显式可选的附加能力；启用后失败关闭，不再用 `continue-on-error` 把计费
+  限制伪装成来源门禁通过。项目签名 provenance 不宣称 GitHub Attestation 或 SLSA 等级认证。
 - **撤权后原 Token 受保护写失效验证（2026-08-11）**：真实签名 `USER_NEUTRAL_V1` JWT
   先通过产品所有的 test-scope HTTP 写路径；管理 SERVICE 随后经真实管理 API 撤销 PostgreSQL
   Binding，复用完全相同且仍在有效期内的 JWT 再写返回 403，业务写事件保持不变。ALLOW 与
@@ -249,7 +263,8 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - 增加 P1 发布能力：根 POM `release` profile 为全部 JAR 制品附加 `-sources.jar` 与
   `-javadoc.jar`（JDK 25、UTF-8、确定性时间戳）并用 `maven-gpg-plugin` 逐制品生成 `.asc`
   签名；`release.yml` 支持仓库变量+secrets 驱动的 GPG 密钥导入（缺失 fail-closed）与
-  `actions/attest-build-provenance` 构建 provenance（SLSA v1）；consumer 门禁改为
+  `actions/attest-build-provenance` 接入可选 GitHub Attestation；当前强制 provenance 与失败策略
+  由 ADR-0041 取代；consumer 门禁改为
   `-Prelease` 安装并断言八个 library 制品的 sources/javadoc 伴随文件存在。
 
 ### Changed

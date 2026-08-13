@@ -1,6 +1,6 @@
 # Ainer 文档总览：从这里开始
 
-> 文档类型：统一入口 · 状态：生效 · 最近核对：2026-08-08 · 适用版本：`0.1.x`
+> 文档类型：统一入口 · 状态：生效 · 最近核对：2026-08-13 · 适用版本：`0.1.x`
 
 本文是 Ainer Boot 文档的唯一权威入口。它帮助开发者、架构师和 AI agent 先建立同一份项目心智
 模型，再进入具体规范。它不复制各专题文档的细节，也不替代当前状态、架构规范或 ADR。
@@ -61,9 +61,9 @@ ainer-server                          业务 Resource Server
 ├── ainer-module-workspace            membership 资源、成员与授权审计
 ├── ainer-module-ai-runtime           模型网关、策略、用量与费用审计
 ├── ainer-module-authorization        混合细粒度授权 + adapter + 审计（ADR-0037）
-├── ainer-module-dictionary           树形字典 + 多语言 + Spring Cache（ADR-0038）
-├── ainer-module-config               动态配置 + 类型安全 + 热更新 + 版本（ADR-0038）
-└── ainer-module-notification         多渠道通知 + PG SKIP LOCKED 队列（ADR-0038）
+├── ainer-module-dictionary           树形字典 + 多语言 + Spring Cache（ADR-0040）
+├── ainer-module-config               动态配置 + 类型安全 + 热更新 + 版本（ADR-0040）
+└── ainer-module-notification         多渠道通知 + PG SKIP LOCKED 队列（ADR-0040）
 
 ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管理面
 └── ainer-module-identity             HumanAccount、ServicePrincipal、登录身份与 Credential
