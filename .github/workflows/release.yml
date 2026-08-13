@@ -134,6 +134,7 @@ jobs:
         run: ./scripts/check-surefire-results.sh
 
       - name: Attest build provenance
+        continue-on-error: true
         uses: actions/attest-build-provenance@1c608d11d69870c2092266b3f9a6f3abbf17002c # v1.4.3
         with:
           subject-path: "**/target/*.jar"
