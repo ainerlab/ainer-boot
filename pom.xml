@@ -251,8 +251,7 @@
                         <configuration>
                             <skip>${gpg.skip}</skip>
                             <keyname>${gpg.keyname}</keyname>
-                            <passphraseEnvName>MAVEN_GPG_PASSPHRASE</passphraseEnvName>
-                            <bestPractices>true</bestPractices>
+                            <useAgent>false</useAgent>
                             <gpgArguments>
                                 <arg>--batch</arg>
                                 <arg>--pinentry-mode</arg>
