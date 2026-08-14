@@ -145,7 +145,7 @@ public class AiGatewayApplicationService {
             throw new BusinessException(AiGatewayErrorCode.INVALID_REQUEST);
         }
 
-        UUID id = UUID.randomUUID();
+        UUID id = dev.ainer.core.uuid.Uuidv7.generate();
         Instant startedAt = clock.instant();
         String requestedModel = command.requestedModel().isBlank()
                 ? properties.getProvider().getDefaultModel()

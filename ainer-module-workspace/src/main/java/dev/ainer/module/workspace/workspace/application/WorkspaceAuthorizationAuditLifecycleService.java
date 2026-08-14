@@ -56,9 +56,9 @@ public class WorkspaceAuthorizationAuditLifecycleService {
                 ? cursor
                 : new WorkspaceAuthorizationAuditCursor(
                         items.getLast().occurredAt(), items.getLast().id());
-        UUID operationId = UUID.randomUUID();
+        UUID operationId = dev.ainer.core.uuid.Uuidv7.generate();
         operationAuditRepository.insert(new WorkspaceSecurityOperationAudit(
-                UUID.randomUUID(), operationId, workspaceId, null,
+                dev.ainer.core.uuid.Uuidv7.generate(), operationId, workspaceId, null,
                 "AUTHORIZATION_AUDIT_EXPORT", "EXPORTED", exporterServiceId,
                 null, items.size(), clock.instant()));
         return new WorkspaceAuthorizationAuditExportBatch(items, nextCursor, hasMore);

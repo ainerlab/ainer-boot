@@ -65,7 +65,7 @@ final class AinerMachineClientBootstrapRunner implements ApplicationRunner {
         ServicePrincipal principal = servicePrincipalFoundationService.registerServicePrincipal(
                 new IdentityAuthorityRef(properties.getIssuer()));
         servicePrincipalFoundationService.bindClient(principal.principalId(), clientId);
-        RegisteredClient.Builder client = RegisteredClient.withId(UUID.randomUUID().toString())
+        RegisteredClient.Builder client = RegisteredClient.withId(dev.ainer.core.uuid.Uuidv7.generate().toString())
                 .clientId(clientId)
                 .clientSecret(passwordEncoder.encode(secret))
                 .clientName("Ainer bootstrap machine client")

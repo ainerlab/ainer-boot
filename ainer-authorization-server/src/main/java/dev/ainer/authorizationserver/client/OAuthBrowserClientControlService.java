@@ -178,7 +178,7 @@ public class OAuthBrowserClientControlService {
             String clientId, String clientName,
             String redirectUri, String postLogoutRedirectUri,
             Set<String> scopes) {
-        return RegisteredClient.withId(UUID.randomUUID().toString())
+        return RegisteredClient.withId(dev.ainer.core.uuid.Uuidv7.generate().toString())
                 .clientId(clientId)
                 .clientName(clientName)
                 .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
@@ -256,7 +256,7 @@ public class OAuthBrowserClientControlService {
                         + "(id, operation, client_id, related_client_id, actor_service_id, "
                         + "request_id, change_reference, occurred_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                UUID.randomUUID(), operation, clientId, relatedClientId,
+                dev.ainer.core.uuid.Uuidv7.generate(), operation, clientId, relatedClientId,
                 actor.serviceId(), actor.requestId(), changeReference,
                 java.sql.Timestamp.from(occurredAt));
     }

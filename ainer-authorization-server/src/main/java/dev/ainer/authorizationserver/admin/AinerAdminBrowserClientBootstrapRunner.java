@@ -58,7 +58,7 @@ final class AinerAdminBrowserClientBootstrapRunner implements ApplicationRunner 
             requireCompatible(existing, redirectUri, postLogoutRedirectUri);
             return;
         }
-        repository.save(RegisteredClient.withId(UUID.randomUUID().toString())
+        repository.save(RegisteredClient.withId(dev.ainer.core.uuid.Uuidv7.generate().toString())
                 .clientId(CLIENT_ID)
                 .clientName("Ainer Admin development browser client")
                 .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)

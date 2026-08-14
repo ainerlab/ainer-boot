@@ -51,7 +51,7 @@ final class AinerBrowserClientOperatorBootstrapRunner implements ApplicationRunn
             throw new IllegalStateException(
                     "Ainer browser-client-control operator bootstrap secret must contain 24 to 128 characters");
         }
-        RegisteredClient client = RegisteredClient.withId(UUID.randomUUID().toString())
+        RegisteredClient client = RegisteredClient.withId(dev.ainer.core.uuid.Uuidv7.generate().toString())
                 .clientId(clientId)
                 .clientSecret(passwordEncoder.encode(secret))
                 .clientName("Ainer browser-client-control operator")

@@ -272,6 +272,22 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-13 持久化身份全域 UUIDv7（G1 硬化收口）
+- **范围**：ADR-0040 Stable 契约与 G1 退出条件要求「零 `UUID.randomUUID()` 在持久化路径」。本次把
+  Workspace、AI Runtime 与 Authorization Server 三个发行物的持久化主键/审计/恢复 ID 从 UUIDv4 统一
+  迁移到应用层 `Uuidv7.generate()`（与 P3 模块既有惯例一致，全限定内联调用）。
+- **改动**：20 处持久化路径调用点替换；数据库 schema/migration 零改动（所有 `id` 列已为 `UUID` 或
+  `VARCHAR(100/128)`，v7 字符串兼容）；framework 的请求追踪 ID（`RequestIdFilter`/`RequestIds`）
+  非持久化身份，保留 `UUID.randomUUID()`。
+- **加固**：Workspace 与 AI 持久化集成测试新增 `id().version() == 7` 断言，证明生成的持久化主键
+  确为 UUIDv7（匹配 identity/persistence 模块既有断言风格）。
+- **验证**：全仓 `src/main/java` grep 确认持久化路径 `UUID.randomUUID()` 残留为 0（仅剩 2 处请求
+  追踪与 `Uuidv7` javadoc 文字）。JDK 25 + Colima 的 `./mvnw clean verify` 全绿，**338 tests /
+  0 failure / 0 error / 0 skipped**，零回归；`git diff --check` 通过。
+- **边界**：统一 `RETURNING`、全域应用层生成与 1.0 clean baseline 的最终收敛仍属后续；本次不改变
+  identity 模块的 DB 端 `uuidv7()` 机制，不触及数据库 migration；G1 的文件元数据持久化与 P3 服务端
+  管理 API/OpenAPI 仍未完成，G1 未整体关闭。
+
 2026-08-13 `xq-platform-next` 消费者接管审计、Initializer Wrapper 补正与 `rc.3` 发布
 - **消费者事实**：独立仓库由 Initializer 生成，当前仍固定 `0.1.0-SNAPSHOT`；README 要求
   `./mvnw`，仓库内却没有 Wrapper。这证明 `rc.2` 的远端 Initializer 三通道只验证了生成源码与
@@ -1101,10 +1117,10 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 ### 工程与运营
 
-- PostgreSQL Native-First 目标已由 ADR-0020 和数据库规范 1.2 确立，但当前持久化实现仍大量使用
-  UUIDv4，Workspace/AI `tenant_id` 仍为 `varchar(128)`；M4.8A 新增 request/grant/outbox/audit
-  /receipt 及预留 tenant/subject 已率先使用 PostgreSQL `uuidv7()`，但统一 `RETURNING`、全域
-  tenant UUID 化和 1.0 clean baseline 尚未实施；
+- PostgreSQL Native-First 目标已由 ADR-0020 和数据库规范 1.2 确立。Workspace、AI Runtime 与
+  Authorization Server 的持久化身份已于 2026-08-13 全域迁移到应用层 `Uuidv7.generate()`（持久化路径
+  零 `UUID.randomUUID()`，见 §3），identity 模块沿用 DB 端 `uuidv7()`；Greenfield 已移除 Workspace/AI
+  的 `tenant_id` 列；统一 `RETURNING`、全域应用层生成与 1.0 clean baseline 的剩余收敛仍属后续；
 - MyBatis-Plus Boot 4 starter 的真实 PostgreSQL 原型、全量 Reactor、既有复杂 XML 与
   Maven 3/Maven 4 外部 consumer 回归已经通过；后续风险转为版本升级回归、规则误用和正式 CI
   尚未固化这些门禁；

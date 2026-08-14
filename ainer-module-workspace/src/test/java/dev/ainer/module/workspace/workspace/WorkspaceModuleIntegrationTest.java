@@ -102,6 +102,7 @@ class WorkspaceModuleIntegrationTest {
         Workspace firstWorkspace = service.create(first, new CreateWorkspaceCommand("第一空间"));
         Workspace secondWorkspace = service.create(second, new CreateWorkspaceCommand("第二空间"));
 
+        assertThat(firstWorkspace.id().version()).isEqualTo(7);
         assertThat(service.get(first, firstWorkspace.id()).id()).isEqualTo(firstWorkspace.id());
         assertThatThrownBy(() -> service.get(first, secondWorkspace.id()))
                 .isInstanceOfSatisfying(BusinessException.class,

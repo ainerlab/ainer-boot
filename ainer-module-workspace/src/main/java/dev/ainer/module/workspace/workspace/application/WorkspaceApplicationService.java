@@ -46,7 +46,7 @@ public class WorkspaceApplicationService {
         Instant now = clock.instant();
         SubjectId ownerSubjectId = subjectId(principal.subjectId());
         Workspace workspace = Workspace.create(
-                UUID.randomUUID(), workspaceName(command.name()), now);
+                dev.ainer.core.uuid.Uuidv7.generate(), workspaceName(command.name()), now);
         WorkspaceMember owner = WorkspaceMember.owner(workspace.id(), ownerSubjectId, now);
 
         auditAllowed(principal, workspace.id(), principal.subjectId(),
