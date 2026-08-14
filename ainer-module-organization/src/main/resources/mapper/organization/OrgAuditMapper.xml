@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.organization.orgdir.infrastructure.OrgAuditMapper">
+
+    <resultMap id="AuditRowMap" type="dev.ainer.module.organization.orgdir.infrastructure.AuditRow">
+        <id property="id" column="id"/>
+        <result property="entityType" column="entity_type"/>
+        <result property="entityId" column="entity_id"/>
+        <result property="operation" column="operation"/>
+        <result property="actorIssuer" column="actor_issuer"/>
+        <result property="actorType" column="actor_type"/>
+        <result property="actorId" column="actor_id"/>
+        <result property="requestId" column="request_id"/>
+        <result property="occurredAt" column="occurred_at"/>
+    </resultMap>
+
+    <insert id="insert">
+        INSERT INTO ainer_org_change_audit
+            (id, entity_type, entity_id, operation, actor_issuer, actor_type, actor_id,
+             request_id, occurred_at)
+        VALUES
+            (#{id}, #{entityType}, #{entityId}, #{operation}, #{actorIssuer}, #{actorType},
+             #{actorId}, #{requestId}, #{occurredAt})
+    </insert>
+
+    <select id="selectByEntity" resultMap="AuditRowMap">
+        SELECT id, entity_type, entity_id, operation, actor_issuer, actor_type, actor_id,
+               request_id, occurred_at
+        FROM ainer_org_change_audit
+        WHERE entity_type = #{entityType} AND entity_id = #{entityId}
+        ORDER BY occurred_at DESC, id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countByEntity" resultType="long">
+        SELECT count(*) FROM ainer_org_change_audit WHERE entity_id = #{entityId}
+    </select>
+</mapper>

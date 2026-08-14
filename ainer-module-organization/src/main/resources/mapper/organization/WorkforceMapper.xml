@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.organization.orgdir.infrastructure.WorkforceMapper">
+
+    <resultMap id="EngagementRowMap" type="dev.ainer.module.organization.orgdir.infrastructure.EngagementRow">
+        <id property="id" column="id"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="directoryId" column="directory_id"/>
+        <result property="subjectIssuer" column="subject_issuer"/>
+        <result property="subjectId" column="subject_id"/>
+        <result property="subjectType" column="subject_type"/>
+        <result property="engagementType" column="engagement_type"/>
+        <result property="employeeNumber" column="employee_number"/>
+        <result property="validFrom" column="valid_from"/>
+        <result property="validUntil" column="valid_until"/>
+        <result property="status" column="status"/>
+        <result property="version" column="version"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="UnitAssignmentRowMap" type="dev.ainer.module.organization.orgdir.infrastructure.UnitAssignmentRow">
+        <id property="id" column="id"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="directoryId" column="directory_id"/>
+        <result property="engagementId" column="engagement_id"/>
+        <result property="orgUnitId" column="org_unit_id"/>
+        <result property="kind" column="kind"/>
+        <result property="validFrom" column="valid_from"/>
+        <result property="validUntil" column="valid_until"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="PositionRowMap" type="dev.ainer.module.organization.orgdir.infrastructure.PositionRow">
+        <id property="id" column="id"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="directoryId" column="directory_id"/>
+        <result property="orgUnitId" column="org_unit_id"/>
+        <result property="code" column="code"/>
+        <result property="displayName" column="display_name"/>
+        <result property="status" column="status"/>
+        <result property="version" column="version"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="PositionAssignmentRowMap" type="dev.ainer.module.organization.orgdir.infrastructure.PositionAssignmentRow">
+        <id property="id" column="id"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="directoryId" column="directory_id"/>
+        <result property="positionId" column="position_id"/>
+        <result property="engagementId" column="engagement_id"/>
+        <result property="unitAssignmentId" column="unit_assignment_id"/>
+        <result property="orgUnitId" column="org_unit_id"/>
+        <result property="kind" column="kind"/>
+        <result property="validFrom" column="valid_from"/>
+        <result property="validUntil" column="valid_until"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="engagementColumns">
+        id, workspace_id, directory_id, subject_issuer, subject_id, subject_type,
+        engagement_type, employee_number, valid_from, valid_until, status, version,
+        created_at, updated_at
+    </sql>
+
+    <insert id="insertEngagement">
+        INSERT INTO ainer_org_engagement
+            (id, workspace_id, directory_id, subject_issuer, subject_id, subject_type,
+             engagement_type, employee_number, valid_from, valid_until, status, version,
+             created_at, updated_at)
+        VALUES
+            (#{id}, #{workspaceId}, #{directoryId}, #{subjectIssuer}, #{subjectId}, #{subjectType},
+             #{engagementType}, #{employeeNumber}, #{validFrom}, #{validUntil}, #{status},
+             #{version}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <select id="selectEngagement" resultMap="EngagementRowMap">
+        SELECT <include refid="engagementColumns"/>
+        FROM ainer_org_engagement
+        WHERE directory_id = #{directoryId} AND id = #{id}
+    </select>
+
+    <select id="pageEngagements" resultMap="EngagementRowMap">
+        SELECT <include refid="engagementColumns"/>
+        FROM ainer_org_engagement
+        WHERE directory_id = #{directoryId}
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countEngagements" resultType="long">
+        SELECT count(*) FROM ainer_org_engagement WHERE directory_id = #{directoryId}
+    </select>
+
+    <select id="existsOverlappingEngagement" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1 FROM ainer_org_engagement
+            WHERE directory_id = #{directoryId}
+              AND (subject_issuer || ':' || subject_id) = #{subjectKey}
+              AND status &lt;&gt; 'REVOKED'
+              AND tstzrange(valid_from, valid_until) &amp;&amp; tstzrange(#{validFrom}, #{validUntil})
+        )
+    </select>
+
+    <update id="updateEngagementStatus">
+        UPDATE ainer_org_engagement
+        SET status = #{status}, valid_until = #{validUntil}, version = #{version},
+            updated_at = #{now}
+        WHERE id = #{id} AND version = #{version} - 1
+    </update>
+
+    <insert id="insertUnitAssignment">
+        INSERT INTO ainer_org_unit_assignment
+            (id, workspace_id, directory_id, engagement_id, org_unit_id, kind, valid_from,
+             valid_until, status, created_at, updated_at)
+        VALUES
+            (#{id}, #{workspaceId}, #{directoryId}, #{engagementId}, #{orgUnitId}, #{kind},
+             #{validFrom}, #{validUntil}, #{status}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <select id="selectUnitAssignment" resultMap="UnitAssignmentRowMap">
+        SELECT id, workspace_id, directory_id, engagement_id, org_unit_id, kind, valid_from,
+               valid_until, status, created_at, updated_at
+        FROM ainer_org_unit_assignment
+        WHERE directory_id = #{directoryId} AND id = #{id}
+    </select>
+
+    <select id="selectUnitAssignmentsByEngagement" resultMap="UnitAssignmentRowMap">
+        SELECT id, workspace_id, directory_id, engagement_id, org_unit_id, kind, valid_from,
+               valid_until, status, created_at, updated_at
+        FROM ainer_org_unit_assignment
+        WHERE engagement_id = #{engagementId}
+        ORDER BY created_at, id
+    </select>
+
+    <update id="closeUnitAssignment">
+        UPDATE ainer_org_unit_assignment
+        SET valid_until = #{atTime}, updated_at = #{now}
+        WHERE id = #{id} AND status = 'ENABLED' AND valid_until IS NULL
+    </update>
+
+    <insert id="insertPosition">
+        INSERT INTO ainer_org_position
+            (id, workspace_id, directory_id, org_unit_id, code, display_name, status, version,
+             created_at, updated_at)
+        VALUES
+            (#{id}, #{workspaceId}, #{directoryId}, #{orgUnitId}, #{code}, #{displayName},
+             #{status}, #{version}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <select id="selectPosition" resultMap="PositionRowMap">
+        SELECT id, workspace_id, directory_id, org_unit_id, code, display_name, status, version,
+               created_at, updated_at
+        FROM ainer_org_position
+        WHERE directory_id = #{directoryId} AND id = #{id}
+    </select>
+
+    <insert id="insertPositionAssignment">
+        INSERT INTO ainer_org_position_assignment
+            (id, workspace_id, directory_id, position_id, engagement_id, unit_assignment_id,
+             org_unit_id, kind, valid_from, valid_until, status, created_at, updated_at)
+        VALUES
+            (#{id}, #{workspaceId}, #{directoryId}, #{positionId}, #{engagementId},
+             #{unitAssignmentId}, #{orgUnitId}, #{kind}, #{validFrom}, #{validUntil}, #{status},
+             #{createdAt}, #{updatedAt})
+    </insert>
+
+    <!-- 决策时实时解析：Engagement 与 UnitAssignment 同时覆盖评估时间（ADR-0042 §3） -->
+    <select id="selectLiveUnitAssignments" resultMap="UnitAssignmentRowMap">
+        SELECT ua.id, ua.workspace_id, ua.directory_id, ua.engagement_id, ua.org_unit_id,
+               ua.kind, ua.valid_from, ua.valid_until, ua.status, ua.created_at, ua.updated_at
+        FROM ainer_org_unit_assignment ua
+        JOIN ainer_org_engagement e
+          ON e.workspace_id = ua.workspace_id AND e.directory_id = ua.directory_id
+         AND e.id = ua.engagement_id
+        WHERE ua.directory_id = #{directoryId}
+          AND ua.org_unit_id = #{orgUnitId}
+          AND ua.status = 'ENABLED'
+          AND ua.valid_from &lt;= #{atTime}
+          AND (ua.valid_until IS NULL OR ua.valid_until &gt; #{atTime})
+          AND e.status = 'ENABLED'
+          AND e.valid_from &lt;= #{atTime}
+          AND (e.valid_until IS NULL OR e.valid_until &gt; #{atTime})
+        ORDER BY ua.created_at, ua.id
+    </select>
+
+    <select id="selectLivePositionAssignments" resultMap="PositionAssignmentRowMap">
+        SELECT pa.id, pa.workspace_id, pa.directory_id, pa.position_id, pa.engagement_id,
+               pa.unit_assignment_id, pa.org_unit_id, pa.kind, pa.valid_from, pa.valid_until,
+               pa.status, pa.created_at, pa.updated_at
+        FROM ainer_org_position_assignment pa
+        JOIN ainer_org_engagement e
+          ON e.workspace_id = pa.workspace_id AND e.directory_id = pa.directory_id
+         AND e.id = pa.engagement_id
+        WHERE pa.directory_id = #{directoryId}
+          AND pa.position_id = #{positionId}
+          AND pa.status = 'ENABLED'
+          AND pa.valid_from &lt;= #{atTime}
+          AND (pa.valid_until IS NULL OR pa.valid_until &gt; #{atTime})
+          AND e.status = 'ENABLED'
+          AND e.valid_from &lt;= #{atTime}
+          AND (e.valid_until IS NULL OR e.valid_until &gt; #{atTime})
+        ORDER BY pa.created_at, pa.id
+    </select>
+
+    <select id="selectEngagementsByIds" resultMap="EngagementRowMap">
+        SELECT <include refid="engagementColumns"/>
+        FROM ainer_org_engagement
+        WHERE id IN
+        <foreach collection="ids" item="item" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </select>
+</mapper>

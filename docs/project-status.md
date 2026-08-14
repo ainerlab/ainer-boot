@@ -310,6 +310,23 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-14 G3 首切片：组织目录模块 `ainer-module-organization`（ADR-0042 O1）
+- **范围**：ADR-0032 组织目录基线以 Greenfield 模型合规取代——ADR-0042 Accepted（Workspace
+  锚点取代 Tenant；撤销语义从 access-event outbox 矩阵改为决策时实时解析；SubjectRef 与
+  ADR-0037 对齐）。O1 切片交付第 25 个 reactor 模块。
+- **交付**：`V202608140400` migration（8 张表 + append-only 审计；`btree_gist` +
+  `tstzrange` EXCLUDE 强制同目录同 Subject 非 REVOKED 任职期不重叠；`(workspace_id,
+  directory_id, id)` 复合 FK 阻止跨目录引用；position_assignment 以 5 列复合 FK 锚定同
+  Engagement 同 Unit 的 UnitAssignment；开放 PRIMARY/ROOT 部分唯一索引）。命令式管理 API
+  `/api/organization/**`（create/transfer/suspend/terminate 动作名词端点、分页 ≤100、
+  `organization.read/manage` scope 应用服务内强制、`AINER.ORGANIZATION.*` 错误码）；成员/
+  岗位投影按评估时间实时解析父链（无事实缓存，暂停/终止下一次查询即生效）；trusted-issuer
+  未配置时 fail-closed 拒绝创建任职。装配进 ainer-server 与发布链（25 projects）。
+- **验证**：服务层 8 项 + 真 JWT HTTP 6 项（JwtTestSupport）= 14 tests / 0 failure /
+  0 error / 0 skipped（真实 PostgreSQL 18.3 Testcontainers）。
+- **边界**：O2（SubjectSetBinding + position assignee resolver + ADR-0037 集成 + 防提权
+  矩阵）未交付，不得宣称组织派生授权；Team/UnitLeadership/ReportingLine/SCIM 未实现。
+
 2026-08-14 G2 消费者验证：xq-platform-next 远端消费 + 升级/回滚 + 产品纵向切片
 - **远端消费**：消费者 pom 固定 `dev.ainer:ainer-dependencies:0.1.0-rc.2/3`，新增
   GitHub Packages `<repositories>` 与 `.mvn/github-packages-settings.xml`（`${env.GITHUB_PACKAGES_USER/TOKEN}`

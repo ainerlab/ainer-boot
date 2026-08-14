@@ -39,7 +39,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0029](0029-jdk25-boot4-modern-baseline.md) | Proposed | JDK 25 / Spring Boot 4 现代化基线 |
 | [0030](0030-hybrid-fine-grained-authorization-baseline.md) | Superseded by [0037](0037-post-greenfield-authorization-baseline.md) | 通用混合细粒度授权基线（pre-Greenfield tenant 模型，已被 ADR-0037 取代） |
 | [0031](0031-agent-delegation-and-ai-context-authorization.md) | Proposed | Agent 代行、Capability 与 AI 上下文授权基线 |
-| [0032](0032-organization-workforce-directory-baseline.md) | Proposed | 组织、员工任职与 SubjectSet 授权基线 |
+| [0032](0032-organization-workforce-directory-baseline.md) | Superseded by [0042](0042-organization-directory-greenfield-baseline.md) | 组织、员工任职与 SubjectSet 授权基线（pre-Greenfield tenant 模型，已被 ADR-0042 取代） |
 | [0033 Greenfield](0033-account-workspace-subject-isolation-greenfield-baseline.md) | Accepted | Account、Workspace、Subject 与 Isolation Greenfield 基线（Option B：完全移除 Tenant；目标基线，按 Impact Stage 0–8 执行） |
 | [0034](0034-knowledge-foundation-and-ai-context-model.md) | Proposed | Knowledge Foundation 与 AI Context Model 基线 |
 | [0035](0035-project-initializer-and-manifest-v1-baseline.md) | Accepted | Project Initializer 与 Manifest v1 基线（确定性生成、安全 preview/diff、golden consumer 门禁） |
@@ -49,6 +49,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0039](0039-cache-and-distributed-coordination-baseline.md) | Accepted | 缓存与分布式协调基础设施基线（引入 Valkey/Redis 可选缓存 + 分布式锁 + Spring Cache 抽象） |
 | [0040](0040-p3-enterprise-base-and-1.0-product-contract.md) | Accepted | P3 企业基座与 1.0 产品契约（取代 ADR-0038，Stable/Incubating/非目标 + G0–G4 路线） |
 | [0041](0041-private-rc-supply-chain-and-immutable-release-baseline.md) | Accepted | 私有 RC 供应链、远端完整读回、项目签名 provenance 与不可变 GitHub Release 基线 |
+| [0042](0042-organization-directory-greenfield-baseline.md) | Accepted | 组织与员工目录 Greenfield 基线（取代 ADR-0032：Workspace 锚点 + 决策时实时解析撤销语义 + O1 切片） |
 
 ## 历史草案与审查记录
 
