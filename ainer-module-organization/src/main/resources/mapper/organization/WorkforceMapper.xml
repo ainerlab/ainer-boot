@@ -216,4 +216,26 @@
             #{item}
         </foreach>
     </select>
+    <!-- 决策时实时解析岗位在岗（ADR-0042 O2）：岗位任职 + 父 Engagement 同期覆盖评估时间 -->
+    <select id="selectLivePositionAssigneeBySubject"
+            resultType="dev.ainer.module.organization.orgdir.infrastructure.LivePositionAssigneeRow">
+        SELECT pa.id AS position_assignment_id,
+               e.id AS engagement_id,
+               least(pa.valid_until, e.valid_until) AS valid_until
+        FROM ainer_org_position_assignment pa
+        JOIN ainer_org_engagement e
+          ON e.workspace_id = pa.workspace_id AND e.directory_id = pa.directory_id
+         AND e.id = pa.engagement_id
+        WHERE pa.position_id = #{positionId}
+          AND e.subject_issuer = #{subjectIssuer}
+          AND e.subject_id = #{subjectId}
+          AND pa.status = 'ENABLED'
+          AND pa.valid_from &lt;= #{atTime}
+          AND (pa.valid_until IS NULL OR pa.valid_until &gt; #{atTime})
+          AND e.status = 'ENABLED'
+          AND e.valid_from &lt;= #{atTime}
+          AND (e.valid_until IS NULL OR e.valid_until &gt; #{atTime})
+        ORDER BY pa.created_at, pa.id
+        LIMIT 1
+    </select>
 </mapper>

@@ -1,8 +1,12 @@
 package dev.ainer.authorization.policy;
 
+import dev.ainer.authorization.domain.ResourceRef;
 import dev.ainer.authorization.domain.SubjectBinding;
 import dev.ainer.authorization.domain.SubjectRef;
+import dev.ainer.authorization.domain.SubjectSetBinding;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -13,4 +17,14 @@ import java.util.Set;
 public interface BindingResolver {
 
     Set<SubjectBinding> liveBindings(SubjectRef subject);
+
+    /**
+     * Live set bindings whose scope covers the resource at {@code at} (ADR-0042 O2). The
+     * decision engine additionally checks requester membership per candidate — subject match
+     * happens through the set, not through this query. Default empty keeps S0 fixtures and
+     * external consumers source-compatible.
+     */
+    default List<SubjectSetBinding> liveSetBindings(ResourceRef resource, Instant at) {
+        return List.of();
+    }
 }

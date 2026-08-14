@@ -53,6 +53,8 @@ public class AuthorizationManagementController {
 
     private final RoleApplicationService roleService;
     private final SubjectBindingApplicationService bindingService;
+    private final dev.ainer.authorization.application.SubjectSetBindingApplicationService setBindingService;
+    private final dev.ainer.authorization.application.SubjectSetBindingRepository setBindingRepository;
     private final RoleRepository roleRepository;
     private final SubjectBindingRepository bindingRepository;
     private final PermissionCatalogRepository permissionCatalogRepository;
@@ -66,9 +68,13 @@ public class AuthorizationManagementController {
             SubjectBindingRepository bindingRepository,
             PermissionCatalogRepository permissionCatalogRepository,
             AuthenticatedPrincipalResolver principalResolver,
-            GrantAdministrationGuard administrationGuard) {
+            GrantAdministrationGuard administrationGuard,
+            dev.ainer.authorization.application.SubjectSetBindingApplicationService setBindingService,
+            dev.ainer.authorization.application.SubjectSetBindingRepository setBindingRepository) {
         this.roleService = roleService;
         this.bindingService = bindingService;
+        this.setBindingService = setBindingService;
+        this.setBindingRepository = setBindingRepository;
         this.roleRepository = roleRepository;
         this.bindingRepository = bindingRepository;
         this.permissionCatalogRepository = permissionCatalogRepository;
@@ -175,6 +181,52 @@ public class AuthorizationManagementController {
         return ApiResponse.success(BindingResponse.from(pb), RequestIds.currentOrCreate(request));
     }
 
+    // ---- Subject-set binding management (ADR-0042 O2) ----
+
+    @PostMapping("/set-bindings")
+    public ResponseEntity<ApiResponse<SetBindingResponse>> createSetBinding(
+            @RequestBody CreateSetBindingRequest body,
+            HttpServletRequest request) {
+        AuthenticatedPrincipal principal = requireManagement();
+        dev.ainer.authorization.domain.SubjectSetRef set = new dev.ainer.authorization.domain.SubjectSetRef(
+                body.setObjectType(), body.setObjectId(), body.setRelation(),
+                body.setWorkspaceId(), body.setDirectoryId());
+        Scope scope = buildScope(body.scopeKind(), body.workspaceId(), body.resourceType(), body.resourceId());
+        String requestId = RequestIds.currentOrCreate(request);
+        UUID bindingId = setBindingService.createSetBinding(
+                principal, set, body.roleId(), scope, Instant.now(), body.validUntil(), requestId, null);
+        dev.ainer.authorization.application.SubjectSetBindingRepository.PersistedSetBinding pb =
+                setBindingRepository.findById(bindingId)
+                        .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.SET_BINDING_NOT_FOUND));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(SetBindingResponse.from(pb), RequestIds.currentOrCreate(request)));
+    }
+
+    @GetMapping("/set-bindings/{bindingId}")
+    public ApiResponse<SetBindingResponse> getSetBinding(
+            @PathVariable UUID bindingId,
+            HttpServletRequest request) {
+        requireManagement();
+        dev.ainer.authorization.application.SubjectSetBindingRepository.PersistedSetBinding pb =
+                setBindingRepository.findById(bindingId)
+                        .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.SET_BINDING_NOT_FOUND));
+        return ApiResponse.success(SetBindingResponse.from(pb), RequestIds.currentOrCreate(request));
+    }
+
+    @PostMapping("/set-bindings/{bindingId}/revocations")
+    public ApiResponse<SetBindingResponse> revokeSetBinding(
+            @PathVariable UUID bindingId,
+            @RequestBody RevokeBindingRequest body,
+            HttpServletRequest request) {
+        AuthenticatedPrincipal principal = requireManagement();
+        String requestId = RequestIds.currentOrCreate(request);
+        setBindingService.revokeSetBinding(principal, bindingId, body.reason(), requestId, null);
+        dev.ainer.authorization.application.SubjectSetBindingRepository.PersistedSetBinding pb =
+                setBindingRepository.findById(bindingId)
+                        .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.SET_BINDING_NOT_FOUND));
+        return ApiResponse.success(SetBindingResponse.from(pb), RequestIds.currentOrCreate(request));
+    }
+
     // ---- Effective Access ----
 
     @GetMapping("/effective-access")
@@ -207,19 +259,24 @@ public class AuthorizationManagementController {
     }
 
     private static Scope buildScope(CreateBindingRequest body) {
-        return switch (body.scopeKind()) {
+        return buildScope(body.scopeKind(), body.workspaceId(), body.resourceType(), body.resourceId());
+    }
+
+    private static Scope buildScope(
+            String scopeKind, java.util.UUID workspaceId, String resourceType, java.util.UUID resourceId) {
+        return switch (scopeKind) {
             case "GLOBAL" -> new Scope.Global();
             case "WORKSPACE" -> {
-                if (body.workspaceId() == null) {
+                if (workspaceId == null) {
                     throw new BusinessException(AuthorizationErrorCode.INVALID_SCOPE);
                 }
-                yield new Scope.Workspace(body.workspaceId());
+                yield new Scope.Workspace(workspaceId);
             }
             case "RESOURCE" -> {
-                if (body.workspaceId() == null || body.resourceType() == null || body.resourceId() == null) {
+                if (workspaceId == null || resourceType == null || resourceId == null) {
                     throw new BusinessException(AuthorizationErrorCode.INVALID_SCOPE);
                 }
-                yield new Scope.Resource(body.workspaceId(), new ResourceType(body.resourceType()), body.resourceId());
+                yield new Scope.Resource(workspaceId, new ResourceType(resourceType), resourceId);
             }
             default -> throw new BusinessException(AuthorizationErrorCode.INVALID_SCOPE);
         };

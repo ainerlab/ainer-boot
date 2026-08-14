@@ -13,11 +13,14 @@ import dev.ainer.authorization.domain.Requester;
 import dev.ainer.authorization.domain.ResourceRef;
 import dev.ainer.authorization.domain.RiskTier;
 import dev.ainer.authorization.domain.Scope;
+import dev.ainer.authorization.domain.SubjectSetBinding;
 import dev.ainer.authorization.domain.SubjectType;
 import dev.ainer.authorization.policy.BindingResolver;
 import dev.ainer.authorization.policy.DomainAuthorizationPolicy;
 import dev.ainer.authorization.policy.PublicAccessPolicy;
 import dev.ainer.authorization.policy.ScopePermissionCeiling;
+import dev.ainer.authorization.policy.SubjectSetMembership;
+import dev.ainer.authorization.policy.SubjectSetMembershipRegistry;
 
 import java.util.Objects;
 
@@ -41,8 +44,13 @@ public final class AuthorizationService {
     private final PublicAccessPolicy publicAccessPolicy;
     private final DomainAuthorizationPolicy domainPolicy;
     private final BindingResolver bindingResolver;
+    private final SubjectSetMembershipRegistry setMembershipRegistry;
     private final String policyVersion;
 
+    /**
+     * Source-compatible constructor without set membership (ADR-0042 O2): behaves as if no
+     * subject-set family is supported — set bindings never contribute a grant (fail-closed).
+     */
     public AuthorizationService(
             PermissionRegistry permissionRegistry,
             ScopePermissionCeiling scopeCeiling,
@@ -50,12 +58,42 @@ public final class AuthorizationService {
             DomainAuthorizationPolicy domainPolicy,
             BindingResolver bindingResolver,
             String policyVersion) {
+        this(permissionRegistry, scopeCeiling, publicAccessPolicy, domainPolicy, bindingResolver,
+                noSetMembership(), policyVersion);
+    }
+
+    public AuthorizationService(
+            PermissionRegistry permissionRegistry,
+            ScopePermissionCeiling scopeCeiling,
+            PublicAccessPolicy publicAccessPolicy,
+            DomainAuthorizationPolicy domainPolicy,
+            BindingResolver bindingResolver,
+            SubjectSetMembershipRegistry setMembershipRegistry,
+            String policyVersion) {
         this.permissionRegistry = Objects.requireNonNull(permissionRegistry, "permissionRegistry");
         this.scopeCeiling = Objects.requireNonNull(scopeCeiling, "scopeCeiling");
         this.publicAccessPolicy = Objects.requireNonNull(publicAccessPolicy, "publicAccessPolicy");
         this.domainPolicy = Objects.requireNonNull(domainPolicy, "domainPolicy");
         this.bindingResolver = Objects.requireNonNull(bindingResolver, "bindingResolver");
+        this.setMembershipRegistry = Objects.requireNonNull(setMembershipRegistry, "setMembershipRegistry");
         this.policyVersion = Objects.requireNonNull(policyVersion, "policyVersion");
+    }
+
+    private static SubjectSetMembershipRegistry noSetMembership() {
+        return new SubjectSetMembershipRegistry() {
+            @Override
+            public boolean supports(dev.ainer.authorization.domain.SubjectSetRef set) {
+                return false;
+            }
+
+            @Override
+            public SubjectSetMembership membership(
+                    dev.ainer.authorization.domain.SubjectRef requester,
+                    dev.ainer.authorization.domain.SubjectSetRef set,
+                    java.time.Instant evaluationTime) {
+                return SubjectSetMembership.unavailable();
+            }
+        };
     }
 
     public AuthorizationDecision authorize(AuthorizationRequest request) {
@@ -132,6 +170,8 @@ public final class AuthorizationService {
                         || subject.subjectRef().type() == SubjectType.SERVICE)
                 .anyMatch(b -> b.isLive(request.permission(), request.resource(), request.context().evaluatedAt()));
 
+        boolean setGrant = setBindingGrant(subject, request);
+
         boolean relationGrant = domainPolicy.relationGrants(
                 subject, request.permission(), request.resource(), request.context());
 
@@ -139,9 +179,9 @@ public final class AuthorizationService {
                 subject, request.permission(), request.resource(), request.context());
 
         boolean granted = switch (path) {
-            case BINDING_REQUIRED -> bindingGrant && stateOk;
+            case BINDING_REQUIRED -> (bindingGrant || setGrant) && stateOk;
             case RELATION_DERIVED -> relationGrant && stateOk;
-            case BINDING_OR_RELATION -> (bindingGrant || relationGrant) && stateOk;
+            case BINDING_OR_RELATION -> (bindingGrant || setGrant || relationGrant) && stateOk;
         };
 
         if (!granted) {
@@ -157,6 +197,28 @@ public final class AuthorizationService {
                     AuthorizationReasonCodes.STRONG_AUTH_REQUIRED, policyVersion, request.context().evaluatedAt());
         }
         return allow(request, AuthorizationReasonCodes.AUTHORIZED);
+    }
+
+    /**
+     * Subject-set grant path (ADR-0042 O2): a live set binding whose scope covers the resource
+     * grants only when the requester is a MEMBER at decision time (pull-based, no cache). GLOBAL
+     * scopes never ride a set binding (rejected at creation, excluded here defensively).
+     */
+    private boolean setBindingGrant(Requester.Authenticated subject, AuthorizationRequest request) {
+        java.time.Instant at = request.context().evaluatedAt();
+        for (SubjectSetBinding binding : bindingResolver.liveSetBindings(request.resource(), at)) {
+            if (binding.scope() instanceof Scope.Global) {
+                continue;
+            }
+            if (binding.isLive(request.permission(), request.resource(), at)) {
+                SubjectSetMembership membership =
+                        setMembershipRegistry.membership(subject.subjectRef(), binding.set(), at);
+                if (membership.isMember()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private AuthorizationDecision allow(AuthorizationRequest request, ReasonCode reason) {

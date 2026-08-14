@@ -2,10 +2,13 @@ package dev.ainer.authorization.infrastructure;
 
 import dev.ainer.authorization.application.RoleRepository;
 import dev.ainer.authorization.application.SubjectBindingRepository;
+import dev.ainer.authorization.application.SubjectSetBindingRepository;
 import dev.ainer.authorization.domain.BindingStatus;
+import dev.ainer.authorization.domain.ResourceRef;
 import dev.ainer.authorization.domain.Role;
 import dev.ainer.authorization.domain.SubjectBinding;
 import dev.ainer.authorization.domain.SubjectRef;
+import dev.ainer.authorization.domain.SubjectSetBinding;
 import dev.ainer.authorization.policy.BindingResolver;
 import org.springframework.stereotype.Component;
 
@@ -27,14 +30,35 @@ import java.util.Set;
 public class PostgresBindingResolver implements BindingResolver {
 
     private final SubjectBindingRepository bindingRepository;
+    private final SubjectSetBindingRepository setBindingRepository;
     private final RoleRepository roleRepository;
     private final Clock clock;
 
     public PostgresBindingResolver(
-            SubjectBindingRepository bindingRepository, RoleRepository roleRepository, Clock clock) {
+            SubjectBindingRepository bindingRepository,
+            SubjectSetBindingRepository setBindingRepository,
+            RoleRepository roleRepository,
+            Clock clock) {
         this.bindingRepository = bindingRepository;
+        this.setBindingRepository = setBindingRepository;
         this.roleRepository = roleRepository;
         this.clock = clock;
+    }
+
+    @Override
+    public java.util.List<SubjectSetBinding> liveSetBindings(ResourceRef resource, java.time.Instant at) {
+        java.util.List<SubjectSetBindingRepository.PersistedSetBinding> persisted =
+                setBindingRepository.findLiveSetBindings(resource, at);
+        java.util.List<SubjectSetBinding> result = new java.util.ArrayList<>(persisted.size());
+        for (SubjectSetBindingRepository.PersistedSetBinding pb : persisted) {
+            RoleRepository.RoleRecord roleRecord = roleRepository.findById(pb.roleId()).orElse(null);
+            if (roleRecord == null) {
+                continue;
+            }
+            result.add(new SubjectSetBinding(pb.id(), pb.set(), roleRecord.role(), pb.scope(),
+                    BindingStatus.ACTIVE, pb.validFrom(), pb.validUntil(), pb.version()));
+        }
+        return result;
     }
 
     @Override

@@ -310,6 +310,18 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-14 G3 第二切片：SubjectSet 授权集成（ADR-0042 O2，撤岗即失权闭环）
+- **范围**：ADR-0037 加性扩展 + 组织模块首个集合族。岗位在岗者通过集合绑定获得授权，
+  组织事实变化（暂停/终止/撤岗）经决策时实时解析在下次决策立即生效——无事件、无缓存。
+- **交付**：决策引擎集合授予路径（旧构造器源兼容，缺省 fail-closed）；
+  `ainer_authorization_subject_set_binding` 加性 migration；管理 API `/api/authorization/set-bindings/**`；
+  创建防提权矩阵（GLOBAL/system-only/HIGH/一致性/未知族/自成员）；
+  `workforce.position#assignee` 成员解析器（在岗 join 查询，validUntil 父链最早）。
+- **验证**：授权模块 77/0/0/0（新增 7）+ 组织模块 15/0/0/0（新增撤岗即失权端到端 1）；
+  全量 reactor 数字见下方 G3 首切片之后的最新记录。
+- **边界**：Decision validUntil 传递与决策审计的集合 provenance 明细属后续增强；O3
+  （Team/Leadership/ReportingLine/子树/SCIM）按需追加。
+
 2026-08-14 G3 首切片：组织目录模块 `ainer-module-organization`（ADR-0042 O1）
 - **范围**：ADR-0032 组织目录基线以 Greenfield 模型合规取代——ADR-0042 Accepted（Workspace
   锚点取代 Tenant；撤销语义从 access-event outbox 矩阵改为决策时实时解析；SubjectRef 与

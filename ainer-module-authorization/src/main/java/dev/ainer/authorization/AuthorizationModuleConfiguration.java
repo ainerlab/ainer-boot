@@ -149,10 +149,11 @@ public class AuthorizationModuleConfiguration {
             PublicAccessPolicy publicAccessPolicy,
             DomainAuthorizationPolicy domainPolicy,
             BindingResolver bindingResolver,
+            dev.ainer.authorization.policy.SubjectSetMembershipRegistry setMembershipRegistry,
             @Value("${ainer.authorization.policy-version:ainer-authorization-default}") String policyVersion) {
         return new AuthorizationService(
                 permissionRegistry, scopeCeiling, publicAccessPolicy,
-                domainPolicy, bindingResolver, policyVersion);
+                domainPolicy, bindingResolver, setMembershipRegistry, policyVersion);
     }
 
     /**
