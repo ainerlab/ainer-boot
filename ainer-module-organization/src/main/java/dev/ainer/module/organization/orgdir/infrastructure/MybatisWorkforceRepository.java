@@ -1,6 +1,7 @@
 package dev.ainer.module.organization.orgdir.infrastructure;
 
 import dev.ainer.module.organization.orgdir.application.WorkforceRepository;
+import dev.ainer.module.organization.orgdir.application.WorkforceRepository.LivePositionAssignee;
 import dev.ainer.module.organization.orgdir.domain.AssignmentKind;
 import dev.ainer.module.organization.orgdir.domain.EngagementType;
 import dev.ainer.module.organization.orgdir.domain.OrgPosition;
@@ -154,6 +155,18 @@ public class MybatisWorkforceRepository implements WorkforceRepository {
     public List<WorkforceEngagement> findEngagementsByIds(List<UUID> engagementIds) {
         return mapper.selectEngagementsByIds(engagementIds).stream()
                 .map(MybatisWorkforceRepository::toEngagement).toList();
+    }
+
+    @Override
+    public Optional<LivePositionAssignee> findLivePositionAssigneeBySubject(
+            UUID positionId, String subjectIssuer, String subjectId, Instant atTime) {
+        LivePositionAssigneeRow row = mapper.selectLivePositionAssigneeBySubject(
+                positionId, subjectIssuer, subjectId, atTime);
+        if (row == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new LivePositionAssignee(
+                row.getPositionAssignmentId(), row.getEngagementId(), row.getValidUntil()));
     }
 
     private static WorkforceEngagement toEngagement(EngagementRow row) {

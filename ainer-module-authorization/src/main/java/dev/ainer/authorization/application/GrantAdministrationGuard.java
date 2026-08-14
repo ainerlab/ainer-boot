@@ -98,6 +98,49 @@ public final class GrantAdministrationGuard {
         requireAssignablePermissions(actor, role.role().permissions());
     }
 
+    /**
+     * Validate a subject-set binding creation (ADR-0042 O2，承接 ADR-0032 §6 防提权）：
+     * GLOBAL 不可授予；set 与 scope 必须同 Workspace；set 家族必须有已注册成员解析器；
+     * 管理者当前不得是目标集合成员（自提权防护）；system-only 与 HIGH 风险权限不得
+     * 通过集合授予；其余约束与直接 Binding 相同。
+     */
+    public void requireSetBindingCreation(
+            AuthenticatedPrincipal actor,
+            dev.ainer.authorization.domain.SubjectSetRef set,
+            RoleRepository.RoleRecord role,
+            dev.ainer.authorization.domain.Scope scope,
+            dev.ainer.authorization.policy.SubjectSetMembershipRegistry membershipRegistry) {
+        requireManager(actor);
+        if (scope instanceof dev.ainer.authorization.domain.Scope.Global
+                || !policy.isScopeAssignable(actor, scope)) {
+            throw new BusinessException(AuthorizationErrorCode.SCOPE_NOT_ASSIGNABLE);
+        }
+        UUID scopeWorkspaceId = switch (scope) {
+            case dev.ainer.authorization.domain.Scope.Workspace ws -> ws.workspaceId();
+            case dev.ainer.authorization.domain.Scope.Resource res -> res.workspaceId();
+            default -> null;
+        };
+        if (scopeWorkspaceId == null || !scopeWorkspaceId.equals(set.workspaceId())) {
+            throw new BusinessException(AuthorizationErrorCode.SUBJECT_SET_SCOPE_MISMATCH);
+        }
+        if (!membershipRegistry.supports(set)) {
+            throw new BusinessException(AuthorizationErrorCode.UNKNOWN_SUBJECT_SET);
+        }
+        if (membershipRegistry.membership(actorSubject(actor), set, java.time.Instant.now()).isMember()) {
+            throw new BusinessException(AuthorizationErrorCode.SELF_GRANT_FORBIDDEN);
+        }
+        for (dev.ainer.authorization.domain.PermissionCode code : role.role().permissions()) {
+            Permission permission = permissionRegistry.find(code)
+                    .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.PERMISSION_NOT_FOUND));
+            if (permission.systemOnly() || permission.riskTier() == dev.ainer.authorization.domain.RiskTier.HIGH) {
+                throw new BusinessException(AuthorizationErrorCode.SUBJECT_SET_PERMISSION_FORBIDDEN);
+            }
+            if (!policy.isPermissionAssignable(actor, permission)) {
+                throw new BusinessException(AuthorizationErrorCode.PERMISSION_NOT_ASSIGNABLE);
+            }
+        }
+    }
+
     /** Validate a Binding mutation, including the generic API's no-self-modification invariant. */
     public void requireBindingRevocation(
             AuthenticatedPrincipal actor, SubjectBindingRepository.PersistedBinding binding) {

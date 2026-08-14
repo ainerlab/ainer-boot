@@ -44,4 +44,18 @@ public interface WorkforceRepository {
     List<PositionAssignment> findLivePositionAssignments(UUID directoryId, UUID positionId, Instant atTime);
 
     List<WorkforceEngagement> findEngagementsByIds(List<UUID> engagementIds);
+
+    /** 岗位在岗事实投影：position assignment + 父 engagement 同时覆盖评估时间的活体行。 */
+    record LivePositionAssignee(
+            UUID positionAssignmentId,
+            UUID engagementId,
+            Instant validUntil) {
+    }
+
+    /**
+     * 决策时实时解析：岗位 positionId 当前是否由 subject（issuer+subjectId）在岗，
+     * 且父 Engagement ENABLED 并覆盖评估时间。validUntil 取岗位任职/任职关系最早到期。
+     */
+    Optional<LivePositionAssignee> findLivePositionAssigneeBySubject(
+            UUID positionId, String subjectIssuer, String subjectId, Instant atTime);
 }

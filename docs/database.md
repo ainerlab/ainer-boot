@@ -110,6 +110,7 @@ GLOBAL binding 仅 SERVICE subject 持有（决策器强制）。
 | `ainer_org_position` | Unit 内岗位（orgUnit 不可变；directory+unit+code 唯一） |
 | `ainer_org_position_assignment` | 岗位任职（5 列复合 FK 锚定同 Engagement 同 Unit 的 UnitAssignment） |
 | `ainer_org_change_audit` | 组织变更审计 append-only（DIRECTORY/UNIT/ENGAGEMENT/…实体类型枚举） |
+| `ainer_authorization_subject_set_binding` | 集合绑定（ADR-0042 O2：set 三元组 + workspace 锚定；CHECK 禁 GLOBAL 且 scope.workspace = set.workspace；加性 migration V202608141000） |
 
 Dictionary 审计 baseline（`V202608140200`，ADR-0040 管理面加固）：
 

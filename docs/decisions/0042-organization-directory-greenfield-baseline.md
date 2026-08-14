@@ -109,8 +109,8 @@ PositionAssignment(id, workspaceId, directoryId, positionId, engagementId,
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|
-| O1 | 目录/Unit/Engagement/Assignment/Position 基线 + 管理 API + 审计 + 实时成员解析 | 本切片 |
-| O2 | SubjectSetBinding + position assignee resolver + 授权集成 + 防提权矩阵 | 后续 |
+| O1 | 目录/Unit/Engagement/Assignment/Position 基线 + 管理 API + 审计 + 实时成员解析 | 已交付（2026-08-14） |
+| O2 | SubjectSetBinding + position assignee resolver + 授权集成 + 防提权矩阵 | 已交付（2026-08-14） |
 | O3 | Team/Leadership/ReportingLine、子树 SubjectSet、SCIM adapter | 真实需求后 |
 
 ## 后果
@@ -132,7 +132,21 @@ PositionAssignment(id, workspaceId, directoryId, positionId, engagementId,
   无双重资格、暂停后成员投影立即为空且子分配未清理、岗位同 Unit 同 Engagement 校验、
   UUIDv7 断言）+ 真 JWT HTTP 测试 6 项（401/403/201/409/422、审计行、成员投影终止后立即
   为空）全部通过，0 skipped。
-- O2 交付前不得宣称「组织派生授权」或 SubjectSet 能力。
+- **O2（2026-08-14）已交付并验证**：ADR-0037 扩展（加性，不破坏已发布契约）——决策引擎新增
+  集合授予路径（`BINDING_REQUIRED`/`BINDING_OR_RELATION` 下 direct ∪ set，成员资格经
+  `SubjectSetMembershipRegistry` 决策时实时解析，无缓存）；`ainer_authorization_subject_set_binding`
+  加性 migration（CHECK 禁 GLOBAL、scope/workspace 一致性、set 索引）；管理 API
+  `POST/GET /api/authorization/set-bindings/**`；创建防提权矩阵（GLOBAL 拒绝、system-only/HIGH
+  权限拒绝、set↔scope Workspace 一致、未注册集合族拒绝、管理者自身成员资格拒绝）；
+  `BindingResolver.liveSetBindings` default 方法保持外部消费者源兼容，`AuthorizationService`
+  旧构造器委托无集合注册表（fail-closed）。组织模块提供首个集合族
+  `workforce.position#assignee`（在岗事实 join 查询，validUntil 取父链最早）。验证：授权模块
+  77/0/0/0（新增 7 项：成员 ALLOW/非成员 DENY/撤销 DENY/跨 Workspace/GLOBAL/一致性/未知族/HIGH
+  权限/401）+ 组织模块 15/0/0/0（含撤岗即失权端到端：在岗者仅凭岗位成员资格 ALLOW，终止
+  Engagement 后同一 subject 下一次决策立即 DENY）。
+- O3（Team/Leadership/ReportingLine、子树 SubjectSet、SCIM）仍按需追加；Decision
+  validUntil 传递与 decision audit 的集合 provenance 明细属后续增强（成员资格事实不缓存，
+  审计以决策结果为准）。
 
 ## 参考
 

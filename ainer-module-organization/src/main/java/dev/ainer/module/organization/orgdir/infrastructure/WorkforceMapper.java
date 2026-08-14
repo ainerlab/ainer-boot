@@ -51,4 +51,10 @@ public interface WorkforceMapper {
             @Param("positionId") UUID positionId, @Param("atTime") Instant atTime);
 
     List<EngagementRow> selectEngagementsByIds(@Param("ids") List<UUID> ids);
+
+    LivePositionAssigneeRow selectLivePositionAssigneeBySubject(
+            @Param("positionId") UUID positionId,
+            @Param("subjectIssuer") String subjectIssuer,
+            @Param("subjectId") String subjectId,
+            @Param("atTime") Instant atTime);
 }

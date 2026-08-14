@@ -2,6 +2,7 @@ package dev.ainer.authorization.api;
 
 import dev.ainer.authorization.application.RoleRepository;
 import dev.ainer.authorization.application.SubjectBindingRepository;
+import dev.ainer.authorization.application.SubjectSetBindingRepository;
 import dev.ainer.authorization.domain.Permission;
 import dev.ainer.authorization.domain.PermissionCode;
 import dev.ainer.authorization.domain.Scope;
@@ -67,6 +68,63 @@ public final class AuthorizationApiDtos {
     }
 
     public record RevokeBindingRequest(@Nullable String reason) {
+    }
+
+    public record CreateSetBindingRequest(
+            String setObjectType,
+            UUID setObjectId,
+            String setRelation,
+            UUID setWorkspaceId,
+            @Nullable UUID setDirectoryId,
+            UUID roleId,
+            String scopeKind,
+            @Nullable UUID workspaceId,
+            @Nullable String resourceType,
+            @Nullable UUID resourceId,
+            @Nullable Instant validUntil) {
+    }
+
+    public record SetBindingResponse(
+            UUID id,
+            String setObjectType,
+            UUID setObjectId,
+            String setRelation,
+            UUID setWorkspaceId,
+            @Nullable UUID setDirectoryId,
+            UUID roleId,
+            String scopeKind,
+            @Nullable UUID workspaceId,
+            @Nullable String resourceType,
+            @Nullable UUID resourceId,
+            String status,
+            Instant validFrom,
+            @Nullable Instant validUntil,
+            long version) {
+
+        public static SetBindingResponse from(SubjectSetBindingRepository.PersistedSetBinding b) {
+            Scope scope = b.scope();
+            String scopeKind;
+            UUID workspaceId = null;
+            String resourceType = null;
+            UUID resourceId = null;
+            switch (scope) {
+                case Scope.Workspace ws -> {
+                    scopeKind = "WORKSPACE";
+                    workspaceId = ws.workspaceId();
+                }
+                case Scope.Resource res -> {
+                    scopeKind = "RESOURCE";
+                    workspaceId = res.workspaceId();
+                    resourceType = res.resourceType().value();
+                    resourceId = res.resourceId();
+                }
+                default -> scopeKind = "GLOBAL";
+            }
+            return new SetBindingResponse(b.id(), b.set().objectType(), b.set().objectId(),
+                    b.set().relation(), b.set().workspaceId(), b.set().directoryId(), b.roleId(),
+                    scopeKind, workspaceId, resourceType, resourceId, b.status().name(),
+                    b.validFrom(), b.validUntil(), b.version());
+        }
     }
 
     public record BindingResponse(
