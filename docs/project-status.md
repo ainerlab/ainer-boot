@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-14 · 工程版本：`0.1.0-SNAPSHOT`
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-14 · 工程版本：`0.1.0` 发布中
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -65,6 +65,19 @@ config 沿用 `ainer_config_history`）。写入面补齐：字典类型/项的�
 `JwtTestSupport` 共享真 JWT fixture（RSA 签发 + 真 JwtDecoder + @Primary resolver 工厂）。
 三模块真签名 JWT HTTP 测试（401/403/201/409/审计行/PII 脱敏）全部通过。剩余边界：OpenAPI
 运行时文档仍未引入（Boot 4.1 springdoc 兼容性待验证），不阻塞 G1 关闭。
+
+2026-08-14 G1 三提交（UUIDv7 全域迁移 `ef6714c`、文件存储模块 `00fb77e`、P3 管理 API
+`68110ea`）以 PR #8 合入 `dev`（merge commit `050cacb`）：PR 三项检查（quality gate
+10m51s、virtual-thread matrix 2m2s、gitleaks）与合并后默认分支 run `31782099908`
+（12m12s success）全绿。dev 主线自此包含 ADR-0040 1.0 Product Contract 的全部 P3 基座。
+
+2026-08-14 首个外部消费者 G2 验证完成：本机 GitHub 凭据已具备 `read:packages`，此前阻塞
+产品消费的授权缺口解除。`xq-platform-next`（独立仓库，本地 git）依次交付：Maven Wrapper
+补齐（对齐 rc.3 生成器合同）；GitHub Packages 仓库与 env 注入认证模板（零密钥入库）；
+远端 `v0.1.0-rc.2` 冷仓基线（隔离 `maven.repo.local`，全部制品远端解析，4/0/0/0）；
+升级/回滚演练 `rc.2 → rc.3 → rc.2 → 最终固定 rc.3`（每步 4/0/0/0，git 历史保留完整序列）；
+产品纵向切片（JWT 安全链、资源授权、V2 migration、真实 HTTP 错误、客户端 SDK，14/0/0/0）。
+G2 的消费者证据项全部关闭，剩余唯一动作是发布 `0.1.0` 本体。
 
 2026-08-13 `v0.1.0-rc.3` 已成为当前**合格受控 RC**：annotated tag、不可变 GitHub Release 与默认
 分支精确绑定到 merge commit `666b1556f11935925369586152a3791180b7314e`；默认分支 run
@@ -287,6 +300,33 @@ Ainer 项目签名 provenance 已通过。
   `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 
 ## 3. 最近验证记录
+
+2026-08-14 G2 消费者验证：xq-platform-next 远端消费 + 升级/回滚 + 产品纵向切片
+- **远端消费**：消费者 pom 固定 `dev.ainer:ainer-dependencies:0.1.0-rc.2/3`，新增
+  GitHub Packages `<repositories>` 与 `.mvn/github-packages-settings.xml`（`${env.GITHUB_PACKAGES_USER/TOKEN}`
+  注入，模板零密钥）。冷仓基线使用隔离 `maven.repo.local=/tmp/xq-cold-repo-rc2`，rc.2/rc.3
+  制品全部从 `maven.pkg.github.com/ainerlab/ainer-boot` 远端解析（本机 `gh` 凭据具备
+  `read:packages`），4 tests / 0 failure / 0 error / 0 skipped，BUILD SUCCESS。
+- **升级/回滚演练**：`rc.2 冷仓基线 → rc.3 升级 → rc.2 回滚 → 最终固定 rc.3`，每步全量
+  verify 均 4/0/0/0；消费者 git 历史（38b2f72/c355108/440cb07/60c349c）保留完整演练序列，
+  rc.2 证明为有效回滚终点。
+- **产品纵向切片**（提交 `fbb1c2a`）：消费者自有 RSA 真签名 JWT 夹具（USER_NEUTRAL_V1/
+  SERVICE_V1 + NimbusJwtDecoder 验签，无 stub）驱动——JWT 安全链（匿名 401、缺 scope 403、
+  `XQ.PLATFORM.APP_NOT_FOUND` 404、重复 appCode 409、缺 workspace 422、X-Request-Id）；
+  Ainer 授权模块消费（产品权限 `xq.platform-app.read/write` 注册、scope 天花板、
+  BINDING_REQUIRED 策略、`xq-ops` 管理白名单；ops SERVICE 经管理 API 建 Role/Binding，
+  业务 USER 受保护写 ALLOW；**撤销 Binding 后同一串 JWT 立即 403 且产品行不变**，跨
+  Workspace 拒绝，白名单外 SERVICE 管理被拒；ALLOW/DENY 决策审计断言）；V2 migration
+  （platform app 增加 `workspace_id`，空库重放 V1+V2+授权基线）；OpenAPI 契约
+  `xq-platform-v1.yaml` + `scripts/verify-sdk.sh`（strict 校验 + typescript-fetch 生成 +
+  tsc 5.9.2 编译门禁）。
+- **消费者验证**：14 tests / 0 failure / 0 error / 0 skipped（真实 PostgreSQL 18.3
+  Testcontainers）；SDK 门禁通过。过程中暴露并修复的消费者侧事实：模块自带显式 `@MapperScan`
+  会使 MyBatis 自动扫描退避（宿主必须显式登记自己的 mapper）；`PermissionCode` 仅接受
+  全小写；`@Value` 不能绑定 YAML 列表；权限目录表是管理投影，宿主需启动时 upsert 同步。
+- **边界**：消费者仓库无远端 CI（本地证据）；weapp 前端工程尚未创建，SDK 的 tsc 编译门禁
+  是「可被前端工程编译」的当前最强形式；`0.1.0` 发布后消费者需再执行一次
+  `rc.3 → 0.1.0` 升级验证。
 
 2026-08-14 P3 三模块服务端管理 API（G1 管理 API 项关闭，G1 整体关闭）
 - **范围**：ADR-0040 G1 退出条件「管理 API 补齐」。此前 dictionary/config/notification 只有
@@ -1218,13 +1258,12 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 按
 [`Ainer Boot 产品定位、竞品能力矩阵与路线图`](design/ainer-scaffold-design.md)
-定义的全局产品化阶段，当前是 **G0 已冻结、G1 收口、P1 私有受控 RC 门禁已完成、P2 已发布合同
-已补正、G2 产品消费验证中**：P3
-企业基座已有代码但文件元数据与管理 API/OpenAPI 尚未完成；`rc.1` 已撤回，`v0.1.0-rc.2` 保留为
-升级/回滚起点，`v0.1.0-rc.3` 已通过 release hardening、默认分支 CI、远端读回/消费和 immutable
-Release。private 仓库分支保护仍缺远端
-强制执行；`xq-platform-next` 目前仍未完成基于合格远端 RC 的真实产品纵向切片、migration replay、
-升级与回滚，因此不允许把当前源码标记为稳定 `0.1.0`。
+定义的全局产品化阶段，当前是 **G0 已冻结、G1 已整体关闭并合入 dev、P1/P2 发布门禁已完成、
+G2 消费者证据已闭环、`0.1.0` 发布进行中**：P3 企业基座（文件/字典/配置/通知 + 缓存 +
+授权）已全部进入 dev 主线；`rc.1` 已撤回，`v0.1.0-rc.2` 保留为升级/回滚起点，
+`v0.1.0-rc.3` 为最终消费目标并被 `xq-platform-next` 真实消费（远端冷仓、升级/回滚演练、
+产品纵向切片、SDK 门禁全部通过）。private 仓库分支保护仍缺远端强制执行；
+`0.1.0` 发布与随后的 `rc.3 → 0.1.0` 消费者升级验证完成后 G2 关闭。
 
 ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -Denforcer.skip=true` 验证；正式
 `./mvnw clean verify`、零跳过门禁与 Testcontainers 集成仍待 Maven 4 RC6 官方发行包恢复后执行）：
@@ -1258,14 +1297,18 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
    immutable GitHub Release；该合格受控 RC 保留为升级/回滚的已发布起点，不覆盖或移动；
 2. `v0.1.0-rc.3` 已完成 338/0/0/0、107/107 远端验签、Maven 3/4 与自带 Wrapper 的远端
    Initializer 消费、签名证据和 immutable GitHub Release；该版本是当前最终消费目标，不覆盖或移动；
-3. 让 `xq-platform-next` 删除 `0.1.0-SNAPSHOT` 与本地仓库依赖，固定从远端 `rc.3` 消费，并以
-   `rc.2` 为起点完成升级、回滚、JWT、
-   Workspace/资源授权、PostgreSQL migration replay、真实 HTTP 错误和客户端 SDK 的产品所有纵向
-   切片，同时演练升级与回滚；
-4. 若产品消费暴露兼容性或发布链问题，使用唯一的新 `rc.N+1` 修复并重复完整门禁，不移动 tag、
-   覆盖制品或回退本地源码依赖；
-5. 只有上述消费证据通过后才评估提升 `0.1.0` 并开放给其他内部产品；
-   `python-learning-service` 保持版本化 BOM/Starter 接入，不绑定开发分支、不复制源码。
+3. ✅（2026-08-14）`xq-platform-next` 已删除 `0.1.0-SNAPSHOT` 与本地仓库依赖，固定从远端
+   `rc.3` 消费，并以 `rc.2` 为起点完成升级、回滚、JWT、Workspace/资源授权、PostgreSQL
+   migration replay、真实 HTTP 错误和客户端 SDK 的产品纵向切片（详见 §3）；
+4. 发布 `v0.1.0`（dev HEAD 含 G1 全部工作，24 模块/112 主制品），走 rc.2/rc.3 同一完整
+   发布门禁：annotated tag、签名 deploy、远端读回验签、空仓消费者、Initializer 三通道、
+   SBOM/provenance 与 immutable Release；
+5. `0.1.0` 发布后让 `xq-platform-next` 完成 `rc.3 → 0.1.0` 真实升级验证，形成首个连续
+   升级链证据（`rc.2 → rc.3 → 0.1.0`）；若暴露兼容性或发布链问题，使用新的 `0.1.1`/
+   `0.2.0` 修复，不移动 tag、不覆盖制品；
+6. `0.1.0` 消费证据闭环后，G2 关闭，进入 G3（产品核心闭环：最小 Agent/Tool/Context/Evaluation
+   治理、组织目录 Greenfield 重述、Knowledge 两个语义切片）；`python-learning-service`
+   保持版本化 BOM/Starter 接入，不绑定开发分支、不复制源码。
 
 Identity、安全与运维纵深继续修复明确的 P0/P1/P3 风险，但方法级授权、组织目录、真实设备矩阵、
 多实例容量、外部不可变审计和商业 entitlement 不再作为首个受控 RC 的无限前置。任何部署若实际

@@ -6,6 +6,43 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 当前无尚未归入版本的用户可见变化。
 
+## [0.1.0] - 2026-08-14
+
+第一个稳定 `0.1` 基线：包含 ADR-0040 G1 全部硬化与 G2 消费者证据闭环。相对
+`0.1.0-rc.3` 的变化如下；`rc.2`/`rc.3` 保持不可变，作为升级/回滚链的已发布起点。
+
+### Added
+
+- **文件存储模块 `ainer-module-file`（第 24 个 reactor 模块）**：`ainer_file_object`/
+  `ainer_file_audit` migration（UUIDv7 CHECK）、`/api/files` 上传/下载/删除与分页管理
+  API（`file.read`/`file.write` scope，413/415 真实状态码）、大小/类型限制、SHA-256 校验、
+  上传失败补偿与同事务变更审计；发布链同步（BOM、release-artifacts 24 projects/112
+  primary、consumer 24 POM）。
+- **P3 服务端管理 API（dictionary/config/notification）**：三模块稳定错误码
+  （`AINER.<MODULE>.*`）、`*.read`/`*.manage`/`*.submit` scope 在应用服务内强制、管理
+  REST API（乐观锁部分更新、动作名词状态变更端点、分页 ≤100）与同事务变更审计
+  （dictionary/notification 新增 append-only 审计表）；写入面补齐（字典类型/项更新与启停、
+  通知模板更新/启停/分页、投递记录状态分页且不回显渲染内容）。
+- **`ainer-test-support` 新增 `JwtTestSupport`**：共享真 JWT fixture（RSA 3072 签发
+  USER_NEUTRAL_V1/SERVICE_V1 + 真 NimbusJwtDecoder + @Primary resolver 工厂）。
+- **首个外部消费者 G2 证据**：`xq-platform-next` 从远端 GitHub Packages 冷仓消费
+  `v0.1.0-rc.3`，完成 `rc.2 → rc.3 → rc.2 → rc.3` 升级/回滚演练（每步 4 tests 零跳过）、
+  JWT 安全链 / Ainer 资源授权（撤销 Binding 后同一 Token 立即 403）/ migration replay /
+  真实 HTTP 错误 / OpenAPI→TypeScript SDK 门禁的产品纵向切片（14 tests 零跳过）。
+
+### Changed
+
+- **持久化身份全域 UUIDv7（ADR-0040 G1）**：Workspace、AI Runtime 与 Authorization
+  Server 的 20 处持久化主键/审计/恢复 ID 从 UUIDv4 统一迁移到应用层 `Uuidv7.generate()`，
+  持久化路径零 `UUID.randomUUID()`；集成测试新增 `id().version() == 7` 断言。数据库
+  schema 零改动。
+
+### 边界
+
+- `0.1.0` 是稳定 `0.1` 基线与 ADR-0040 G2 的收口版本，不是公开发行版、生产就绪或 1.0
+  声明；许可状态仍为私有/专有。OpenAPI 运行时文档未引入（Boot 4.1 springdoc 兼容性
+  待验证）。
+
 ## [0.1.0-rc.3] - 2026-08-13
 
 ### Fixed

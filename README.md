@@ -33,15 +33,17 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 
 当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
 
-[`v0.1.0-rc.3`](https://github.com/ainerlab/ainer-boot/releases/tag/v0.1.0-rc.3) 是当前合格受控 RC：
-不可变 Release 精确绑定源码 `666b1556f11935925369586152a3791180b7314e`，release run
-`31675920731` 完成 338 tests / 0 failure / 0 error / 0 skipped、107/107 远端制品读回验签、
-Maven 3/Maven 4 空仓消费，以及从远端 CLI 生成并用项目自带 Maven 3.9.16 Wrapper 构建的
-Project Initializer 三通道。
-[`v0.1.0-rc.2`](https://github.com/ainerlab/ainer-boot/releases/tag/v0.1.0-rc.2) 保持为第一个合格、
-不可变的前序 RC，但其生成项目缺少已约定的 Wrapper，只作为升级/回滚起点，不作为最终消费目标。
-`0.1.0-rc.1` 仍是 withdrawn/non-qualifying，禁止消费或复用；当前开发版本仍为
-`0.1.0-SNAPSHOT`。`rc.3` 不是稳定版、公开发行版、生产就绪或 1.0 声明；动态门禁只以
+[`v0.1.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v0.1.0) 是第一个稳定 `0.1`
+基线：包含 ADR-0040 G1 全部硬化（UUIDv7 全域、文件存储模块、P3 管理 API）与 G2 消费者证据
+闭环。发布走与 RC 相同的完整门禁（annotated tag、签名 deploy、远端读回验签、空仓消费者、
+Initializer 三通道、SBOM/provenance、immutable Release），制品规模为 24 projects /
+112 primary。首个外部消费者 `xq-platform-next` 已在 `v0.1.0-rc.3` 上完成远端冷仓消费、
+`rc.2 → rc.3 → rc.2 → rc.3` 升级/回滚演练与 JWT/授权/migration/HTTP 错误/SDK 产品纵向
+切片，`0.1.0` 发布后执行 `rc.3 → 0.1.0` 升级验证。
+[`v0.1.0-rc.2`](https://github.com/ainerlab/ainer-boot/releases/tag/v0.1.0-rc.2) 与
+[`v0.1.0-rc.3`](https://github.com/ainerlab/ainer-boot/releases/tag/v0.1.0-rc.3) 保持
+不可变，作为升级/回滚链的历史起点。`0.1.0-rc.1` 仍是 withdrawn/non-qualifying，禁止消费
+或复用。`0.1.0` 不是公开发行版、生产就绪或 1.0 声明；动态门禁只以
 [`docs/project-status.md`](docs/project-status.md) 为准。
 
 ## 架构立场
