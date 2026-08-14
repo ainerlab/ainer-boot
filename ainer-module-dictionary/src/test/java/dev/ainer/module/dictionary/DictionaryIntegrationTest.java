@@ -1,8 +1,18 @@
 package dev.ainer.module.dictionary;
 
+import dev.ainer.core.error.BusinessException;
+import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.module.dictionary.dictionary.application.DictionaryApplicationService;
+import dev.ainer.module.dictionary.dictionary.application.DictionaryAuthorities;
+import dev.ainer.module.dictionary.dictionary.application.DictionaryErrorCode;
 import dev.ainer.module.dictionary.dictionary.domain.DictionaryItem;
+import dev.ainer.module.dictionary.dictionary.domain.DictionaryStatus;
 import dev.ainer.module.dictionary.dictionary.domain.DictionaryType;
+import dev.ainer.security.principal.HumanSubjectRef;
+import dev.ainer.security.principal.IdentityAuthorityRef;
+import dev.ainer.security.token.AuthenticatedPrincipal;
+import dev.ainer.security.token.AuthenticatedPrincipalResolver;
+import dev.ainer.security.token.TokenProfile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +20,7 @@ import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -21,14 +32,16 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Integration test for the dictionary module (ADR-0038). Runs against a real PostgreSQL 18.3
- * Testcontainers instance, exercises the full migration → MyBatis → domain → service path.
+ * Integration test for the dictionary module (ADR-0040 management hardening). Real PostgreSQL
+ * 18.3; exercises migration → MyBatis → domain → service including optimistic-locked updates,
+ * status transitions, pagination, same-transaction audit and scope enforcement.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
@@ -39,6 +52,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
                 "spring.main.banner-mode=off"
         })
 class DictionaryIntegrationTest {
+
+    private static final IdentityAuthorityRef AUTHORITY =
+            new IdentityAuthorityRef("https://auth.ainer.test");
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
@@ -59,76 +75,150 @@ class DictionaryIntegrationTest {
     @Autowired
     JdbcTemplate jdbcTemplate;
 
+    private final AuthenticatedPrincipal manager = principal(
+            DictionaryAuthorities.READ, DictionaryAuthorities.MANAGE);
+    private final AuthenticatedPrincipal reader = principal(DictionaryAuthorities.READ);
+
     @BeforeEach
     void clean() {
+        jdbcTemplate.execute("DELETE FROM ainer_dictionary_audit");
         jdbcTemplate.execute("DELETE FROM ainer_dictionary_item");
         jdbcTemplate.execute("DELETE FROM ainer_dictionary_type");
     }
 
     @Test
-    void createTypeAndGetItBack() {
-        UUID typeId = service.createType(null, "gender", "性别", "Gender", "Biological gender");
+    void createTypeWritesAuditAndReadsBack() {
+        UUID typeId = service.createType(manager, "req-1", null, "gender", "性别", "Gender", null);
 
-        Optional<DictionaryType> loaded = service.getType(typeId);
+        Optional<DictionaryType> loaded = service.getType(manager, typeId);
         assertThat(loaded).isPresent();
         assertThat(loaded.get().code()).isEqualTo("gender");
-        assertThat(loaded.get().name()).isEqualTo("性别");
-        assertThat(loaded.get().nameEn()).isEqualTo("Gender");
+        assertThat(loaded.get().status()).isEqualTo(DictionaryStatus.ACTIVE);
+        assertThat(loaded.get().id().version()).isEqualTo(7);
+
+        Integer audits = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_dictionary_audit WHERE operation = 'TYPE_CREATED'",
+                Integer.class);
+        assertThat(audits).isEqualTo(1);
     }
 
     @Test
     void duplicateTypeCodeFails() {
-        service.createType(null, "status", "状态", "Status", null);
-        assertThatThrownBy(() -> service.createType(null, "status", "重复", "Dup", null))
-                .isInstanceOf(IllegalArgumentException.class);
+        service.createType(manager, null, null, "status", "状态", "Status", null);
+        assertThatThrownBy(() -> service.createType(manager, null, null, "status", "重复", "Dup", null))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.errorCode())
+                                .isEqualTo(DictionaryErrorCode.TYPE_ALREADY_EXISTS));
     }
 
     @Test
     void childTypeRequiresValidParent() {
         assertThatThrownBy(() -> service.createType(
-                java.util.UUID.randomUUID(), "child", "子", "Child", null))
-                .isInstanceOf(IllegalArgumentException.class);
+                manager, null, UUID.randomUUID(), "child", "子", "Child", null))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.errorCode())
+                                .isEqualTo(DictionaryErrorCode.PARENT_NOT_FOUND));
     }
 
     @Test
     void treeStructureWithParentAndChildren() {
-        UUID parentId = service.createType(null, "industry", "行业", "Industry", null);
-        service.createType(parentId, "tech", "科技", "Technology", null);
-        service.createType(parentId, "finance", "金融", "Finance", null);
+        UUID parentId = service.createType(manager, null, null, "industry", "行业", "Industry", null);
+        service.createType(manager, null, parentId, "tech", "科技", "Technology", null);
+        service.createType(manager, null, parentId, "finance", "金融", "Finance", null);
 
-        List<DictionaryType> children = service.getChildTypes(parentId);
+        List<DictionaryType> children = service.getChildTypes(manager, parentId);
         assertThat(children).hasSize(2);
         assertThat(children).extracting(DictionaryType::code).contains("tech", "finance");
     }
 
     @Test
-    void createItemAndResolveByTypeCode() {
-        UUID typeId = service.createType(null, "order_status", "订单状态", "Order Status", null);
-        service.createItem(typeId, "PENDING", "待处理", "Pending", "1", 0, null, null);
-        service.createItem(typeId, "PAID", "已支付", "Paid", "2", 1, "text-success", null);
-        service.createItem(typeId, "CANCELLED", "已取消", "Cancelled", "3", 2, "text-danger", null);
+    void updateTypeUsesOptimisticLockAndBumpsVersion() {
+        UUID typeId = service.createType(manager, null, null, "region", "区域", "Region", null);
 
-        List<DictionaryItem> items = service.resolveItemsByTypeCode("order_status");
-        assertThat(items).hasSize(3);
-        assertThat(items).extracting(DictionaryItem::code).containsExactly("PENDING", "PAID", "CANCELLED");
-        assertThat(items.get(1).label()).isEqualTo("已支付");
-        assertThat(items.get(1).labelEn()).isEqualTo("Paid");
-        assertThat(items.get(1).cssClass()).isEqualTo("text-success");
+        DictionaryType updated = service.updateType(
+                manager, null, typeId, "大区", "Region v2", null, 5, 0);
+        assertThat(updated.name()).isEqualTo("大区");
+        assertThat(updated.sortIndex()).isEqualTo(5);
+        assertThat(updated.version()).isEqualTo(1L);
+
+        // stale version is rejected with 409
+        assertThatThrownBy(() -> service.updateType(
+                manager, null, typeId, "再改", null, null, null, 0))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.errorCode())
+                                .isEqualTo(DictionaryErrorCode.CONCURRENT_MODIFICATION));
+    }
+
+    @Test
+    void changeTypeStatusDisablesAndWritesAudit() {
+        UUID typeId = service.createType(manager, null, null, "legacy", "旧类型", "Legacy", null);
+
+        DictionaryType disabled = service.changeTypeStatus(
+                manager, null, typeId, DictionaryStatus.DISABLED, 0);
+        assertThat(disabled.status()).isEqualTo(DictionaryStatus.DISABLED);
+
+        String operation = jdbcTemplate.queryForObject(
+                "SELECT operation FROM ainer_dictionary_audit WHERE target_kind = 'TYPE' "
+                        + "AND operation = 'TYPE_STATUS_CHANGED'", String.class);
+        assertThat(operation).isEqualTo("TYPE_STATUS_CHANGED");
+    }
+
+    @Test
+    void pageTypesFiltersByStatus() {
+        service.createType(manager, null, null, "a", "A", null, null);
+        UUID b = service.createType(manager, null, null, "b", "B", null, null);
+        service.changeTypeStatus(manager, null, b, DictionaryStatus.DISABLED, 0);
+
+        var active = service.pageTypes(manager, "ACTIVE", 1, 20);
+        assertThat(active.total()).isEqualTo(1);
+        assertThat(active.items().get(0).code()).isEqualTo("a");
+
+        var all = service.pageTypes(manager, null, 1, 20);
+        assertThat(all.total()).isEqualTo(2);
+    }
+
+    @Test
+    void itemLifecycleWithUpdateStatusAndPagination() {
+        UUID typeId = service.createType(manager, null, null, "order_status", "订单状态", null, null);
+        UUID first = service.createItem(manager, null, typeId, "PENDING", "待处理", "Pending", "1", 0, null, null);
+        service.createItem(manager, null, typeId, "PAID", "已支付", "Paid", "2", 1, null, null);
+
+        DictionaryItem updated = service.updateItem(
+                manager, null, first, "待处理(新)", null, "0", null, null, null, 0);
+        assertThat(updated.label()).isEqualTo("待处理(新)");
+        assertThat(updated.version()).isEqualTo(1L);
+
+        DictionaryItem disabled = service.changeItemStatus(
+                manager, null, first, DictionaryStatus.DISABLED, 1);
+        assertThat(disabled.status()).isEqualTo(DictionaryStatus.DISABLED);
+
+        var page = service.pageItems(manager, typeId, 1, 20);
+        assertThat(page.total()).isEqualTo(2);
+        // resolve (active-only projection) no longer sees the disabled item
+        List<DictionaryItem> resolved = service.resolveItemsByTypeCode("order_status");
+        assertThat(resolved).extracting(DictionaryItem::code).containsExactly("PAID");
+    }
+
+    @Test
+    void duplicateItemCodeFails() {
+        UUID typeId = service.createType(manager, null, null, "gender", "性别", "Gender", null);
+        service.createItem(manager, null, typeId, "MALE", "男", "Male", null, 0, null, null);
+        assertThatThrownBy(() -> service.createItem(manager, null, typeId, "MALE", "重复", "Dup", null, 1, null, null))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.errorCode())
+                                .isEqualTo(DictionaryErrorCode.ITEM_ALREADY_EXISTS));
     }
 
     @Test
     void cacheEvictedOnItemCreate() {
-        UUID typeId = service.createType(null, "cached_type", "缓存测试", "Cached", null);
-        service.createItem(typeId, "A", "A", "A-label", null, 0, null, null);
+        UUID typeId = service.createType(manager, null, null, "cached_type", "缓存测试", "Cached", null);
+        service.createItem(manager, null, typeId, "A", "A", "A-label", null, 0, null, null);
 
-        // 第一次查询缓存
         List<DictionaryItem> first = service.resolveItemsByTypeCode("cached_type");
         assertThat(first).hasSize(1);
 
-        // 通过 service 创建新 item → @CacheEvict 生效
-        service.createItem(typeId, "B", "B", "B-label", null, 1, null, null);
+        service.createItem(manager, null, typeId, "B", "B", "B-label", null, 1, null, null);
 
-        // 再次查询应看到新 item（缓存已失效，重新加载）
         List<DictionaryItem> reloaded = service.resolveItemsByTypeCode("cached_type");
         assertThat(reloaded).extracting(DictionaryItem::code).contains("A", "B");
     }
@@ -140,16 +230,58 @@ class DictionaryIntegrationTest {
     }
 
     @Test
-    void duplicateItemCodeFails() {
-        UUID typeId = service.createType(null, "gender", "性别", "Gender", null);
-        service.createItem(typeId, "MALE", "男", "Male", null, 0, null, null);
-        assertThatThrownBy(() -> service.createItem(typeId, "MALE", "重复", "Dup", null, 1, null, null))
-                .isInstanceOf(IllegalArgumentException.class);
+    void manageWithoutScopeIsForbidden() {
+        service.createType(manager, null, null, "x", "X", null, null); // manager is allowed
+        assertThatThrownBy(() -> service.createType(reader, null, null, "y", "Y", null, null))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.errorCode())
+                                .isEqualTo(StandardErrorCode.FORBIDDEN));
+        service.pageTypes(reader, null, 1, 20); // read scope is sufficient for queries
+    }
+
+    @Test
+    void invalidPageSizeIsRejected() {
+        assertThatThrownBy(() -> service.pageTypes(manager, null, 1, 101))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.errorCode())
+                                .isEqualTo(DictionaryErrorCode.INVALID_PAGE));
+    }
+
+    private static AuthenticatedPrincipal principal(String... scopes) {
+        return new AuthenticatedPrincipal(
+                new HumanSubjectRef(AUTHORITY, "account:1"),
+                AUTHORITY,
+                TokenProfile.USER_NEUTRAL_V1,
+                "1",
+                Set.of("ainer-api"),
+                Set.of(scopes),
+                "pwd",
+                null,
+                0L);
     }
 
     @SpringBootConfiguration
     @EnableAutoConfiguration
     @Import({DictionaryModuleConfiguration.class})
     static class TestApplication {
+    }
+
+    /** Satisfies the controller's resolver dependency without enabling the resource-server chain. */
+    @TestConfiguration
+    static class PrincipalFixture {
+
+        @Bean
+        AuthenticatedPrincipalResolver integrationTestPrincipalResolver() {
+            return () -> new AuthenticatedPrincipal(
+                    new HumanSubjectRef(AUTHORITY, "account:1"),
+                    AUTHORITY,
+                    TokenProfile.USER_NEUTRAL_V1,
+                    "1",
+                    Set.of("ainer-api"),
+                    Set.of(DictionaryAuthorities.READ, DictionaryAuthorities.MANAGE),
+                    "pwd",
+                    null,
+                    0L);
+        }
     }
 }

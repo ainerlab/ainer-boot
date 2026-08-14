@@ -50,7 +50,7 @@ public class AiTaskRunService {
     public AiTaskRunResult executeTask(AiTaskCreateCommand command, AuthenticatedPrincipal principal) {
         Objects.requireNonNull(command, "command");
         Objects.requireNonNull(principal, "principal");
-        String requestId = UUID.randomUUID().toString();
+        String requestId = dev.ainer.core.uuid.Uuidv7.generate().toString();
 
         // Phase 1: 创建 Task + Snapshot + TaskRun（独立事务提交，确保后续 Gateway 可见）
         TaskRunCreated created = createTaskAndRun(command, principal, requestId);
@@ -80,7 +80,7 @@ public class AiTaskRunService {
 
         Instant now = clock.instant();
         AiTask task = new AiTask(
-                UUID.randomUUID(),
+                dev.ainer.core.uuid.Uuidv7.generate(),
                 governedCtx.workspaceId(),
                 command.taskType(),
                 command.targetIdentityId(),
@@ -95,7 +95,7 @@ public class AiTaskRunService {
         ContextSnapshotBuilder.ContextSnapshotData snapshotData =
                 snapshotBuilder.build(task, governedCtx);
         ContextSnapshot snapshot = new ContextSnapshot(
-                UUID.randomUUID(),
+                dev.ainer.core.uuid.Uuidv7.generate(),
                 snapshotData.identityId(),
                 snapshotData.identityVersionId(),
                 snapshotData.evidenceRefsJson(),
@@ -110,7 +110,7 @@ public class AiTaskRunService {
         }
 
         AiTaskRun run = new AiTaskRun(
-                UUID.randomUUID(),
+                dev.ainer.core.uuid.Uuidv7.generate(),
                 task.id(),
                 snapshot.id(),
                 serializeContext(governedCtx),
@@ -125,7 +125,7 @@ public class AiTaskRunService {
     public AiTaskRunResult completeTaskRun(TaskRunCreated created, CompletionResult completion) {
         Instant completedAt = clock.instant();
         AiResult result = new AiResult(
-                UUID.randomUUID(),
+                dev.ainer.core.uuid.Uuidv7.generate(),
                 created.run().id(),
                 completion.invocationId(),
                 completion.completion().content(),

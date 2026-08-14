@@ -1,8 +1,10 @@
 package dev.ainer.module.dictionary.dictionary.infrastructure;
 
+import dev.ainer.module.dictionary.dictionary.application.DictionaryPageSlice;
 import dev.ainer.module.dictionary.dictionary.application.DictionaryTypeRepository;
 import dev.ainer.module.dictionary.dictionary.domain.DictionaryStatus;
 import dev.ainer.module.dictionary.dictionary.domain.DictionaryType;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -59,6 +61,27 @@ public class MybatisDictionaryTypeRepository implements DictionaryTypeRepository
     @Override
     public Collection<DictionaryType> findAll() {
         return mapper.selectAll().stream().map(MybatisDictionaryTypeRepository::toDomain).toList();
+    }
+
+    @Override
+    public boolean update(UUID id, @Nullable String name, @Nullable String nameEn,
+            @Nullable String description, @Nullable Integer sortIndex,
+            long expectedVersion, long newVersion) {
+        return mapper.update(id, name, nameEn, description, sortIndex,
+                expectedVersion, newVersion, Instant.now()) > 0;
+    }
+
+    @Override
+    public boolean updateStatus(UUID id, DictionaryStatus status,
+            long expectedVersion, long newVersion) {
+        return mapper.updateStatus(id, status.name(), expectedVersion, newVersion, Instant.now()) > 0;
+    }
+
+    @Override
+    public DictionaryPageSlice<DictionaryType> findPage(@Nullable String status, long offset, int size) {
+        List<DictionaryType> items = mapper.selectPage(status, offset, size).stream()
+                .map(MybatisDictionaryTypeRepository::toDomain).toList();
+        return new DictionaryPageSlice<>(items, mapper.countPage(status));
     }
 
     private static DictionaryType toDomain(DictionaryTypeRow row) {

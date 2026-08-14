@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-13 · 工程版本：`0.1.0-SNAPSHOT`
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-14 · 工程版本：`0.1.0-SNAPSHOT`
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -47,8 +47,24 @@ P2 的已发布实现合同已重新关闭。`rc.2` 保持不可变，只作为�
 2026-08-12 P3 企业基建首批代码完成：文件存储 SPI、字典、配置、通知、缓存 starter、Spring Cache
 改造。新建 5 个模块（ainer-module-dictionary/config/notification + ainer-starter-cache + 文件存储
 SPI），全部装配到 ainer-server。ADR-0039 Accepted；ADR-0038 已因决策维护违规被 ADR-0040 合规取代。
-最近完整基线为 338 tests / 0 fail / 0 error / 0 skipped，23 模块全部 SUCCESS。G1 尚未关闭：文件
-元数据持久化、P3 服务端管理 API/OpenAPI 与对应安全/审计门禁仍需完成。
+
+2026-08-14 文件存储模块 `ainer-module-file` 交付（G1「文件元数据补齐」项关闭）：新建第 24 个
+reactor 模块，含 `ainer_file_object`/`ainer_file_audit` migration（UUIDv7 CHECK）、上传/下载/删除
+与分页管理 API（`/api/files`，`file.read`/`file.write` scope，413/415 真实状态码）、大小/类型
+限制、SHA-256 校验、上传失败补偿与同事务变更审计；装配进 ainer-server 并同步发布链
+（BOM、release-artifacts 24 projects/112 primary、consumer 24 POM）。服务层 11 + 真签名 JWT
+HTTP 6 项 Testcontainers 测试全绿。
+
+2026-08-14 P3 三模块服务端管理 API 交付（G1「管理 API 补齐」项关闭，**G1 整体关闭**）：
+dictionary/config/notification 各自新增稳定错误码枚举（`AINER.<MODULE>.*`，替换裸
+IllegalArgumentException）、`*.read`/`*.manage`（notification 另有 `*.submit`）scope 在应用服务
+内对已验证 principal 强制、管理 REST API（乐观锁部分更新、动作名词状态变更端点、分页 ≤100）
+与同事务变更审计（dictionary/notification 新增 append-only 审计表 `V202608140200/0300`；
+config 沿用 `ainer_config_history`）。写入面补齐：字典类型/项的更新与启停、通知模板更新/启停/
+分页、投递记录按状态分页（记录列表不回显 title/body，PII）。`ainer-test-support` 新增
+`JwtTestSupport` 共享真 JWT fixture（RSA 签发 + 真 JwtDecoder + @Primary resolver 工厂）。
+三模块真签名 JWT HTTP 测试（401/403/201/409/审计行/PII 脱敏）全部通过。剩余边界：OpenAPI
+运行时文档仍未引入（Boot 4.1 springdoc 兼容性待验证），不阻塞 G1 关闭。
 
 2026-08-13 `v0.1.0-rc.3` 已成为当前**合格受控 RC**：annotated tag、不可变 GitHub Release 与默认
 分支精确绑定到 merge commit `666b1556f11935925369586152a3791180b7314e`；默认分支 run
@@ -271,6 +287,60 @@ Ainer 项目签名 provenance 已通过。
   `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 
 ## 3. 最近验证记录
+
+2026-08-14 P3 三模块服务端管理 API（G1 管理 API 项关闭，G1 整体关闭）
+- **范围**：ADR-0040 G1 退出条件「管理 API 补齐」。此前 dictionary/config/notification 只有
+  domain/application/infrastructure，零 HTTP 面、零稳定错误码、零 scope、零审计。
+- **交付**：三模块 `*ErrorCode` enum（含 CONCURRENT_MODIFICATION 409）+ `*Authorities` scope +
+  管理 Controller/DTO（乐观锁部分更新、`status-changes` 动作名词端点、分页 ≤100）+
+  `IllegalArgumentException → BusinessException` 全量迁移；dictionary/notification 新增 append-only
+  审计表与同事务写入，config 复用 ConfigHistory；写入面补齐（字典类型/项更新与启停、通知模板
+  更新/启停/分页、投递记录状态分页且不回显渲染内容）；`ainer-test-support` 新增 `JwtTestSupport`
+  （RSA 3072 签发 USER_NEUTRAL_V1/SERVICE_V1、真 NimbusJwtDecoder、生产等价 @Primary resolver 工厂）。
+- **验证**：三模块定向（dictionary 17、config 14、notification 12）后全量 `./mvnw clean verify`
+  （JDK 25 + Colima）：**374 tests / 0 failure / 0 error / 0 skipped**，24 模块全部 SUCCESS；
+  `git diff --check` 通过。真 JWT HTTP 覆盖 401 无 token、403 缺 scope、201/200 生命周期、
+  409 并发与重复、审计行 DB 断言、secret/PII 脱敏。
+- **边界**：OpenAPI 运行时文档未引入（Boot 4.1 springdoc 兼容性未验证，引入需依赖台账评估，
+  不阻塞 G1 关闭）；`NotificationDeliveryEngine` 的 `@EnableScheduling` 仍依赖 ainer-server 侧
+  配置类，属既有已知项。
+
+2026-08-14 文件存储模块 `ainer-module-file`（G1 文件元数据补齐）
+- **范围**：ADR-0040 规格「上传/下载/删除、元数据、大小/类型限制、路径遍历防护」。此前
+  `FileStoragePort` SPI 与本地适配器已存在但零消费、零元数据持久化、零限制检查。
+- **交付**：新模块含 `V202608140100__file_baseline.sql`（`ainer_file_object` UUIDv7 CHECK +
+  `ainer_file_audit` append-only，file_id FK ON DELETE SET NULL）；application/infrastructure/api
+  全层；`FileStorageApplicationService` 提供 upload（DigestInputStream 边存边算 SHA-256、存后
+  核实实际大小、DB 失败删除已存字节补偿）/download/delete（审计先插、元数据同事务删、字节后删，
+  孤儿容忍）/page（size≤100）；`FileStorageController` `/api/files`（multipart 201、流式下载
+  Content-Disposition、DELETE）；`AINER.FILE.*` 错误码（413/415 真实语义）；`file.read`/`file.write`
+  scope 手动强制。
+- **发布链**：BOM 注册、root modules、ainer-server 装配、`release-artifacts.txt` 24 projects、
+  `check-release-contracts.sh`/`verify-remote-release-artifacts.sh` 24/112、
+  `verify-maven-consumers.sh` 24 POM；off-state 冒烟测试补 `ainer.file.enabled=false`。
+- **验证**：服务层 11 项（元数据/字节落盘、SHA-256、超限补偿清理、类型拒绝、scope 403、下载
+  roundtrip、删除后审计保留、孤儿清理、分页过滤、id v7）+ 真签名 JWT HTTP 6 项（401/403/201/
+  413/415/审计行）。全量 `./mvnw clean verify`（JDK 25 + Colima）：**355 tests / 0 failure /
+  0 error / 0 skipped**，24 模块全部 SUCCESS；`git diff --check` 通过。
+- **边界**：OpenAPI 运行时文档未引入（Boot 4.1 下 springdoc 兼容性未验证，与 P3 管理 API 批次
+  统一决策）；S3/OSS 适配器、病毒扫描/魔数嗅探不在 ADR-0040 规格；`workspace_id` 归属列为可空，
+  产品接入时绑定。
+
+2026-08-13 持久化身份全域 UUIDv7（G1 硬化收口）
+- **范围**：ADR-0040 Stable 契约与 G1 退出条件要求「零 `UUID.randomUUID()` 在持久化路径」。本次把
+  Workspace、AI Runtime 与 Authorization Server 三个发行物的持久化主键/审计/恢复 ID 从 UUIDv4 统一
+  迁移到应用层 `Uuidv7.generate()`（与 P3 模块既有惯例一致，全限定内联调用）。
+- **改动**：20 处持久化路径调用点替换；数据库 schema/migration 零改动（所有 `id` 列已为 `UUID` 或
+  `VARCHAR(100/128)`，v7 字符串兼容）；framework 的请求追踪 ID（`RequestIdFilter`/`RequestIds`）
+  非持久化身份，保留 `UUID.randomUUID()`。
+- **加固**：Workspace 与 AI 持久化集成测试新增 `id().version() == 7` 断言，证明生成的持久化主键
+  确为 UUIDv7（匹配 identity/persistence 模块既有断言风格）。
+- **验证**：全仓 `src/main/java` grep 确认持久化路径 `UUID.randomUUID()` 残留为 0（仅剩 2 处请求
+  追踪与 `Uuidv7` javadoc 文字）。JDK 25 + Colima 的 `./mvnw clean verify` 全绿，**338 tests /
+  0 failure / 0 error / 0 skipped**，零回归；`git diff --check` 通过。
+- **边界**：统一 `RETURNING`、全域应用层生成与 1.0 clean baseline 的最终收敛仍属后续；本次不改变
+  identity 模块的 DB 端 `uuidv7()` 机制，不触及数据库 migration；G1 的文件元数据持久化与 P3 服务端
+  管理 API/OpenAPI 仍未完成，G1 未整体关闭。
 
 2026-08-13 `xq-platform-next` 消费者接管审计、Initializer Wrapper 补正与 `rc.3` 发布
 - **消费者事实**：独立仓库由 Initializer 生成，当前仍固定 `0.1.0-SNAPSHOT`；README 要求
@@ -1101,10 +1171,10 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 ### 工程与运营
 
-- PostgreSQL Native-First 目标已由 ADR-0020 和数据库规范 1.2 确立，但当前持久化实现仍大量使用
-  UUIDv4，Workspace/AI `tenant_id` 仍为 `varchar(128)`；M4.8A 新增 request/grant/outbox/audit
-  /receipt 及预留 tenant/subject 已率先使用 PostgreSQL `uuidv7()`，但统一 `RETURNING`、全域
-  tenant UUID 化和 1.0 clean baseline 尚未实施；
+- PostgreSQL Native-First 目标已由 ADR-0020 和数据库规范 1.2 确立。Workspace、AI Runtime 与
+  Authorization Server 的持久化身份已于 2026-08-13 全域迁移到应用层 `Uuidv7.generate()`（持久化路径
+  零 `UUID.randomUUID()`，见 §3），identity 模块沿用 DB 端 `uuidv7()`；Greenfield 已移除 Workspace/AI
+  的 `tenant_id` 列；统一 `RETURNING`、全域应用层生成与 1.0 clean baseline 的剩余收敛仍属后续；
 - MyBatis-Plus Boot 4 starter 的真实 PostgreSQL 原型、全量 Reactor、既有复杂 XML 与
   Maven 3/Maven 4 外部 consumer 回归已经通过；后续风险转为版本升级回归、规则误用和正式 CI
   尚未固化这些门禁；

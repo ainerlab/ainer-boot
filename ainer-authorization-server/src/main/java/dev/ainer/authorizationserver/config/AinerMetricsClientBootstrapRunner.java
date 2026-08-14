@@ -52,7 +52,7 @@ final class AinerMetricsClientBootstrapRunner implements ApplicationRunner {
                     "Ainer bootstrap metrics client secret must contain 24 to 128 characters");
         }
 
-        repository.save(RegisteredClient.withId(UUID.randomUUID().toString())
+        repository.save(RegisteredClient.withId(dev.ainer.core.uuid.Uuidv7.generate().toString())
                 .clientId(clientId)
                 .clientSecret(passwordEncoder.encode(secret))
                 .clientName("Ainer dedicated metrics client")

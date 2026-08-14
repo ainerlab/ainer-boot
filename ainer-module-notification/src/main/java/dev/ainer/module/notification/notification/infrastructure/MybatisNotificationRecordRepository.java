@@ -54,6 +54,15 @@ public class MybatisNotificationRecordRepository implements NotificationRecordRe
         mapper.markFailed(id, errorMessage, retryCount, maxRetries, nextRetryAt, clock.instant());
     }
 
+    @Override
+    public dev.ainer.module.notification.notification.application.NotificationPageSlice<NotificationRecord> findPage(
+            @org.jspecify.annotations.Nullable String status, long offset, int size) {
+        List<NotificationRecord> items = mapper.selectPage(status, offset, size).stream()
+                .map(MybatisNotificationRecordRepository::toDomain).toList();
+        return new dev.ainer.module.notification.notification.application.NotificationPageSlice<>(
+                items, mapper.countPage(status));
+    }
+
     private static NotificationRecordRow toRow(NotificationRecord record) {
         NotificationRecordRow row = new NotificationRecordRow();
         row.setId(record.id());

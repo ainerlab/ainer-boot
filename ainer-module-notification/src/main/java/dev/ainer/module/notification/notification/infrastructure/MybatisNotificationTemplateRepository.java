@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.ainer.module.notification.notification.application.NotificationTemplateRepository;
 import dev.ainer.module.notification.notification.domain.NotificationChannel;
 import dev.ainer.module.notification.notification.domain.NotificationTemplate;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -40,6 +41,34 @@ public class MybatisNotificationTemplateRepository implements NotificationTempla
     public Optional<NotificationTemplate> findActiveByCode(String code) {
         return Optional.ofNullable(mapper.selectActiveByCode(code))
                 .map(MybatisNotificationTemplateRepository::toDomain);
+    }
+
+    @Override
+    public Optional<NotificationTemplate> findById(UUID id) {
+        return Optional.ofNullable(mapper.selectById(id))
+                .map(MybatisNotificationTemplateRepository::toDomain);
+    }
+
+    @Override
+    public boolean update(UUID id, @Nullable String titleTemplate, @Nullable String bodyTemplate,
+            @Nullable Map<String, Object> variablesSchema, long expectedVersion, long newVersion) {
+        return mapper.update(id, titleTemplate, bodyTemplate,
+                variablesSchema == null ? null : toJson(variablesSchema),
+                expectedVersion, newVersion, Instant.now()) > 0;
+    }
+
+    @Override
+    public boolean updateStatus(UUID id, String status, long expectedVersion, long newVersion) {
+        return mapper.updateStatus(id, status, expectedVersion, newVersion, Instant.now()) > 0;
+    }
+
+    @Override
+    public dev.ainer.module.notification.notification.application.NotificationPageSlice<NotificationTemplate> findPage(
+            @Nullable String status, long offset, int size) {
+        java.util.List<NotificationTemplate> items = mapper.selectPage(status, offset, size).stream()
+                .map(MybatisNotificationTemplateRepository::toDomain).toList();
+        return new dev.ainer.module.notification.notification.application.NotificationPageSlice<>(
+                items, mapper.countPage(status));
     }
 
     private static NotificationTemplate toDomain(NotificationTemplateRow row) {

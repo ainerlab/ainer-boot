@@ -82,4 +82,28 @@
         WHERE id = #{id}
     </update>
 
+    <select id="selectPage" resultMap="RecordRowMap">
+        SELECT id, template_code, channel, recipient, title, body,
+               payload::text AS payload, status, retry_count, max_retries,
+               next_retry_at, error_message, sent_at, created_at, updated_at
+        FROM ainer_notification_record
+        <where>
+            <if test="status != null">
+                status = #{status}
+            </if>
+        </where>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        SELECT COUNT(*)
+        FROM ainer_notification_record
+        <where>
+            <if test="status != null">
+                status = #{status}
+            </if>
+        </where>
+    </select>
+
 </mapper>

@@ -64,7 +64,8 @@ ainer-server                          业务 Resource Server
 ├── ainer-module-authorization        混合细粒度授权 + adapter + 审计（ADR-0037）
 ├── ainer-module-dictionary           树形字典 + 多语言 + Spring Cache（ADR-0040）
 ├── ainer-module-config               动态配置 + 类型安全 + 热更新 + 版本（ADR-0040）
-└── ainer-module-notification         多渠道通知 + PG SKIP LOCKED 队列（ADR-0040）
+├── ainer-module-notification         多渠道通知 + PG SKIP LOCKED 队列（ADR-0040）
+└── ainer-module-file                 文件元数据 + 大小/类型限制 + 管理 API（ADR-0040）
 
 ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管理面
 └── ainer-module-identity             HumanAccount、ServicePrincipal、登录身份与 Credential

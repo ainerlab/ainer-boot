@@ -45,7 +45,7 @@ public class AiFeedbackService {
 
         Instant now = clock.instant();
         AiFeedback feedback = new AiFeedback(
-                UUID.randomUUID(),
+                dev.ainer.core.uuid.Uuidv7.generate(),
                 result.id(),
                 decision,
                 decision == AiFeedbackDecision.EDIT ? command.editedContent() : null,

@@ -51,4 +51,39 @@
         ORDER BY sort_index, code
     </select>
 
+    <update id="update">
+        UPDATE ainer_dictionary_item
+        SET label = COALESCE(#{label}, label),
+            label_en = COALESCE(#{labelEn}, label_en),
+            value = COALESCE(#{value}, value),
+            sort_index = COALESCE(#{sortIndex}, sort_index),
+            css_class = COALESCE(#{cssClass}, css_class),
+            remark = COALESCE(#{remark}, remark),
+            version = #{newVersion},
+            updated_at = #{now}
+        WHERE id = #{id} AND version = #{expectedVersion}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE ainer_dictionary_item
+        SET status = #{status},
+            version = #{newVersion},
+            updated_at = #{now}
+        WHERE id = #{id} AND version = #{expectedVersion}
+    </update>
+
+    <select id="selectPage" resultMap="ItemRowMap">
+        SELECT <include refid="itemColumns"/>
+        FROM ainer_dictionary_item
+        WHERE type_id = #{typeId}
+        ORDER BY sort_index, code
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        SELECT COUNT(*)
+        FROM ainer_dictionary_item
+        WHERE type_id = #{typeId}
+    </select>
+
 </mapper>

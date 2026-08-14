@@ -96,6 +96,25 @@ AI runtime foundation baseline（`V202608070320`）：
 `WORKSPACE`（workspace_id 非空）、`RESOURCE`（workspace_id+resource_type+resource_id 全非空）。
 GLOBAL binding 仅 SERVICE subject 持有（决策器强制）。
 
+文件存储 baseline（`V202608140100`，ADR-0040）：
+
+| 表 | 用途 |
+|---|---|
+| `ainer_file_object` | 存储对象元数据（storage_key 唯一、namespace、SHA-256、上传者三元组；UUIDv7 CHECK） |
+| `ainer_file_audit` | 变更审计 append-only（UPLOADED/DELETED；file_id FK ON DELETE SET NULL，文件删除后审计保留） |
+
+Dictionary 审计 baseline（`V202608140200`，ADR-0040 管理面加固）：
+
+| 表 | 用途 |
+|---|---|
+| `ainer_dictionary_audit` | 类型/项变更审计 append-only（operation/target_kind/target_id/actor；UUIDv7 CHECK） |
+
+Notification 审计 baseline（`V202608140300`，ADR-0040 管理面加固）：
+
+| 表 | 用途 |
+|---|---|
+| `ainer_notification_audit` | 模板变更审计 append-only（TEMPLATE_CREATED/UPDATED/STATUS_CHANGED；FK ON DELETE RESTRICT） |
+
 ### 2.2 身份库 `ainer_auth`（`ainer-authorization-server`）
 
 Identity foundation baseline（`V202608070300`）：

@@ -325,6 +325,9 @@ class AiGatewayModuleIntegrationTest {
         assertThat(taskId).isNotNull();
         assertThat(runId).isNotNull();
         assertThat(resultId).isNotNull();
+        assertThat(taskId.version()).isEqualTo(7); // ADR-0020: persistent IDs are UUIDv7
+        assertThat(runId.version()).isEqualTo(7);
+        assertThat(resultId.version()).isEqualTo(7);
 
         // 验证 Task 记录
         java.util.Map<String, Object> taskRow = jdbcTemplate.queryForMap(

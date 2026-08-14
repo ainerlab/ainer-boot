@@ -53,7 +53,7 @@ public class WorkspaceOwnerRecoveryService {
         recoveryRepository.expireOpenRequests(workspaceId, now);
         requireRecoverable(workspaceId, newOwnerSubjectId);
         WorkspaceOwnerRecoveryRequest request = new WorkspaceOwnerRecoveryRequest(
-                UUID.randomUUID(), workspaceId, newOwnerSubjectId,
+                dev.ainer.core.uuid.Uuidv7.generate(), workspaceId, newOwnerSubjectId,
                 requesterServiceId, null, incidentReference, "REQUESTED",
                 now, now.plus(approvalTtl), null);
         recoveryRepository.insert(request);
@@ -117,7 +117,7 @@ public class WorkspaceOwnerRecoveryService {
             String actorServiceId,
             Instant occurredAt) {
         operationAuditRepository.insert(new WorkspaceSecurityOperationAudit(
-                UUID.randomUUID(), request.id(), request.workspaceId(),
+                dev.ainer.core.uuid.Uuidv7.generate(), request.id(), request.workspaceId(),
                 request.newOwnerSubjectId(), "OWNER_RECOVERY", phase, actorServiceId,
                 request.incidentReference(), null, occurredAt));
     }

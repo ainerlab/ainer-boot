@@ -1,5 +1,6 @@
 package dev.ainer.module.config.config.application;
 
+import dev.ainer.core.error.BusinessException;
 import dev.ainer.module.config.config.domain.ConfigEntry;
 import dev.ainer.module.config.config.domain.ConfigHistory;
 import dev.ainer.module.config.config.domain.ConfigValueType;
@@ -55,11 +56,12 @@ public class ConfigApplicationService {
             String namespace, String key, String value, ConfigValueType valueType,
             @Nullable String description, @Nullable AuthenticatedPrincipal changedBy) {
         Objects.requireNonNull(value, "value");
+        requireManage(changedBy);
         Optional<ConfigEntry> existing = entryRepository.findByNamespaceAndKey(namespace, key);
         if (existing.isPresent()) {
             ConfigEntry entry = existing.get();
             if (entry.secret()) {
-                throw new IllegalArgumentException("Cannot set plaintext value for a secret key: " + key);
+                throw new BusinessException(ConfigErrorCode.PLAINTEXT_ON_SECRET_KEY);
             }
             long newVersion = entry.version() + 1;
             entryRepository.update(entry.id(), value, null, entry.version(), newVersion);
@@ -82,6 +84,7 @@ public class ConfigApplicationService {
             String namespace, String key, String plaintext, ConfigValueType valueType,
             @Nullable String description, @Nullable AuthenticatedPrincipal changedBy) {
         Objects.requireNonNull(plaintext, "plaintext");
+        requireManage(changedBy);
         String ciphertext = encryption.encrypt(plaintext);
         Optional<ConfigEntry> existing = entryRepository.findByNamespaceAndKey(namespace, key);
         if (existing.isPresent()) {
@@ -132,6 +135,13 @@ public class ConfigApplicationService {
         return entryRepository.findByNamespace(namespace);
     }
 
+    /** Management read path: requires {@code config.read} on the verified principal. */
+    @Transactional(readOnly = true)
+    public List<ConfigEntry> getByNamespace(AuthenticatedPrincipal principal, String namespace) {
+        requireRead(principal);
+        return entryRepository.findByNamespace(namespace);
+    }
+
     @Transactional(readOnly = true)
     public List<ConfigHistory> getHistory(String namespace, String key) {
         return entryRepository.findByNamespaceAndKey(namespace, key)
@@ -139,7 +149,28 @@ public class ConfigApplicationService {
                 .orElse(List.of());
     }
 
+    /** Management read path: requires {@code config.read} on the verified principal. */
+    @Transactional(readOnly = true)
+    public List<ConfigHistory> getHistory(
+            AuthenticatedPrincipal principal, String namespace, String key) {
+        requireRead(principal);
+        return getHistory(namespace, key);
+    }
+
     // ---- Internal ----
+
+    private static void requireManage(@Nullable AuthenticatedPrincipal principal) {
+        if (principal != null && !principal.hasScope(ConfigAuthorities.MANAGE)) {
+            throw new BusinessException(dev.ainer.core.error.StandardErrorCode.FORBIDDEN);
+        }
+    }
+
+    private static void requireRead(AuthenticatedPrincipal principal) {
+        Objects.requireNonNull(principal, "principal");
+        if (!principal.hasScope(ConfigAuthorities.READ)) {
+            throw new BusinessException(dev.ainer.core.error.StandardErrorCode.FORBIDDEN);
+        }
+    }
 
     private void recordHistory(
             ConfigEntry entry, @Nullable String oldValue, @Nullable String newValue,

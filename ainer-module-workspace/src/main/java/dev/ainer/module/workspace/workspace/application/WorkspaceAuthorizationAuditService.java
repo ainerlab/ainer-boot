@@ -30,7 +30,7 @@ public class WorkspaceAuthorizationAuditService {
             WorkspaceAuthorizationDecision decision,
             ErrorCode reason) {
         repository.insert(new WorkspaceAuthorizationAudit(
-                UUID.randomUUID(),
+                dev.ainer.core.uuid.Uuidv7.generate(),
                 workspaceId,
                 principal.subjectId(),
                 targetSubjectId,
