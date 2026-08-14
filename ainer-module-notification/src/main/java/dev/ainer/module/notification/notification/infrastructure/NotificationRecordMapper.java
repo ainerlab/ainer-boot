@@ -2,6 +2,7 @@ package dev.ainer.module.notification.notification.infrastructure;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.List;
@@ -25,4 +26,9 @@ public interface NotificationRecordMapper {
     void markFailed(@Param("id") UUID id, @Param("errorMessage") String errorMessage,
                     @Param("retryCount") int retryCount, @Param("maxRetries") int maxRetries,
                     @Param("nextRetryAt") Instant nextRetryAt, @Param("now") Instant now);
+
+    List<NotificationRecordRow> selectPage(@Nullable @Param("status") String status,
+            @Param("offset") long offset, @Param("limit") int limit);
+
+    long countPage(@Nullable @Param("status") String status);
 }

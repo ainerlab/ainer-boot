@@ -33,4 +33,52 @@
         WHERE code = #{code} AND status = 'ACTIVE'
     </select>
 
+    <select id="selectById" resultMap="TemplateRowMap">
+        SELECT id, code, channel, title_template, body_template,
+               variables_schema::text AS variables_schema, status, version, created_at, updated_at
+        FROM ainer_notification_template
+        WHERE id = #{id}
+    </select>
+
+    <update id="update">
+        UPDATE ainer_notification_template
+        SET title_template = COALESCE(#{titleTemplate}, title_template),
+            body_template = COALESCE(#{bodyTemplate}, body_template),
+            variables_schema = COALESCE(#{variablesSchema}::jsonb, variables_schema),
+            version = #{newVersion},
+            updated_at = #{now}
+        WHERE id = #{id} AND version = #{expectedVersion}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE ainer_notification_template
+        SET status = #{status},
+            version = #{newVersion},
+            updated_at = #{now}
+        WHERE id = #{id} AND version = #{expectedVersion}
+    </update>
+
+    <select id="selectPage" resultMap="TemplateRowMap">
+        SELECT id, code, channel, title_template, body_template,
+               variables_schema::text AS variables_schema, status, version, created_at, updated_at
+        FROM ainer_notification_template
+        <where>
+            <if test="status != null">
+                status = #{status}
+            </if>
+        </where>
+        ORDER BY code
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        SELECT COUNT(*)
+        FROM ainer_notification_template
+        <where>
+            <if test="status != null">
+                status = #{status}
+            </if>
+        </where>
+    </select>
+
 </mapper>

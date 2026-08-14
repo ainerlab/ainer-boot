@@ -247,7 +247,45 @@ subject 使用。
 `ainer.file.allowed-content-types` 白名单返回 415（`AINER.FILE.CONTENT_TYPE_NOT_ALLOWED`）。上传/删除
 写入同事务 `ainer_file_audit`。存储后端为 `FileStoragePort` SPI（默认本地适配器，产品可用 S3/OSS 覆盖）。
 
-## 10. 兼容与变更
+## 10. 企业基座管理 API（ADR-0040）
+
+三模块管理面默认随模块装配；scope 在应用服务内对已验证 principal 强制。
+
+### Dictionary（`dictionary.read` / `dictionary.manage`）
+
+| Method | Path | Scope | 说明 |
+|---|---|---|---|
+| POST/GET | `/api/dictionaries/types` | manage / read | 创建类型（409 重复编码）；`?status=&page=&size=` 分页 |
+| GET/PUT | `/api/dictionaries/types/{id}` | read / manage | 读取；乐观锁部分更新（stale 409） |
+| POST | `/api/dictionaries/types/{id}/status-changes` | manage | 启用/禁用（动作名词端点） |
+| POST/GET | `/api/dictionaries/types/{typeId}/items` | manage / read | 创建项；分页（含禁用状态） |
+| PUT | `/api/dictionaries/items/{id}`、POST `.../status-changes` | manage | 项更新与状态变更 |
+
+写入同事务记录 `ainer_dictionary_audit`（operation/target/actor/requestId）。错误码 `AINER.DICTIONARY.*`。
+
+### Config（`config.read` / `config.manage`）
+
+| Method | Path | Scope | 说明 |
+|---|---|---|---|
+| POST | `/api/configs/entries` | manage | 设置明文值；对 secret 键返回 409 |
+| POST | `/api/configs/secrets` | manage | 设置 secret（AES-GCM；明文不回显） |
+| GET | `/api/configs/entries?namespace=` | read | 列表；secret 项 value 置 null |
+| GET | `/api/configs/history?namespace=&key=` | read | 版本历史（secret 记录为 `[encrypted]`） |
+
+审计即 `ainer_config_history`（同事务，含 actor）。错误码 `AINER.CONFIG.*`。
+
+### Notification（`notification.read` / `manage` / `submit`）
+
+| Method | Path | Scope | 说明 |
+|---|---|---|---|
+| POST/GET | `/api/notifications/templates` | manage / read | 创建模板（409 重复）；`?status=` 分页 |
+| PUT | `/api/notifications/templates/{id}`、POST `.../status-changes` | manage | 乐观锁更新与状态变更 |
+| POST | `/api/notifications/messages` | submit | 直接提交通知入队 |
+| GET | `/api/notifications/records?status=` | read | 投递记录分页；**不含**渲染 title/body（PII） |
+
+模板变更同事务记录 `ainer_notification_audit`。错误码 `AINER.NOTIFICATION.*`。
+
+## 11. 兼容与变更
 
 - 新增可选响应字段通常向后兼容，客户端必须容忍未知字段；
 - 删除、改名、改变字段类型、收紧枚举或改变 status/error code 都需要发布说明；

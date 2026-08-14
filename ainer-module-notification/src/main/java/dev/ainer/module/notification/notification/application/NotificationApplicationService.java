@@ -1,10 +1,15 @@
 package dev.ainer.module.notification.notification.application;
 
+import dev.ainer.core.error.BusinessException;
+import dev.ainer.core.error.StandardErrorCode;
+import dev.ainer.module.notification.notification.domain.NotificationAudit;
 import dev.ainer.module.notification.notification.domain.NotificationChannel;
 import dev.ainer.module.notification.notification.domain.NotificationIntent;
 import dev.ainer.module.notification.notification.domain.NotificationRecord;
 import dev.ainer.module.notification.notification.domain.NotificationStatus;
 import dev.ainer.module.notification.notification.domain.NotificationTemplate;
+import dev.ainer.security.token.AuthenticatedPrincipal;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,16 +17,15 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Application service for submitting notification intents and managing templates (ADR-0038).
- * Uses JDK 25 switch pattern matching on {@link NotificationIntent} sealed interface to deconstruct
- * the intent and build the {@link NotificationRecord} — no visitor pattern or instanceof chains.
- *
- * <p>Template rendering uses simple {@code {variable}} substitution from the JSONB variables map.
- * The record is persisted as PENDING; the {@link NotificationDeliveryEngine} claims and sends it
- * asynchronously via virtual threads.
+ * Application service for submitting notification intents and managing templates (ADR-0040
+ * management hardening). Template management requires {@code notification.manage}, reads
+ * {@code notification.read}, submission {@code notification.submit}; template mutations write
+ * same-transaction {@link NotificationAudit} rows. Delivery facts live in
+ * {@code ainer_notification_record} and are paged for operations.
  */
 @Service
 @Transactional
@@ -29,23 +33,36 @@ public class NotificationApplicationService {
 
     private final NotificationTemplateRepository templateRepository;
     private final NotificationRecordRepository recordRepository;
+    private final NotificationAuditRepository auditRepository;
     private final Clock clock;
 
     public NotificationApplicationService(
             NotificationTemplateRepository templateRepository,
             NotificationRecordRepository recordRepository,
+            NotificationAuditRepository auditRepository,
             Clock clock) {
         this.templateRepository = templateRepository;
         this.recordRepository = recordRepository;
+        this.auditRepository = auditRepository;
         this.clock = clock;
     }
 
-    /**
-     * Submit a notification intent for async delivery. Returns the record ID.
-     */
+    // ---- Submission ----
+
+    /** Submit over the managed surface: requires {@code notification.submit}. */
+    public UUID submit(AuthenticatedPrincipal principal, @Nullable String requestId,
+            NotificationIntent intent) {
+        requireScope(principal, NotificationAuthorities.SUBMIT);
+        return submitInternal(intent);
+    }
+
+    /** Internal submission path (product code, no HTTP principal involved). */
     public UUID submit(NotificationIntent intent) {
+        return submitInternal(intent);
+    }
+
+    private UUID submitInternal(NotificationIntent intent) {
         Objects.requireNonNull(intent, "intent");
-        // JDK 25 record pattern: deconstruct the sealed intent
         NotificationRecord record = switch (intent) {
             case NotificationIntent.TemplateIntent t -> buildFromTemplate(t);
             case NotificationIntent.DirectIntent d -> buildFromDirect(d);
@@ -55,29 +72,88 @@ public class NotificationApplicationService {
 
     // ---- Template management ----
 
-    public UUID createTemplate(String code, NotificationChannel channel,
-                               String titleTemplate, String bodyTemplate,
-                               Map<String, Object> variablesSchema) {
+    public UUID createTemplate(
+            AuthenticatedPrincipal principal, @Nullable String requestId, String code,
+            NotificationChannel channel, String titleTemplate, String bodyTemplate,
+            Map<String, Object> variablesSchema) {
+        requireScope(principal, NotificationAuthorities.MANAGE);
         templateRepository.findActiveByCode(code).ifPresent(t -> {
-            throw new IllegalArgumentException("Template already exists: " + code);
+            throw new BusinessException(NotificationErrorCode.TEMPLATE_ALREADY_EXISTS);
         });
         UUID id = dev.ainer.core.uuid.Uuidv7.generate();
-        Instant now = clock.instant();
         NotificationTemplate template = new NotificationTemplate(
                 id, code, channel, titleTemplate, bodyTemplate,
                 variablesSchema, NotificationTemplate.NotificationTemplateStatus.ACTIVE, 0);
-        return templateRepository.save(template);
+        UUID saved = templateRepository.save(template);
+        audit(principal, requestId, NotificationAudit.OPERATION_TEMPLATE_CREATED, saved);
+        return saved;
+    }
+
+    public NotificationTemplate updateTemplate(
+            AuthenticatedPrincipal principal, @Nullable String requestId, UUID id,
+            @Nullable String titleTemplate, @Nullable String bodyTemplate,
+            @Nullable Map<String, Object> variablesSchema, long expectedVersion) {
+        requireScope(principal, NotificationAuthorities.MANAGE);
+        templateRepository.findById(id).orElseThrow(
+                () -> new BusinessException(NotificationErrorCode.TEMPLATE_NOT_FOUND));
+        if (!templateRepository.update(id, titleTemplate, bodyTemplate, variablesSchema,
+                expectedVersion, expectedVersion + 1)) {
+            throw new BusinessException(NotificationErrorCode.CONCURRENT_MODIFICATION);
+        }
+        audit(principal, requestId, NotificationAudit.OPERATION_TEMPLATE_UPDATED, id);
+        return getTemplateInternal(id);
+    }
+
+    public NotificationTemplate changeTemplateStatus(
+            AuthenticatedPrincipal principal, @Nullable String requestId, UUID id,
+            NotificationTemplate.NotificationTemplateStatus status, long expectedVersion) {
+        requireScope(principal, NotificationAuthorities.MANAGE);
+        templateRepository.findById(id).orElseThrow(
+                () -> new BusinessException(NotificationErrorCode.TEMPLATE_NOT_FOUND));
+        if (!templateRepository.updateStatus(id, status.name(),
+                expectedVersion, expectedVersion + 1)) {
+            throw new BusinessException(NotificationErrorCode.CONCURRENT_MODIFICATION);
+        }
+        audit(principal, requestId, NotificationAudit.OPERATION_TEMPLATE_STATUS_CHANGED, id);
+        return getTemplateInternal(id);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<NotificationTemplate> getTemplate(AuthenticatedPrincipal principal, UUID id) {
+        requireScope(principal, NotificationAuthorities.READ);
+        return templateRepository.findById(id);
+    }
+
+    @Transactional(readOnly = true)
+    public NotificationPageSlice<NotificationTemplate> pageTemplates(
+            AuthenticatedPrincipal principal, @Nullable String status, int page, int size) {
+        requireScope(principal, NotificationAuthorities.READ);
+        requirePage(page, size);
+        return templateRepository.findPage(normalizeStatus(status), (long) (page - 1) * size, size);
+    }
+
+    // ---- Delivery records (operations) ----
+
+    @Transactional(readOnly = true)
+    public NotificationPageSlice<NotificationRecord> pageRecords(
+            AuthenticatedPrincipal principal, @Nullable String status, int page, int size) {
+        requireScope(principal, NotificationAuthorities.READ);
+        requirePage(page, size);
+        return recordRepository.findPage(normalizeStatus(status), (long) (page - 1) * size, size);
     }
 
     // ---- Internal ----
 
+    private NotificationTemplate getTemplateInternal(UUID id) {
+        return templateRepository.findById(id).orElseThrow(
+                () -> new BusinessException(NotificationErrorCode.TEMPLATE_NOT_FOUND));
+    }
+
     private NotificationRecord buildFromTemplate(NotificationIntent.TemplateIntent intent) {
         NotificationTemplate template = templateRepository.findActiveByCode(intent.templateCode())
-                .orElseThrow(() -> new IllegalArgumentException("Template not found: " + intent.templateCode()));
+                .orElseThrow(() -> new BusinessException(NotificationErrorCode.TEMPLATE_NOT_FOUND));
         if (template.channel() != intent.channel()) {
-            throw new IllegalArgumentException(
-                    "Template channel mismatch: template=%s, intent=%s".formatted(
-                            template.channel(), intent.channel()));
+            throw new BusinessException(NotificationErrorCode.CHANNEL_MISMATCH);
         }
         String title = renderTemplate(template.titleTemplate(), intent.variables());
         String body = renderTemplate(template.bodyTemplate(), intent.variables());
@@ -97,6 +173,40 @@ public class NotificationApplicationService {
         return new NotificationRecord(
                 dev.ainer.core.uuid.Uuidv7.generate(), templateCode, channel, recipient, title, body, payload,
                 NotificationStatus.PENDING, 0, 3, null, null, null, now, now);
+    }
+
+    private static void requireScope(AuthenticatedPrincipal principal, String scope) {
+        Objects.requireNonNull(principal, "principal");
+        if (!principal.hasScope(scope)) {
+            throw new BusinessException(StandardErrorCode.FORBIDDEN);
+        }
+    }
+
+    private static void requirePage(int page, int size) {
+        if (page < 1 || size < 1 || size > 100) {
+            throw new BusinessException(NotificationErrorCode.INVALID_PAGE);
+        }
+    }
+
+    private static String normalizeStatus(@Nullable String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        return status.strip().toUpperCase();
+    }
+
+    private void audit(
+            AuthenticatedPrincipal principal, @Nullable String requestId,
+            String operation, UUID templateId) {
+        auditRepository.insert(new NotificationAudit(
+                dev.ainer.core.uuid.Uuidv7.generate(),
+                operation,
+                templateId,
+                principal.authority().issuer(),
+                principal.isService() ? "SERVICE" : "USER",
+                principal.subjectId(),
+                requestId,
+                clock.instant()));
     }
 
     /**

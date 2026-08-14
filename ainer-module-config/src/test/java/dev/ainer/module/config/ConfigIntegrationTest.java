@@ -124,7 +124,48 @@ class ConfigIntegrationTest {
         service.setSecret("app", "api.key", "my-api-key", ConfigValueType.STRING, null, null);
         assertThatThrownBy(() -> service.setValue("app", "api.key", "plaintext",
                 ConfigValueType.STRING, null, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOfSatisfying(dev.ainer.core.error.BusinessException.class,
+                        exception -> assertThat(exception.errorCode())
+                                .isEqualTo(dev.ainer.module.config.config.application.ConfigErrorCode.PLAINTEXT_ON_SECRET_KEY));
+    }
+
+    @Test
+    void setWithPrincipalMissingManageScopeIsForbidden() {
+        dev.ainer.security.token.AuthenticatedPrincipal restricted =
+                testPrincipal("config.read");
+        assertThatThrownBy(() -> service.setValue("app", "k", "v", ConfigValueType.STRING, null,
+                restricted))
+                .isInstanceOfSatisfying(dev.ainer.core.error.BusinessException.class,
+                        exception -> assertThat(exception.errorCode())
+                                .isEqualTo(dev.ainer.core.error.StandardErrorCode.FORBIDDEN));
+    }
+
+    @Test
+    void managementReadVariantsEnforceReadScope() {
+        service.setValue("app", "scoped", "1", ConfigValueType.STRING, null, null);
+        dev.ainer.module.config.config.application.ConfigApplicationService sameService = service;
+
+        assertThatThrownBy(() -> sameService.getByNamespace(testPrincipal("other.x"), "app"))
+                .isInstanceOfSatisfying(dev.ainer.core.error.BusinessException.class,
+                        exception -> assertThat(exception.errorCode())
+                                .isEqualTo(dev.ainer.core.error.StandardErrorCode.FORBIDDEN));
+        assertThat(sameService.getByNamespace(testPrincipal("config.read"), "app")).hasSize(1);
+        assertThat(sameService.getHistory(testPrincipal("config.read"), "app", "scoped")).hasSize(1);
+    }
+
+    private static dev.ainer.security.token.AuthenticatedPrincipal testPrincipal(String... scopes) {
+        dev.ainer.security.principal.IdentityAuthorityRef authority =
+                new dev.ainer.security.principal.IdentityAuthorityRef("https://auth.ainer.test");
+        return new dev.ainer.security.token.AuthenticatedPrincipal(
+                new dev.ainer.security.principal.HumanSubjectRef(authority, "account:1"),
+                authority,
+                dev.ainer.security.token.TokenProfile.USER_NEUTRAL_V1,
+                "1",
+                java.util.Set.of("ainer-api"),
+                java.util.Set.of(scopes),
+                "pwd",
+                null,
+                0L);
     }
 
     @Test
@@ -159,5 +200,15 @@ class ConfigIntegrationTest {
     @EnableAutoConfiguration
     @Import({ConfigModuleConfiguration.class})
     static class TestApplication {
+    }
+
+    /** Satisfies the controller's resolver dependency without enabling the resource-server chain. */
+    @org.springframework.boot.test.context.TestConfiguration
+    static class PrincipalFixture {
+
+        @org.springframework.context.annotation.Bean
+        dev.ainer.security.token.AuthenticatedPrincipalResolver configIntegrationPrincipalResolver() {
+            return () -> testPrincipal("config.read", "config.manage");
+        }
     }
 }

@@ -53,7 +53,18 @@ reactor 模块，含 `ainer_file_object`/`ainer_file_audit` migration（UUIDv7 C
 与分页管理 API（`/api/files`，`file.read`/`file.write` scope，413/415 真实状态码）、大小/类型
 限制、SHA-256 校验、上传失败补偿与同事务变更审计；装配进 ainer-server 并同步发布链
 （BOM、release-artifacts 24 projects/112 primary、consumer 24 POM）。服务层 11 + 真签名 JWT
-HTTP 6 项 Testcontainers 测试全绿。G1 剩余：P3 服务端管理 API/OpenAPI 与对应安全/审计门禁。
+HTTP 6 项 Testcontainers 测试全绿。
+
+2026-08-14 P3 三模块服务端管理 API 交付（G1「管理 API 补齐」项关闭，**G1 整体关闭**）：
+dictionary/config/notification 各自新增稳定错误码枚举（`AINER.<MODULE>.*`，替换裸
+IllegalArgumentException）、`*.read`/`*.manage`（notification 另有 `*.submit`）scope 在应用服务
+内对已验证 principal 强制、管理 REST API（乐观锁部分更新、动作名词状态变更端点、分页 ≤100）
+与同事务变更审计（dictionary/notification 新增 append-only 审计表 `V202608140200/0300`；
+config 沿用 `ainer_config_history`）。写入面补齐：字典类型/项的更新与启停、通知模板更新/启停/
+分页、投递记录按状态分页（记录列表不回显 title/body，PII）。`ainer-test-support` 新增
+`JwtTestSupport` 共享真 JWT fixture（RSA 签发 + 真 JwtDecoder + @Primary resolver 工厂）。
+三模块真签名 JWT HTTP 测试（401/403/201/409/审计行/PII 脱敏）全部通过。剩余边界：OpenAPI
+运行时文档仍未引入（Boot 4.1 springdoc 兼容性待验证），不阻塞 G1 关闭。
 
 2026-08-13 `v0.1.0-rc.3` 已成为当前**合格受控 RC**：annotated tag、不可变 GitHub Release 与默认
 分支精确绑定到 merge commit `666b1556f11935925369586152a3791180b7314e`；默认分支 run
@@ -276,6 +287,23 @@ Ainer 项目签名 provenance 已通过。
   `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 
 ## 3. 最近验证记录
+
+2026-08-14 P3 三模块服务端管理 API（G1 管理 API 项关闭，G1 整体关闭）
+- **范围**：ADR-0040 G1 退出条件「管理 API 补齐」。此前 dictionary/config/notification 只有
+  domain/application/infrastructure，零 HTTP 面、零稳定错误码、零 scope、零审计。
+- **交付**：三模块 `*ErrorCode` enum（含 CONCURRENT_MODIFICATION 409）+ `*Authorities` scope +
+  管理 Controller/DTO（乐观锁部分更新、`status-changes` 动作名词端点、分页 ≤100）+
+  `IllegalArgumentException → BusinessException` 全量迁移；dictionary/notification 新增 append-only
+  审计表与同事务写入，config 复用 ConfigHistory；写入面补齐（字典类型/项更新与启停、通知模板
+  更新/启停/分页、投递记录状态分页且不回显渲染内容）；`ainer-test-support` 新增 `JwtTestSupport`
+  （RSA 3072 签发 USER_NEUTRAL_V1/SERVICE_V1、真 NimbusJwtDecoder、生产等价 @Primary resolver 工厂）。
+- **验证**：三模块定向（dictionary 17、config 14、notification 12）后全量 `./mvnw clean verify`
+  （JDK 25 + Colima）：**374 tests / 0 failure / 0 error / 0 skipped**，24 模块全部 SUCCESS；
+  `git diff --check` 通过。真 JWT HTTP 覆盖 401 无 token、403 缺 scope、201/200 生命周期、
+  409 并发与重复、审计行 DB 断言、secret/PII 脱敏。
+- **边界**：OpenAPI 运行时文档未引入（Boot 4.1 springdoc 兼容性未验证，引入需依赖台账评估，
+  不阻塞 G1 关闭）；`NotificationDeliveryEngine` 的 `@EnableScheduling` 仍依赖 ainer-server 侧
+  配置类，属既有已知项。
 
 2026-08-14 文件存储模块 `ainer-module-file`（G1 文件元数据补齐）
 - **范围**：ADR-0040 规格「上传/下载/删除、元数据、大小/类型限制、路径遍历防护」。此前

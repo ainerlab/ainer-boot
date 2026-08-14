@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.dictionary.dictionary.infrastructure.DictionaryAuditMapper">
+
+    <insert id="insert">
+        INSERT INTO ainer_dictionary_audit (
+            id, operation, target_kind, target_id, actor_issuer, actor_type, actor_id,
+            request_id, detail, occurred_at
+        ) VALUES (
+            #{row.id}, #{row.operation}, #{row.targetKind}, #{row.targetId}, #{row.actorIssuer},
+            #{row.actorType}, #{row.actorId}, #{row.requestId}, #{row.detail}, #{row.occurredAt}
+        )
+    </insert>
+
+</mapper>

@@ -98,6 +98,15 @@ OWNER 恢复的 request/approve scope 必须授予两个不同 Client；不得�
 | `AINER_STORAGE_LOCAL_ENABLED` | `true` | 本地文件适配器（`FileStoragePort` 默认实现） |
 | `AINER_STORAGE_LOCAL_BASE_DIRECTORY` | `./data/ainer-storage` | 本地存储根目录；产品可用 S3/OSS bean 覆盖整个端口 |
 
+P3 管理面 scope（ADR-0040，在应用服务内对已验证 principal 强制）：
+
+| Scope | 模块 | 说明 |
+|---|---|---|
+| `dictionary.read` / `dictionary.manage` | dictionary | 查询 / 类型与项全生命周期 |
+| `config.read` / `config.manage` | config | 列表与历史 / 设置值与 secret |
+| `notification.read` / `notification.manage` / `notification.submit` | notification | 模板与记录查询 / 模板生命周期 / 直接提交 |
+| `file.read` / `file.write` | file | 读取下载 / 上传删除 |
+
 ## 4. AI runtime
 
 AI 默认关闭。启用时以下设置共同构成安全门禁：
