@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-14 · 工程版本：`0.1.0` 发布中
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-14 · 工程版本：`0.1.0`（已发布，主线回到 `0.1.1-SNAPSHOT` 待定）
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -65,6 +65,15 @@ config 沿用 `ainer_config_history`）。写入面补齐：字典类型/项的�
 `JwtTestSupport` 共享真 JWT fixture（RSA 签发 + 真 JwtDecoder + @Primary resolver 工厂）。
 三模块真签名 JWT HTTP 测试（401/403/201/409/审计行/PII 脱敏）全部通过。剩余边界：OpenAPI
 运行时文档仍未引入（Boot 4.1 springdoc 兼容性待验证），不阻塞 G1 关闭。
+
+2026-08-14 `v0.1.0` 已成为第一个稳定 `0.1` 基线（**G2 关闭**）：发布准备 PR #9 合入默认分支
+（merge `ccd5097`，dev CI run `31784657704` 12m41s 全绿）后，annotated tag `v0.1.0` 与 release
+run `31785695252` 全部通过——签名 deploy、112 个主制品/112 个 `.asc` 远端读回验签、Maven 3/Maven 4
+空仓消费、远端 Initializer 三通道、SBOM/checksum/provenance 与 immutable GitHub Release
+（读回 `immutable=true`、非 draft、非 prerelease、精确绑定 `ccd5097`，16 个签名证据资产）。
+发布后 `xq-platform-next` 已完成 `rc.3 → 0.1.0` 真实升级（新隔离冷仓，0.1.0 制品全部远端解析，
+14 tests / 0 skipped），连续升级链 `rc.2 → rc.3 → 0.1.0` 全绿。`rc.2`/`rc.3` 保持不可变，作为
+升级/回滚链历史起点；`0.1.0` 不是公开发行版、生产就绪或 1.0 声明，许可状态仍为私有/专有。
 
 2026-08-14 G1 三提交（UUIDv7 全域迁移 `ef6714c`、文件存储模块 `00fb77e`、P3 管理 API
 `68110ea`）以 PR #8 合入 `dev`（merge commit `050cacb`）：PR 三项检查（quality gate
@@ -1258,12 +1267,12 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 按
 [`Ainer Boot 产品定位、竞品能力矩阵与路线图`](design/ainer-scaffold-design.md)
-定义的全局产品化阶段，当前是 **G0 已冻结、G1 已整体关闭并合入 dev、P1/P2 发布门禁已完成、
-G2 消费者证据已闭环、`0.1.0` 发布进行中**：P3 企业基座（文件/字典/配置/通知 + 缓存 +
-授权）已全部进入 dev 主线；`rc.1` 已撤回，`v0.1.0-rc.2` 保留为升级/回滚起点，
-`v0.1.0-rc.3` 为最终消费目标并被 `xq-platform-next` 真实消费（远端冷仓、升级/回滚演练、
-产品纵向切片、SDK 门禁全部通过）。private 仓库分支保护仍缺远端强制执行；
-`0.1.0` 发布与随后的 `rc.3 → 0.1.0` 消费者升级验证完成后 G2 关闭。
+定义的全局产品化阶段，当前是 **G0 已冻结、G1 已关闭、G2 已关闭（`v0.1.0` 已发布并被真实
+消费者消费）、进入 G3（产品核心闭环）**：P3 企业基座（文件/字典/配置/通知 + 缓存 + 授权）
+全部进入 `0.1.0`；`xq-platform-next` 完成 `rc.2 → rc.3 → 0.1.0` 连续升级链与全部产品纵向
+切片。G3 剩余：最小 Agent/Tool/Context/Evaluation 治理、组织目录（ADR-0032 需 Greenfield
+重述，37 处 tenant 依赖）、Knowledge 两个语义切片（ADR-0034 基本兼容）。private 仓库分支
+保护仍缺远端强制执行。
 
 ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -Denforcer.skip=true` 验证；正式
 `./mvnw clean verify`、零跳过门禁与 Testcontainers 集成仍待 Maven 4 RC6 官方发行包恢复后执行）：
@@ -1300,15 +1309,15 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 3. ✅（2026-08-14）`xq-platform-next` 已删除 `0.1.0-SNAPSHOT` 与本地仓库依赖，固定从远端
    `rc.3` 消费，并以 `rc.2` 为起点完成升级、回滚、JWT、Workspace/资源授权、PostgreSQL
    migration replay、真实 HTTP 错误和客户端 SDK 的产品纵向切片（详见 §3）；
-4. 发布 `v0.1.0`（dev HEAD 含 G1 全部工作，24 模块/112 主制品），走 rc.2/rc.3 同一完整
-   发布门禁：annotated tag、签名 deploy、远端读回验签、空仓消费者、Initializer 三通道、
-   SBOM/provenance 与 immutable Release；
-5. `0.1.0` 发布后让 `xq-platform-next` 完成 `rc.3 → 0.1.0` 真实升级验证，形成首个连续
-   升级链证据（`rc.2 → rc.3 → 0.1.0`）；若暴露兼容性或发布链问题，使用新的 `0.1.1`/
-   `0.2.0` 修复，不移动 tag、不覆盖制品；
-6. `0.1.0` 消费证据闭环后，G2 关闭，进入 G3（产品核心闭环：最小 Agent/Tool/Context/Evaluation
-   治理、组织目录 Greenfield 重述、Knowledge 两个语义切片）；`python-learning-service`
-   保持版本化 BOM/Starter 接入，不绑定开发分支、不复制源码。
+4. ✅（2026-08-14）`v0.1.0` 已发布（dev merge `ccd5097` + release run `31785695252` 全绿），
+   走 rc.2/rc.3 同一完整发布门禁：annotated tag、签名 deploy、112/112 远端读回验签、
+   空仓消费者、Initializer 三通道、SBOM/provenance 与 immutable Release（16 个签名证据资产）；
+5. ✅（2026-08-14）`xq-platform-next` 完成 `rc.3 → 0.1.0` 真实升级验证（新隔离冷仓，0.1.0
+   制品全部远端解析，14 tests / 0 skipped），首个连续升级链 `rc.2 → rc.3 → 0.1.0` 全绿；
+   后续兼容性或发布链问题使用新的 `0.1.1`/`0.2.0` 修复，不移动 tag、不覆盖制品；
+6. **G2 已关闭**。进入 G3（产品核心闭环：最小 Agent/Tool/Context/Evaluation 治理、组织目录
+   Greenfield 重述（ADR-0032 有 37 处 tenant 依赖需取代性重述）、Knowledge 两个语义切片）；
+   `python-learning-service` 保持版本化 BOM/Starter 接入，不绑定开发分支、不复制源码。
 
 Identity、安全与运维纵深继续修复明确的 P0/P1/P3 风险，但方法级授权、组织目录、真实设备矩阵、
 多实例容量、外部不可变审计和商业 entitlement 不再作为首个受控 RC 的无限前置。任何部署若实际
