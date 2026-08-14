@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.file.file.infrastructure.FileObjectMapper">
+
+    <resultMap id="ObjectRowMap" type="dev.ainer.module.file.file.infrastructure.FileObjectRow">
+        <id property="id" column="id"/>
+        <result property="storageKey" column="storage_key"/>
+        <result property="namespace" column="namespace"/>
+        <result property="filename" column="filename"/>
+        <result property="contentType" column="content_type"/>
+        <result property="contentLength" column="content_length"/>
+        <result property="checksumSha256" column="checksum_sha256"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="uploadedByIssuer" column="uploaded_by_issuer"/>
+        <result property="uploadedByType" column="uploaded_by_type"/>
+        <result property="uploadedById" column="uploaded_by_id"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <sql id="objectColumns">
+        id, storage_key, namespace, filename, content_type, content_length, checksum_sha256,
+        workspace_id, uploaded_by_issuer, uploaded_by_type, uploaded_by_id, created_at
+    </sql>
+
+    <insert id="insert">
+        INSERT INTO ainer_file_object (
+            id, storage_key, namespace, filename, content_type, content_length, checksum_sha256,
+            workspace_id, uploaded_by_issuer, uploaded_by_type, uploaded_by_id, created_at
+        ) VALUES (
+            #{row.id}, #{row.storageKey}, #{row.namespace}, #{row.filename}, #{row.contentType},
+            #{row.contentLength}, #{row.checksumSha256}, #{row.workspaceId}, #{row.uploadedByIssuer},
+            #{row.uploadedByType}, #{row.uploadedById}, #{row.createdAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="ObjectRowMap">
+        SELECT <include refid="objectColumns"/>
+        FROM ainer_file_object
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectPage" resultMap="ObjectRowMap">
+        SELECT <include refid="objectColumns"/>
+        FROM ainer_file_object
+        <where>
+            <if test="namespace != null">
+                namespace = #{namespace}
+            </if>
+        </where>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countForPage" resultType="long">
+        SELECT COUNT(*)
+        FROM ainer_file_object
+        <where>
+            <if test="namespace != null">
+                namespace = #{namespace}
+            </if>
+        </where>
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM ainer_file_object
+        WHERE id = #{id}
+    </delete>
+
+</mapper>

@@ -16,6 +16,7 @@ ainer-module-authorization jar -
 ainer-module-dictionary jar -
 ainer-module-config jar -
 ainer-module-notification jar -
+ainer-module-file jar -
 ainer-server jar -
 ainer-authorization-server jar -
 ainer-offstate-app jar -

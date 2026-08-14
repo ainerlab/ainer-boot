@@ -232,7 +232,22 @@ Scope kind 与底层 CHECK 约束：`GLOBAL`（workspace_id/resource_type/resour
 通用管理 API 不创建 GLOBAL Binding；受控平台路径若建立 GLOBAL Binding，决策器仍只允许 SERVICE
 subject 使用。
 
-## 9. 兼容与变更
+## 9. 文件 API（ADR-0040）
+
+文件模块默认装配；所有端点要求认证，scope 在应用服务内强制（`file.read` 读取/下载，`file.write` 上传/删除）。
+
+| Method | Path | Scope | 响应 | 说明 |
+|---|---|---|---|---|
+| POST | `/api/files` | `file.write` | 201 JSON | multipart 上传（`namespace` + `file`）；返回元数据（含 SHA-256） |
+| GET | `/api/files` | `file.read` | JSON | 分页（`page`≥1、`size`≤100，可选 `namespace` 过滤） |
+| GET | `/api/files/{id}/content` | `file.read` | 文件流 | `Content-Disposition` 携带原文件名 |
+| DELETE | `/api/files/{id}` | `file.write` | JSON | 删除字节与元数据；审计行保留 |
+
+限制：超出 `ainer.file.max-size-bytes` 返回 413（`AINER.FILE.FILE_TOO_LARGE`）；content-type 不在
+`ainer.file.allowed-content-types` 白名单返回 415（`AINER.FILE.CONTENT_TYPE_NOT_ALLOWED`）。上传/删除
+写入同事务 `ainer_file_audit`。存储后端为 `FileStoragePort` SPI（默认本地适配器，产品可用 S3/OSS 覆盖）。
+
+## 10. 兼容与变更
 
 - 新增可选响应字段通常向后兼容，客户端必须容忍未知字段；
 - 删除、改名、改变字段类型、收紧枚举或改变 status/error code 都需要发布说明；

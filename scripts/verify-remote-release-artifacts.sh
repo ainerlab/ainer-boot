@@ -127,10 +127,10 @@ while read -r artifact packaging classifiers extra; do
   fi
 done <"$artifact_manifest"
 
-[[ "$project_count" == "23" ]] \
-  || fail "release artifact manifest must contain 23 projects, found $project_count"
-[[ "$expected_primary_count" == "107" ]] \
-  || fail "release artifact manifest must describe 107 primary artifacts, found $expected_primary_count"
+[[ "$project_count" == "24" ]] \
+  || fail "release artifact manifest must contain 24 projects, found $project_count"
+[[ "$expected_primary_count" == "112" ]] \
+  || fail "release artifact manifest must describe 112 primary artifacts, found $expected_primary_count"
 
 primary_count="$(find "$maven_dir" -type f ! -name '*.asc' | wc -l | tr -d ' ')"
 signature_count="$(find "$maven_dir" -type f -name '*.asc' | wc -l | tr -d ' ')"
@@ -221,7 +221,7 @@ cat >"$release_notes_path" <<EOF
 ## Ainer Boot $release_version release evidence
 
 - Source: \`$source_sha\` (annotated tag \`$release_tag\`)
-- Maven artifacts: 107 primary files, each read back from GitHub Packages with a valid detached OpenPGP signature
+- Maven artifacts: 112 primary files, each read back from GitHub Packages with a valid detached OpenPGP signature
 - Consumers: Maven 3.9+ and Maven 4 run from separate empty local repositories; Project Initializer is fetched remotely
 - Evidence: CycloneDX SBOM, SHA-256/SHA-512 manifests, signed provenance statement, release public key and fingerprint
 - Build: https://github.com/$repository_slug/actions/runs/${GITHUB_RUN_ID:-local}

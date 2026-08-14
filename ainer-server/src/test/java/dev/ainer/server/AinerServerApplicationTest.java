@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "ainer.dictionary.enabled=false",
                 "ainer.config.enabled=false",
                 "ainer.notification.enabled=false",
+                "ainer.file.enabled=false",
                 "ainer.security.resource-server.enabled=false",
                 "spring.flyway.enabled=false",
                 "spring.autoconfigure.exclude="
