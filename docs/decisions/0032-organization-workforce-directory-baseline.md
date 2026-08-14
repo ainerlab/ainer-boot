@@ -1,10 +1,10 @@
 # ADR-0032：组织与员工目录基线
 
-- 状态：Proposed
+- 状态：Superseded
 - 日期：2026-08-02
 - 决策者：Ainer 项目维护者
 - 取代：无
-- 被取代：无
+- 被取代：[ADR-0042](0042-organization-directory-greenfield-baseline.md)（ADR-0033 Greenfield 删除 Tenant 后，本 ADR 的 tenant 锚点与 access-event 前置矩阵不再成立；领域取舍与备选方案结论由 ADR-0042 继承）
 
 ## 背景
 

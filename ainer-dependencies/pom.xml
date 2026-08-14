@@ -127,6 +127,11 @@
             </dependency>
             <dependency>
                 <groupId>dev.ainer</groupId>
+                <artifactId>ainer-module-organization</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.ainer</groupId>
                 <artifactId>ainer-initializer</artifactId>
                 <version>${revision}</version>
             </dependency>

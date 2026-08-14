@@ -102,6 +102,14 @@ GLOBAL binding 仅 SERVICE subject 持有（决策器强制）。
 |---|---|
 | `ainer_file_object` | 存储对象元数据（storage_key 唯一、namespace、SHA-256、上传者三元组；UUIDv7 CHECK） |
 | `ainer_file_audit` | 变更审计 append-only（UPLOADED/DELETED；file_id FK ON DELETE SET NULL，文件删除后审计保留） |
+| `ainer_org_directory` | 组织目录容器（ADR-0042：Workspace 锚点，workspace+code 唯一） |
+| `ainer_org_unit` | 组织单元（ROOT 每 Directory 唯一部分索引；复合 FK 阻止跨目录引用） |
+| `ainer_org_unit_parent` | Unit 父关系（开放父关系每子唯一；递归 CTE 查询祖先） |
+| `ainer_org_engagement` | 任职关系（btree_gist + tstzrange EXCLUDE：同目录同 Subject 非 REVOKED 有效期不重叠；employeeNumber 目录内唯一不复用） |
+| `ainer_org_unit_assignment` | 任职分配（开放 PRIMARY 每 Engagement 唯一；复合 FK 到 engagement/unit） |
+| `ainer_org_position` | Unit 内岗位（orgUnit 不可变；directory+unit+code 唯一） |
+| `ainer_org_position_assignment` | 岗位任职（5 列复合 FK 锚定同 Engagement 同 Unit 的 UnitAssignment） |
+| `ainer_org_change_audit` | 组织变更审计 append-only（DIRECTORY/UNIT/ENGAGEMENT/…实体类型枚举） |
 
 Dictionary 审计 baseline（`V202608140200`，ADR-0040 管理面加固）：
 
