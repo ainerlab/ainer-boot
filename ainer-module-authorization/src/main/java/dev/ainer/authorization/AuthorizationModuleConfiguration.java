@@ -57,6 +57,13 @@ public class AuthorizationModuleConfiguration {
         return Clock.systemUTC();
     }
 
+    /** 默认 fail-closed：无产品 Agent 注册表时，一切委托检查点对 Agent 状态返回 UNKNOWN。 */
+    @Bean
+    @ConditionalOnMissingBean
+    dev.ainer.authorization.policy.AgentDefinitionStatusResolver denyAllAgentStatusResolver() {
+        return agentId -> dev.ainer.authorization.policy.AgentDefinitionStatusResolver.AgentStatus.UNKNOWN;
+    }
+
     @Bean
     ErrorCodeContributor authorizationErrorCodes() {
         return () -> List.of(AuthorizationErrorCode.values());

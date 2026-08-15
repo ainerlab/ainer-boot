@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "ainer.notification.enabled=false",
                 "ainer.file.enabled=false",
                 "ainer.organization.enabled=false",
+                "ainer.ai.agents.enabled=false",
                 "ainer.security.resource-server.enabled=false",
                 "spring.flyway.enabled=false",
                 "spring.autoconfigure.exclude="

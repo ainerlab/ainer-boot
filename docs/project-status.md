@@ -310,6 +310,18 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-15 G3 第三切片：Agent 代行 A1（ADR-0043，取代 ADR-0031）
+- **范围**：一层 principal→agent 委托 + 委托检查点。ADR-0031 以 Greenfield 语义合规取代
+  （Workspace 锚点、SubjectRef 与 ADR-0037 对齐、撤销语义复用决策时实时解析）。
+- **交付**：授权侧 ActingGrant（permission 子集子表 + 单一结构化 Scope；签发强制
+  agentDelegable ∧ principal live effective 子集 ∧ scope 被覆盖 ∧ GLOBAL/system-only 拒绝；
+  `check` 检查点拉取式实时解析 grant/principal bindings/agent 状态）；ai-runtime 侧独立
+  `AiAgentModuleConfiguration` + Agent 定义注册表 + `/api/ai/agents`；默认状态解析 fail-closed。
+- **验证**：ai-runtime 28/0/0/0（新增委托端到端 4 项：ALLOW、退役即拒、权限收缩即拒、
+  撤委托即拒、签发矩阵 422×2）。全量数字见最新 reactor 记录。
+- **边界**：A2（Capability catalog/Context 授权）、A3（Tool/副作用/Challenge 检查点）、
+  A4（Token Exchange）未交付；`Permission.agentDelegable` 自本切片真实消费。
+
 2026-08-14 G3 第二切片：SubjectSet 授权集成（ADR-0042 O2，撤岗即失权闭环）
 - **范围**：ADR-0037 加性扩展 + 组织模块首个集合族。岗位在岗者通过集合绑定获得授权，
   组织事实变化（暂停/终止/撤岗）经决策时实时解析在下次决策立即生效——无事件、无缓存。
