@@ -180,6 +180,8 @@ public class WorkforceApplicationService {
         OrgUnit unit = directoryRepository.findUnit(directoryId, orgUnitId)
                 .orElseThrow(() -> new BusinessException(OrganizationErrorCode.UNIT_NOT_FOUND));
         requirePeriod(validFrom, validUntil);
+        validFrom = micros(validFrom);
+        validUntil = micros(validUntil);
         requireWithin(validFrom, validUntil, engagement.validFrom(), engagement.validUntil());
         if (unit.status() != OrgStatus.ENABLED) {
             throw new BusinessException(OrganizationErrorCode.UNIT_NOT_FOUND);
@@ -368,13 +370,16 @@ public class WorkforceApplicationService {
     private static void requireWithin(
             Instant from, Instant until, Instant parentFrom, Instant parentUntil) {
         if (from.isBefore(parentFrom)) {
-            throw new BusinessException(OrganizationErrorCode.INVALID_PERIOD);
+            throw new BusinessException(OrganizationErrorCode.INVALID_PERIOD,
+                    "子关系[%s,%s)早于父关系[%s,%s)".formatted(from, until, parentFrom, parentUntil));
         }
         if (parentUntil != null && !from.isBefore(parentUntil)) {
-            throw new BusinessException(OrganizationErrorCode.INVALID_PERIOD);
+            throw new BusinessException(OrganizationErrorCode.INVALID_PERIOD,
+                    "子关系起点%s不早于父终点%s".formatted(from, parentUntil));
         }
         if (until != null && parentUntil != null && until.isAfter(parentUntil)) {
-            throw new BusinessException(OrganizationErrorCode.INVALID_PERIOD);
+            throw new BusinessException(OrganizationErrorCode.INVALID_PERIOD,
+                    "子终点%s晚于父终点%s".formatted(until, parentUntil));
         }
     }
 
