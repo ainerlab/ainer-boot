@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -69,6 +70,8 @@ public class WorkforceApplicationService {
         requireManage(principal);
         OrgDirectory directory = requireDirectory(directoryId);
         requirePeriod(validFrom, validUntil);
+        validFrom = micros(validFrom);
+        validUntil = micros(validUntil);
         String issuer = subjectIssuer == null ? "" : subjectIssuer.strip();
         if (properties.trustedIssuer().isEmpty() || !properties.trustedIssuer().equals(issuer)) {
             throw new BusinessException(OrganizationErrorCode.INVALID_ISSUER);
@@ -205,6 +208,7 @@ public class WorkforceApplicationService {
             Instant atTime) {
         requireManage(principal);
         Objects.requireNonNull(atTime, "atTime");
+        atTime = micros(atTime);
         WorkforceEngagement engagement = requireEngagement(directoryId, engagementId);
         UnitAssignment existing = repository.findUnitAssignment(directoryId, assignmentId)
                 .orElseThrow(() -> new BusinessException(OrganizationErrorCode.ASSIGNMENT_NOT_FOUND));
@@ -284,6 +288,8 @@ public class WorkforceApplicationService {
             throw new BusinessException(OrganizationErrorCode.UNIT_MISMATCH);
         }
         requirePeriod(validFrom, validUntil);
+        validFrom = micros(validFrom);
+        validUntil = micros(validUntil);
         requireWithin(validFrom, validUntil, engagement.validFrom(), engagement.validUntil());
         requireWithin(validFrom, validUntil, unitAssignment.validFrom(), unitAssignment.validUntil());
         Instant now = clock.instant();
@@ -341,6 +347,11 @@ public class WorkforceApplicationService {
     private WorkforceEngagement requireEngagement(UUID directoryId, UUID engagementId) {
         return repository.findEngagement(directoryId, engagementId)
                 .orElseThrow(() -> new BusinessException(OrganizationErrorCode.ENGAGEMENT_NOT_FOUND));
+    }
+
+    /** PostgreSQL timestamptz 只有微秒精度；入口统一截断，防止纳秒时间戳回读后比较漂移。 */
+    private static Instant micros(Instant value) {
+        return value == null ? null : value.truncatedTo(ChronoUnit.MICROS);
     }
 
     private static void requirePeriod(Instant validFrom, Instant validUntil) {
