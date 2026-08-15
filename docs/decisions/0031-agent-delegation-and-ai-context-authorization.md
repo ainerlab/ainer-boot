@@ -1,10 +1,10 @@
 # ADR-0031：Agent 代行、Capability 与 AI 上下文授权基线
 
-- 状态：Proposed
+- 状态：Superseded
 - 日期：2026-08-02
 - 决策者：Ainer 项目维护者
 - 取代：无
-- 被取代：无
+- 被取代：[ADR-0043](0043-agent-delegation-greenfield-baseline.md)（Greenfield/ADR-0037 语义合规重述；领域取舍与备选方案结论由 ADR-0043 继承）
 
 ## 背景
 

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.ai.agent.infrastructure.AiAgentMapper">
+
+    <resultMap id="AiAgentRowMap" type="dev.ainer.module.ai.agent.infrastructure.AiAgentRow">
+        <id property="id" column="id"/>
+        <result property="code" column="code"/>
+        <result property="agentVersion" column="agent_version"/>
+        <result property="status" column="status"/>
+        <result property="purpose" column="purpose"/>
+        <result property="runtimeRef" column="runtime_ref"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="retiredAt" column="retired_at"/>
+    </resultMap>
+
+    <insert id="insert">
+        INSERT INTO ainer_ai_agent_definition
+            (id, code, agent_version, status, purpose, runtime_ref, workspace_id,
+             created_at, updated_at, retired_at)
+        VALUES
+            (#{id}, #{code}, #{agentVersion}, #{status}, #{purpose}, #{runtimeRef},
+             #{workspaceId}, #{createdAt}, #{updatedAt}, #{retiredAt})
+    </insert>
+
+    <select id="selectById" resultMap="AiAgentRowMap">
+        SELECT id, code, agent_version, status, purpose, runtime_ref, workspace_id,
+               created_at, updated_at, retired_at
+        FROM ainer_ai_agent_definition
+        WHERE id = #{id}
+    </select>
+
+    <update id="retire">
+        UPDATE ainer_ai_agent_definition
+        SET status = 'RETIRED', retired_at = #{at}, updated_at = #{at}
+        WHERE id = #{id} AND status = 'ACTIVE'
+    </update>
+
+    <select id="page" resultMap="AiAgentRowMap">
+        SELECT id, code, agent_version, status, purpose, runtime_ref, workspace_id,
+               created_at, updated_at, retired_at
+        FROM ainer_ai_agent_definition
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+</mapper>

@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -69,6 +70,8 @@ public class WorkforceApplicationService {
         requireManage(principal);
         OrgDirectory directory = requireDirectory(directoryId);
         requirePeriod(validFrom, validUntil);
+        validFrom = micros(validFrom);
+        validUntil = micros(validUntil);
         String issuer = subjectIssuer == null ? "" : subjectIssuer.strip();
         if (properties.trustedIssuer().isEmpty() || !properties.trustedIssuer().equals(issuer)) {
             throw new BusinessException(OrganizationErrorCode.INVALID_ISSUER);
@@ -177,6 +180,8 @@ public class WorkforceApplicationService {
         OrgUnit unit = directoryRepository.findUnit(directoryId, orgUnitId)
                 .orElseThrow(() -> new BusinessException(OrganizationErrorCode.UNIT_NOT_FOUND));
         requirePeriod(validFrom, validUntil);
+        validFrom = micros(validFrom);
+        validUntil = micros(validUntil);
         requireWithin(validFrom, validUntil, engagement.validFrom(), engagement.validUntil());
         if (unit.status() != OrgStatus.ENABLED) {
             throw new BusinessException(OrganizationErrorCode.UNIT_NOT_FOUND);
@@ -205,6 +210,7 @@ public class WorkforceApplicationService {
             Instant atTime) {
         requireManage(principal);
         Objects.requireNonNull(atTime, "atTime");
+        atTime = micros(atTime);
         WorkforceEngagement engagement = requireEngagement(directoryId, engagementId);
         UnitAssignment existing = repository.findUnitAssignment(directoryId, assignmentId)
                 .orElseThrow(() -> new BusinessException(OrganizationErrorCode.ASSIGNMENT_NOT_FOUND));
@@ -284,6 +290,8 @@ public class WorkforceApplicationService {
             throw new BusinessException(OrganizationErrorCode.UNIT_MISMATCH);
         }
         requirePeriod(validFrom, validUntil);
+        validFrom = micros(validFrom);
+        validUntil = micros(validUntil);
         requireWithin(validFrom, validUntil, engagement.validFrom(), engagement.validUntil());
         requireWithin(validFrom, validUntil, unitAssignment.validFrom(), unitAssignment.validUntil());
         Instant now = clock.instant();
@@ -343,6 +351,11 @@ public class WorkforceApplicationService {
                 .orElseThrow(() -> new BusinessException(OrganizationErrorCode.ENGAGEMENT_NOT_FOUND));
     }
 
+    /** PostgreSQL timestamptz 只有微秒精度；入口统一截断，防止纳秒时间戳回读后比较漂移。 */
+    private static Instant micros(Instant value) {
+        return value == null ? null : value.truncatedTo(ChronoUnit.MICROS);
+    }
+
     private static void requirePeriod(Instant validFrom, Instant validUntil) {
         Objects.requireNonNull(validFrom, "validFrom");
         if (validUntil != null && !validUntil.isAfter(validFrom)) {
@@ -357,13 +370,16 @@ public class WorkforceApplicationService {
     private static void requireWithin(
             Instant from, Instant until, Instant parentFrom, Instant parentUntil) {
         if (from.isBefore(parentFrom)) {
-            throw new BusinessException(OrganizationErrorCode.INVALID_PERIOD);
+            throw new BusinessException(OrganizationErrorCode.INVALID_PERIOD,
+                    "子关系[%s,%s)早于父关系[%s,%s)".formatted(from, until, parentFrom, parentUntil));
         }
         if (parentUntil != null && !from.isBefore(parentUntil)) {
-            throw new BusinessException(OrganizationErrorCode.INVALID_PERIOD);
+            throw new BusinessException(OrganizationErrorCode.INVALID_PERIOD,
+                    "子关系起点%s不早于父终点%s".formatted(from, parentUntil));
         }
         if (until != null && parentUntil != null && until.isAfter(parentUntil)) {
-            throw new BusinessException(OrganizationErrorCode.INVALID_PERIOD);
+            throw new BusinessException(OrganizationErrorCode.INVALID_PERIOD,
+                    "子终点%s晚于父终点%s".formatted(until, parentUntil));
         }
     }
 

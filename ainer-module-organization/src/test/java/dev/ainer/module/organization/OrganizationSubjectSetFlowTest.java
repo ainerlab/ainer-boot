@@ -170,7 +170,9 @@ class OrganizationSubjectSetFlowTest {
 
     private String jsonPost(String path, String body) {
         RestResponse response = client.postJson(path, body);
-        assertThat(response.status().value()).isEqualTo(201);
+        assertThat(response.status().value())
+                .as("POST %s -> %s", path, response.body())
+                .isEqualTo(201);
         return (String) response.jsonPath("$.data.id");
     }
 

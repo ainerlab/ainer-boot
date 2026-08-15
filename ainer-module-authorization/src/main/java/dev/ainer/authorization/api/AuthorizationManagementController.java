@@ -55,6 +55,7 @@ public class AuthorizationManagementController {
     private final SubjectBindingApplicationService bindingService;
     private final dev.ainer.authorization.application.SubjectSetBindingApplicationService setBindingService;
     private final dev.ainer.authorization.application.SubjectSetBindingRepository setBindingRepository;
+    private final dev.ainer.authorization.application.ActingGrantApplicationService actingGrantService;
     private final RoleRepository roleRepository;
     private final SubjectBindingRepository bindingRepository;
     private final PermissionCatalogRepository permissionCatalogRepository;
@@ -70,11 +71,13 @@ public class AuthorizationManagementController {
             AuthenticatedPrincipalResolver principalResolver,
             GrantAdministrationGuard administrationGuard,
             dev.ainer.authorization.application.SubjectSetBindingApplicationService setBindingService,
-            dev.ainer.authorization.application.SubjectSetBindingRepository setBindingRepository) {
+            dev.ainer.authorization.application.SubjectSetBindingRepository setBindingRepository,
+            dev.ainer.authorization.application.ActingGrantApplicationService actingGrantService) {
         this.roleService = roleService;
         this.bindingService = bindingService;
         this.setBindingService = setBindingService;
         this.setBindingRepository = setBindingRepository;
+        this.actingGrantService = actingGrantService;
         this.roleRepository = roleRepository;
         this.bindingRepository = bindingRepository;
         this.permissionCatalogRepository = permissionCatalogRepository;
@@ -225,6 +228,56 @@ public class AuthorizationManagementController {
                 setBindingRepository.findById(bindingId)
                         .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.SET_BINDING_NOT_FOUND));
         return ApiResponse.success(SetBindingResponse.from(pb), RequestIds.currentOrCreate(request));
+    }
+
+    // ---- Acting grants (ADR-0043 A1) ----
+
+    @PostMapping("/acting-grants")
+    public ResponseEntity<ApiResponse<ActingGrantResponse>> createActingGrant(
+            @RequestBody CreateActingGrantRequest body,
+            HttpServletRequest request) {
+        AuthenticatedPrincipal principal = requireManagement();
+        dev.ainer.authorization.domain.SubjectRef target = new dev.ainer.authorization.domain.SubjectRef(
+                body.principalIssuer(), body.principalSubjectId(),
+                dev.ainer.authorization.domain.SubjectType.valueOf(body.principalSubjectType()));
+        java.util.Set<dev.ainer.authorization.domain.PermissionCode> permissions = new java.util.LinkedHashSet<>();
+        for (String code : body.permissions()) {
+            permissions.add(new dev.ainer.authorization.domain.PermissionCode(code));
+        }
+        Scope scope = buildScope(body.scopeKind(), body.workspaceId(), body.resourceType(),
+                body.resourceId());
+        String requestId = RequestIds.currentOrCreate(request);
+        UUID grantId = actingGrantService.issueGrant(principal, target, body.agentId(),
+                body.agentVersion(), permissions, scope, Instant.now(), body.validUntil(),
+                requestId);
+        dev.ainer.authorization.application.ActingGrantRepository.PersistedGrant grant =
+                actingGrantService.findById(grantId)
+                        .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.SET_BINDING_NOT_FOUND));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(ActingGrantResponse.from(grant),
+                        RequestIds.currentOrCreate(request)));
+    }
+
+    @GetMapping("/acting-grants/{grantId}")
+    public ApiResponse<ActingGrantResponse> getActingGrant(
+            @PathVariable UUID grantId, HttpServletRequest request) {
+        requireManagement();
+        return ApiResponse.success(ActingGrantResponse.from(actingGrantService.findById(grantId)
+                .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.SET_BINDING_NOT_FOUND))),
+                RequestIds.currentOrCreate(request));
+    }
+
+    @PostMapping("/acting-grants/{grantId}/revocations")
+    public ApiResponse<ActingGrantResponse> revokeActingGrant(
+            @PathVariable UUID grantId,
+            @RequestBody RevokeBindingRequest body,
+            HttpServletRequest request) {
+        AuthenticatedPrincipal principal = requireManagement();
+        actingGrantService.revokeGrant(principal, grantId, body.reason(),
+                RequestIds.currentOrCreate(request));
+        return ApiResponse.success(ActingGrantResponse.from(actingGrantService.findById(grantId)
+                .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.SET_BINDING_NOT_FOUND))),
+                RequestIds.currentOrCreate(request));
     }
 
     // ---- Effective Access ----

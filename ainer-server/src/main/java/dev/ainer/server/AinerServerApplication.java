@@ -2,6 +2,7 @@ package dev.ainer.server;
 
 import dev.ainer.authorization.AuthorizationModuleConfiguration;
 import dev.ainer.module.ai.AiRuntimeModuleConfiguration;
+import dev.ainer.module.ai.agent.AiAgentModuleConfiguration;
 import dev.ainer.module.config.ConfigModuleConfiguration;
 import dev.ainer.module.dictionary.DictionaryModuleConfiguration;
 import dev.ainer.module.file.FileModuleConfiguration;
@@ -19,7 +20,8 @@ import org.springframework.context.annotation.Import;
         ConfigModuleConfiguration.class,
         NotificationModuleConfiguration.class,
         FileModuleConfiguration.class,
-        OrganizationModuleConfiguration.class})
+        OrganizationModuleConfiguration.class,
+        AiAgentModuleConfiguration.class})
 public class AinerServerApplication {
 
     public static void main(String[] args) {

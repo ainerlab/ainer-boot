@@ -84,6 +84,65 @@ public final class AuthorizationApiDtos {
             @Nullable Instant validUntil) {
     }
 
+    public record CreateActingGrantRequest(
+            String principalIssuer,
+            String principalSubjectId,
+            String principalSubjectType,
+            UUID agentId,
+            String agentVersion,
+            java.util.Set<String> permissions,
+            String scopeKind,
+            @Nullable UUID workspaceId,
+            @Nullable String resourceType,
+            @Nullable UUID resourceId,
+            @Nullable Instant validUntil) {
+    }
+
+    public record ActingGrantResponse(
+            UUID id,
+            String principalIssuer,
+            String principalSubjectId,
+            UUID agentId,
+            String agentVersion,
+            java.util.Set<String> permissions,
+            String scopeKind,
+            @Nullable UUID workspaceId,
+            @Nullable String resourceType,
+            @Nullable UUID resourceId,
+            String status,
+            Instant validFrom,
+            @Nullable Instant validUntil,
+            long version) {
+
+        public static ActingGrantResponse from(
+                dev.ainer.authorization.application.ActingGrantRepository.PersistedGrant g) {
+            Scope scope = g.scope();
+            String scopeKind;
+            UUID workspaceId = null;
+            String resourceType = null;
+            UUID resourceId = null;
+            switch (scope) {
+                case Scope.Workspace ws -> {
+                    scopeKind = "WORKSPACE";
+                    workspaceId = ws.workspaceId();
+                }
+                case Scope.Resource res -> {
+                    scopeKind = "RESOURCE";
+                    workspaceId = res.workspaceId();
+                    resourceType = res.resourceType().value();
+                    resourceId = res.resourceId();
+                }
+                default -> scopeKind = "GLOBAL";
+            }
+            return new ActingGrantResponse(g.id(), g.principal().issuerNamespace(),
+                    g.principal().subjectId(), g.agentId(), g.agentVersion(),
+                    g.permissions().stream().map(pc -> pc.value())
+                            .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new)),
+                    scopeKind, workspaceId, resourceType, resourceId, g.status().name(),
+                    g.validFrom(), g.validUntil(), g.version());
+        }
+    }
+
     public record SetBindingResponse(
             UUID id,
             String setObjectType,
