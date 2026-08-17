@@ -553,7 +553,7 @@ port 和 local adapter；只有满足 ADR-0024 的拆分条件后再增加 remot
 | 消费者 | groupId / 位置 | 领域边界 | 接入方式 | 状态 |
 |---|---|---|---|---|
 | `xq-platform-next` | `dev.xq:xq-platform-next`，独立仓库 | 公开行业信息与协作、录货、搜索、交易 | Initializer 生成 + BOM 固定版本 | 已创建（2026-08-09），P3 验证中 |
-| `python-learning-service` | 待定，独立仓库 | Python 课程、学习进度、练习、Tutor | 版本化制品升级（BOM + Starter 固定版本），拒绝源码副本 | 已登记，未接入 |
+| `python-learning-service` | `dev.learning:python-learning-service`，独立仓库（`/Users/xq/01-code/self/python-learning-service`） | Python 课程、学习进度、练习、Tutor（`python-interactive-learning` 前端的平台后端） | 版本化制品升级（BOM + Starter 固定版本），拒绝源码副本 | 已接入（2026-08-17）：Initializer 生成 + 远端 `0.1.0` 冷仓消费 + Evidence 存档首切片（learner JWT 归属隔离，8 tests 0 skipped） |
 
 新消费者接入必须采用“版本化制品升级”，不是 Git 合并或开发分支依赖：
 
