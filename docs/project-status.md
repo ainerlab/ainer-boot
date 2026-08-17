@@ -310,6 +310,17 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-15 G3 第四切片：Knowledge Foundation K1/K2（ADR-0044，**G3 产品核心闭环整体完成**）
+- **范围**：ADR-0034 目标合同的首批实现切片。K1 身份与版本（KnowledgeObject 语义身份 +
+  不可变 Revision + SUPERSEDES lineage + asOf 精确 pin）；K2 信任与生命周期（SourceRef/
+  EvidenceLink + append-only 生命周期 + **人工发布门禁**：SERVICE 提案允许、发布一律 403）。
+- **交付**：`ainer-module-knowledge`（第 26 个 reactor 模块，发布链 26 projects/122 primary），
+  `/api/knowledge/**`（objects/revisions/publications 动作名词端点），`knowledge.read/manage`
+  scope 应用服务内强制，`AINER.KNOWLEDGE.*` 错误码；时间入口微秒截断。
+- **验证**：模块真 JWT HTTP 5/0/0/0（0 skipped）；全量 reactor 数字见最新记录。
+- **边界**：向量/图索引、Context Assembly、OKF import/export、PlatformCatalog 属
+  ADR-0034 Phase 2–4，未交付不得宣称。
+
 2026-08-15 G3 第三切片：Agent 代行 A1（ADR-0043，取代 ADR-0031）
 - **范围**：一层 principal→agent 委托 + 委托检查点。ADR-0031 以 Greenfield 语义合规取代
   （Workspace 锚点、SubjectRef 与 ADR-0037 对齐、撤销语义复用决策时实时解析）。

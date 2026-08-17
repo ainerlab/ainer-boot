@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.knowledge.knowledge.infrastructure.KnowledgeMapper">
+
+    <resultMap id="ObjectRowMap" type="dev.ainer.module.knowledge.knowledge.infrastructure.KnowledgeObjectRow">
+        <id property="id" column="id"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="kind" column="kind"/>
+        <result property="title" column="title"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="RevisionRowMap" type="dev.ainer.module.knowledge.knowledge.infrastructure.KnowledgeRevisionRow">
+        <id property="id" column="id"/>
+        <result property="objectId" column="object_id"/>
+        <result property="revisionNumber" column="revision_number"/>
+        <result property="payloadMarkdown" column="payload_markdown"/>
+        <result property="status" column="status"/>
+        <result property="createdByIssuer" column="created_by_issuer"/>
+        <result property="createdByType" column="created_by_type"/>
+        <result property="createdById" column="created_by_id"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="publishedAt" column="published_at"/>
+    </resultMap>
+
+    <resultMap id="SourceRowMap" type="dev.ainer.module.knowledge.knowledge.infrastructure.KnowledgeSourceRow">
+        <id property="id" column="id"/>
+        <result property="revisionId" column="revision_id"/>
+        <result property="sourceType" column="source_type"/>
+        <result property="sourceRef" column="source_ref"/>
+    </resultMap>
+
+    <resultMap id="EvidenceRowMap" type="dev.ainer.module.knowledge.knowledge.infrastructure.KnowledgeEvidenceRow">
+        <id property="id" column="id"/>
+        <result property="revisionId" column="revision_id"/>
+        <result property="linkType" column="link_type"/>
+        <result property="targetRef" column="target_ref"/>
+    </resultMap>
+
+    <insert id="insertObject">
+        INSERT INTO ainer_knowledge_object
+            (id, workspace_id, kind, title, status, created_at, updated_at)
+        VALUES
+            (#{id}, #{workspaceId}, #{kind}, #{title}, #{status}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <select id="selectObject" resultMap="ObjectRowMap">
+        SELECT id, workspace_id, kind, title, status, created_at, updated_at
+        FROM ainer_knowledge_object WHERE id = #{id}
+    </select>
+
+    <select id="pageObjects" resultMap="ObjectRowMap">
+        SELECT id, workspace_id, kind, title, status, created_at, updated_at
+        FROM ainer_knowledge_object
+        WHERE workspace_id = #{workspaceId}
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countObjects" resultType="long">
+        SELECT count(*) FROM ainer_knowledge_object WHERE workspace_id = #{workspaceId}
+    </select>
+
+    <insert id="insertRevision">
+        INSERT INTO ainer_knowledge_revision
+            (id, object_id, revision_number, payload_markdown, status, created_by_issuer,
+             created_by_type, created_by_id, created_at, published_at)
+        VALUES
+            (#{id}, #{objectId}, #{revisionNumber}, #{payloadMarkdown}, #{status},
+             #{createdByIssuer}, #{createdByType}, #{createdById}, #{createdAt}, #{publishedAt})
+    </insert>
+
+    <insert id="insertSources">
+        INSERT INTO ainer_knowledge_source (id, revision_id, source_type, source_ref)
+        VALUES
+        <foreach collection="rows" item="row" separator=",">
+            (#{row.id}, #{revisionId}, #{row.sourceType}, #{row.sourceRef})
+        </foreach>
+    </insert>
+
+    <insert id="insertEvidence">
+        INSERT INTO ainer_knowledge_evidence (id, revision_id, link_type, target_ref)
+        VALUES
+        <foreach collection="rows" item="row" separator=",">
+            (#{row.id}, #{revisionId}, #{row.linkType}, #{row.targetRef})
+        </foreach>
+    </insert>
+
+    <select id="selectRevision" resultMap="RevisionRowMap">
+        SELECT id, object_id, revision_number, payload_markdown, status, created_by_issuer,
+               created_by_type, created_by_id, created_at, published_at
+        FROM ainer_knowledge_revision WHERE id = #{id}
+    </select>
+
+    <select id="selectSources" resultMap="SourceRowMap">
+        SELECT id, revision_id, source_type, source_ref
+        FROM ainer_knowledge_source WHERE revision_id = #{revisionId} ORDER BY id
+    </select>
+
+    <select id="selectEvidence" resultMap="EvidenceRowMap">
+        SELECT id, revision_id, link_type, target_ref
+        FROM ainer_knowledge_evidence WHERE revision_id = #{revisionId} ORDER BY id
+    </select>
+
+    <select id="selectMaxRevisionNumber" resultType="java.lang.Long">
+        SELECT max(revision_number) FROM ainer_knowledge_revision WHERE object_id = #{objectId}
+    </select>
+
+    <select id="selectRevisionsByObject" resultMap="RevisionRowMap">
+        SELECT id, object_id, revision_number, payload_markdown, status, created_by_issuer,
+               created_by_type, created_by_id, created_at, published_at
+        FROM ainer_knowledge_revision WHERE object_id = #{objectId}
+        ORDER BY revision_number
+    </select>
+
+    <!-- asOf 解析：仅已发布且 published_at <= asOf 的最新版本；未发布版本不可见（ADR-0044 K1） -->
+    <select id="selectPublishedAt" resultMap="RevisionRowMap">
+        SELECT id, object_id, revision_number, payload_markdown, status, created_by_issuer,
+               created_by_type, created_by_id, created_at, published_at
+        FROM ainer_knowledge_revision
+        WHERE object_id = #{objectId}
+          AND status = 'PUBLISHED'
+          AND published_at &lt;= #{asOf}
+        ORDER BY revision_number DESC
+        LIMIT 1
+    </select>
+
+    <insert id="insertLineage">
+        INSERT INTO ainer_knowledge_revision_lineage (from_revision_id, to_revision_id, relation, created_at)
+        VALUES (#{from}, #{to}, 'SUPERSEDES', #{at})
+    </insert>
+
+    <update id="markPublished">
+        UPDATE ainer_knowledge_revision
+        SET status = 'PUBLISHED', published_at = #{at}
+        WHERE id = #{id} AND status = 'PROPOSED'
+    </update>
+
+    <insert id="insertLifecycle">
+        INSERT INTO ainer_knowledge_lifecycle_event
+            (id, object_id, revision_id, event, actor_issuer, actor_type, actor_id, occurred_at)
+        VALUES
+            (#{id}, #{objectId}, #{revisionId}, #{event}, #{actorIssuer}, #{actorType},
+             #{actorId}, #{occurredAt})
+    </insert>
+
+    <select id="countLifecycle" resultType="long">
+        SELECT count(*) FROM ainer_knowledge_lifecycle_event WHERE object_id = #{objectId}
+    </select>
+</mapper>

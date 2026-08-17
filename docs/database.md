@@ -113,6 +113,7 @@ GLOBAL binding 仅 SERVICE subject 持有（决策器强制）。
 | `ainer_authorization_subject_set_binding` | 集合绑定（ADR-0042 O2：set 三元组 + workspace 锚定；CHECK 禁 GLOBAL 且 scope.workspace = set.workspace；加性 migration V202608141000） |
 | `ainer_authorization_acting_grant` + `_permission` | 一层委托（ADR-0043 A1：principal→agent；permission 子表 FK 目录；GLOBAL 不可表达；decision audit 增 agent/grant 关联列；V202608150100） |
 | `ainer_ai_agent_definition` | Agent 定义注册表（ADR-0043 A1：code+version 唯一、ACTIVE/RETIRED；ai-runtime 所有，V202608150200） |
+| `ainer_knowledge_object` / `_revision` / `_revision_lineage` / `_source` / `_evidence` / `_lifecycle_event` | Knowledge Foundation（ADR-0044 K1/K2：不可变 Revision + SUPERSEDES lineage + asOf 精确解析 + append-only 生命周期；V202608150300） |
 
 Dictionary 审计 baseline（`V202608140200`，ADR-0040 管理面加固）：
 
