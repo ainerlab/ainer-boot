@@ -51,6 +51,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0041](0041-private-rc-supply-chain-and-immutable-release-baseline.md) | Accepted | 私有 RC 供应链、远端完整读回、项目签名 provenance 与不可变 GitHub Release 基线 |
 | [0042](0042-organization-directory-greenfield-baseline.md) | Accepted | 组织与员工目录 Greenfield 基线（取代 ADR-0032：Workspace 锚点 + 决策时实时解析撤销语义 + O1/O2 切片） |
 | [0043](0043-agent-delegation-greenfield-baseline.md) | Accepted | Agent 代行 Greenfield 基线（取代 ADR-0031：ActingGrant + 委托检查点实时解析 + A1 最小切片） |
+| [0044](0044-knowledge-foundation-implementation-baseline.md) | Accepted | Knowledge Foundation 实现基线（落实 ADR-0034：Greenfield 澄清 + K1 身份/版本 + K2 信任/生命周期两切片） |
 
 ## 历史草案与审查记录
 

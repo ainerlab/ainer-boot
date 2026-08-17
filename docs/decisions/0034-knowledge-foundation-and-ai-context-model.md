@@ -2,6 +2,10 @@
 
 ## Status
 
+> 实现注记（2026-08-15）：本文保持目标合同地位；首批实现切片（K1/K2）与 Greenfield 澄清见
+> [ADR-0044](0044-knowledge-foundation-implementation-baseline.md)。文中 3 处 tenant 表述按
+> ADR-0044 澄清为 Workspace 语义。
+
 - 状态：Proposed
 - 日期：2026-08-03
 - 决策者：Ainer 项目维护者
