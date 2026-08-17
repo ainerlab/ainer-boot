@@ -310,6 +310,21 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-17 G4 开篇：第二参考消费者 `python-learning-service` 接入
+- **定位**：`python-interactive-learning`（Angular/Pyodide 前端）的平台后端；Ainer 第二个
+  独立参考消费者（scaffold-design §13.5 登记，Java 制品消费，拒绝源码副本）。
+- **交付**：Initializer（本地 CLI jar）按 manifest v1 生成独立仓库（postgres 变体 +
+  learningEvidence 实体 + 自有 Maven Wrapper）；接入 GitHub Packages（env 注入认证）；**隔离
+  冷仓基线全部 0.1.0 制品远端解析，4/0/0/0**；Evidence 云端存档首切片——JWT 安全链
+  （learner 从 sub 绑定）、跨学员统一 404 不泄露存在性、append-only（无 update/delete）、
+  `learning.evidence.read/write` scope、`LEARNING.EVIDENCE.*` 错误码、V2 learner 归属列。
+- **验证**：隔离冷仓 8 tests / 0 failure / 0 error / 0 skipped（真实 PostgreSQL 18.3
+  Testcontainers；401/403/201/跨学员 404/422 矩阵）。至此双消费者并存：xq-platform-next
+  （0.1.0 升级链已闭环）+ python-learning-service（0.1.0 冷仓接入）。
+- **G4 剩余**：双消费者连续升级/回滚矩阵、HTTP/Java/schema/config 兼容检查、LTS/补丁
+  策略成文；Tutor（经 AI Runtime）属产品后续切片。
+
+
 2026-08-15 G3 第四切片：Knowledge Foundation K1/K2（ADR-0044，**G3 产品核心闭环整体完成**）
 - **范围**：ADR-0034 目标合同的首批实现切片。K1 身份与版本（KnowledgeObject 语义身份 +
   不可变 Revision + SUPERSEDES lineage + asOf 精确 pin）；K2 信任与生命周期（SourceRef/
