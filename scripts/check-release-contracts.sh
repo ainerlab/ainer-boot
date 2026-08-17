@@ -36,8 +36,8 @@ awk '
   END { exit invalid ? 1 : 0 }
 ' "$artifact_manifest" | sort >"$manifest_projects" \
   || fail "release artifact manifest contains an invalid row"
-[[ "$(wc -l <"$manifest_projects" | tr -d ' ')" == "25" ]] \
-  || fail "release artifact manifest must contain exactly 25 projects"
+[[ "$(wc -l <"$manifest_projects" | tr -d ' ')" == "26" ]] \
+  || fail "release artifact manifest must contain exactly 26 projects"
 [[ -z "$(cut -d' ' -f1 "$manifest_projects" | uniq -d)" ]] \
   || fail "release artifact manifest contains duplicate artifactIds"
 

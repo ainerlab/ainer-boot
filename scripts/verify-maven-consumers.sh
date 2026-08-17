@@ -107,8 +107,8 @@ if [[ "$artifact_source" == "local" ]]; then
     fi
   done < <(find "$installed_root" -type f -name '*.pom' ! -name '*-build.pom' -print0)
 
-  [[ "${#installed_poms[@]}" -eq 25 ]] \
-    || fail "expected 25 installed Ainer consumer POMs, found ${#installed_poms[@]}"
+  [[ "${#installed_poms[@]}" -eq 26 ]] \
+    || fail "expected 26 installed Ainer consumer POMs, found ${#installed_poms[@]}"
 
   # Ainer 的公开配置类（含 @ConfigurationProperties 的 library/module 制品）必须随 JAR
   # 生成 spring-configuration-metadata.json（ADR-0029 P0-3）。应用可执行 JAR（ainer-server、

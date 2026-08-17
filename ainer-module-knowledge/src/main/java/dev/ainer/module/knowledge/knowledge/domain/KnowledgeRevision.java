@@ -8,5 +8,6 @@ import java.util.UUID;
 public record KnowledgeRevision(
         UUID id, UUID objectId, long revisionNumber, String payloadMarkdown, String status,
         String createdByIssuer, String createdByType, String createdById, Instant createdAt,
+        java.time.Instant publishedAt,
         List<KnowledgeSource> sources, List<KnowledgeEvidence> evidence) {
 }

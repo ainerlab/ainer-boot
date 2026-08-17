@@ -24,6 +24,7 @@ CREATE TABLE ainer_knowledge_revision (
     created_by_type VARCHAR(16) NOT NULL,
     created_by_id VARCHAR(128) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
+    published_at TIMESTAMPTZ,
     CONSTRAINT ck_ainer_knowledge_revision_id_v7 CHECK (uuid_extract_version(id) = 7),
     CONSTRAINT ck_ainer_knowledge_revision_status
         CHECK (status IN ('PROPOSED', 'PUBLISHED', 'RETIRED')),

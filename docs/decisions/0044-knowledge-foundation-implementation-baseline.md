@@ -49,9 +49,13 @@ Context Assembly 分层），并要求「另立实现 ADR」。本文即实现 A
 
 ## 验收
 
-- 交付时追加：Revision 不可变（无更新路径）、supersede 产生新 Revision+lineage、asOf 解析
-  返回精确 pin、SERVICE propose 允许而 publish 拒绝、未发布 Revision 对 read 解析不可见、
-  lifecycle 事件 append-only 断言、真 JWT HTTP（401/403/201/409/422）。
+- **K1/K2（2026-08-15）已交付并验证**：`ainer-module-knowledge`（第 26 个 reactor 模块），
+  migration `V202608150300` 从空库重放。真 JWT HTTP 5 项全绿（0 skipped）：SERVICE 可提案
+  （PROPOSED，createdByType=SERVICE）而**发布 403 `AINER.KNOWLEDGE.PUBLISH_REQUIRES_HUMAN`**
+  （不变式 #9）；人工发布 200、重复发布 409；未发布 Revision 对 asOf 解析 404 不可见；
+  supersede 产生新 Revision + SUPERSEDES lineage；asOf 精确 pin（v1 发布后 +1µs → v1，
+  -1µs → 404）；生命周期事件 append-only 计数断言；kind 非 namespaced 422。
+  负载列无更新路径（仅 status/published_at 投影经 markPublished 单向转移）。
 
 ## 参考
 

@@ -6,6 +6,7 @@ import dev.ainer.module.ai.agent.AiAgentModuleConfiguration;
 import dev.ainer.module.config.ConfigModuleConfiguration;
 import dev.ainer.module.dictionary.DictionaryModuleConfiguration;
 import dev.ainer.module.file.FileModuleConfiguration;
+import dev.ainer.module.knowledge.KnowledgeModuleConfiguration;
 import dev.ainer.module.organization.OrganizationModuleConfiguration;
 import dev.ainer.module.notification.NotificationModuleConfiguration;
 import dev.ainer.module.workspace.WorkspaceModuleConfiguration;
@@ -21,7 +22,8 @@ import org.springframework.context.annotation.Import;
         NotificationModuleConfiguration.class,
         FileModuleConfiguration.class,
         OrganizationModuleConfiguration.class,
-        AiAgentModuleConfiguration.class})
+        AiAgentModuleConfiguration.class,
+        KnowledgeModuleConfiguration.class})
 public class AinerServerApplication {
 
     public static void main(String[] args) {
