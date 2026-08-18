@@ -52,6 +52,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0042](0042-organization-directory-greenfield-baseline.md) | Accepted | 组织与员工目录 Greenfield 基线（取代 ADR-0032：Workspace 锚点 + 决策时实时解析撤销语义 + O1/O2 切片） |
 | [0043](0043-agent-delegation-greenfield-baseline.md) | Accepted | Agent 代行 Greenfield 基线（取代 ADR-0031：ActingGrant + 委托检查点实时解析 + A1 最小切片） |
 | [0044](0044-knowledge-foundation-implementation-baseline.md) | Accepted | Knowledge Foundation 实现基线（落实 ADR-0034：Greenfield 澄清 + K1 身份/版本 + K2 信任/生命周期两切片） |
+| [0045](0045-versioning-lts-and-patch-baseline.md) | Accepted | 版本策略、LTS 与补丁支持基线（相邻 minor 升级 + 一级回滚窗口 + patch 规则 + 兼容检查落地形态；v0.2.0 双消费者矩阵为首批证据） |
 
 ## 历史草案与审查记录
 
