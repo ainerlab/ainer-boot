@@ -6,6 +6,44 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 当前无尚未归入版本的用户可见变化。
 
+## [0.2.0] - 2026-08-17
+
+ADR-0040 G3（产品核心闭环）四个切片全部落地后的次版本。**全部为加性变更**：已发布 API、
+SPI 签名与 migration 不变（旧构造器保留、`BindingResolver.liveSetBindings` 为 default 方法、
+migration 只追加），是对 1.x 兼容承诺的首次真实验证。
+
+### Added
+
+- **组织目录模块 `ainer-module-organization`（第 25 个模块）**：ADR-0042 取代 ADR-0032
+  （Workspace 锚点 + 决策时实时解析撤销语义）。O1：Unit/Engagement/Assignment/Position
+  基线（btree_gist 任职期不重叠、复合 FK、调岗单事务）+ 管理 API `/api/organization/**`；
+  O2：`workforce.position#assignee` 成员解析器——**撤岗即失权**（岗位集合绑定 + 终止任职
+  后下一次决策立即 DENY）。
+- **SubjectSet 授权（ADR-0042 O2）**：决策引擎集合授予路径（`SubjectSetMembershipRegistry`
+  端口，产品提供解析器）；`ainer_authorization_subject_set_binding` 加性 migration；管理 API
+  `/api/authorization/set-bindings/**`；创建防提权矩阵（GLOBAL/system-only/HIGH 拒绝、
+  set↔scope Workspace 一致、自成员拒绝）。
+- **Agent 代行 A1（ADR-0043 取代 ADR-0031）**：`ActingGrant` 一层委托（签发防扩权：
+  agentDelegable ∧ principal live 子集 ∧ scope 覆盖）+ 委托检查点实时解析（Agent 退役/
+  权限收缩/撤委托下一次检查即拒）+ 管理 API `/api/authorization/acting-grants/**`；
+  ai-runtime 独立 `AiAgentModuleConfiguration` + Agent 定义注册表 `/api/ai/agents`。
+- **Knowledge Foundation K1/K2（ADR-0044，第 26 个模块）**：不可变 Revision + SUPERSEDES
+  lineage + asOf 精确解析（未发布不可见）+ 人工发布门禁（SERVICE/AI 可提案、发布一律 403）
+  + append-only 生命周期事件；管理 API `/api/knowledge/**`。
+- 决策审计新增 agent/grant 可空关联列（加性 ALTER）。
+
+### Fixed
+
+- **timestamptz 微秒精度缺陷（组织模块）**：Linux JDK 纳秒时钟 + PostgreSQL 微秒截断使
+  客户端纳秒时间戳在子分配包含性比较中漂移 <1µs 触发 422；全部时间入口统一
+  `truncatedTo(MICROS)`（macOS 本地时钟无法复现，仅 CI 暴露）。
+
+### 边界
+
+- 授权 A2–A4（Capability catalog/Context 授权/Tool 检查点/Token Exchange）与 Knowledge
+  Phase 2–4（索引/Context Assembly/OKF）按需推进；本版本不含。制品规模 26 projects /
+  122 primary。
+
 ## [0.1.0] - 2026-08-14
 
 第一个稳定 `0.1` 基线：包含 ADR-0040 G1 全部硬化与 G2 消费者证据闭环。相对
