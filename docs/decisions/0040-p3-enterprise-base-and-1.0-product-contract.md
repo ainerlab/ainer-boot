@@ -93,6 +93,35 @@ ADR-0038 初版将企业基建模块（通知/任务/缓存）设为「端口+�
 - 通知日志不记录 recipient/title/body 原文（PII 脱敏）
 - 持久化 ID 统一 UUIDv7（时间有序，零 `UUID.randomUUID()`）
 
+## 验收记录（2026-08-18：G0–G4 全部关闭，1.0 产品合同核对）
+
+**Stable 清单逐项核对**（模块 → 证据）：
+
+| 合同项 | 证据 |
+|---|---|
+| Framework：core/spring/security/web/persistence/security/cache/test-support | 8 个框架模块全部发布于 26-project 制品链；cache 见 ADR-0039 |
+| Identity：HumanAccount/ServicePrincipal/Credential/Passkey | Greenfield foundation（ADR-0033）+ Authorization Server Passkey 全链（ceremony/恢复/条件 MFA） |
+| Workspace：membership 治理 + OWNER 转移 + 审计热/归档 | M4.8C + 归档/热冷查询/SIEM 游标 |
+| Authorization：ADR-0037 混合授权 + adapter + 审计 + 防提权 | 授权模块 + ADR-0042 O2 SubjectSet + ADR-0043 A1（均加性） |
+| AI Runtime：网关 + SSE + 预算 + 费用审计 | ai-runtime（另含 ADR-0043 Agent 注册表，Incubating） |
+| Dictionary/Config/Notification/FileStorage | P3 四模块 + G1 管理 API/错误码/scope/审计 |
+| Initializer：manifest v1 + CRUD 模板 | ADR-0035/0036；rc.3 起生成项目自带 Wrapper；双消费者均由其生成 |
+| Docker Compose 开发环境 | docker-compose + 双库初始化 + dev 密钥脚本 |
+| HTTP 统一响应 + 真实状态码 + 稳定错误码 | GlobalExceptionHandler；全部模块真 JWT HTTP 测试矩阵 |
+| 真实签名 JWT 端到端安全链 | JwtTestSupport + 各模块 HTTP 测试；双消费者独立复刻同链 |
+| Spring Cache 抽象（Caffeine/Redis 可选） | ADR-0039 + ainer-starter-cache |
+| AES-GCM secret 加密 | AesGcmEncryptor + ConfigEncryptionPort（ADR-0040 §安全） |
+| UUIDv7 持久化身份 | G1 全域迁移，持久化路径零 `UUID.randomUUID()`，CI 断言 |
+
+**Incubating 清单状态**：组织目录（ADR-0042 O1/O2 已交付，O3 按需）、Agent 代行（ADR-0043
+A1 已交付，A2–A4 按需）、Knowledge Foundation（ADR-0044 K1/K2 已交付，Phase 2–4 按需）
+——三者均按各自 ADR 声明为 incubating API。任务调度（P4）**未建设**，不包含在 1.0 制品中。
+
+**G4 门禁证据**：双消费者（xq-platform-next 链 `rc.2→rc.3→0.1.0→0.2.0` 含回滚 +
+python-learning-service `0.1.0→0.2.0`）、兼容检查（ADR-0045 §4：双消费者全绿 = HTTP/Java、
+migration 重放 = schema、配置元数据 = config）、LTS/补丁策略（ADR-0045 + ADR-0046）。
+1.0.0 自 0.2.0 起零代码差异（纯合同定稿发布），消费者升级矩阵在发布后同轮执行。
+
 ## 参考
 
 - [ADR-0038（被取代）](0038-p4-scope-refinement-and-enterprise-base.md)
