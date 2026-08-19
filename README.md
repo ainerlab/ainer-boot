@@ -39,7 +39,9 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 LTS 线（ADR-0045/0046）。双参考消费者并存：`xq-platform-next`（`rc.2 → rc.3 → 0.1.0 →
 0.2.0` 含回滚）与 `python-learning-service`（`0.1.0 → 0.2.0` 冷仓接入 + Evidence 存档切片）。
 [`v0.2.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v0.2.0) 及更早版本保持不可变，
-作为升级链历史。动态门禁只以 [`docs/project-status.md`](docs/project-status.md) 为准。
+作为升级链历史。完整产品说明（能力域、合同、质量模型与快速开始）见
+[`docs/ainer-boot-1.0-product.md`](docs/ainer-boot-1.0-product.md)；动态门禁只以
+[`docs/project-status.md`](docs/project-status.md) 为准。
 
 ## 架构立场
 

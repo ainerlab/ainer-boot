@@ -92,6 +92,7 @@ ainer-initializer-cli                 P2 离线 CLI：preview / init / diff
 | 文档类型 | 回答的问题 | 权威文档 | 更新方式 |
 |---|---|---|---|
 | 产品入口 | Ainer 是什么，如何快速运行 | [`../README.md`](../README.md) | 用户可见能力变化时更新 |
+| 1.0 产品说明 | 1.0 合同快照：能力域、合同、质量模型、版本支持与快速开始 | [`ainer-boot-1.0-product.md`](ainer-boot-1.0-product.md) | 1.0 快照不滚动；能力变化走 CHANGELOG |
 | 当前状态 | 现在完成了什么、验证结果和缺口是什么 | [`project-status.md`](project-status.md) | 每个里程碑、发布候选或风险变化时更新 |
 | 长期规范 | 以后应当如何设计和实现 | `architecture.md`、`conventions.md` 等 | 代码与规范同一变更 |
 | ADR | 为什么选择这个不可轻易逆转的方案 | [`decisions/README.md`](decisions/README.md) | 接受后不改写结论，以新 ADR 取代 |
@@ -232,6 +233,7 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 | 文档 | 作用 |
 |---|---|
 | [`project-status.md`](project-status.md) | 当前阶段、完成项、验证记录、缺口和下一步 |
+| [`ainer-boot-1.0-product.md`](ainer-boot-1.0-product.md) | 1.0 产品说明（合同快照：六大能力域、Stable/Incubating、质量与信任模型、LTS、参考消费者、快速开始） |
 | [`architecture.md`](architecture.md) | 模块、依赖、发行物、运行模式和数据所有权 |
 | [`design/paradigm-redesign.md`](design/paradigm-redesign.md) | 为什么不沿用旧脚手架范式 |
 | [`design/ainer-scaffold-design.md`](design/ainer-scaffold-design.md) | Ainer Boot 产品定位、竞品能力矩阵、P0–P5 路线与长期架构设计 |
