@@ -41,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         classes = WorkspaceModuleIntegrationTest.TestApplication.class,
         properties = {
                 "ainer.workspace.enabled=true",
+                "ainer.workspace.test-module-integration=true",
                 "mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml",
                 "spring.main.banner-mode=off"
         })
@@ -126,6 +127,8 @@ class WorkspaceModuleIntegrationTest {
     }
 
     @TestConfiguration(proxyBeanMethods = false)
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+            name = "ainer.workspace.test-module-integration", havingValue = "true")
     static class TestSecurityConfiguration {
         @Bean
         AuthenticatedPrincipalResolver authenticatedPrincipalResolver() {

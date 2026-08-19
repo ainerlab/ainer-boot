@@ -136,6 +136,7 @@ jobs:
       - name: Install Ainer artifacts to local repository
         run: ./mvnw --batch-mode --no-transfer-progress -DskipTests -Dgpg.skip=true install
       - name: Install ApacheBench
+        timeout-minutes: 5
         run: sudo apt-get update && sudo apt-get install -y apache2-utils
       - name: Run platform vs virtual thread matrix
         run: ./scripts/measure-virtual-threads.sh -n 2000 -c 40 -d "$RUNNER_TEMP/vt-matrix"
