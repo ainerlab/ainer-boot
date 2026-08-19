@@ -1278,12 +1278,10 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
   `resourceType=request`；`AuthorizationTargetResolver`、DecisionObligationExecutor、RFC 9470 challenge
   和方法级 AOP 未实现。高价值写与资源 ownership 必须继续在 application service 显式授权；远端
   不可变制品、Ainer Admin、外部产品关系/字段投影和生产撤权 SLA 尚未验收；
-- 组织与员工目录当前只有 ADR-0032 和详细方案；`ainer-module-organization`、OrgUnit、
-  WorkforceEngagement、Position/Assignment、SubjectSetBinding、管理 API 和 XQ 岗位纵向切片均未
-  实现。普通 tenant 成员角色变更/移除还没有完整写入 access-event outbox，Identity 已定义的
-  role-changed 事件与 Workspace consumer 合同也不兼容；在修复并验证 Token 失效、Workspace 撤销、
-  workforce-derived grant 撤销三条独立语义前，不能承诺调岗/离职即时失权；当前 subject-scoped
-  access event 也不能表达 tenant-wide disable，需补 tenant epoch/event 或等价在线门禁；
+- 组织与员工目录已按 ADR-0042 交付（O1 目录基线 + O2 SubjectSet，撤岗即失权端到端验证；
+  详细方案中 pre-Greenfield 的 access-event 前置矩阵已被决策时实时解析取代）。Team/
+  UnitLeadership/ReportingLine/子树 SubjectSet/SCIM 属 O3 按需追加；授权 A2–A4（Capability
+  catalog/Context 授权/Tool 检查点/Token Exchange）与 Knowledge Phase 2–4 同属按需；
 - 选择性在线校验只覆盖配置的高风险 API；普通低风险自包含 JWT 仍有自然到期窗口；
 - Authorization Server 已成为高风险 API 在线依赖；受保护 exporter 与独立 metrics/introspection 凭据创建基线已有代码，但尚未完成生产高可用、容量、旧凭据退役、真实 Prometheus、dashboard 与告警；
 - 重放与 OWNER 恢复已做服务 `sub` 分离，但生产 IAM 仍需证明凭据由不同人员/职责保管；
@@ -1402,28 +1400,19 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 
 ## 5. 下一里程碑
 
-`0.1` 主线按以下顺序推进：
+**1.0 后路线：消费驱动**（G0–G4 已关闭；`0.1` 主线历史序列已全部完成并存档于 §3 与
+CHANGELOG：rc.2/rc.3 → 0.1.0 → 0.2.0（G3 四切片）→ 1.0.0（合同定稿），双消费者矩阵见 §3）。
 
-1. `v0.1.0-rc.2` 已完成默认分支 CI、annotated tag、107/107 远端验签、空仓消费者、签名证据和
-   immutable GitHub Release；该合格受控 RC 保留为升级/回滚的已发布起点，不覆盖或移动；
-2. `v0.1.0-rc.3` 已完成 338/0/0/0、107/107 远端验签、Maven 3/4 与自带 Wrapper 的远端
-   Initializer 消费、签名证据和 immutable GitHub Release；该版本是当前最终消费目标，不覆盖或移动；
-3. ✅（2026-08-14）`xq-platform-next` 已删除 `0.1.0-SNAPSHOT` 与本地仓库依赖，固定从远端
-   `rc.3` 消费，并以 `rc.2` 为起点完成升级、回滚、JWT、Workspace/资源授权、PostgreSQL
-   migration replay、真实 HTTP 错误和客户端 SDK 的产品纵向切片（详见 §3）；
-4. ✅（2026-08-14）`v0.1.0` 已发布（dev merge `ccd5097` + release run `31785695252` 全绿），
-   走 rc.2/rc.3 同一完整发布门禁：annotated tag、签名 deploy、112/112 远端读回验签、
-   空仓消费者、Initializer 三通道、SBOM/provenance 与 immutable Release（16 个签名证据资产）；
-5. ✅（2026-08-14）`xq-platform-next` 完成 `rc.3 → 0.1.0` 真实升级验证（新隔离冷仓，0.1.0
-   制品全部远端解析，14 tests / 0 skipped），首个连续升级链 `rc.2 → rc.3 → 0.1.0` 全绿；
-   后续兼容性或发布链问题使用新的 `0.1.1`/`0.2.0` 修复，不移动 tag、不覆盖制品；
-6. **G2 已关闭**。进入 G3（产品核心闭环：最小 Agent/Tool/Context/Evaluation 治理、组织目录
-   Greenfield 重述（ADR-0032 有 37 处 tenant 依赖需取代性重述）、Knowledge 两个语义切片）；
-   `python-learning-service` 保持版本化 BOM/Starter 接入，不绑定开发分支、不复制源码。
-
-Identity、安全与运维纵深继续修复明确的 P0/P1/P3 风险，但方法级授权、组织目录、真实设备矩阵、
-多实例容量、外部不可变审计和商业 entitlement 不再作为首个受控 RC 的无限前置。任何部署若实际
-依赖这些能力，必须在对应产品发布门禁中单独补齐，不能借用 `0.1` 工程测试替代生产证据。
+1. **1.0.x 补丁线**（ADR-0045/0046）：OpenAPI 运行时文档兼容性验证（Boot 4.1 springdoc，
+  当前最大诚实缺口——消费者在手写 OpenAPI）；消费者使用中暴露的缺陷按 patch 规则修复；
+  分支保护治理小决策（GitHub Pro 或转 public）。
+2. **消费者拉动的能力演进**（构成 1.1.0 内容，不预建）：pil 的 Tutor → AI Runtime 凭据
+  托管/A2 最小 Context 授权；xq 的 VS1 业务切片 → 组织目录 O2 真实消费 + XA Access Model；
+  RAG 真实需求出现时再启 Knowledge Phase 2；A4 Token Exchange 只在真实跨服务边界出现后。
+3. **Incubating → Stable 晋升**：组织目录/Agent 代行经第二个消费者兼容验证后评估（各自
+  ADR 声明的条件）；Knowledge 保持更久。
+4. **发行决策（需负责人拍板，不阻塞）**：公开发行/开源（LICENSE/NOTICE、品牌资产、密钥
+   历史审计）与 Studio 定位。
 
 ## 6. 更新规则
 

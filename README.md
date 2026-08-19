@@ -9,8 +9,9 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 多标杆能力矩阵和 P0–P5 路线见
 [Ainer Boot 产品定位、竞品能力矩阵与路线图](docs/design/ainer-scaffold-design.md)。
 
-品牌与活动技术标识现已统一为 Ainer，计划开源的脚手架产品名为 **Ainer Boot**。当前 `0.1`
-仍处于私有、专有的发布候选准备期，不等同于已经完成开源许可或公开发行。正式决策、产品命名、
+品牌与活动技术标识现已统一为 Ainer，脚手架产品名为 **Ainer Boot**。`v1.0.0` 已发布
+（工程合同定稿，见 [`docs/ainer-boot-1.0-product.md`](docs/ainer-boot-1.0-product.md)）；
+仓库仍为私有、专有，公开发行/开源许可决策未做，正式决策、产品命名、
 域名状态、目标标识和迁移记录见 [ADR-0004：Ainer 品牌与技术命名基线](docs/decisions/0004-ainer-brand-and-naming-baseline.md)。
 
 ## 当前可用能力
@@ -28,7 +29,11 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 | `ainer-module-workspace` | ✅ | Workspace 资源、ACTIVE membership、OWNER 专用转移与授权审计热/归档契约 |
 | `ainer-module-ai-runtime` | ✅ | OpenAI-compatible 网关、SSE、策略、预算与用量/费用审计 |
 | `ainer-module-authorization` | ✅ 工程基线 | ADR-0037 Workspace 语义的 RBAC+ReBAC+ABAC 决策器、PostgreSQL Binding/审计、管理 API、类型化集合查询，以及真实 JWT 下由 MVC 拦截器执行的 `@AinerAuthorize` 端点粗粒度门禁；资源 target resolver、obligation executor 与方法级 AOP 仍属后续 |
-| `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、Workspace、AI Runtime 与 Authorization 装配 |
+| `ainer-starter-cache` | ✅ | Spring Cache 抽象（Caffeine 默认 / Redis 可选）与分布式锁（ADR-0039） |
+| `ainer-module-dictionary` / `ainer-module-config` / `ainer-module-notification` / `ainer-module-file` | ✅ | P3 企业基座四件套：管理 API、稳定错误码、scope、同事务审计（通知默认为日志发送器，真实渠道经 `ChannelSender` SPI 由产品实现） |
+| `ainer-module-organization` | ✅ Incubating | 组织目录：Unit/任职/分配/岗位 + `workforce.position#assignee` 成员解析（撤岗即失权，ADR-0042） |
+| `ainer-module-knowledge` | ✅ Incubating | Knowledge Foundation：不可变 Revision + SUPERSEDES 血缘 + 人工发布门禁（ADR-0044） |
+| `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、Workspace、AI Runtime、Authorization、P3 与 Incubating 模块装配 |
 | `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、typed token profile、RFC 7662/7009 与受审计 JDBC 协议仓库 |
 
 当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
