@@ -1,0 +1,179 @@
+# Ainer Boot 1.0 产品说明
+
+> 文档类型：产品说明（1.0 时间点快照） · 版本：`v1.0.0`（2026-08-18） · 状态：已发布
+> 维护协议：本文件描述 1.0 合同快照，不随主线滚动更新；能力变化以
+> [`CHANGELOG.md`](../CHANGELOG.md) 与 [`project-status.md`](project-status.md) 为准。
+
+## 1. 一句话定位
+
+**Ainer Boot**（AI-Native Extensible Runtime Boot）是一个 **AI 原生、但不局限于 AI** 的
+通用企业 Java 脚手架与运行基线：JDK 25 + Spring Boot 4.1 + PostgreSQL 18 的模块化单体，
+自带可信的身份、授权、工作区治理、AI 模型网关与企业基座，让产品团队从「第一个业务提交」
+开始，而不是从「搭后台」开始。
+
+## 2. 解决什么问题
+
+传统 Java 脚手架给一个「能跑的后台」，但产品团队真正要付的代价在后面：
+
+| 常见脚手架的隐性成本 | Ainer Boot 1.0 的回答 |
+|---|---|
+| 登录/权限是演示级的，上生产前要重写 | 独立 OAuth 2.1/OIDC Authorization Server、Passkey、真 JWT 端到端安全链 |
+| `user.dept_id + role + data_scope` 表达不了真实组织与多任职 | Workspace 成员治理 + ADR-0037 混合授权（RBAC+ReBAC+ABAC）+ 组织目录与岗位集合绑定（撤岗即失权） |
+| 错误码、响应信封、分页各自为政 | 统一 `ApiResponse` 信封、真实 HTTP 状态码、`AINER.*` 稳定错误码、`X-Request-Id` 全响应追踪 |
+| 数据库方言混用，测试靠 H2 自欺 | PostgreSQL 18 唯一基线；集成测试全量真实库重放，CI 强制 **0 skipped** |
+| AI 能力是「再加一个 SDK」 | 治理式模型网关：预算/限流/Token 费用审计/脱敏，调用必经网关 |
+| 升级靠玄学 | 版本化制品 + 签名供应链 + 相邻 minor 升级/一级回滚窗口 + 双参考消费者真实矩阵 |
+| 从脚手架到「我的项目」要改一百处 | Project Initializer：manifest v1 确定性生成，自带 Wrapper/测试/部署基线 |
+
+## 3. 产品全景（六大能力域）
+
+### A. 现代运行基座（Stable）
+
+- JDK 25、Spring Boot 4.1、PostgreSQL 18 唯一业务数据库基线（不保留方言兼容层）
+- Maven 4 生产构建 + Maven 3.9 消费者兼容双通道；虚拟线程默认启用（压测决策记录在案）
+- 模块化单体默认交付；按需服务化（`monolith|service` 只切适配器，不改拓扑/事务边界）
+- Docker Compose 一键开发环境（双库 + 密钥脚本 + 全栈 profile）
+
+### B. 安全身份底座（Stable）
+
+- 独立 OAuth 2.1/OIDC Authorization Server：Authorization Code + PKCE、Client Credentials、
+  RFC 7662 introspection、RFC 7009 revocation
+- Identity foundation：HumanAccount / ServicePrincipal / Credential（密码 / Passkey /
+  OIDC subject），typed token profile（`USER_NEUTRAL_V1` / `SERVICE_V1`）+ `sec_epoch`
+  在线撤销比对
+- Resource Server：真 JWT 端到端链、高风险路径在线校验失败关闭、step-up 强认证策略
+- 全部模块与两个参考消费者的 HTTP 测试都跑在真 RSA 签名 JWT 上，无 stub
+
+### C. 工作区与治理（Stable）
+
+- Workspace membership 资源边界（OWNER/ADMIN/MEMBER），OWNER 专用锁定事务转移，无
+  OWNER 双人恢复
+- 授权审计热表 + 同库归档、稳定游标 SIEM 拉取
+
+### D. 通用授权（Stable + Incubating）
+
+- **Stable**：ADR-0037 混合授权——Permission/Role/Binding、结构化 Scope
+  （Workspace/Resource/Global）、Spring Security adapter、管理 API、防提权矩阵、决策审计、
+  类型化集合查询计划（授权约束下推为参数化 SQL）；**SubjectSet 集合绑定**（首个集合族
+  `workforce.position#assignee`：岗位在岗者获得授权，终止任职下一次决策立即拒绝）
+- **Incubating**：组织目录（部门/任职/调岗/岗位，含调岗单事务与任职期不重叠约束）、
+  Agent 代行 A1（一层委托 + 委托检查点实时解析：Agent 退役/权限收缩/撤委托即拒）
+
+### E. AI 运行时（Stable + Incubating）
+
+- **Stable**：模型网关（OpenAI-compatible 非流式/SSE）、模型白名单、限流、预算、
+  Token/费用/耗时/策略决策审计；供应商错误与 API key 不进客户端/日志
+- **Incubating**：Agent 定义注册表（code+version、退役即失权）
+
+### F. 企业基座与知识（Stable + Incubating）
+
+- **Stable（P3 四件套）**：文件存储（上传/下载/删除、SHA-256、大小/类型限制、补偿与
+  审计）、字典（树形/多语言/缓存）、配置（类型安全/热更新/版本史/AES-GCM secret 加密）、
+  通知（多渠道/模板/SKIP LOCKED 队列/指数退避）；Spring Cache 抽象（Caffeine 默认、
+  Redis 可选）与分布式锁
+- **Incubating**：Knowledge Foundation K1/K2——不可变知识 Revision + SUPERSEDES 血缘 +
+  asOf 精确解析；**发布是人工门禁**（AI 只能提案，SERVICE 调用发布端点一律 403）
+
+### G. 开发者工具链（Stable）
+
+- **Project Initializer**：manifest v1 声明式生成独立项目（确定性：同 manifest 两轮生成
+  字节一致）、CRUD 模板、生成项目自带锁定版 Maven Wrapper；两个参考消费者均由它生成
+- `ainer-test-support`：真 JWT 夹具（JwtTestSupport）、TestRestClient 封装、PostgreSQL
+  容器基座
+- 发布供应链：GPG 签名制品、SBOM、项目签名 provenance、远端全量读回验签、不可变
+  GitHub Release（每次发布 122/122 主制品逐一带签名读回）
+
+## 4. 1.0 产品合同
+
+**Stable（1.x 内保持兼容：HTTP API 路径与响应结构、`AINER.*` 错误码、SPI 签名、migration
+只向前追加）**——13 项逐项核对与证据见
+[ADR-0040 验收记录](decisions/0040-p3-enterprise-base-and-1.0-product-contract.md)：
+框架 8 模块、Identity、Workspace、Authorization、AI Runtime、P3 四件套、Initializer、
+Docker Compose、HTTP 契约、JWT 安全链、Cache 抽象、AES-GCM、UUIDv7 持久化身份。
+
+**Incubating（可用，不承诺 API 稳定）**：组织目录（O1/O2 已交付）、Agent 代行（A1 已
+交付）、Knowledge（K1/K2 已交付）；任务调度（P4）未建设。
+
+**非目标（1.0 明确不做）**：消息中间件（Kafka/RocketMQ 等，触发条件未满足）、菜单/前端
+route 权限引擎、商业连接器、前端管理面（Ainer Studio 是独立产品）、多数据源/分库分表、
+Spring Cloud 全家桶。完整清单见 ADR-0040。
+
+## 5. 质量与信任模型
+
+- **测试真实性**：集成测试全部真实 PostgreSQL 18 Testcontainers、真签名 JWT、CI 强制
+  0 skipped（405 项测试；发布 run 同标准重跑）
+- **兼容承诺的验证方式**：不是声明而是证据——两个独立参考消费者（不同业务域）在每次
+  minor 发布上全量测试 + 升级/回滚矩阵；schema 兼容靠空库 migration 全量重放；config
+  兼容靠配置元数据契约进消费者门禁
+- **供应链**：annotated tag 与源码/默认分支三方一致才可发布；目标版本已存在即失败；
+  发布后全量制品读回验签 + immutable Release 读回断言
+
+## 6. 版本与支持
+
+- `1.0.x` 是**首个 LTS 线**：接收缺陷/安全补丁（零 API/配置/schema 变化），自 `1.1.0`
+  发布起再支持一个 minor 周期（ADR-0045/0046）
+- 官方支持**相邻 minor 升级 + 一级回滚**（N+1 → N 为有效回滚终点）；每个 minor 的发布
+  证据必须包含至少一个真实消费者全量通过
+- 首条完整证据链：`rc.2 → rc.3 → 0.1.0 → 0.2.0 → 1.0.0`，每级升级与回滚终点均由
+  消费者验证并留档
+
+## 7. 生态与参考消费者
+
+| 消费者 | 域 | 接入方式 | 证据 |
+|---|---|---|---|
+| `xq-platform-next` | 翡翠行业信息与协作网络（xq-zhiwu / xq-shop-next 共同后台） | Initializer 生成 + 远端制品固定版本 | 完整升级链至 1.0.0 含回滚；JWT/授权/migration/SDK 纵向切片 |
+| `python-learning-service` | Python 交互式学习产品的平台后端 | Initializer 生成 + 远端制品固定版本 | 0.1.0 冷仓接入 → 1.0.0；Evidence 存档切片（learner JWT 归属隔离） |
+
+新消费者接入只允许「版本化制品升级」（BOM + Starter 固定版本），拒绝源码副本与开发分支
+依赖（scaffold-design §13.5）。
+
+## 8. 快速开始
+
+**路径一：生成一个新项目**（推荐起点）
+
+```bash
+# 用 Initializer CLI（制品带 cli classifier）按 manifest v1 生成：
+java -jar ainer-initializer-cli.jar init manifest.yaml my-product/
+cd my-product && ./mvnw verify   # 生成项目自带锁定版 Wrapper 与真实 PG 测试
+```
+
+**路径二：既有项目消费制品**
+
+```xml
+<dependencyManagement>
+  <dependencies>
+    <dependency>
+      <groupId>dev.ainer</groupId>
+      <artifactId>ainer-dependencies</artifactId>
+      <version>1.0.0</version>
+      <type>pom</type>
+      <scope>import</scope>
+    </dependency>
+  </dependencies>
+</dependencyManagement>
+```
+
+私有 GitHub Packages 认证经环境变量注入（见各消费者仓库的 `.mvn/github-packages-settings.xml`
+模板模式：零密钥入库）。
+
+**运行本地全栈**：`docker compose up -d`（PostgreSQL 双库）→ 按需启动 Authorization
+Server 与业务 Server。
+
+## 9. 边界与许可
+
+- 1.0.0 是**工程合同定稿**，不是公开发行/开源/生产就绪声明；许可状态为私有/专有，
+  公开发行前需另行完成 LICENSE/NOTICE、品牌资产与对外许可决策（ADR-0040）
+- 文档示例不含真实密钥/客户数据/prompt 正文；生产高可用、容量与告警需按产品部署单独
+  完成——本产品交付的是可验证的工程基线，不是托管服务
+
+## 10. 深入阅读
+
+| 想了解 | 读 |
+|---|---|
+| 当前状态、验证记录与缺口 | [`project-status.md`](project-status.md) |
+| 架构、模块与数据所有权 | [`architecture.md`](architecture.md) |
+| 产品路线与竞品能力矩阵 | [`design/ainer-scaffold-design.md`](design/ainer-scaffold-design.md) |
+| 为什么这样设计（决策链） | [`decisions/README.md`](decisions/README.md)（ADR-0033 Greenfield、0037 授权、0040 合同、0041 供应链、0042–0044 G3 三域、0045/0046 版本与 LTS） |
+| HTTP/API 契约 | [`api.md`](api.md) |
+| 数据库规范 | [`database.md`](database.md)、[`database-design-standard.md`](database-design-standard.md) |
+| 如何贡献/协作 | [`../AGENTS.md`](../AGENTS.md) |
