@@ -263,11 +263,20 @@ class AiGatewayModuleIntegrationTest {
                 "test/model", "test/model", false, "a".repeat(64), reservation, clock.instant());
     }
 
+    /** 测试 RSA key：与 FakeProviderConfiguration.testJwtDecoder 同源。 */
+    static final com.nimbusds.jose.jwk.RSAKey HTTP_RSA_JWK =
+            dev.ainer.testsupport.jwt.JwtTestSupport.generateRsaKey();
+
+    private static String userJwt(String subjectId) {
+        return dev.ainer.testsupport.jwt.JwtTestSupport.signUserJwt(
+                HTTP_RSA_JWK, "https://auth.ainer.test", "ainer-api", subjectId, "ai.invoke");
+    }
+
     private HttpResponse<String> post(String path, String tenantId, String body) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:" + port + path))
                 .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + tenantId)
+                .header("Authorization", "Bearer " + userJwt(tenantId))
                 .header(RequestIds.HEADER, "request-" + UUID.randomUUID())
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();
@@ -277,7 +286,7 @@ class AiGatewayModuleIntegrationTest {
     private HttpResponse<String> get(String path, String tenantId) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:" + port + path))
-                .header("Authorization", "Bearer " + tenantId)
+                .header("Authorization", "Bearer " + userJwt(tenantId))
                 .GET()
                 .build();
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -414,22 +423,11 @@ class AiGatewayModuleIntegrationTest {
                             + "\"summary\":\"优先发布教程类内容\"}]");
         }
 
+        /** 真链：RSA 验签 + issuer 校验（JwtTestSupport），替代按 token 字符串直接构造的 stub。 */
         @Bean
         JwtDecoder testJwtDecoder() {
-            return token -> Jwt.withTokenValue(token)
-                    .header("alg", "RS256")
-                    .issuer("https://auth.ainer.test")
-                    .audience(List.of("ainer-api"))
-                    .subject("subject:" + token)
-                    .claim("token_profile", "USER_NEUTRAL_V1")
-                    .claim("claim_contract_version", "1")
-                    .claim("actor_type", "USER")
-                    .claim("scope", "ai.invoke")
-                    .claim("amr", "pwd")
-                    .claim("sec_epoch", 0L)
-                    .issuedAt(Instant.now().minusSeconds(5))
-                    .expiresAt(Instant.now().plusSeconds(300))
-                    .build();
+            return dev.ainer.testsupport.jwt.JwtTestSupport.jwtDecoder(
+                    HTTP_RSA_JWK, "https://auth.ainer.test", "ainer-api");
         }
     }
 

@@ -310,6 +310,20 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-19 1.0.x 测试真值补齐（评审暴露的两项代码债关闭）
+- **AI 网关**：`AiGatewayModuleIntegrationTest` 的按 token 字符串直接构造、不验签的测试
+  decoder 已删除，替换为 `JwtTestSupport` 真链（RSA 验签 + issuer 校验）；post/get 辅助
+  改为签发真实 USER_NEUTRAL_V1 JWT。9 项测试全绿。
+- **Workspace**：新增 `WorkspaceHttpJwtTest`——`/api/workspaces` 真 JWT HTTP 门禁（401 无
+  token、403 缺 scope、201 创建、owner 读取 200、非成员 404 不泄露存在性、授权审计行断言）。
+  过程中修复两处装配事实：模块缺 `ainer-starter-security` 依赖（安全链此前不生效于测试）；
+  `WorkspaceModuleIntegrationTest` 的无守卫 fixture resolver 泄漏（按仓内惯例加
+  `@ConditionalOnProperty` 守卫）。Workspace 9 → 12 tests。
+- **CI**：virtual-thread matrix 的 `Install ApacheBench` 步骤加 `timeout-minutes: 5`
+  （连续两次 apt 停滞导致 job 卡死）。
+- 产品说明快照的「已知例外」句已升级为「1.0.0 制品中的历史例外，1.0.x 线已补齐」。
+
+
 2026-08-18 `v1.0.0` 已发布——**1.0 产品合同定稿，G0–G4 全部关闭（1.0 达成）**
 - **发布**：准备 PR #18（ADR-0040 验收记录 + ADR-0046 LTS 条款 + CHANGELOG/README）合入
   `622b249`（dev CI 14m30s 绿）→ annotated tag `v1.0.0` → release run `32155505204` 全绿

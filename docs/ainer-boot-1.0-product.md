@@ -53,9 +53,10 @@
 - Resource Server：真 JWT 端到端链、高风险路径在线校验失败关闭、step-up 强认证策略
 - 测试真实性按模块分层如实标注：字典/配置/通知/文件/组织/知识/授权（含集合绑定与委托）
   的 HTTP 测试使用真 RSA 签名 JWT + `NimbusJwtDecoder` 验签（`JwtTestSupport`）；两个
-  参考消费者同链。**已知例外**：AI 网关的模块 HTTP 测试当前用按 token 字符串直接构造、
-  不验签的测试 decoder；Workspace 模块为服务层集成测试（内存 principal），其 `/api/workspaces`
-  HTTP 面未在本模块内做 JWT 门禁测试
+  参考消费者同链。**1.0.0 制品中的历史例外**（AI 网关模块 HTTP 测试曾用不验签的测试
+  decoder、Workspace 模块仅有服务层集成测试）已在 1.0.x 线补齐：AI 网关测试已转真链
+  （9 项），Workspace 新增 `/api/workspaces` 真 JWT HTTP 门禁测试（401/403/201/非成员
+  404/审计行）——见 CHANGELOG 与 `project-status.md`
 
 ### C. 工作区与治理（Stable）
 
