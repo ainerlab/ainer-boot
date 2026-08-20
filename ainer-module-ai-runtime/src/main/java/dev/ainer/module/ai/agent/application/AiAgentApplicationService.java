@@ -46,7 +46,7 @@ public class AiAgentApplicationService implements AgentDefinitionStatusResolver 
         requireManage(principal);
         if (code == null || code.isBlank() || version == null || version.isBlank()
                 || purpose == null || purpose.isBlank()) {
-            throw new BusinessException(StandardErrorCode.INVALID_REQUEST);
+            throw new BusinessException(AiAgentErrorCode.INVALID_DEFINITION);
         }
         Instant now = clock.instant();
         AiAgentDefinition agent = new AiAgentDefinition(Uuidv7.generate(), code.strip(),
@@ -54,8 +54,7 @@ public class AiAgentApplicationService implements AgentDefinitionStatusResolver 
         try {
             repository.insert(agent);
         } catch (org.springframework.dao.DuplicateKeyException duplicate) {
-            throw new BusinessException(StandardErrorCode.CONFLICT,
-                    "Agent code+version 已存在: " + code + "/" + version);
+            throw new BusinessException(AiAgentErrorCode.CODE_VERSION_CONFLICT);
         }
         return agent;
     }
@@ -64,23 +63,23 @@ public class AiAgentApplicationService implements AgentDefinitionStatusResolver 
     public AiAgentDefinition retire(AuthenticatedPrincipal principal, UUID agentId) {
         requireManage(principal);
         AiAgentDefinition agent = repository.findById(agentId)
-                .orElseThrow(() -> new BusinessException(StandardErrorCode.NOT_FOUND,
-                        "Agent 不存在: " + agentId));
+                .orElseThrow(() -> new BusinessException(AiAgentErrorCode.AGENT_NOT_FOUND));
         if (!agent.active()) {
-            throw new BusinessException(StandardErrorCode.CONFLICT, "Agent 已退役");
+            throw new BusinessException(AiAgentErrorCode.ALREADY_RETIRED);
         }
         Instant now = clock.instant();
         repository.retire(agentId, now);
         return repository.findById(agentId).orElseThrow();
     }
 
+    @Transactional(readOnly = true)
     public AiAgentDefinition get(AuthenticatedPrincipal principal, UUID agentId) {
         requireManage(principal);
         return repository.findById(agentId)
-                .orElseThrow(() -> new BusinessException(StandardErrorCode.NOT_FOUND,
-                        "Agent 不存在: " + agentId));
+                .orElseThrow(() -> new BusinessException(AiAgentErrorCode.AGENT_NOT_FOUND));
     }
 
+    @Transactional(readOnly = true)
     public List<AiAgentDefinition> page(AuthenticatedPrincipal principal, long page, long size) {
         requireManage(principal);
         long safePage = Math.max(page, 1);

@@ -69,12 +69,14 @@ public class KnowledgeController {
     public record RevisionResponse(
             UUID id, UUID objectId, long revisionNumber, String status, Instant createdAt,
             @Nullable Instant publishedAt, String createdByType, String createdById,
+            String payloadMarkdown,
             List<SourceDto> sources, List<EvidenceDto> evidence) {
 
         static RevisionResponse from(KnowledgeRevision revision) {
             return new RevisionResponse(revision.id(), revision.objectId(),
                     revision.revisionNumber(), revision.status(), revision.createdAt(),
                     revision.publishedAt(), revision.createdByType(), revision.createdById(),
+                    revision.payloadMarkdown(),
                     revision.sources().stream()
                             .map(source -> new SourceDto(source.sourceType(), source.sourceRef()))
                             .toList(),
@@ -109,7 +111,7 @@ public class KnowledgeController {
                 .stream().map(ObjectResponse::from).toList();
         long total = service.countObjects(principal, workspaceId);
         return ApiResponse.success(
-                new PageResponse<>(records, total, Math.max(page, 1), size),
+                new PageResponse<>(records, total, Math.max(page, 1), Math.min(Math.max(size, 1), 100)),
                 RequestIds.currentOrCreate(request));
     }
 

@@ -335,8 +335,7 @@ public class WorkspaceApplicationService {
             WorkspaceAuthorizationAction action,
             UUID workspaceId,
             String targetSubjectId) {
-        String scope = authority.startsWith("SCOPE_") ? authority.substring("SCOPE_".length()) : authority;
-        if (!principal.scopes().contains(scope)) {
+        if (!principal.scopes().contains(authority)) {
             throw denied(principal, workspaceId, targetSubjectId, action, StandardErrorCode.FORBIDDEN);
         }
     }

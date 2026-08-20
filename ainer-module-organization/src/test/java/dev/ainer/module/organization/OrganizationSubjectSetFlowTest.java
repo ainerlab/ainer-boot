@@ -74,6 +74,7 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "spring.main.banner-mode=off"
         })
 @AutoConfigureTestRestTemplate
+@org.junit.jupiter.api.TestMethodOrder(org.junit.jupiter.api.MethodOrderer.OrderAnnotation.class)
 class OrganizationSubjectSetFlowTest {
 
     private static final String ISSUER = "https://auth.ainer.test";
@@ -176,6 +177,7 @@ class OrganizationSubjectSetFlowTest {
         return (String) response.jsonPath("$.data.id");
     }
 
+    @org.junit.jupiter.api.Order(1)
     @Test
     void positionAssigneeGainsGrantAndTerminationRevokesItImmediately() {
         // 1) 组织事实：目录 + Unit + 岗位 + 任职 + 分配 + 岗位任职
@@ -230,6 +232,64 @@ class OrganizationSubjectSetFlowTest {
 
         assertThat(decideAsWorker().outcome()).isEqualTo(AuthorizationOutcome.DENY);
     }
+
+    @org.junit.jupiter.api.Order(2)
+    @Test
+    void crossWorkspaceSetDeclarationCannotEscalateMembership() {
+        // 岗位事实属于 WORKSPACE_ID；恶意 SubjectSetBinding 声明 otherWorkspace + scope(otherWorkspace)。
+        // 修复前：membership 只按 positionId+subject 查询 → 误判 MEMBER → 跨工作区提权。
+        // 修复后：解析按声明 workspace 过滤目录事实 → NOT_MEMBER。
+        var principal = new dev.ainer.security.token.AuthenticatedPrincipal(
+                new dev.ainer.security.principal.HumanSubjectRef(
+                        new dev.ainer.security.principal.IdentityAuthorityRef(ISSUER), "account:ops"),
+                new dev.ainer.security.principal.IdentityAuthorityRef(ISSUER),
+                dev.ainer.security.token.TokenProfile.USER_NEUTRAL_V1, "1",
+                java.util.Set.of(AUDIENCE),
+                java.util.Set.of("organization.read", "organization.manage"), "pwd", null, 0L);
+        var directory = directoryService.createDirectory(
+                principal, null, WORKSPACE_ID, "xws", "跨工作区目录");
+        UUID rootUnitId = directoryService.unitTree(principal, directory.id()).get(0).id();
+        var unit = directoryService.createUnit(principal, null, directory.id(), rootUnitId, "ops2", "运营2");
+        Instant past = Instant.now().minusSeconds(3600);
+        var engagement = workforceService.engage(principal, null, directory.id(),
+                ISSUER, WORKER_SUBJECT, "EMPLOYEE", null, past, null);
+        var assignment = workforceService.assignUnit(principal, null, directory.id(),
+                engagement.id(), unit.id(),
+                dev.ainer.module.organization.orgdir.domain.AssignmentKind.PRIMARY, past, null);
+        var position = workforceService.createPosition(principal, null, directory.id(),
+                unit.id(), "buyer2", "采购2");
+        workforceService.assignPosition(principal, null, directory.id(), position.id(),
+                engagement.id(), assignment.id(),
+                dev.ainer.module.organization.orgdir.domain.AssignmentKind.PRIMARY, past, null);
+
+        UUID otherWorkspace = UUID.fromString("019c4000-0000-7000-8000-0000000000ff");
+        var membership = new dev.ainer.module.organization.orgdir.access.WorkforcePositionMembershipResolver(
+                workforceRepositoryBean);
+        var result = membership.resolve(
+                new dev.ainer.authorization.domain.SubjectRef(
+                        ISSUER, WORKER_SUBJECT, dev.ainer.authorization.domain.SubjectType.USER),
+                new dev.ainer.authorization.domain.SubjectSetRef(
+                        "workforce.position", position.id(), "assignee", otherWorkspace, null),
+                Instant.now());
+        org.assertj.core.api.Assertions.assertThat(result.isMember()).isFalse();
+        // 同工作区声明仍解析为 MEMBER（正向对照）
+        var sameWorkspace = membership.resolve(
+                new dev.ainer.authorization.domain.SubjectRef(
+                        ISSUER, WORKER_SUBJECT, dev.ainer.authorization.domain.SubjectType.USER),
+                new dev.ainer.authorization.domain.SubjectSetRef(
+                        "workforce.position", position.id(), "assignee", WORKSPACE_ID, null),
+                Instant.now());
+        org.assertj.core.api.Assertions.assertThat(sameWorkspace.isMember()).isTrue();
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    dev.ainer.module.organization.orgdir.application.DirectoryApplicationService directoryService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    dev.ainer.module.organization.orgdir.application.WorkforceApplicationService workforceService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    dev.ainer.module.organization.orgdir.application.WorkforceRepository workforceRepositoryBean;
 
     @SpringBootConfiguration
     @EnableAutoConfiguration

@@ -78,6 +78,30 @@ public class KnowledgeApplicationService {
         }
         List<KnowledgeSource> safeSources = sources == null ? List.of() : List.copyOf(sources);
         List<KnowledgeEvidence> safeEvidence = evidence == null ? List.of() : List.copyOf(evidence);
+        for (KnowledgeSource source : safeSources) {
+            String type = source.sourceType() == null ? "" : source.sourceType().strip();
+            if (!NAMESPACED_KIND.matcher(type).matches()) {
+                throw new BusinessException(KnowledgeErrorCode.INVALID_KIND,
+                        "sourceType 必须是 namespaced 受控字符串");
+            }
+            if (source.sourceRef() == null || source.sourceRef().isBlank()
+                    || source.sourceRef().length() > 512) {
+                throw new BusinessException(KnowledgeErrorCode.EMPTY_PAYLOAD,
+                        "sourceRef 不能为空且不超过 512 字符");
+            }
+        }
+        for (KnowledgeEvidence link : safeEvidence) {
+            String type = link.linkType() == null ? "" : link.linkType().strip();
+            if (!"SUPPORTS".equals(type) && !"CONTRADICTS".equals(type)) {
+                throw new BusinessException(KnowledgeErrorCode.EMPTY_PAYLOAD,
+                        "linkType 只能是 SUPPORTS 或 CONTRADICTS");
+            }
+            if (link.targetRef() == null || link.targetRef().isBlank()
+                    || link.targetRef().length() > 512) {
+                throw new BusinessException(KnowledgeErrorCode.EMPTY_PAYLOAD,
+                        "targetRef 不能为空且不超过 512 字符");
+            }
+        }
         KnowledgeRevision base = null;
         if (basedOnRevisionId != null) {
             base = repository.findRevision(basedOnRevisionId)
@@ -88,17 +112,38 @@ public class KnowledgeApplicationService {
         }
         Instant now = micros(clock.instant());
         UUID revisionId = Uuidv7.generate();
-        KnowledgeRevision revision = new KnowledgeRevision(
-                revisionId, objectId, repository.nextRevisionNumber(objectId),
-                payloadMarkdown, "PROPOSED",
-                principal.authority().issuer(), principal.isService() ? "SERVICE" : "USER",
-                principal.subjectId(), now, null, safeSources, safeEvidence);
-        repository.insertRevision(revision, safeSources, safeEvidence);
+        // Concurrent proposals race on (object_id, revision_number); the unique constraint is the
+        // arbiter — on conflict re-read the current max once instead of surfacing a 500.
+        KnowledgeRevision revision = insertWithRevisionNumberRetry(objectId, payloadMarkdown,
+                principal, now, safeSources, safeEvidence, revisionId);
         if (base != null) {
             repository.insertLineage(base.id(), revisionId, now);
         }
         lifecycle(objectId, revisionId, "PROPOSED", principal, now);
         return revision;
+    }
+
+    private KnowledgeRevision insertWithRevisionNumberRetry(
+            UUID objectId, String payloadMarkdown, AuthenticatedPrincipal principal, Instant now,
+            List<dev.ainer.module.knowledge.knowledge.domain.KnowledgeSource> safeSources,
+            List<dev.ainer.module.knowledge.knowledge.domain.KnowledgeEvidence> safeEvidence,
+            UUID revisionId) {
+        org.springframework.dao.DuplicateKeyException conflict = null;
+        for (int attempt = 0; attempt < 2; attempt++) {
+            try {
+                KnowledgeRevision revision = new KnowledgeRevision(
+                        revisionId, objectId, repository.nextRevisionNumber(objectId),
+                        payloadMarkdown, "PROPOSED",
+                        principal.authority().issuer(), principal.isService() ? "SERVICE" : "USER",
+                        principal.subjectId(), now, null, safeSources, safeEvidence);
+                repository.insertRevision(revision, safeSources, safeEvidence);
+                return revision;
+            } catch (org.springframework.dao.DuplicateKeyException race) {
+                conflict = race;
+            }
+        }
+        throw new BusinessException(KnowledgeErrorCode.EMPTY_PAYLOAD,
+                "并发提案冲突，请重试: " + conflict.getMessage());
     }
 
     /**
@@ -151,9 +196,10 @@ public class KnowledgeApplicationService {
             AuthenticatedPrincipal principal, UUID workspaceId, long page, long size) {
         requireRead(principal);
         Objects.requireNonNull(workspaceId, "workspaceId");
-        long safePage = Math.max(page, 1);
-        int safeSize = (int) Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
-        return repository.pageObjects(workspaceId, (safePage - 1) * safeSize, safeSize);
+        if (page < 1 || size < 1 || size > MAX_PAGE_SIZE) {
+            throw new BusinessException(KnowledgeErrorCode.INVALID_PAGE);
+        }
+        return repository.pageObjects(workspaceId, (page - 1) * (int) size, (int) size);
     }
 
     @Transactional(readOnly = true)

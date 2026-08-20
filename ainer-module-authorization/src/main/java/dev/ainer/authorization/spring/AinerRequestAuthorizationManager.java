@@ -56,14 +56,23 @@ import java.util.function.Supplier;
 public final class AinerRequestAuthorizationManager
         implements AuthorizationManager<RequestAuthorizationContext> {
 
+    /** Request attribute the step-up filter publishes when the current token carries recent strong auth. */
+    public static final String RECENT_STRONG_AUTH_ATTRIBUTE =
+            "dev.ainer.security.authorization.recentStrongAuthentication";
+
     private final AuthorizationService authorizationService;
     private final AuthenticatedPrincipalResolver principalResolver;
+    private final org.springframework.beans.factory.ObjectProvider<
+            dev.ainer.authorization.application.AuthorizationDecisionAuditService> decisionAudit;
 
     public AinerRequestAuthorizationManager(
             AuthorizationService authorizationService,
-            AuthenticatedPrincipalResolver principalResolver) {
+            AuthenticatedPrincipalResolver principalResolver,
+            org.springframework.beans.factory.ObjectProvider<
+                    dev.ainer.authorization.application.AuthorizationDecisionAuditService> decisionAudit) {
         this.authorizationService = Objects.requireNonNull(authorizationService, "authorizationService");
         this.principalResolver = Objects.requireNonNull(principalResolver, "principalResolver");
+        this.decisionAudit = decisionAudit;
     }
 
     @Override
@@ -92,13 +101,42 @@ public final class AinerRequestAuthorizationManager
                 resource,
                 new AuthorizationContext(
                         Instant.now(),
-                        AuthorizationContext.Assurance.NONE,
+                        resolveAssurance(request),
                         null,
-                        null,
+                        request.getHeader("X-Request-Id"),
                         null));
 
         AuthorizationDecision decision = authorizationService.authorize(authRequest);
+        recordDecisionAudit(authRequest, decision, request);
         return new AinerAuthorizationResult(decision);
+    }
+
+    /**
+     * Step-up filter publishes its strong-authentication verdict as a request attribute; the
+     * authorization context consumes it so HIGH-risk permissions can distinguish a recent strong
+     * authentication from a plain session instead of challenging unconditionally.
+     */
+    private static AuthorizationContext.Assurance resolveAssurance(HttpServletRequest request) {
+        return Boolean.TRUE.equals(request.getAttribute(RECENT_STRONG_AUTH_ATTRIBUTE))
+                ? AuthorizationContext.Assurance.RECENT_STRONG
+                : AuthorizationContext.Assurance.NONE;
+    }
+
+    /**
+     * Persists the decision audit row according to the permission's audit level (ADR-0037 §12.4).
+     * The service writes in an independent transaction, so a DENY audit survives any later
+     * business rollback; audit failures propagate and block the request (fail-closed).
+     */
+    private void recordDecisionAudit(
+            AuthorizationRequest authRequest, AuthorizationDecision decision,
+            HttpServletRequest request) {
+        dev.ainer.authorization.application.AuthorizationDecisionAuditService audit =
+                decisionAudit.getIfAvailable();
+        if (audit != null) {
+            audit.recordIfApplicable(
+                    authRequest, decision,
+                    request.getHeader("X-Request-Id"), null);
+        }
     }
 
     private Requester resolveRequester(AccessMode accessMode) {

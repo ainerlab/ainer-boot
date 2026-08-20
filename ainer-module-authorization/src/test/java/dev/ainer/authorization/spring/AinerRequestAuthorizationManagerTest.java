@@ -110,8 +110,8 @@ class AinerRequestAuthorizationManagerTest {
         AinerAuthorizationResult result = (AinerAuthorizationResult) manager.authorize(auth(), context(request));
 
         assertThat(result.outcome()).isEqualTo(AuthorizationOutcome.ALLOW);
-        assertThat(result.isGranted()).as("ALLOW with obligations is not grantable by adapter alone (§8.6)")
-                .isFalse();
+        assertThat(result.isGranted()).as("ALLOW with only a projection must be grantable")
+                .isTrue();
     }
 
     @Test
@@ -125,7 +125,9 @@ class AinerRequestAuthorizationManagerTest {
 
         assertThat(result.outcome()).isEqualTo(AuthorizationOutcome.ALLOW);
         assertThat(result.reasonCode()).isEqualTo("PUBLIC_ALLOWED");
-        assertThat(result.isGranted()).as("public projection obligation is still unhandled").isFalse();
+        // PublicProjection is projected response data carried in the obligations slot, not a
+        // pending obligation — it must not block the grant (review H2 fix).
+        assertThat(result.isGranted()).as("public projection must be grantable").isTrue();
     }
 
     @Test
@@ -252,7 +254,8 @@ class AinerRequestAuthorizationManagerTest {
 
     private AinerRequestAuthorizationManager manager(
             AuthorizationService service, AuthenticatedPrincipalResolver resolver) {
-        return new AinerRequestAuthorizationManager(service, resolver);
+        return new AinerRequestAuthorizationManager(service, resolver,
+                emptyAuditProvider());
     }
 
     private Supplier<org.springframework.security.core.Authentication> auth() {
@@ -261,5 +264,25 @@ class AinerRequestAuthorizationManagerTest {
 
     private RequestAuthorizationContext context(MockHttpServletRequest request) {
         return new RequestAuthorizationContext(request);
+    }
+    private static org.springframework.beans.factory.ObjectProvider<
+            dev.ainer.authorization.application.AuthorizationDecisionAuditService> emptyAuditProvider() {
+        return new org.springframework.beans.factory.ObjectProvider<>() {
+            @Override
+            public dev.ainer.authorization.application.AuthorizationDecisionAuditService getObject() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public dev.ainer.authorization.application.AuthorizationDecisionAuditService getObject(
+                    Object... args) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public dev.ainer.authorization.application.AuthorizationDecisionAuditService getIfAvailable() {
+                return null;
+            }
+        };
     }
 }

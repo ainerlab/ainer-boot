@@ -88,7 +88,7 @@ public class OrganizationManagementController {
                 .map(DirectoryResponse::from).toList();
         long total = directoryService.countDirectories(principal, workspaceId);
         return ApiResponse.success(
-                new PageResponse<>(records, total, Math.max(page, 1), size),
+                new PageResponse<>(records, total, Math.max(page, 1), Math.min(Math.max(size, 1), 100)),
                 RequestIds.currentOrCreate(request));
     }
 
@@ -140,7 +140,7 @@ public class OrganizationManagementController {
                 .map(EngagementResponse::from).toList();
         long total = workforceService.countEngagements(principal, directoryId);
         return ApiResponse.success(
-                new PageResponse<>(records, total, Math.max(page, 1), size),
+                new PageResponse<>(records, total, Math.max(page, 1), Math.min(Math.max(size, 1), 100)),
                 RequestIds.currentOrCreate(request));
     }
 

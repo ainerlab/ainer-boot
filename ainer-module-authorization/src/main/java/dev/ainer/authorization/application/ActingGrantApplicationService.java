@@ -110,9 +110,9 @@ public class ActingGrantApplicationService {
             @Nullable String requestId) {
         administrationGuard.requireManager(actor);
         grantRepository.findById(grantId)
-                .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.SET_BINDING_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.ACTING_GRANT_NOT_FOUND));
         grantRepository.revoke(grantId, Instant.now(clock), reason)
-                .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.SET_BINDING_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.ACTING_GRANT_ALREADY_REVOKED));
         changeAuditService.record(actor, TARGET_TYPE_ACTING_GRANT, grantId, "REVOKE",
                 null, null, requestId, null);
     }

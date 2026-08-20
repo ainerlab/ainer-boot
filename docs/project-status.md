@@ -310,6 +310,25 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-19 商业级代码评审与修复（付费客户可读标准，审计快照见 reviews/）
+- **方法**：机械扫描（零 TODO/SQL 拼接/UUIDv4 持久化/密钥日志）+ 三路并行语义评审（最新三
+  模块 / 安全关键链 / 全模块契约一致性），40+ 项发现。
+- **安全修复（5 项）**：starter 默认 fail-open→fail-closed（C1，删除 matchIfMissing）；
+  SubjectSet 跨工作区提权（H4，解析按声明 workspace 过滤 + 回归测试）；决策审计接线到
+  授权管理器（H1，按 auditLevel 落 REQUIRES_NEW 审计）；PUBLIC 投影误拒（H2）；
+  CHALLENGE→401 + step-up 强认证事实接入授权上下文（H3）。
+- **正确性修复（4 项）**：org 乐观锁 CAS 静默失效→409 + 不写假审计（H-1）；EXCLUDE 23P01
+  竞态分流（H-2）；knowledge 版本号竞态重试（H-3）；RevisionResponse 暴露 payloadMarkdown
+  （C-1，K1 读语义闭环）。
+- **契约修复（9 项）**：AI 网关 scope 403；AiAgentErrorCode；ACTING_GRANT 独立错误码；
+  SCOPE_ 前缀全域统一；分页 422 + 回显钳制；DUPLICATE_POSITION_CODE；knowledge sources/
+  evidence 校验；readOnly 13 方法补齐；死代码清除。
+- **验证**：全量 reactor 411/0/0/0（+1 跨工作区提权回归）。
+- **遗留 follow-up**：workspace ALLOWED 审计顺序（M3，7 方法重构）、自提权创建后防护（M2）、
+  合成锚点保留类型拒绝（M1）、生产装配 policy 注册使引擎有活路径（M5）、客户可读性拉齐
+  批处理（L 系，含注释语言方向决策）——详见评审快照。
+
+
 2026-08-19 OpenAPI 运行时文档 spike 关闭（springdoc 3.1.0 × Boot 4.1 兼容性验证通过）
 - **结论**：springdoc 3.1.0 与 Boot 4.1/Framework 7 兼容（官方 FAQ 确认 3.x 支持 Boot 4，
   3.1.0 升级到 Boot 4.1.0 基线）。此前反复记录的「OpenAPI 运行时文档兼容性待验证」缺口关闭。

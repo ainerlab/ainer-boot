@@ -74,12 +74,14 @@ public class DirectoryApplicationService {
         return directory;
     }
 
+    @Transactional(readOnly = true)
     public OrgDirectory getDirectory(AuthenticatedPrincipal principal, UUID workspaceId, UUID id) {
         requireRead(principal);
         return directoryRepository.findDirectory(workspaceId, id)
                 .orElseThrow(() -> new BusinessException(OrganizationErrorCode.DIRECTORY_NOT_FOUND));
     }
 
+    @Transactional(readOnly = true)
     public List<OrgDirectory> pageDirectories(
             AuthenticatedPrincipal principal, UUID workspaceId, long page, long size) {
         requireRead(principal);
@@ -88,6 +90,7 @@ public class DirectoryApplicationService {
         return directoryRepository.pageDirectories(workspaceId, (safePage - 1) * safeSize, safeSize);
     }
 
+    @Transactional(readOnly = true)
     public long countDirectories(AuthenticatedPrincipal principal, UUID workspaceId) {
         requireRead(principal);
         return directoryRepository.countDirectories(workspaceId);
@@ -110,9 +113,6 @@ public class DirectoryApplicationService {
         OrgUnit parent = directoryRepository.findUnit(directoryId, parentUnitId)
                 .orElseThrow(() -> new BusinessException(OrganizationErrorCode.UNIT_NOT_FOUND));
         requireEnabled(parent.status(), OrganizationErrorCode.UNIT_NOT_FOUND);
-        if (parent.kind() == OrgUnitKind.ROOT && !"ROOT".equals(code)) {
-            // ROOT 子单元没有额外限制；保留分支以显式表达根的直接子级也是普通 UNIT
-        }
         Instant now = clock.instant();
         OrgUnit unit = new OrgUnit(Uuidv7.generate(), directory.workspaceId(), directoryId,
                 code.strip(), displayName.strip(), OrgUnitKind.UNIT,
@@ -129,6 +129,7 @@ public class DirectoryApplicationService {
         return unit;
     }
 
+    @Transactional(readOnly = true)
     public List<OrgUnit> unitTree(AuthenticatedPrincipal principal, UUID directoryId) {
         requireRead(principal);
         directoryRepository.findDirectory(directoryId)

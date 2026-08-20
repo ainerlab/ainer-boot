@@ -96,21 +96,29 @@ public class WorkforceApplicationService {
         try {
             repository.insertEngagement(engagement);
         } catch (DuplicateKeyException duplicate) {
-            if (duplicate.getMessage() != null && duplicate.getMessage().contains("employee_number")) {
-                throw new BusinessException(OrganizationErrorCode.DUPLICATE_EMPLOYEE_NUMBER);
-            }
-            throw new BusinessException(OrganizationErrorCode.ENGAGEMENT_PERIOD_OVERLAP);
+            // Unique-constraint races (employee number) surface as 23505.
+            throw new BusinessException(isEmployeeNumberViolation(duplicate)
+                    ? OrganizationErrorCode.DUPLICATE_EMPLOYEE_NUMBER
+                    : OrganizationErrorCode.ENGAGEMENT_PERIOD_OVERLAP);
+        } catch (org.springframework.dao.DataIntegrityViolationException integrity) {
+            // The tstzrange EXCLUDE constraint raises SQLState 23P01 (exclusion_violation), which
+            // Spring does not map to DuplicateKeyException — a concurrent overlap race lands here.
+            throw new BusinessException(isEmployeeNumberViolation(integrity)
+                    ? OrganizationErrorCode.DUPLICATE_EMPLOYEE_NUMBER
+                    : OrganizationErrorCode.ENGAGEMENT_PERIOD_OVERLAP);
         }
         audit(principal, requestId, "ENGAGEMENT", engagement.id(), "ENGAGED", now);
         return engagement;
     }
 
+    @Transactional(readOnly = true)
     public WorkforceEngagement getEngagement(AuthenticatedPrincipal principal, UUID directoryId, UUID id) {
         requireRead(principal);
         return repository.findEngagement(directoryId, id)
                 .orElseThrow(() -> new BusinessException(OrganizationErrorCode.ENGAGEMENT_NOT_FOUND));
     }
 
+    @Transactional(readOnly = true)
     public UnitAssignment getUnitAssignment(
             AuthenticatedPrincipal principal, UUID directoryId, UUID assignmentId) {
         requireRead(principal);
@@ -118,14 +126,17 @@ public class WorkforceApplicationService {
                 .orElseThrow(() -> new BusinessException(OrganizationErrorCode.ASSIGNMENT_NOT_FOUND));
     }
 
+    @Transactional(readOnly = true)
     public List<WorkforceEngagement> pageEngagements(
             AuthenticatedPrincipal principal, UUID directoryId, long page, long size) {
         requireRead(principal);
-        long safePage = Math.max(page, 1);
-        int safeSize = (int) Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
-        return repository.pageEngagements(directoryId, (safePage - 1) * safeSize, safeSize);
+        if (page < 1 || size < 1 || size > MAX_PAGE_SIZE) {
+            throw new BusinessException(OrganizationErrorCode.INVALID_PAGE);
+        }
+        return repository.pageEngagements(directoryId, (page - 1) * (int) size, (int) size);
     }
 
+    @Transactional(readOnly = true)
     public long countEngagements(AuthenticatedPrincipal principal, UUID directoryId) {
         requireRead(principal);
         return repository.countEngagements(directoryId);
@@ -140,9 +151,12 @@ public class WorkforceApplicationService {
             throw new BusinessException(OrganizationErrorCode.INVALID_STATUS_CHANGE);
         }
         Instant now = clock.instant();
-        repository.updateEngagementStatus(
+        if (!repository.updateEngagementStatus(
                 engagementId, OrgStatus.SUSPENDED.name(), engagement.validUntil(),
-                engagement.version() + 1, now);
+                engagement.version() + 1, now)) {
+            // Optimistic-lock CAS missed: the row changed concurrently — no state change and no audit.
+            throw new BusinessException(OrganizationErrorCode.CONCURRENT_MODIFICATION);
+        }
         audit(principal, requestId, "ENGAGEMENT", engagementId, "SUSPENDED", now);
         return repository.findEngagement(directoryId, engagementId).orElseThrow();
     }
@@ -158,9 +172,11 @@ public class WorkforceApplicationService {
         Instant now = clock.instant();
         Instant closedUntil = engagement.validUntil() == null || engagement.validUntil().isAfter(now)
                 ? now : engagement.validUntil();
-        repository.updateEngagementStatus(
+        if (!repository.updateEngagementStatus(
                 engagementId, OrgStatus.REVOKED.name(), closedUntil,
-                engagement.version() + 1, now);
+                engagement.version() + 1, now)) {
+            throw new BusinessException(OrganizationErrorCode.CONCURRENT_MODIFICATION);
+        }
         audit(principal, requestId, "ENGAGEMENT", engagementId, "TERMINATED", now);
         return repository.findEngagement(directoryId, engagementId).orElseThrow();
     }
@@ -229,7 +245,9 @@ public class WorkforceApplicationService {
                 .orElseThrow(() -> new BusinessException(OrganizationErrorCode.UNIT_NOT_FOUND));
         requireWithin(atTime, null, engagement.validFrom(), engagement.validUntil());
         Instant now = clock.instant();
-        repository.closeUnitAssignment(assignmentId, atTime, now);
+        if (!repository.closeUnitAssignment(assignmentId, atTime, now)) {
+            throw new BusinessException(OrganizationErrorCode.CONCURRENT_MODIFICATION);
+        }
         UnitAssignment next = new UnitAssignment(
                 Uuidv7.generate(), engagement.workspaceId(), directoryId, engagementId, targetUnitId,
                 AssignmentKind.PRIMARY, atTime, null, OrgStatus.ENABLED, now, now);
@@ -262,7 +280,7 @@ public class WorkforceApplicationService {
         try {
             repository.insertPosition(position);
         } catch (DuplicateKeyException duplicate) {
-            throw new BusinessException(OrganizationErrorCode.DUPLICATE_UNIT_CODE);
+            throw new BusinessException(OrganizationErrorCode.DUPLICATE_POSITION_CODE);
         }
         audit(principal, requestId, "POSITION", position.id(), "CREATED", now);
         return position;
@@ -305,6 +323,7 @@ public class WorkforceApplicationService {
     }
 
     /** Unit 成员投影：决策时实时解析父链（Engagement + UnitAssignment 同时覆盖评估时间）。 */
+    @Transactional(readOnly = true)
     public List<UnitAssignment> unitMembers(
             AuthenticatedPrincipal principal, UUID directoryId, UUID orgUnitId, Instant atTime) {
         requireRead(principal);
@@ -315,6 +334,7 @@ public class WorkforceApplicationService {
     }
 
     /** 岗位在岗者投影：同样按评估时间实时解析。 */
+    @Transactional(readOnly = true)
     public List<PositionAssignment> positionAssignees(
             AuthenticatedPrincipal principal, UUID directoryId, UUID positionId, Instant atTime) {
         requireRead(principal);
@@ -324,6 +344,7 @@ public class WorkforceApplicationService {
         return repository.findLivePositionAssignments(directoryId, positionId, evaluationTime);
     }
 
+    @Transactional(readOnly = true)
     public List<WorkforceEngagement> engagementsForMembers(
             AuthenticatedPrincipal principal, List<UUID> engagementIds) {
         requireRead(principal);
@@ -349,6 +370,20 @@ public class WorkforceApplicationService {
     private WorkforceEngagement requireEngagement(UUID directoryId, UUID engagementId) {
         return repository.findEngagement(directoryId, engagementId)
                 .orElseThrow(() -> new BusinessException(OrganizationErrorCode.ENGAGEMENT_NOT_FOUND));
+    }
+
+    /** Distinguishes the employee-number unique constraint from the period EXCLUDE constraint. */
+    private static boolean isEmployeeNumberViolation(
+            org.springframework.dao.DataIntegrityViolationException exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            String message = cause.getMessage();
+            if (message != null && message.contains("employee_number")) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     /** PostgreSQL timestamptz 只有微秒精度；入口统一截断，防止纳秒时间戳回读后比较漂移。 */

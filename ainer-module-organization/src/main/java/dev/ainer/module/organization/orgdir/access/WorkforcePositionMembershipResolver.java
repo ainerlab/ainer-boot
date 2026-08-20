@@ -15,6 +15,10 @@ import java.util.Optional;
  * 解析：目标岗位存在一条 ENABLED 岗位任职覆盖评估时间，且其父 Engagement 同期覆盖、
  * subject 与 requester 的 issuer/subjectId 完全一致 → MEMBER；validUntil 取父链最早到期。
  * 暂停/终止/撤岗在下次决策即失去成员资格（无事实缓存）。
+ *
+ * <p>安全语义：查询按 SubjectSetRef 声明的 {@code workspaceId} 过滤目录事实——集合声明的
+ * 工作区与岗位实际归属不一致时解析为 NOT_MEMBER，堵住「声明工作区 B + 工作区 A 的岗位」
+ * 跨工作区提权通道。
  */
 @Component
 public class WorkforcePositionMembershipResolver implements SubjectSetMembershipResolver {
@@ -41,8 +45,8 @@ public class WorkforcePositionMembershipResolver implements SubjectSetMembership
         }
         Optional<WorkforceRepository.LivePositionAssignee> assignee =
                 workforceRepository.findLivePositionAssigneeBySubject(
-                        set.objectId(), requester.issuerNamespace(), requester.subjectId(),
-                        evaluationTime);
+                        set.workspaceId(), set.objectId(), requester.issuerNamespace(),
+                        requester.subjectId(), evaluationTime);
         return assignee
                 .map(live -> new SubjectSetMembership(
                         SubjectSetMembership.Status.MEMBER,
