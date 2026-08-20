@@ -17,4 +17,6 @@ public interface AiAgentRepository {
     void retire(UUID id, Instant at);
 
     List<AiAgentDefinition> page(long offset, int limit);
+
+    long count();
 }

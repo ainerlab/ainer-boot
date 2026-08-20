@@ -310,6 +310,21 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-20 评审 follow-up 收口（M1/M2/M3 + L 系四项）
+- **M1**：管理 API 的 `buildScope` 拒绝保留 resourceType（`workspace.anchor`/`request`）——
+  ActingGrant 子集校验的合成锚点不可经 API 声明伪造。
+- **M2（部分）**：SubjectSet 自提权防线失败关闭——成员解析 UNAVAILABLE 时拒绝创建集合
+  绑定（原实现 fail-open 放行）。创建后的延迟自提权（先签绑定再入岗）仍属已知边界，
+  check() 实时复查部分兜底。
+- **M3**：workspace 全部 7 个写方法的 `auditAllowed` 移到业务写成功之后——失败操作不再
+  留下「已允许」的 REQUIRES_NEW 审计行（审计与事实一致）。
+- **L 系**：workspace 成员响应域枚举 String 化（`role`/`status` 用 `.name()`，防枚举重命名
+  破坏 JSON 契约）+ `@Nullable activatedAt`；notification 提交响应从匿名 Map 改为
+  `SubmitResponse` record；ai-agent 分页补 `AgentPageResponse` 信封（records+total）+
+  count 查询；organization 请求 DTO 补 `@Nullable`。
+- **验证**：全量 reactor 415/0/0/0。
+
+
 2026-08-20 M5 关闭：授权引擎生产路径激活（参考装配不再是全 deny 死链）
 - **交付**：`AinerServerAuthorizationPolicyConfiguration`——18 项平台权限（各模块 scope
   恒等映射，`resourceType=request` 与端点适配器资源形状一致）+ scope 恒等天花板 +

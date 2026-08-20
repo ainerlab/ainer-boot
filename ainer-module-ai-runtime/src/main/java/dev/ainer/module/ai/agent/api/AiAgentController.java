@@ -74,14 +74,22 @@ public class AiAgentController {
                 RequestIds.currentOrCreate(request));
     }
 
+    /** 分页信封：与其他模块一致（records + total + page + size）。 */
+    public record AgentPageResponse(
+            List<AgentResponse> records, long total, long page, long size) {
+    }
+
     @GetMapping
-    public ApiResponse<List<AgentResponse>> page(
+    public ApiResponse<AgentPageResponse> page(
             @RequestParam(name = "page", defaultValue = "1") long page,
             @RequestParam(name = "size", defaultValue = "20") long size,
             HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
         List<AgentResponse> agents = service.page(principal, page, size).stream()
                 .map(AgentResponse::from).toList();
-        return ApiResponse.success(agents, RequestIds.currentOrCreate(request));
+        long total = service.count(principal);
+        return ApiResponse.success(
+                new AgentPageResponse(agents, total, Math.max(page, 1), Math.min(Math.max(size, 1), 100)),
+                RequestIds.currentOrCreate(request));
     }
 }

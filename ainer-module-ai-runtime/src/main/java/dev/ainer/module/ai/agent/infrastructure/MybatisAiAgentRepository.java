@@ -38,6 +38,11 @@ public class MybatisAiAgentRepository implements AiAgentRepository {
         return mapper.page(offset, limit).stream().map(MybatisAiAgentRepository::toDomain).toList();
     }
 
+    @Override
+    public long count() {
+        return mapper.countAll();
+    }
+
     private static AiAgentRow toRow(AiAgentDefinition agent) {
         AiAgentRow row = new AiAgentRow();
         row.setId(agent.id());

@@ -17,4 +17,6 @@ public interface AiAgentMapper {
     int retire(@Param("id") UUID id, @Param("at") Instant at);
 
     List<AiAgentRow> page(@Param("offset") long offset, @Param("limit") int limit);
+
+    long countAll();
 }

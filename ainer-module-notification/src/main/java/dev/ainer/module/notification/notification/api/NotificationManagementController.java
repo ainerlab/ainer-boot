@@ -105,7 +105,7 @@ public class NotificationManagementController {
     // ---- 直接提交 ----
 
     @PostMapping("/messages")
-    public ResponseEntity<ApiResponse<java.util.Map<String, UUID>>> submitDirect(
+    public ResponseEntity<ApiResponse<SubmitResponse>> submitDirect(
             @RequestBody NotificationApiDtos.SubmitDirectRequest body,
             HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -114,7 +114,7 @@ public class NotificationManagementController {
                         parseChannel(body.channel()), body.recipient(), body.title(), body.body(),
                         body.payload()));
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(java.util.Map.of("id", id),
+                .body(ApiResponse.success(SubmitResponse.of(id),
                         RequestIds.currentOrCreate(request)));
     }
 
@@ -147,6 +147,13 @@ public class NotificationManagementController {
                     status.strip().toUpperCase());
         } catch (RuntimeException exception) {
             throw new BusinessException(NotificationErrorCode.INVALID_REQUEST);
+        }
+    }
+    /** 提交回执：回显最小字段（id），不回显 title/body（PII）。 */
+    public record SubmitResponse(java.util.UUID id) {
+
+        static SubmitResponse of(java.util.UUID id) {
+            return new SubmitResponse(id);
         }
     }
 }

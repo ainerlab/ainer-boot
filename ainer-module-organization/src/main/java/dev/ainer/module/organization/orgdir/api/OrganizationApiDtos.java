@@ -1,6 +1,7 @@
 package dev.ainer.module.organization.orgdir.api;
 
 import dev.ainer.module.organization.orgdir.domain.OrgDirectory;
+import org.jspecify.annotations.Nullable;
 import dev.ainer.module.organization.orgdir.domain.OrgPosition;
 import dev.ainer.module.organization.orgdir.domain.OrgUnit;
 import dev.ainer.module.organization.orgdir.domain.PositionAssignment;
@@ -26,13 +27,14 @@ public final class OrganizationApiDtos {
             String subjectIssuer,
             String subjectId,
             String engagementType,
-            String employeeNumber,
+            @Nullable String employeeNumber,
             Instant validFrom,
-            Instant validUntil) {
+            @Nullable Instant validUntil) {
     }
 
     public record AssignUnitRequest(
-            UUID engagementId, UUID orgUnitId, String kind, Instant validFrom, Instant validUntil) {
+            UUID engagementId, UUID orgUnitId, String kind, Instant validFrom,
+            @Nullable Instant validUntil) {
     }
 
     public record TransferRequest(UUID engagementId, UUID targetUnitId, Instant atTime) {
@@ -43,7 +45,7 @@ public final class OrganizationApiDtos {
 
     public record AssignPositionRequest(
             UUID positionId, UUID engagementId, UUID unitAssignmentId, String kind,
-            Instant validFrom, Instant validUntil) {
+            Instant validFrom, @Nullable Instant validUntil) {
     }
 
     public record DirectoryResponse(

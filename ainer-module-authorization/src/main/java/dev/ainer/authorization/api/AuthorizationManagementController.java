@@ -314,6 +314,10 @@ public class AuthorizationManagementController {
         return buildScope(body.scopeKind(), body.workspaceId(), body.resourceType(), body.resourceId());
     }
 
+    /** 保留 resourceType：内部子集校验合成锚点使用，不得经 API 声明（防伪造绑定绕过）。 */
+    private static final java.util.Set<String> RESERVED_RESOURCE_TYPES = java.util.Set.of(
+            "workspace.anchor", "request");
+
     private static Scope buildScope(
             String scopeKind, java.util.UUID workspaceId, String resourceType, java.util.UUID resourceId) {
         return switch (scopeKind) {
@@ -325,7 +329,8 @@ public class AuthorizationManagementController {
                 yield new Scope.Workspace(workspaceId);
             }
             case "RESOURCE" -> {
-                if (workspaceId == null || resourceType == null || resourceId == null) {
+                if (workspaceId == null || resourceType == null || resourceId == null
+                        || RESERVED_RESOURCE_TYPES.contains(resourceType)) {
                     throw new BusinessException(AuthorizationErrorCode.INVALID_SCOPE);
                 }
                 yield new Scope.Resource(workspaceId, new ResourceType(resourceType), resourceId);
