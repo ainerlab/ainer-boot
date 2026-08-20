@@ -46,7 +46,7 @@
 | M3 | workspace ALLOWED 审计先于业务写提交（REQUIRES_NEW），失败操作留下「已允许」审计 | Medium | 涉及 7 个方法重构，风险收益比需单独评估；DENY 路径语义正确 |
 | M2 | SubjectSet 自提权防护是创建瞬间的快照；管理者之后被安排进岗位可回溯获得授权；成员解析 UNAVAILABLE 时该防线放行 | Medium | 需要设计决策（成员关系变化告警/复核钩子）；check() 的实时复查部分兜底 |
 | M1 | ActingGrant 签发子集校验的合成锚点（`workspace.anchor`）可被伪造的 RESOURCE 绑定满足 | Medium | `check()` 实时复查兜底（其按真实资源复查）；需要保留 resourceType 拒绝列表 |
-| M5/M5' | 授权引擎在 ainer-server 生产装配中因无 policy/ceiling 注册而全 deny；`@AinerAuthorize` 在控制器零使用；ActingGrant.check 无生产调用方 | Medium | 属于「产品装配责任」而非模块缺陷（ADR-0037 设计如此）；建议为 workspace/file 注册真实 policy 并在 AI 网关接入 check()，使引擎有活的生产路径 |
+| M5/M5' | 授权引擎在 ainer-server 生产装配中因无 policy/ceiling 注册而全 deny；`@AinerAuthorize` 在控制器零使用；ActingGrant.check 无生产调用方 | Medium | **M5 已于 2026-08-20 关闭**：参考装配注册 18 项平台权限 + 恒等天花板 + BINDING_REQUIRED 策略 + 管理面白名单 + 目录同步，`AinerServerAuthorizationLivePathTest` 证明 Binding→ALLOW→撤销→DENY 全链活。M5'（@AinerAuthorize 端点消费与 check() 网关接线）仍留给产品 |
 | L 系 | workspace 域枚举直出 API、@Nullable 缺失、内联 FQN、notification 匿名 Map 响应、ai-agent 分页无信封、注释语言中英文按模块分裂（基准英文 vs 新模块中文） | Low | 建议一次「客户可读性拉齐」批处理；注释语言方向（全中文或全英文）需负责人拍板 |
 | H5' | Access token 在线校验与 step-up 默认关闭（`AINER_SECURITY_*_ENABLED:false`） | Low | 撤销即时生效依赖 DB 直查（无缓存）已验证；在线校验建议在部署文档标注为上线必选项 |
 
