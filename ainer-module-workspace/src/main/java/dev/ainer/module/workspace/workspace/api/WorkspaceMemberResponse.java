@@ -1,28 +1,28 @@
 package dev.ainer.module.workspace.workspace.api;
 
 import dev.ainer.module.workspace.workspace.domain.WorkspaceMember;
-import dev.ainer.module.workspace.workspace.domain.WorkspaceRole;
-import dev.ainer.module.workspace.workspace.domain.WorkspaceMemberStatus;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.UUID;
 
-    public record WorkspaceMemberResponse(
+/** 成员投影响应：域枚举序列化为稳定 String，避免枚举重命名破坏 JSON 契约。 */
+public record WorkspaceMemberResponse(
         UUID workspaceId,
         String subjectId,
-        WorkspaceRole role,
-        WorkspaceMemberStatus status,
+        String role,
+        String status,
         String invitedBy,
         Instant createdAt,
-        Instant activatedAt,
+        @Nullable Instant activatedAt,
         Instant updatedAt) {
 
     static WorkspaceMemberResponse from(WorkspaceMember member) {
         return new WorkspaceMemberResponse(
                 member.workspaceId(),
                 member.subjectId().value(),
-                member.role(),
-                member.status(),
+                member.role().name(),
+                member.status().name(),
                 member.invitedBy().value(),
                 member.createdAt(),
                 member.activatedAt(),

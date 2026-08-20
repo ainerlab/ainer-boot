@@ -87,6 +87,12 @@ public class AiAgentApplicationService implements AgentDefinitionStatusResolver 
         return repository.page((safePage - 1) * safeSize, safeSize);
     }
 
+    @Transactional(readOnly = true)
+    public long count(AuthenticatedPrincipal principal) {
+        requireManage(principal);
+        return repository.count();
+    }
+
     private static void requireManage(AuthenticatedPrincipal principal) {
         if (!principal.hasScope(SCOPE_MANAGE)) {
             throw new BusinessException(StandardErrorCode.FORBIDDEN);

@@ -59,10 +59,10 @@ public class WorkspaceApplicationService {
                 dev.ainer.core.uuid.Uuidv7.generate(), workspaceName(command.name()), now);
         WorkspaceMember owner = WorkspaceMember.owner(workspace.id(), ownerSubjectId, now);
 
-        auditAllowed(principal, workspace.id(), principal.subjectId(),
-                WorkspaceAuthorizationAction.WORKSPACE_CREATE);
         workspaceRepository.insert(workspace);
         memberRepository.insert(owner);
+        auditAllowed(principal, workspace.id(), principal.subjectId(),
+                WorkspaceAuthorizationAction.WORKSPACE_CREATE);
         return workspace;
     }
 
@@ -97,13 +97,14 @@ public class WorkspaceApplicationService {
                 WorkspaceAuthorizationAction.WORKSPACE_RENAME, null);
         Workspace current = access.workspace();
         Workspace renamed = current.rename(workspaceName(name), clock.instant());
-        auditAllowed(principal, id, null, WorkspaceAuthorizationAction.WORKSPACE_RENAME);
         if (renamed == current) {
+            auditAllowed(principal, id, null, WorkspaceAuthorizationAction.WORKSPACE_RENAME);
             return current;
         }
         if (!workspaceRepository.update(renamed, current.version())) {
             throw new BusinessException(WorkspaceErrorCode.CONCURRENT_MODIFICATION);
         }
+        auditAllowed(principal, id, null, WorkspaceAuthorizationAction.WORKSPACE_RENAME);
         return renamed;
     }
 
@@ -128,8 +129,8 @@ public class WorkspaceApplicationService {
                 subjectId(principal.subjectId()),
                 now);
 
-        auditAllowed(principal, id, targetSubjectId.value(), WorkspaceAuthorizationAction.MEMBER_INVITE);
         memberRepository.insert(invitation);
+        auditAllowed(principal, id, targetSubjectId.value(), WorkspaceAuthorizationAction.MEMBER_INVITE);
         return invitation;
     }
 
@@ -152,10 +153,10 @@ public class WorkspaceApplicationService {
         }
 
         Instant now = clock.instant();
-        auditAllowed(principal, id, subjectId.value(), WorkspaceAuthorizationAction.MEMBERSHIP_ACCEPT);
         if (!memberRepository.activatePending(id, subjectId, now)) {
             throw new BusinessException(WorkspaceErrorCode.MEMBER_UPDATE_CONFLICT);
         }
+        auditAllowed(principal, id, subjectId.value(), WorkspaceAuthorizationAction.MEMBERSHIP_ACCEPT);
         return new WorkspaceMember(
                 workspace.id(), invitation.subjectId(), invitation.role(),
                 WorkspaceMemberStatus.ACTIVE, invitation.invitedBy(),
@@ -183,8 +184,8 @@ public class WorkspaceApplicationService {
                     WorkspaceErrorCode.ACCESS_DENIED);
         }
 
-        auditAllowed(principal, id, targetSubjectId.value(), WorkspaceAuthorizationAction.MEMBER_ROLE_CHANGE);
         if (target.role() == newRole) {
+            auditAllowed(principal, id, targetSubjectId.value(), WorkspaceAuthorizationAction.MEMBER_ROLE_CHANGE);
             return target;
         }
         Instant now = clock.instant();
@@ -192,6 +193,7 @@ public class WorkspaceApplicationService {
                 id, targetSubjectId, target.role(), newRole, now)) {
             throw new BusinessException(WorkspaceErrorCode.MEMBER_UPDATE_CONFLICT);
         }
+        auditAllowed(principal, id, targetSubjectId.value(), WorkspaceAuthorizationAction.MEMBER_ROLE_CHANGE);
         return new WorkspaceMember(
                 target.workspaceId(), target.subjectId(), newRole, target.status(),
                 target.invitedBy(), target.createdAt(), target.activatedAt(), now);
@@ -216,10 +218,10 @@ public class WorkspaceApplicationService {
                     WorkspaceAuthorizationAction.MEMBER_REMOVE, WorkspaceErrorCode.ACCESS_DENIED);
         }
 
-        auditAllowed(principal, id, targetSubjectId.value(), WorkspaceAuthorizationAction.MEMBER_REMOVE);
         if (!memberRepository.deleteNonOwner(id, targetSubjectId)) {
             throw new BusinessException(WorkspaceErrorCode.MEMBER_UPDATE_CONFLICT);
         }
+        auditAllowed(principal, id, targetSubjectId.value(), WorkspaceAuthorizationAction.MEMBER_REMOVE);
     }
 
     @Transactional
@@ -260,13 +262,13 @@ public class WorkspaceApplicationService {
         }
 
         Instant now = clock.instant();
-        auditAllowed(principal, id, targetSubjectId.value(),
-                WorkspaceAuthorizationAction.OWNERSHIP_TRANSFER);
         if (!memberRepository.demoteOwner(id, actorSubjectId, now)
                 || !memberRepository.promoteActiveMemberToOwner(
                         id, targetSubjectId, target.role(), now)) {
             throw new BusinessException(WorkspaceErrorCode.MEMBER_UPDATE_CONFLICT);
         }
+        auditAllowed(principal, id, targetSubjectId.value(),
+                WorkspaceAuthorizationAction.OWNERSHIP_TRANSFER);
         return new WorkspaceMember(
                 workspace.id(), target.subjectId(), WorkspaceRole.OWNER,
                 target.status(), target.invitedBy(), target.createdAt(), target.activatedAt(), now);

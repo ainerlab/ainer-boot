@@ -125,8 +125,15 @@ public final class GrantAdministrationGuard {
         if (!membershipRegistry.supports(set)) {
             throw new BusinessException(AuthorizationErrorCode.UNKNOWN_SUBJECT_SET);
         }
-        if (membershipRegistry.membership(actorSubject(actor), set, java.time.Instant.now()).isMember()) {
+        dev.ainer.authorization.policy.SubjectSetMembership selfMembership =
+                membershipRegistry.membership(actorSubject(actor), set, java.time.Instant.now());
+        if (selfMembership.isMember()) {
             throw new BusinessException(AuthorizationErrorCode.SELF_GRANT_FORBIDDEN);
+        }
+        if (selfMembership.status()
+                == dev.ainer.authorization.policy.SubjectSetMembership.Status.UNAVAILABLE) {
+            // 自提权防线失败关闭：成员事实不可读时拒绝创建，不得因解析失败放行。
+            throw new BusinessException(AuthorizationErrorCode.UNKNOWN_SUBJECT_SET);
         }
         for (dev.ainer.authorization.domain.PermissionCode code : role.role().permissions()) {
             Permission permission = permissionRegistry.find(code)
