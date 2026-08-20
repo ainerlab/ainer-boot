@@ -310,6 +310,19 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-20 M5 关闭：授权引擎生产路径激活（参考装配不再是全 deny 死链）
+- **交付**：`AinerServerAuthorizationPolicyConfiguration`——18 项平台权限（各模块 scope
+  恒等映射，`resourceType=request` 与端点适配器资源形状一致）+ scope 恒等天花板 +
+  BINDING_REQUIRED 领域策略 + 管理面白名单（`ainer.authorization.trusted-managers`，
+  缺省空=fail-closed）+ 启动目录同步（幂等 upsert，管理 API 外键可用）。与授权模块
+  同条件装配；导入顺序在授权模块之前（deny-all 正确退避）。
+- **验证**：`AinerServerAuthorizationLivePathTest` 4/0/0/0——启动同步 18 项断言；
+  **Binding 授予 ALLOW → 撤销立即 DENY**（全链激活的引擎证据）；白名单外 SERVICE 管理
+  403；无 token 401。ainer-server 13 tests 0 skipped。
+- **语义**：产品部署应覆盖/取代本参考策略（javadoc 明示）；@AinerAuthorize 端点注解
+  在模块控制器仍未使用（模块 scope 检查在应用服务层），引擎的端点消费留给产品。
+
+
 2026-08-19 注释语言统一中文（评审 L 系 follow-up 关闭，商业可读性拉齐）
 - **决策**（conventions.md §2）：`src/main/java` 注释统一中文，技术名词/类名/SQL/ADR
   编号保留英文；理由——付费客户与维护团队为中文团队，文档/错误消息/协作语言均已中文。

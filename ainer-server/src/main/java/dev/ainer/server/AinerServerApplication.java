@@ -7,6 +7,7 @@ import dev.ainer.module.config.ConfigModuleConfiguration;
 import dev.ainer.module.dictionary.DictionaryModuleConfiguration;
 import dev.ainer.module.file.FileModuleConfiguration;
 import dev.ainer.module.knowledge.KnowledgeModuleConfiguration;
+import dev.ainer.server.authorization.AinerServerAuthorizationPolicyConfiguration;
 import dev.ainer.module.organization.OrganizationModuleConfiguration;
 import dev.ainer.module.notification.NotificationModuleConfiguration;
 import dev.ainer.module.workspace.WorkspaceModuleConfiguration;
@@ -15,7 +16,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Import;
 
 @SpringBootApplication
-@Import({WorkspaceModuleConfiguration.class, AiRuntimeModuleConfiguration.class,
+@Import({AinerServerAuthorizationPolicyConfiguration.class,
+        WorkspaceModuleConfiguration.class, AiRuntimeModuleConfiguration.class,
         AuthorizationModuleConfiguration.class,
         DictionaryModuleConfiguration.class,
         ConfigModuleConfiguration.class,
@@ -23,7 +25,8 @@ import org.springframework.context.annotation.Import;
         FileModuleConfiguration.class,
         OrganizationModuleConfiguration.class,
         AiAgentModuleConfiguration.class,
-        KnowledgeModuleConfiguration.class})
+        KnowledgeModuleConfiguration.class,
+        AinerServerAuthorizationPolicyConfiguration.class})
 public class AinerServerApplication {
 
     public static void main(String[] args) {
