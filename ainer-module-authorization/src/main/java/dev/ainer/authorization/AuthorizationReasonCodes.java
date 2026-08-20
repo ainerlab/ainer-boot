@@ -3,9 +3,9 @@ package dev.ainer.authorization;
 import dev.ainer.authorization.domain.ReasonCode;
 
 /**
- * Stable, low-cardinality reason codes for {@link dev.ainer.authorization.domain.AuthorizationDecision}
- * (ADR-0030 §6.1). These must not leak resource existence or policy internals to anonymous/non-member
- * callers; HTTP adapters map them to safe outer codes.
+ * {@link dev.ainer.authorization.domain.AuthorizationDecision} 使用的稳定、低基数 reason code
+ * 集合（ADR-0030 §6.1）。这些 code 不得向匿名/非成员调用方泄露资源存在性或策略内部细节；
+ * HTTP 适配器会将其映射为安全的外层错误码。
  */
 public final class AuthorizationReasonCodes {
 

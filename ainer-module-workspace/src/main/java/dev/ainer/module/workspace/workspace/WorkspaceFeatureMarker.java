@@ -1,7 +1,7 @@
 package dev.ainer.module.workspace.workspace;
 
 /**
- * Type-safe component-scan anchor for the workspace feature.
+ * workspace 特性的类型安全组件扫描锚点。
  */
 public final class WorkspaceFeatureMarker {
 

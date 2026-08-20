@@ -2,6 +2,10 @@ package dev.ainer.module.ai.gateway.application;
 
 import java.util.Objects;
 
+/**
+ * 一次 AI 调用的最小追溯上下文：主体标识（subjectId）与请求标识（requestId），
+ * 构造时校验安全字符集与长度。
+ */
 public record InvocationContext(String subjectId, String requestId) {
 
     public InvocationContext {

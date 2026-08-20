@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Tree-structured dictionary classification (ADR-0038). Supports unlimited nesting via parentId.
+ * 树形结构的字典分类（ADR-0038）。通过 parentId 支持无限层级嵌套。
  */
 public record DictionaryType(
         UUID id,

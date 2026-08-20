@@ -1,8 +1,8 @@
 package dev.ainer.module.config.config.domain;
 
 /**
- * Supported value types for dynamic configuration (ADR-0038). The type determines how the raw string
- * value is parsed and type-safely retrieved.
+ * 动态配置支持的值类型（ADR-0038）。类型决定原始字符串如何被解析
+ * 并以类型安全的方式读取。
  */
 public enum ConfigValueType {
     STRING,

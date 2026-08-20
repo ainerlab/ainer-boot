@@ -6,8 +6,8 @@ import dev.ainer.authorization.domain.SubjectSetRef;
 import java.time.Instant;
 
 /**
- * Aggregating registry over {@link SubjectSetMembershipResolver} providers. Unknown families are
- * unsupported (fail-closed); the default aggregation returns {@code UNAVAILABLE} membership.
+ * 聚合 {@link SubjectSetMembershipResolver} 提供者的注册表。未知集合族不受支持
+ * （fail-closed）；默认聚合返回 {@code UNAVAILABLE} 成员关系。
  */
 public interface SubjectSetMembershipRegistry {
 

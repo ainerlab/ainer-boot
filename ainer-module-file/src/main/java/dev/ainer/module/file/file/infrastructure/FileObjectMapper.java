@@ -7,7 +7,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 import java.util.UUID;
 
-/** MyBatis mapper for {@code ainer_file_object}; SQL lives in {@code mapper/file/FileObjectMapper.xml}. */
+/** {@code ainer_file_object} 的 MyBatis mapper；SQL 位于 {@code mapper/file/FileObjectMapper.xml}。 */
 @Mapper
 public interface FileObjectMapper {
 

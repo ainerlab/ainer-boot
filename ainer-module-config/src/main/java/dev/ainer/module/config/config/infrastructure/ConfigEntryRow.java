@@ -3,7 +3,7 @@ package dev.ainer.module.config.config.infrastructure;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Row mapping for {@code ainer_config_entry}. */
+/** {@code ainer_config_entry} 的行映射。 */
 public class ConfigEntryRow {
     private UUID id;
     private String namespace;

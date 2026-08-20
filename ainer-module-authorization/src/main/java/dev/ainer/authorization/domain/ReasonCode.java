@@ -3,8 +3,8 @@ package dev.ainer.authorization.domain;
 import java.util.Objects;
 
 /**
- * Stable, low-cardinality reason code explaining an {@link AuthorizationDecision} (ADR-0030 §6.1, §security).
- * Reason codes must not leak resource existence or policy internals to anonymous/non-member callers.
+ * 解释 {@link AuthorizationDecision} 的稳定、低基数 reason code（ADR-0030 §6.1、§security）。
+ * reason code 不得向匿名/非成员调用方泄露资源存在性或策略内部细节。
  */
 public record ReasonCode(String value) {
 

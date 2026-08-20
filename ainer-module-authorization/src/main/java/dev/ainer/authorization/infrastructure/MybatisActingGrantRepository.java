@@ -17,7 +17,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-/** MyBatis adapter for {@code ainer_authorization_acting_grant}（ADR-0043 A1）. */
+/** {@code ainer_authorization_acting_grant} 的 MyBatis 适配器（ADR-0043 A1）。 */
 @Repository
 public class MybatisActingGrantRepository implements ActingGrantRepository {
 

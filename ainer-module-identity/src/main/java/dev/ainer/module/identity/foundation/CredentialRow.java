@@ -6,8 +6,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Mutable persistence row for {@link Credential} (MyBatis plain-POJO mapping against
- * {@code ainer_identity_credential}). {@code rotatedAt} is nullable.
+ * {@link Credential} 的可变持久化行（MyBatis 普通 POJO 映射，对应表
+ * {@code ainer_identity_credential}）。{@code rotatedAt} 可为 null。
  */
 public class CredentialRow {
 

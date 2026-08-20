@@ -3,22 +3,21 @@ package dev.ainer.authorization.domain;
 import java.util.Objects;
 
 /**
- * Request to authorize a collection/list query (ADR-0030 §7, S3).
+ * 集合/列表查询的授权请求（ADR-0030 §7、S3）。
  *
- * <p>Unlike {@link AuthorizationRequest} which targets a single concrete resource, this request
- * targets a resource <em>type</em> and asks the authorization engine to produce a typed query
- * constraint ({@code Q}) that the product repository/search adapter must apply to exclude
- * unauthorized rows at the database level. Ainer never outputs SQL strings, table names, column
- * names or search DSL — it only produces the typed {@code Q} that the product adapter translates.
+ * <p>与面向单个具体资源的 {@link AuthorizationRequest} 不同，该请求面向资源<em>类型</em>，
+ * 要求授权引擎产出类型化查询约束（{@code Q}），由产品仓储/检索适配器应用它，在数据库
+ * 层排除未授权的行。Ainer 绝不输出 SQL 字符串、表名、列名或检索 DSL——只产出由产品
+ * 适配器翻译的类型化 {@code Q}。
  *
- * @param requester       who is asking
- * @param accessMode      {@link AccessMode#PUBLIC_PROJECTION} or {@link AccessMode#AUTHENTICATED}
- * @param permission      the permission being requested (e.g. a {@code *.list.read})
- * @param resourceType    the resource type being queried
- * @param queryPurpose    a stable, human-readable purpose tag for audit/metrics (not a raw SQL fragment)
- * @param requestedQuery  product-defined, already-input-validated query intent (e.g. filters, sort keys)
- * @param context         evaluation context (time, assurance, trace)
- * @param <I>             product query-intent type
+ * @param requester       发起请求的主体
+ * @param accessMode      {@link AccessMode#PUBLIC_PROJECTION} 或 {@link AccessMode#AUTHENTICATED}
+ * @param permission      所请求的权限（例如 {@code *.list.read}）
+ * @param resourceType    被查询的资源类型
+ * @param queryPurpose    稳定、人类可读的用途标签，用于审计/指标（不是原始 SQL 片段）
+ * @param requestedQuery  产品定义、已完成输入校验的查询意图（例如过滤条件、排序键）
+ * @param context         求值上下文（时间、保证强度、追踪）
+ * @param <I>             产品查询意图类型
  */
 public record QueryAuthorizationRequest<I>(
         Requester requester,
@@ -39,6 +38,6 @@ public record QueryAuthorizationRequest<I>(
         if (queryPurpose.isBlank()) {
             throw new IllegalArgumentException("queryPurpose must not be blank");
         }
-        // requestedQuery may be null if the product has no additional intent.
+        // requestedQuery 可为 null——当产品没有额外查询意图时。
     }
 }

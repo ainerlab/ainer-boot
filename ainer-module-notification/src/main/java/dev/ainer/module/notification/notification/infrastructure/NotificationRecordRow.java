@@ -5,7 +5,7 @@ import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Row mapping for {@code ainer_notification_record}. */
+/** {@code ainer_notification_record} 的行映射。 */
 public class NotificationRecordRow {
     private UUID id;
     private @Nullable String templateCode;

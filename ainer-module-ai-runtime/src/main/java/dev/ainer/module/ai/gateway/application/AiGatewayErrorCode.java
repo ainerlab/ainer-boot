@@ -2,6 +2,10 @@ package dev.ainer.module.ai.gateway.application;
 
 import dev.ainer.core.error.ErrorCode;
 
+/**
+ * AI Model Gateway 的稳定错误码：请求/上下文校验、策略拒绝（模型白名单、prompt 大小、
+ * 敏感数据、限流、预算）与供应商失败（限流、超时、不可用、协议错误）。
+ */
 public enum AiGatewayErrorCode implements ErrorCode {
     INVALID_REQUEST("AINER.AI.INVALID_REQUEST", "AI 调用请求不合法", 400),
     INVALID_CONTEXT("AINER.AI.INVALID_CONTEXT", "调用上下文不合法", 400),

@@ -14,6 +14,13 @@ import org.springframework.core.Ordered;
 
 import java.util.List;
 
+/**
+ * Servlet web 应用的 Ainer web 自动装配。
+ *
+ * <p>注册错误码注册表（聚合 {@link ErrorCodeContributor}）、全局异常处理器与
+ * {@code X-Request-Id} 请求关联过滤器；过滤器以最高优先级注册，保证所有响应携带
+ * 请求追踪标识。全部 Bean 均可用同类型 Bean 覆盖。
+ */
 @AutoConfiguration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class AinerWebAutoConfiguration {

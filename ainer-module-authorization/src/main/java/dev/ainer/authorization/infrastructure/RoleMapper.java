@@ -7,15 +7,15 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * MyBatis mapper for the role aggregate and its permission association (ADR-0030 S1).
+ * Role 聚合及其权限关联的 MyBatis mapper（ADR-0030 S1）。
  */
 @Mapper
 public interface RoleMapper {
 
     /**
-     * Insert a role row and return the database-generated UUIDv7 primary key.
-     * Uses {@code INSERT ... RETURNING id} so must be a {@code <select>} (MyBatis disallows non-int
-     * return types on {@code <insert>}).
+     * 插入 Role 行并返回数据库生成的 UUIDv7 主键。使用
+     * {@code INSERT ... RETURNING id}，因此必须是 {@code <select>}（MyBatis 不允许
+     * {@code <insert>} 返回非 int 类型）。
      */
     UUID insertReturningId(@Param("row") RoleRow row, @Param("now") java.time.Instant now);
 
@@ -26,19 +26,18 @@ public interface RoleMapper {
     List<RoleRow> selectAll();
 
     /**
-     * Delete all permission associations for a role.
+     * 删除 Role 的全部权限关联。
      */
     int deletePermissions(@Param("roleId") UUID roleId);
 
     /**
-     * Insert a batch of permission codes for a role.
+     * 为 Role 批量插入权限 code。
      */
     int insertPermissions(@Param("roleId") UUID roleId, @Param("codes") List<String> permissionCodes,
                           @Param("now") java.time.Instant now);
 
     /**
-     * Bump the role version, guarded by an optimistic version check.
-     * Returns the number of affected rows (0 if the version is stale).
+     * 递增 Role 版本，由乐观版本检查守护。返回受影响行数（版本过期时为 0）。
      */
     int bumpVersion(@Param("roleId") UUID roleId, @Param("expectedVersion") long expectedVersion,
                     @Param("now") java.time.Instant now);

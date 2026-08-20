@@ -7,8 +7,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Append-only change audit for the dictionary module (ADR-0040). Written in the same transaction
- * as the mutation; audit failure rolls the mutation back.
+ * 字典模块的只追加变更审计（ADR-0040）。与业务变更同事务写入；
+ * 审计失败会连同业务变更一起回滚。
  */
 public record DictionaryAudit(
         UUID id,

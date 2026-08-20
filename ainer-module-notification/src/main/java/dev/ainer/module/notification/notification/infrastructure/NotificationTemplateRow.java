@@ -3,6 +3,7 @@ package dev.ainer.module.notification.notification.infrastructure;
 import java.time.Instant;
 import java.util.UUID;
 
+/** {@code ainer_notification_template} 的行映射；variablesSchema 以 JSONB 字符串形式存储。 */
 public class NotificationTemplateRow {
     private UUID id;
     private String code;

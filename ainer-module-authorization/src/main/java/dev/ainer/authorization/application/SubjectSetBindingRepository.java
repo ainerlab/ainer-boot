@@ -11,10 +11,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Persistence port for subject-set bindings (ADR-0042 O2), mirroring the direct-binding port. */
+/** 主体集合 Binding 的持久化端口（ADR-0042 O2），与直接 Binding 端口对应。 */
 public interface SubjectSetBindingRepository {
 
-    /** Persisted set binding with database identity and role reference. */
+    /** 持久化集合 Binding，附带数据库身份与 Role 引用。 */
     record PersistedSetBinding(
             UUID id,
             SubjectSetRef set,
@@ -32,6 +32,6 @@ public interface SubjectSetBindingRepository {
 
     Optional<Long> revoke(UUID id, Instant revokedAt, String reason);
 
-    /** Live (ACTIVE, time-covered) set bindings whose scope covers the resource; SQL-side filtered. */
+    /** scope 覆盖该资源的 live（ACTIVE 且时间有效）集合 Binding；SQL 侧已过滤。 */
     List<PersistedSetBinding> findLiveSetBindings(ResourceRef resource, Instant at);
 }

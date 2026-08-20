@@ -1,19 +1,19 @@
 package dev.ainer.module.identity.foundation;
 
 /**
- * Status of an {@link OAuthClientBinding} linking a rotatable OAuth {@code client_id} to a stable
- * {@link ServicePrincipal} (ADR-0033 Greenfield §2.6).
+ * 把可轮换 OAuth {@code client_id} 连接到稳定 {@link ServicePrincipal} 的
+ * {@link OAuthClientBinding} 状态（ADR-0033 Greenfield §2.6）。
  *
- * <p>Only one {@code ACTIVE} binding may exist per {@code client_id} at a time (enforced by a partial unique
- * index); a {@code RETIRED} binding is preserved for audit and historical token introspection while a fresh
- * credential occupies the same {@code client_id}.
+ * <p>同一 {@code client_id} 任一时刻至多一个 {@code ACTIVE} 绑定（由部分唯一索引强制）；
+ * {@code RETIRED} 绑定在新凭证占用同一 {@code client_id} 后保留，供审计与历史 token
+ * introspection。
  */
 public enum OAuthClientBindingStatus {
 
     ACTIVE,
     RETIRED;
 
-    /** Whether this binding currently authorises the linked client_id to authenticate as its principal. */
+    /** 该绑定当前是否授权所关联的 client_id 以其 principal 身份认证。 */
     public boolean isActive() {
         return this == ACTIVE;
     }

@@ -1,11 +1,11 @@
 package dev.ainer.module.identity.foundation;
 
 /**
- * Lifecycle status of a {@link LoginIdentity} binding (ADR-0033 Greenfield §4).
+ * {@link LoginIdentity} 绑定的生命周期状态（ADR-0033 Greenfield §4）。
  *
- * <p>{@code ACTIVE} may be used to authenticate (subject to its {@link HumanAccount} status and epoch).
- * {@code REVOKED} is terminal for that binding — unlink / re-link requires a fresh verification ceremony and
- * produces a new binding; it must never resurrect access on its own.
+ * <p>{@code ACTIVE} 可用于认证（还需满足其 {@link HumanAccount} 状态与 epoch）。
+ * {@code REVOKED} 对该绑定是终态——解绑/重新绑定需要一次全新的验证仪式并产生新绑定；
+ * 它绝不能凭自身复活访问权。
  */
 public enum LoginIdentityStatus {
 

@@ -9,7 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Persistence port for {@link DictionaryItem} entries (ADR-0038/0040).
+ * {@link DictionaryItem} 条目的持久化端口（ADR-0038/0040）。
  */
 public interface DictionaryItemRepository {
 
@@ -22,17 +22,17 @@ public interface DictionaryItemRepository {
     List<DictionaryItem> findActiveByTypeId(UUID typeId);
 
     /**
-     * Partial update with optimistic locking; {@code null} fields keep their stored value.
-     * Returns false when the row does not exist or the version is stale.
+     * 乐观锁部分更新；{@code null} 字段保留库中已有值。
+     * 行不存在或版本过期时返回 false。
      */
     boolean update(UUID id, @Nullable String label, @Nullable String labelEn,
             @Nullable String value, @Nullable Integer sortIndex,
             @Nullable String cssClass, @Nullable String remark,
             long expectedVersion, long newVersion);
 
-    /** Status transition with optimistic locking. Returns false on missing row or stale version. */
+    /** 乐观锁状态迁移。行不存在或版本过期时返回 false。 */
     boolean updateStatus(UUID id, DictionaryStatus status, long expectedVersion, long newVersion);
 
-    /** Page through items of one type (all statuses), ordered by sortIndex/code. */
+    /** 分页遍历某一类型的字典项（含全部状态），按 sortIndex/code 排序。 */
     DictionaryPageSlice<DictionaryItem> findPage(UUID typeId, long offset, int size);
 }

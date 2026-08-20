@@ -8,7 +8,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 import java.util.UUID;
 
-/** API models for the dictionary management surface (ADR-0040). Explicitly designed records. */
+/** 字典管理面的 API 模型（ADR-0040）。均为显式设计的 record。 */
 public final class DictionaryApiDtos {
 
     private DictionaryApiDtos() {

@@ -8,17 +8,16 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Stable non-human security principal within one {@link IdentityAuthorityRef} (ADR-0033 Greenfield §2.6).
+ * 单一 {@link IdentityAuthorityRef}（身份权威）内稳定的非人类安全主体
+ * （ADR-0033 Greenfield §2.6）。
  *
- * <p>A ServicePrincipal is the audit-stable identity of a non-human caller. OAuth {@code client_id}s are
- * rotatable credentials bound to it (see {@link OAuthClientBinding}), not the principal itself: client
- * rotation must never change the audit identity. A service can never hold a human WorkspaceMembership or a
- * governance OWNER role.
+ * <p>ServicePrincipal 是非人类调用方在审计上稳定的身份。OAuth {@code client_id} 是绑定到
+ * 它之上的可轮换凭证（见 {@link OAuthClientBinding}），不是主体本身：客户端轮换绝不能
+ * 改变审计身份。Service 绝不能持有人类的 WorkspaceMembership 或治理 OWNER 角色。
  *
- * <p>{@code securityEpoch} mirrors {@link HumanAccount#securityEpoch()}: a monotonic principal-wide
- * revocation version — credentials, sessions and tokens minted before the current epoch are invalid. It is
- * the Greenfield replacement for the legacy service-client lookup that conflated {@code client_id} with
- * subject.
+ * <p>{@code securityEpoch} 与 {@link HumanAccount#securityEpoch()} 对应：单调递增的
+ * principal 级 revocation 版本——早于当前 epoch 签发的凭证、会话与 token 全部失效。
+ * 它是旧版把 {@code client_id} 混同为主体的服务客户端查找的 Greenfield 替代。
  */
 public record ServicePrincipal(
         UUID principalId,
@@ -38,8 +37,8 @@ public record ServicePrincipal(
     }
 
     /**
-     * The authority-qualified principal reference used by token issuance, authorization and audit. The
-     * {@code servicePrincipalId} is the stable UUID string of this principal, never a rotatable client_id.
+     * 供 token 签发、授权与审计使用的、带权威限定的主体引用。{@code servicePrincipalId}
+     * 是该主体的稳定 UUID 字符串，绝不是可轮换的 client_id。
      */
     public ServiceSubjectRef toSubjectRef() {
         return new ServiceSubjectRef(authority, principalId.toString());

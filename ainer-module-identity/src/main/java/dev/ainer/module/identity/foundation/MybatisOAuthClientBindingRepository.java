@@ -6,9 +6,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * PostgreSQL implementation of {@link OAuthClientBindingRepository} (Greenfield foundation persistence, S1.1 spine).
- * Mirrors the project's plain-MyBatis repository style: delegates to {@link OAuthClientBindingMapper},
- * generates primary keys via {@code uuidv7()} and fails loudly when an insert does not affect exactly one row.
+ * {@link OAuthClientBindingRepository} 的 PostgreSQL 实现（Greenfield foundation 持久化，
+ * S1.1 主干）。沿用项目统一的纯 MyBatis 仓库风格：委托给
+ * {@link OAuthClientBindingMapper}，通过 {@code uuidv7()} 生成主键，插入未精确影响一行时
+ * 立即失败。
  */
 @Repository
 public class MybatisOAuthClientBindingRepository implements OAuthClientBindingRepository {

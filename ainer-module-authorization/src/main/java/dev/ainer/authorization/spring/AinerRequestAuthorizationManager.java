@@ -26,37 +26,35 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
- * HTTP-layer Spring Security {@link AuthorizationManager} backed by Ainer's
- * {@link AuthorizationService} (ADR-0037 §4, ADR-0030 §8.2).
+ * 由 Ainer {@link AuthorizationService} 支撑的 HTTP 层 Spring Security
+ * {@link AuthorizationManager}（ADR-0037 §4、ADR-0030 §8.2）。
  *
- * <p>For each request matched to this manager, it:
+ * <p>对每个匹配到该管理器的请求，它依次：
  * <ol>
- *   <li>resolves the {@link AuthenticatedPrincipal} via {@link AuthenticatedPrincipalResolver}
- *       (which reads the verified JWT from the SecurityContext);</li>
- *   <li>reads the permission code and access mode from request attributes set by
- *       {@link AinerAuthorizeInterceptor};</li>
- *   <li>builds an {@link AuthorizationRequest} and calls {@link AuthorizationService#authorize};</li>
- *   <li>maps the {@link AuthorizationDecision} to an {@link AinerAuthorizationResult}.</li>
+ *   <li>通过 {@link AuthenticatedPrincipalResolver} 解析 {@link AuthenticatedPrincipal}
+ *       （从 SecurityContext 读取已验证 JWT）；</li>
+ *   <li>从 {@link AinerAuthorizeInterceptor} 写入的请求属性读取权限 code 与访问模式；</li>
+ *   <li>构建 {@link AuthorizationRequest} 并调用 {@link AuthorizationService#authorize}；</li>
+ *   <li>把 {@link AuthorizationDecision} 映射为 {@link AinerAuthorizationResult}。</li>
  * </ol>
  *
- * <p>The manager is invoked by {@link AinerAuthorizeInterceptor} after Spring MVC resolves the
- * annotated handler. It is intentionally not installed as the catch-all manager in the earlier
- * servlet filter chain because handler annotations do not exist at that stage.
+ * <p>该管理器由 {@link AinerAuthorizeInterceptor} 在 Spring MVC 解析出带注解的 handler
+ * 之后调用。它有意不作为更早的 servlet 过滤链中的兜底管理器安装，因为那一阶段还不存在
+ * handler 注解。
  *
- * <p><strong>First-version limitation</strong>: {@link ResourceRef} is a generic placeholder
- * (workspaceId from request attribute if present, otherwise a synthetic "any" resource). A typed
- * {@code AuthorizationTargetResolver} that maps path variables / request body to concrete
- * {@code ResourceRef} is a future slice (ADR-0037 §4). Until then, this manager is suitable for
- * coarse-grained permission gates (e.g. "must have {@code authorization.manage}"), not for
- * per-resource ownership checks — those must still be done explicitly in the application service
- * (ADR-0030 §8.4).
+ * <p><strong>第一版限制</strong>：{@link ResourceRef} 是通用占位（若请求属性中存在
+ * workspaceId 则使用之，否则合成一个"任意"资源）。把路径变量/请求体映射为具体
+ * {@code ResourceRef} 的类型化 {@code AuthorizationTargetResolver} 属于未来切片
+ * （ADR-0037 §4）。在此之前，该管理器适合粗粒度权限闸门（例如"必须持有
+ * {@code authorization.manage}"），不适合逐资源归属检查——那类检查仍必须在应用服务中
+ * 显式完成（ADR-0030 §8.4）。
  *
- * <p>This class lives in the {@code spring/} adapter boundary (ADR-0037 §3).
+ * <p>该类位于 {@code spring/} 适配器边界（ADR-0037 §3）。
  */
 public final class AinerRequestAuthorizationManager
         implements AuthorizationManager<RequestAuthorizationContext> {
 
-    /** Request attribute the step-up filter publishes when the current token carries recent strong auth. */
+    /** step-up 过滤器在当前 Token 携带近期强认证时发布的请求属性键。 */
     public static final String RECENT_STRONG_AUTH_ATTRIBUTE =
             "dev.ainer.security.authorization.recentStrongAuthentication";
 
@@ -81,8 +79,8 @@ public final class AinerRequestAuthorizationManager
         HttpServletRequest request = context.getRequest();
         String permissionCode = AinerAuthorizeInterceptor.resolvePermission(request);
         if (permissionCode == null || permissionCode.isBlank()) {
-            // No @AinerAuthorize on this handler — defer to the default anyRequest().authenticated() policy.
-            // Returning null tells Spring Security to fall through to the next manager / matcher.
+            // 该 handler 上没有 @AinerAuthorize——交给默认的 anyRequest().authenticated() 策略。
+            // 返回 null 告知 Spring Security 落入下一个管理器/匹配器。
             return null;
         }
 
@@ -112,9 +110,8 @@ public final class AinerRequestAuthorizationManager
     }
 
     /**
-     * Step-up filter publishes its strong-authentication verdict as a request attribute; the
-     * authorization context consumes it so HIGH-risk permissions can distinguish a recent strong
-     * authentication from a plain session instead of challenging unconditionally.
+     * step-up 过滤器把强认证结论发布为请求属性；授权上下文消费它，让 HIGH 风险权限能够
+     * 区分"近期强认证"与普通会话，而不是一律发起挑战。
      */
     private static AuthorizationContext.Assurance resolveAssurance(HttpServletRequest request) {
         return Boolean.TRUE.equals(request.getAttribute(RECENT_STRONG_AUTH_ATTRIBUTE))
@@ -123,9 +120,8 @@ public final class AinerRequestAuthorizationManager
     }
 
     /**
-     * Persists the decision audit row according to the permission's audit level (ADR-0037 §12.4).
-     * The service writes in an independent transaction, so a DENY audit survives any later
-     * business rollback; audit failures propagate and block the request (fail-closed).
+     * 按权限的审计级别持久化决策审计行（ADR-0037 §12.4）。服务在独立事务中写入，
+     * 因此 DENY 审计在任何后续业务回滚后仍存活；审计失败会传播并阻断请求（fail-closed）。
      */
     private void recordDecisionAudit(
             AuthorizationRequest authRequest, AuthorizationDecision decision,
@@ -161,9 +157,9 @@ public final class AinerRequestAuthorizationManager
     }
 
     /**
-     * Resolve a {@link ResourceRef} from the request. First version uses a synthetic "any-resource"
-     * placeholder with an optional workspaceId from a request attribute
-     * ({@code ainer.authorization.workspaceId}). A typed target resolver is a future slice.
+     * 从请求解析 {@link ResourceRef}。第一版使用合成"任意资源"占位，workspaceId 可选地
+     * 来自请求属性（{@code ainer.authorization.workspaceId}）。类型化目标解析器属于
+     * 未来切片。
      */
     private static ResourceRef resolveResource(HttpServletRequest request) {
         Object wsId = request.getAttribute("ainer.authorization.workspaceId");

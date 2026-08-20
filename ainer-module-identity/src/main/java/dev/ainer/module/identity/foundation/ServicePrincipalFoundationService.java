@@ -11,20 +11,20 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
- * Application core for the Greenfield ServicePrincipal model (ADR-0033 Greenfield §2.6, S1.1 spine).
+ * Greenfield ServicePrincipal 模型的应用核心（ADR-0033 Greenfield §2.6、S1.1 主干）。
  *
- * <p>Exercises {@link ServicePrincipal} + {@link OAuthClientBinding} via the foundation ports. The principal
- * is the audit-stable non-human identity; an OAuth {@code client_id} is a rotatable credential bound to it.
- * Client rotation must never change the audit identity, and a binding collision (an ACTIVE binding already
- * exists for the same client_id) is a hard conflict.
+ * <p>通过 foundation 端口驱动 {@link ServicePrincipal} + {@link OAuthClientBinding}。
+ * principal 是审计上稳定的非人类身份；OAuth {@code client_id} 是绑定到它之上的可轮换
+ * 凭证。客户端轮换绝不能改变审计身份；绑定冲突（同一 client_id 已存在 ACTIVE 绑定）
+ * 是硬冲突。
  *
- * <p>Like {@link IdentityFoundationService}, this service is deliberately decoupled from the legacy
- * tenant-bound services and does not touch them. It is the working core that the destructive cutover wires
- * into the token-issuance path to project stable {@code ServiceSubjectRef}s from rotatable credentials.
+ * <p>与 {@link IdentityFoundationService} 一样，该服务刻意与旧版 tenant 绑定服务解耦，
+ * 不触碰它们。破坏性切换时把本核心接入 token 签发路径，把可轮换凭证投影为稳定的
+ * {@code ServiceSubjectRef}。
  *
- * <p>Not annotated {@code @Service}: the {@code Supplier<UUID>} id source is bound to the foundation
- * repository's {@code nextUuidV7()} in {@code IdentityModuleConfiguration}, so the bean is declared explicitly
- * there rather than auto-wired with an ambiguous {@code Supplier}.
+ * <p>未标注 {@code @Service}：{@code Supplier<UUID>} ID 来源在
+ * {@code IdentityModuleConfiguration} 中绑定到 foundation 仓库的 {@code nextUuidV7()}，
+ * 因此 bean 在那里显式声明，而不是注入语义含糊的 {@code Supplier}。
  */
 public class ServicePrincipalFoundationService {
 
@@ -45,7 +45,8 @@ public class ServicePrincipalFoundationService {
     }
 
     /**
-     * Register a new ACTIVE ServicePrincipal. Fails closed if a principal already exists for the same id.
+     * 注册一个新的 ACTIVE ServicePrincipal。同一 ID 已存在 principal 时失败关闭
+     * （fail-closed）。
      */
     public ServicePrincipal registerServicePrincipal(IdentityAuthorityRef authority) {
         Objects.requireNonNull(authority, "authority");
@@ -57,8 +58,8 @@ public class ServicePrincipalFoundationService {
     }
 
     /**
-     * Bind a rotatable OAuth client_id to an existing ACTIVE ServicePrincipal. Fails closed if the principal
-     * does not exist, is not active, or already carries an ACTIVE binding for the same client_id.
+     * 把可轮换的 OAuth client_id 绑定到既有 ACTIVE ServicePrincipal。principal 不存在、
+     * 不处于活跃状态，或同一 client_id 已携带 ACTIVE 绑定时，一律失败关闭（fail-closed）。
      */
     public OAuthClientBinding bindClient(UUID principalId, String clientId) {
         Objects.requireNonNull(principalId, "principalId");
@@ -78,7 +79,7 @@ public class ServicePrincipalFoundationService {
         return binding;
     }
 
-    /** Resolve the stable principal backing a rotatable OAuth client_id, if any. */
+    /** 解析可轮换 OAuth client_id 背后的稳定 principal（如存在）。 */
     public Optional<ServicePrincipal> findPrincipalByClientId(String clientId) {
         requireNonBlank(clientId, "clientId");
         return principalRepository.findByActiveClientId(clientId);

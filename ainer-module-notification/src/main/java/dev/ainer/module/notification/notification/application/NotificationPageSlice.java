@@ -2,7 +2,7 @@ package dev.ainer.module.notification.notification.application;
 
 import java.util.List;
 
-/** Generic pagination slice for notification queries (items + total). */
+/** 通知查询的通用分页切片（items + total）。 */
 public record NotificationPageSlice<T>(List<T> items, long total) {
 
     public NotificationPageSlice {

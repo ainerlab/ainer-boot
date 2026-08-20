@@ -5,9 +5,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.util.Set;
 
 /**
- * Size and content-type limits for uploads (ADR-0040 spec: 大小/类型限制). Fail-closed defaults:
- * a blank content type is always rejected; only listed types are accepted. Override via
- * {@code ainer.file.max-size-bytes} / {@code ainer.file.allowed-content-types}.
+ * 上传的大小与内容类型限制（ADR-0040 规格：大小/类型限制）。默认值失败关闭：
+ * 空白内容类型一律拒绝；仅接受列表内类型。可通过
+ * {@code ainer.file.max-size-bytes} / {@code ainer.file.allowed-content-types} 覆盖。
  */
 @ConfigurationProperties(prefix = "ainer.file")
 public record FileStorageProperties(long maxSizeBytes, Set<String> allowedContentTypes) {

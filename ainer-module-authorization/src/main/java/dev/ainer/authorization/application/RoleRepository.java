@@ -9,20 +9,20 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Persistence port for Role aggregates (ADR-0030 S1). Implemented by the infrastructure layer;
- * consumed by {@link RoleApplicationService}.
+ * Role 聚合的持久化端口（ADR-0030 S1）。由基础设施层实现；由
+ * {@link RoleApplicationService} 消费。
  */
 public interface RoleRepository {
 
     /**
-     * Persisted Role carrying its database identity alongside the domain {@link Role} value.
+     * 持久化 Role，附带数据库身份与领域 {@link Role} 值。
      *
-     * @param id          database-generated UUIDv7 primary key
-     * @param role        domain value (code + name + permissions)
-     * @param systemRole  whether this is a built-in system role that cannot be deleted
-     * @param version     optimistic-concurrency version
-     * @param createdAt   row creation timestamp (set once on insert)
-     * @param updatedAt   row last-modification timestamp (refreshed on version bump)
+     * @param id          数据库生成的 UUIDv7 主键
+     * @param role        领域值（code + name + permissions）
+     * @param systemRole  是否为不可删除的内建系统角色
+     * @param version     乐观并发版本
+     * @param createdAt   行创建时间戳（插入时一次性写入）
+     * @param updatedAt   行最后修改时间戳（版本递增时刷新）
      */
     record RoleRecord(UUID id, Role role, boolean systemRole, long version,
                       java.time.Instant createdAt, java.time.Instant updatedAt) {
@@ -35,17 +35,16 @@ public interface RoleRepository {
     Optional<RoleRecord> findActiveByCode(String code);
 
     /**
-     * Atomically replace the permission set of the role identified by {@code roleId}, provided the
-     * current version matches {@code expectedVersion}. Returns the updated version, or empty if the
-     * version check fails.
+     * 在当前版本与 {@code expectedVersion} 匹配的前提下，原子替换 {@code roleId} 对应
+     * Role 的权限集合。成功返回更新后的版本，版本检查失败返回空。
      */
     Optional<Long> replacePermissions(UUID roleId, Set<PermissionCode> permissions, long expectedVersion);
 
     Collection<RoleRecord> findAll();
 
     /**
-     * Load the permissions granted by the given role IDs. Used by the binding resolver to reconstruct
-     * domain {@link Role} instances without a separate round-trip per binding.
+     * 加载给定 Role ID 授予的权限。供 Binding 解析器重建领域 {@link Role} 实例，
+     * 无需按 Binding 逐条往返查询。
      */
     Set<PermissionCode> findPermissionCodesByRoleId(UUID roleId);
 }

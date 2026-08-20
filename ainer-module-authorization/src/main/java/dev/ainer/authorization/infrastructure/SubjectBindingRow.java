@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Row mapping for {@code ainer_authorization_subject_binding}.
+ * {@code ainer_authorization_subject_binding} 的行映射。
  */
 public class SubjectBindingRow {
 

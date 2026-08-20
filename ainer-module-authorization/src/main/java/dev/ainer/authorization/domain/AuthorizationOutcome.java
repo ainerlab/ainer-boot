@@ -1,9 +1,8 @@
 package dev.ainer.authorization.domain;
 
 /**
- * Outcome of an authorization evaluation (ADR-0030 §6). {@link #CHALLENGE} means the action must not
- * proceed until the requested factor/confirmation/approval is satisfied, after which the decision must be
- * re-evaluated; it is not an ALLOW.
+ * 授权求值的结果（ADR-0030 §6）。{@link #CHALLENGE} 表示在所要求的因子/确认/审批被满足
+ * 之前动作不得继续，满足后必须重新求值；它不是 ALLOW。
  */
 public enum AuthorizationOutcome {
     ALLOW,

@@ -15,6 +15,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * {@link NotificationRecordRepository} 的 MyBatis 适配器，对应表 {@code ainer_notification_record}。
+ * 队列领取（SKIP LOCKED）、发送结果回写与运维分页由对应 mapper 语句完成；
+ * payload 在 JSONB 与 Map 之间双向转换，解析失败按空值降级。
+ */
 @Repository
 public class MybatisNotificationRecordRepository implements NotificationRecordRepository {
 

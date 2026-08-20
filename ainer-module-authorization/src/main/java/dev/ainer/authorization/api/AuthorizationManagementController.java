@@ -37,15 +37,14 @@ import java.util.UUID;
 import static dev.ainer.authorization.api.AuthorizationApiDtos.*;
 
 /**
- * Management REST API for the authorization module (ADR-0030 S2).
+ * 授权模块的管理 REST API（ADR-0030 S2）。
  *
- * <p>All endpoints require a service principal with {@code authorization.manage} scope plus exact
- * trust from the host's versioned GrantAdministrationPolicy. The guard also constrains assignable
- * permissions, scopes and targets and rejects self modification; scope possession alone never
- * grants administration authority.
+ * <p>所有端点都要求持有 {@code authorization.manage} scope 的 SERVICE 主体，且通过宿主
+ * 带版本的 GrantAdministrationPolicy 的精确受信校验。守卫同时约束可分配的权限、scope
+ * 与目标，并拒绝自我修改；仅拥有 scope 绝不等于拥有管理权。
  *
- * <p>Mutations use the action-path noun convention ({@code POST .../revocations}) rather than physical
- * DELETE — revocation is a logical state transition, not row deletion.
+ * <p>变更类操作采用动作路径名词约定（{@code POST .../revocations}）而非物理 DELETE——
+ * 撤销是逻辑状态迁移，不是行删除。
  */
 @RestController
 @RequestMapping("/api/authorization")
@@ -85,7 +84,7 @@ public class AuthorizationManagementController {
         this.administrationGuard = administrationGuard;
     }
 
-    // ---- Permission catalog (read-only) ----
+    // ---- 权限目录（只读） ----
 
     @GetMapping("/permissions")
     public ApiResponse<List<PermissionResponse>> permissions(HttpServletRequest request) {
@@ -96,7 +95,7 @@ public class AuthorizationManagementController {
         return ApiResponse.success(items, RequestIds.currentOrCreate(request));
     }
 
-    // ---- Role management ----
+    // ---- Role 管理 ----
 
     @PostMapping("/roles")
     public ResponseEntity<ApiResponse<RoleResponse>> createRole(
@@ -142,7 +141,7 @@ public class AuthorizationManagementController {
         return ApiResponse.success(RoleResponse.from(reloaded, codeStrings), RequestIds.currentOrCreate(request));
     }
 
-    // ---- Binding management ----
+    // ---- Binding 管理 ----
 
     @PostMapping("/bindings")
     public ResponseEntity<ApiResponse<BindingResponse>> createBinding(
@@ -184,7 +183,7 @@ public class AuthorizationManagementController {
         return ApiResponse.success(BindingResponse.from(pb), RequestIds.currentOrCreate(request));
     }
 
-    // ---- Subject-set binding management (ADR-0042 O2) ----
+    // ---- 主体集合 Binding 管理（ADR-0042 O2） ----
 
     @PostMapping("/set-bindings")
     public ResponseEntity<ApiResponse<SetBindingResponse>> createSetBinding(
@@ -230,7 +229,7 @@ public class AuthorizationManagementController {
         return ApiResponse.success(SetBindingResponse.from(pb), RequestIds.currentOrCreate(request));
     }
 
-    // ---- Acting grants (ADR-0043 A1) ----
+    // ---- ActingGrant 委托授权（ADR-0043 A1） ----
 
     @PostMapping("/acting-grants")
     public ResponseEntity<ApiResponse<ActingGrantResponse>> createActingGrant(
@@ -280,7 +279,7 @@ public class AuthorizationManagementController {
                 RequestIds.currentOrCreate(request));
     }
 
-    // ---- Effective Access ----
+    // ---- Effective Access 查询 ----
 
     @GetMapping("/effective-access")
     public ApiResponse<EffectiveAccessResponse> effectiveAccess(
@@ -295,7 +294,7 @@ public class AuthorizationManagementController {
         return ApiResponse.success(response, RequestIds.currentOrCreate(request));
     }
 
-    // ---- Helpers ----
+    // ---- 辅助方法 ----
 
     private AuthenticatedPrincipal requireManagement() {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();

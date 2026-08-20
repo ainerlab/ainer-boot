@@ -6,14 +6,13 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Sealed notification intent — what the caller wants to send. Designed for record pattern
- * deconstruction in the dispatch layer (JDK 25):
- * {@code switch (intent) { case TemplateIntent t -> ...; case DirectIntent d -> ...; }}.
+ * sealed 通知意图——调用方想发送什么。为分发层的 record 模式解构而设计（JDK 25）：
+ * {@code switch (intent) { case TemplateIntent t -> ...; case DirectIntent d -> ...; }}。
  *
- * <p>Two implementations:
+ * <p>两个实现：
  * <ul>
- *   <li>{@link TemplateIntent} — render a template by code with variable bindings;</li>
- *   <li>{@link DirectIntent} — send a raw title/body without a template.</li>
+ *   <li>{@link TemplateIntent}——按编码渲染模板并绑定变量；</li>
+ *   <li>{@link DirectIntent}——不经模板直接发送 title/body。</li>
  * </ul>
  */
 public sealed interface NotificationIntent permits NotificationIntent.TemplateIntent, NotificationIntent.DirectIntent {
@@ -21,7 +20,7 @@ public sealed interface NotificationIntent permits NotificationIntent.TemplateIn
     NotificationChannel channel();
     String recipient();
 
-    /** Render a template by code with JSONB variable bindings. */
+    /** 按编码渲染模板并绑定 JSONB 变量。 */
     record TemplateIntent(
             NotificationChannel channel,
             String recipient,
@@ -36,7 +35,7 @@ public sealed interface NotificationIntent permits NotificationIntent.TemplateIn
         }
     }
 
-    /** Send a raw message without a template. */
+    /** 不经模板直接发送原始消息。 */
     record DirectIntent(
             NotificationChannel channel,
             String recipient,

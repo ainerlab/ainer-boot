@@ -4,19 +4,18 @@ import dev.ainer.authorization.domain.AuthorizedQueryPlan;
 import dev.ainer.authorization.domain.QueryAuthorizationRequest;
 
 /**
- * Produces a typed {@link AuthorizedQueryPlan} for a collection/list query (ADR-0030 §7, S3).
+ * 为集合/列表查询产出类型化 {@link AuthorizedQueryPlan}（ADR-0030 §7、S3）。
  *
- * <p>This is the query-level analog of {@link dev.ainer.authorization.AuthorizationService#authorize}.
- * Instead of deciding on a single concrete resource, the planner evaluates the requester's bindings
- * and scope ceiling to produce a typed constraint {@code Q} that the product repository/search adapter
- * must apply to the database query.
+ * <p>这是 {@link dev.ainer.authorization.AuthorizationService#authorize} 的查询级对应物。
+ * 规划器不是对单个具体资源做决策，而是求值请求者的 Binding 与 scope ceiling，产出一个
+ * 类型化约束 {@code Q}，由产品仓储/检索适配器应用到数据库查询上。
  *
- * <p>Ainer's own implementation handles scope ceiling, binding aggregation and grant-path routing.
- * Product modules supply their own {@code I} (query intent) and {@code Q} (constraint) types; they
- * translate {@code Q} to parameterized SQL or search filters — Ainer never outputs SQL.
+ * <p>Ainer 自身的实现处理 scope ceiling、Binding 聚合与授权路径分流。产品模块提供自己的
+ * {@code I}（查询意图）与 {@code Q}（约束）类型；由它们把 {@code Q} 翻译为参数化 SQL
+ * 或检索过滤条件——Ainer 绝不输出 SQL。
  *
- * @param <I> product-defined query-intent type (already input-validated)
- * @param <Q> product-defined typed query constraint (applied by the repository/search adapter)
+ * @param <I> 产品定义的查询意图类型（已完成输入校验）
+ * @param <Q> 产品定义的类型化查询约束（由仓储/检索适配器应用）
  */
 public interface QueryAuthorizationPlanner<I, Q> {
 

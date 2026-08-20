@@ -7,9 +7,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Append-only change audit for the file module (ADR-0040). Written in the same transaction as the
- * mutation; {@code fileId} is nulled by the database when the referenced object row is deleted, so
- * the audit fact survives the file.
+ * 文件模块的只追加变更审计（ADR-0040）。与业务变更同事务写入；被引用的对象行被删除时，
+ * {@code fileId} 由数据库置空，因此审计事实的生命周期比文件本身更长。
  */
 public record FileAudit(
         UUID id,

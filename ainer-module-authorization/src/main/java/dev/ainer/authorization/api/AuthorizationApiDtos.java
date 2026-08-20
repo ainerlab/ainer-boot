@@ -14,8 +14,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Request and response DTOs for the authorization management API (ADR-0030 S2).
- * All records are public; response factories are package-private static {@code from(...)} methods.
+ * 授权管理 API 的请求与响应 DTO（ADR-0030 S2）。所有 record 均为 public；
+ * 响应工厂是包私有的静态 {@code from(...)} 方法。
  */
 public final class AuthorizationApiDtos {
 

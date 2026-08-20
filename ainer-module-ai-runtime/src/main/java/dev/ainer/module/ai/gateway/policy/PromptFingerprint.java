@@ -8,6 +8,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 
+/**
+ * prompt 指纹：对消息序列（role + content）计算 SHA-256，供审计关联同一 prompt
+ * 而不存储正文。
+ */
 public final class PromptFingerprint {
 
     public String digest(List<ModelMessage> messages) {

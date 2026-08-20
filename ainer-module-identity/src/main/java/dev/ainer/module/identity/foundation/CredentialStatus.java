@@ -1,11 +1,10 @@
 package dev.ainer.module.identity.foundation;
 
 /**
- * Lifecycle status of a {@link Credential} (ADR-0033 Greenfield §4).
+ * {@link Credential} 的生命周期状态（ADR-0033 Greenfield §4）。
  *
- * <p>Only {@code ACTIVE} material takes part in authentication. {@code REVOKED} marks material superseded by
- * a rotation or otherwise invalidated for future use; it is kept for audit while the new ACTIVE material for
- * the same {@code (account, type)} is inserted.
+ * <p>只有 {@code ACTIVE} 材料参与认证。{@code REVOKED} 标记被轮换取代或因其他原因
+ * 失效的材料；在同一 {@code (account, type)} 插入新的 ACTIVE 材料时，旧材料保留供审计。
  */
 public enum CredentialStatus {
 

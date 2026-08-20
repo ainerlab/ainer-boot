@@ -11,8 +11,8 @@ import org.springframework.context.annotation.Configuration;
 import java.time.Clock;
 
 /**
- * Module configuration for the dictionary slice (ADR-0038). Assembled by the host application via
- * {@code @Import}. Enabled by default; disable with {@code ainer.dictionary.enabled=false}.
+ * 字典切片的模块配置（ADR-0038）。由宿主应用通过 {@code @Import} 装配。
+ * 默认启用，可通过 {@code ainer.dictionary.enabled=false} 关闭。
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "ainer.dictionary", name = "enabled", havingValue = "true", matchIfMissing = true)

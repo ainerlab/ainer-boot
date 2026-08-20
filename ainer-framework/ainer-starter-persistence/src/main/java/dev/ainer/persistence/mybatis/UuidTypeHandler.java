@@ -12,6 +12,10 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.UUID;
 
+/**
+ * MyBatis {@link UUID} 类型处理器：以 PostgreSQL 原生 uuid 类型（JDBC {@code Types.OTHER}）
+ * 读写，避免 varchar 往返与大小写/连字符差异。
+ */
 @MappedTypes(UUID.class)
 @MappedJdbcTypes(JdbcType.OTHER)
 public final class UuidTypeHandler extends BaseTypeHandler<UUID> {

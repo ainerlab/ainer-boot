@@ -1,32 +1,32 @@
 package dev.ainer.module.notification.notification.domain;
 
 /**
- * SPI for sending a notification via a specific channel (ADR-0038). Products implement this for
- * each channel (SMS gateway, SMTP email, push service, webhook). The default in-memory noop sender
- * is for testing; production uses real adapters.
+ * 通过特定渠道发送通知的 SPI（ADR-0038）。产品为每个渠道提供实现
+ * （短信网关、SMTP 邮件、push 服务、webhook）。默认的内存 noop sender 用于测试；
+ * 生产环境使用真实适配器。
  *
- * <p>Senders run on virtual threads — implementations may block freely (HTTP calls, SMTP) without
- * blocking platform threads.
+ * <p>sender 运行在虚拟线程上——实现可以自由阻塞（HTTP 调用、SMTP），
+ * 不会阻塞平台线程。
  */
 public interface ChannelSender {
 
     /**
-     * Which channel this sender handles. Used for switch pattern dispatch:
-     * {@code switch (sender.channel()) { case SMS -> ...; case EMAIL -> ...; }}.
+     * 该 sender 负责的渠道。用于 switch 模式路由：
+     * {@code switch (sender.channel()) { case SMS -> ...; case EMAIL -> ...; }}。
      */
     NotificationChannel channel();
 
     /**
-     * Send a notification synchronously. Throws on failure — the caller handles retry.
+     * 同步发送一条通知。失败时抛出——重试由调用方处理。
      *
-     * @param recipient target address (phone, email, device token, URL)
-     * @param title     message title (may be null for SMS)
-     * @param body      message body
+     * @param recipient 目标地址（手机号、邮箱、设备 token、URL）
+     * @param title     消息标题（短信渠道可为 null）
+     * @param body      消息正文
      */
     void send(String recipient, String title, String body);
 
     /**
-     * Result of a send attempt, for structured error handling.
+     * 单次发送尝试的结果，用于结构化错误处理。
      */
     record SendResult(boolean success, @org.jspecify.annotations.Nullable String errorMessage) {
         public static SendResult ok() { return new SendResult(true, null); }

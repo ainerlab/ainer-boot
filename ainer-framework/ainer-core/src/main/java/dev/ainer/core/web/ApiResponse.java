@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Stable response envelope. HTTP status remains authoritative for transport semantics.
+ * 稳定响应信封。传输层语义仍以 HTTP 状态码为权威。
  */
 public record ApiResponse<T>(String code, String message, @Nullable T data, String requestId, Instant timestamp) {
 

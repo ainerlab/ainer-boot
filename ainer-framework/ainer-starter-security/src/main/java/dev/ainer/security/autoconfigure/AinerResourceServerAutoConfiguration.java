@@ -37,6 +37,17 @@ import java.net.URI;
 import java.time.Clock;
 import java.util.List;
 
+/**
+ * Servlet 应用的 Ainer JWT Resource Server 自动装配（需显式
+ * {@code ainer.security.resource-server.enabled=true}）。
+ *
+ * <p>装配无状态 Bearer JWT 安全链：除 {@code publicPaths} 外全部要求认证，Prometheus
+ * 端点要求携带 {@code platform.metrics.read} scope 的 SERVICE token；401/403 经
+ * {@link AinerSecurityFailureWriter} 写出 {@code ApiResponse} 错误信封。按需启用
+ * introspection 在线校验（{@link OnlineAccessTokenValidationFilter}）与近期强认证
+ * step-up 门禁（{@link RecentStrongAuthenticationFilter}），两者都插在
+ * {@code BearerTokenAuthenticationFilter} 之后。
+ */
 @AutoConfiguration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @ConditionalOnProperty(prefix = "ainer.security.resource-server", name = "enabled", havingValue = "true")

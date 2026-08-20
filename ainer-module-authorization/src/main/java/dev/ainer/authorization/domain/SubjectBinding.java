@@ -6,8 +6,8 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Assigns a {@link Role} and precise {@link Scope} to a subject over a validity window (ADR-0030 §4.1).
- * Bindings are revocable; a still-valid JWT cannot restore a revoked database grant.
+ * 在有效时间窗口内为主体分配 {@link Role} 与精确 {@link Scope}（ADR-0030 §4.1）。
+ * Binding 可撤销；仍然有效的 JWT 无法恢复已撤销的数据库授权。
  */
 public record SubjectBinding(
         SubjectRef subject,
@@ -24,7 +24,7 @@ public record SubjectBinding(
         Objects.requireNonNull(scope, "scope");
         Objects.requireNonNull(status, "status");
         Objects.requireNonNull(validFrom, "validFrom");
-        // validUntil may be null (open-ended)
+        // validUntil 可为 null（开放式，无截止时间）。
     }
 
     public boolean isLive(PermissionCode permission, ResourceRef resource, Instant at) {

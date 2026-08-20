@@ -5,22 +5,21 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Append-only record of a management action on the authorization catalog (ADR-0030 §11.7, §12.4).
- * Role/Binding changes must be persisted in the same transaction as the change; an audit write
- * failure rolls back the business change. No Token, credential, prompt or resource body is stored.
+ * 授权目录管理动作的 append-only 记录（ADR-0030 §11.7、§12.4）。Role/Binding 变更必须与
+ * 审计写入同一事务；审计写失败即回滚业务变更。不保存 Token、凭据、prompt 或资源正文。
  *
- * @param id            audit row identity (DB-generated UUIDv7)
- * @param actorIssuer   issuer namespace of the actor, or null for a system-initiated change
- * @param actorType     {@code USER} or {@code SERVICE}, or null
- * @param actorId       subject id of the actor, or null
- * @param targetType    the kind of target changed ({@code ROLE}, {@code BINDING})
- * @param targetId      the primary key of the target
- * @param action        the action performed ({@code CREATE}, {@code REPLACE_PERMISSIONS}, {@code REVOKE})
- * @param beforeVersion the target version before the change, or null for create
- * @param afterVersion  the target version after the change, or null
- * @param requestId     request trace id, or null
- * @param traceId       distributed trace id, or null
- * @param occurredAt    when the action occurred
+ * @param id            审计行身份（数据库生成 UUIDv7）
+ * @param actorIssuer   操作者 issuer 命名空间，系统发起的变更可为 null
+ * @param actorType     {@code USER} 或 {@code SERVICE}，可为 null
+ * @param actorId       操作者 subject id，可为 null
+ * @param targetType    被变更目标的种类（{@code ROLE}、{@code BINDING}）
+ * @param targetId      目标主键
+ * @param action        执行的动作（{@code CREATE}、{@code REPLACE_PERMISSIONS}、{@code REVOKE}）
+ * @param beforeVersion 变更前目标版本，创建时为 null
+ * @param afterVersion  变更后目标版本，可为 null
+ * @param requestId     请求追踪 id，可为 null
+ * @param traceId       分布式追踪 id，可为 null
+ * @param occurredAt    动作发生时间
  */
 public record AuthorizationChangeAudit(
         UUID id,

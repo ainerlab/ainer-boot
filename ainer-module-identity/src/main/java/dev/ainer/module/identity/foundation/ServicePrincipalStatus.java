@@ -1,19 +1,18 @@
 package dev.ainer.module.identity.foundation;
 
 /**
- * Lifecycle status of a {@link ServicePrincipal} (ADR-0033 Greenfield §2.6).
+ * {@link ServicePrincipal} 的生命周期状态（ADR-0033 Greenfield §2.6）。
  *
- * <p>The C1 foundation baseline keeps the service lifecycle intentionally minimal: a service principal is
- * either {@code ACTIVE} (can authenticate and bind credentials) or {@code DISABLED} (revoked; credentials
- * and tokens minted before the current epoch are invalid). Granular lock/close states are deferred until a
- * concrete operational need arrives.
+ * <p>C1 foundation 基线刻意保持服务生命周期最小化：service principal 要么 {@code ACTIVE}
+ * （可认证、可绑定凭证），要么 {@code DISABLED}（已吊销；早于当前 epoch 的凭证与 token
+ * 全部失效）。更细粒度的锁定/关闭状态推迟到出现具体运营需求时再引入。
  */
 public enum ServicePrincipalStatus {
 
     ACTIVE,
     DISABLED;
 
-    /** Whether this principal can authenticate or hold an active credential binding. */
+    /** 该 principal 是否可以认证或持有活跃凭证绑定。 */
     public boolean canAuthenticate() {
         return this == ACTIVE;
     }

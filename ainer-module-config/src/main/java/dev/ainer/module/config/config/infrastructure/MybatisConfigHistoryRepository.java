@@ -7,6 +7,10 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * {@link ConfigHistoryRepository} 的 MyBatis 适配器，对应表 {@code ainer_config_history}。
+ * 插入影响行数不是 1 时抛出异常，保证审计事实不静默丢失。
+ */
 @Repository
 public class MybatisConfigHistoryRepository implements ConfigHistoryRepository {
 

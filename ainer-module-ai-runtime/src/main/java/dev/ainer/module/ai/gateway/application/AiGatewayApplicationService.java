@@ -26,6 +26,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * AI Model Gateway 应用服务（ADR-0003）：所有模型调用的统一入口。
+ *
+ * <p>每次调用在进入 provider 前依次执行治理策略——模型白名单、prompt 大小、敏感数据、
+ * 主体限流与主体日预算（预留审计行）——被拒绝的策略决策与预估成本一并写入审计；
+ * 调用结束后记录模型、Token 用量、费用、耗时与结果状态。支持非流式与流式两种路径，
+ * 流式任务在专用线程池执行并保证审计行可靠落库。
+ */
 @Service
 public class AiGatewayApplicationService {
 
@@ -133,7 +141,7 @@ public class AiGatewayApplicationService {
         try {
             listener.onError(id, errorCode);
         } catch (RuntimeException ignored) {
-            // The client may already have disconnected; the audit row is authoritative.
+            // 客户端可能已经断开；以审计行为准。
         }
     }
 

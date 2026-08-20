@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** API models for the config management surface (ADR-0040). */
+/** 配置管理面的 API 模型（ADR-0040）。 */
 public final class ConfigApiDtos {
 
     private ConfigApiDtos() {
@@ -31,8 +31,8 @@ public final class ConfigApiDtos {
     }
 
     /**
-     * Entry projection. Secret entries never expose value or ciphertext — only the fact that a
-     * secret exists at this key with its version.
+     * 条目投影。secret 条目绝不暴露明文值或密文——
+     * 只给出该键下存在 secret 及其版本这一事实。
      */
     public record ConfigEntryResponse(
             UUID id,

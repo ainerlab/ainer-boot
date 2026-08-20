@@ -7,9 +7,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * PostgreSQL implementation of {@link LoginIdentityRepository} (Greenfield foundation persistence, S1.2).
- * {@code findByTypeAndIdentifier} resolves the single ACTIVE binding for a credential; REVOKED bindings do
- * not block re-link, matching the partial unique index on the table.
+ * {@link LoginIdentityRepository} 的 PostgreSQL 实现（Greenfield foundation 持久化，S1.2）。
+ * {@code findByTypeAndIdentifier} 解析凭证的唯一 ACTIVE 绑定；REVOKED 绑定不阻塞
+ * 重新绑定，与表上的部分唯一索引语义一致。
  */
 @Repository
 public class MybatisLoginIdentityRepository implements LoginIdentityRepository {

@@ -16,6 +16,14 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import java.net.URI;
 import java.util.Set;
 
+/**
+ * client_credentials 服务 Token 获取器：使用独立的 OAuth 2.1 client（basic 认证、
+ * 内存 client registration）向授权服务器 token 端点获取 access token，并缓存至过期。
+ *
+ * <p>仅接受 HTTPS token 端点（{@code allowInsecureHttp} 只用于回环测试）；
+ * client secret 长度与 scope 非空在构造时校验。获取失败统一抛
+ * {@link ServiceTokenException}，不泄露端点响应正文。
+ */
 public final class ClientCredentialsServiceTokenProvider {
 
     private static final String REGISTRATION_ID = "ainer-service-client";

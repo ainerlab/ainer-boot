@@ -1,8 +1,8 @@
 package dev.ainer.authorization.domain;
 
 /**
- * Risk tier attached to a Permission (ADR-0030 §3.1, §6). Higher tiers may route an ALLOW into a
- * {@link AuthorizationOutcome#CHALLENGE} requiring step-up, transaction confirmation or human approval.
+ * 权限上附带的风险层级（ADR-0030 §3.1、§6）。更高层级可把 ALLOW 改道为
+ * {@link AuthorizationOutcome#CHALLENGE}，要求 step-up、交易确认或人工审批。
  */
 public enum RiskTier {
     LOW,

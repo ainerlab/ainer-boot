@@ -21,14 +21,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Application service for dictionary operations (ADR-0040 management hardening). Uses Spring
- * Cache abstraction (ADR-0039) — {@code @Cacheable} for read-heavy lookups, {@code @CacheEvict}
- * on writes. Cache backend is swappable: Caffeine (local, default) or Redis/Valkey (distributed).
+ * 字典操作的应用服务（ADR-0040 管理面硬化）。使用 Spring Cache 抽象（ADR-0039）——
+ * 读多查询用 {@code @Cacheable}，写入时 {@code @CacheEvict}。缓存后端可替换：
+ * Caffeine（本地，默认）或 Redis/Valkey（分布式）。
  *
- * <p>Management surface (create/update/status/page) requires an {@link AuthenticatedPrincipal}
- * carrying {@code dictionary.read} / {@code dictionary.manage}; every mutation writes a
- * same-transaction {@link DictionaryAudit} row. {@link #resolveItemsByTypeCode} is the internal
- * product read path and is intentionally unscoped.
+ * <p>管理面（创建/更新/状态/分页）要求 {@link AuthenticatedPrincipal} 携带
+ * {@code dictionary.read} / {@code dictionary.manage}；每次变更写入同事务的
+ * {@link DictionaryAudit} 行。{@link #resolveItemsByTypeCode} 是内部产品读路径，
+ * 有意不校验 scope。
  */
 @Service
 @Transactional
@@ -53,7 +53,7 @@ public class DictionaryApplicationService {
         this.clock = clock;
     }
 
-    // ---- Type management ----
+    // ---- 类型管理 ----
 
     @Caching(evict = {
             @CacheEvict(value = CACHE_ITEMS_BY_TYPE, allEntries = true),
@@ -141,7 +141,7 @@ public class DictionaryApplicationService {
         return typeRepository.findPage(normalizeStatus(status), (long) (page - 1) * size, size);
     }
 
-    // ---- Item management ----
+    // ---- 字典项管理 ----
 
     @CacheEvict(value = CACHE_ITEMS_BY_TYPE, allEntries = true)
     public UUID createItem(
@@ -220,11 +220,11 @@ public class DictionaryApplicationService {
                 (long) (page - 1) * size, size);
     }
 
-    // ---- Internal product read path (unscoped by design) ----
+    // ---- 内部产品读路径（设计上不校验 scope）----
 
     /**
-     * Resolve items by type code with caching. Primary read path for product dropdowns; not
-     * exposed over the management HTTP surface.
+     * 按类型编码解析字典项并缓存。产品下拉框的主读路径；
+     * 不经管理 HTTP 面暴露。
      */
     @Cacheable(value = CACHE_ITEMS_BY_TYPE, key = "#typeCode", unless = "#result.isEmpty()")
     @Transactional(readOnly = true)
@@ -237,7 +237,7 @@ public class DictionaryApplicationService {
                 .orElse(List.of());
     }
 
-    // ---- Helpers ----
+    // ---- 辅助方法 ----
 
     private static void requireManage(AuthenticatedPrincipal principal) {
         Objects.requireNonNull(principal, "principal");

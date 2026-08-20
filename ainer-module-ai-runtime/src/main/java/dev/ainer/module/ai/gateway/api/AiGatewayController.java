@@ -30,6 +30,14 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * AI Model Gateway 的 HTTP 入口（ADR-0003）：暴露 {@code /api/ai} 下的非流式补全、
+ * SSE 流式补全与调用结果查询。
+ *
+ * <p>所有端点都要求已验证 JWT 主体携带 {@code ai.invoke} scope；主体身份来自
+ * {@link AuthenticatedPrincipalResolver}，绝不信任请求参数中的身份信息。流式端点把
+ * 网关回调适配为 SSE 事件（delta/usage/error），客户端断开不中断审计落库。
+ */
 @Validated
 @RestController
 @RequestMapping("/api/ai")

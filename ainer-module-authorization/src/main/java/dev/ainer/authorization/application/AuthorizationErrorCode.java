@@ -3,8 +3,8 @@ package dev.ainer.authorization.application;
 import dev.ainer.core.error.ErrorCode;
 
 /**
- * Authorization-module error codes (ADR-0030 S1). Uses the stable {@code AINER.AUTHORIZATION.<ERROR>}
- * convention — no hash allocation or manual numeric fields.
+ * 授权模块错误码（ADR-0030 S1）。采用稳定的 {@code AINER.AUTHORIZATION.<ERROR>} 约定——
+ * 不使用 hash 分配或手工数字段位。
  */
 public enum AuthorizationErrorCode implements ErrorCode {
     ROLE_NOT_FOUND("AINER.AUTHORIZATION.ROLE_NOT_FOUND", "角色不存在", 404),

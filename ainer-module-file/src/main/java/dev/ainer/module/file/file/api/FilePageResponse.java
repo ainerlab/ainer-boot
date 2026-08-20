@@ -4,7 +4,7 @@ import dev.ainer.module.file.file.application.FilePage;
 
 import java.util.List;
 
-/** Pagination envelope for file metadata. */
+/** 文件元数据的分页信封。 */
 public record FilePageResponse(List<FileResponse> items, int page, int size, long total) {
 
     public static FilePageResponse from(FilePage page) {

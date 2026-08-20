@@ -10,6 +10,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * {@link ConfigEntryRepository} 的 MyBatis 适配器，对应表 {@code ainer_config_entry}。
+ * 领域对象与行对象双向映射；更新经 {@code updateValue} 的版本条件实现乐观锁。
+ */
 @Repository
 public class MybatisConfigEntryRepository implements ConfigEntryRepository {
 

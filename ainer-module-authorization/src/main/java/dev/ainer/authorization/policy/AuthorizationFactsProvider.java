@@ -9,17 +9,16 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Provides raw authorization facts (owner, participants, resource state) for a given resource
- * (ADR-0030 §5.1). Product/domain modules implement this port; the {@link DomainAuthorizationPolicy}
- * consumes these facts to evaluate relation-derived grants and resource-state conditions. The evaluator
- * never calls this port directly — it goes through the policy.
+ * 为给定资源提供原始授权事实（所有者、参与者、资源状态）（ADR-0030 §5.1）。由产品/
+ * 领域模块实现该端口；{@link DomainAuthorizationPolicy} 消费这些事实来求值关系派生授权
+ * 与资源状态条件。求值器绝不直接调用该端口——一律经由策略。
  */
 @FunctionalInterface
 public interface AuthorizationFactsProvider {
 
     AuthorizationFacts factsFor(Requester.Authenticated subject, ResourceRef resource, AuthorizationContext context);
 
-    /** Minimal typed facts; absent values are {@code null} or empty, never fabricated. */
+    /** 最小类型化事实；缺失值为 {@code null} 或空集，绝不捏造。 */
     record AuthorizationFacts(
             @Nullable UUID ownerSubjectId,
             Set<UUID> participantSubjectIds,

@@ -4,13 +4,12 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * Reference to a stable non-human service principal within an {@link IdentityAuthorityRef}
- * (ADR-0033 Greenfield §2.6).
+ * 指向某个 {@link IdentityAuthorityRef}（身份权威）内稳定非人类 ServicePrincipal 的引用
+ * （ADR-0033 Greenfield §2.6）。
  *
- * <p>A {@code ServicePrincipal} is the stable identity of a non-human caller; an OAuth {@code client_id}
- * is a rotatable credential/client identifier bound to it, not the principal itself. Client rotation must
- * not change the audit identity, and a Service can never hold a human WorkspaceMembership or a governance
- * OWNER role.
+ * <p>{@code ServicePrincipal} 是非人类调用方的稳定身份；OAuth {@code client_id} 是绑定到它
+ * 之上的可轮换凭证/客户端标识，而不是主体本身。客户端轮换不得改变审计身份；Service
+ * 绝不能持有人类的 WorkspaceMembership 或治理 OWNER 角色。
  */
 public record ServiceSubjectRef(IdentityAuthorityRef authority, String servicePrincipalId)
         implements PrincipalSubjectRef {

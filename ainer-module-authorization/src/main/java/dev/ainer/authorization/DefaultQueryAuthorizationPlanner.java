@@ -26,15 +26,14 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Default implementation of {@link QueryAuthorizationPlanner} (ADR-0030 §7, S3).
+ * {@link QueryAuthorizationPlanner} 的默认实现（ADR-0030 §7、S3）。
  *
- * <p>Evaluates scope ceiling, permission registry and live bindings to produce a typed query
- * constraint {@code Q}. The product adapter translates {@code Q} to parameterized SQL/search
- * filters — Ainer never outputs SQL. If no binding grants the requested permission, the query
- * is denied.
+ * <p>求值 scope ceiling、权限注册表与 live Binding，产出类型化查询约束 {@code Q}。
+ * 产品适配器负责把 {@code Q} 翻译为参数化 SQL/检索过滤条件——Ainer 绝不输出 SQL。
+ * 若没有任何 Binding 授予所请求的权限，则整个查询被拒绝。
  *
- * @param <I> product-defined query-intent type
- * @param <Q> product-defined typed query constraint
+ * @param <I> 产品定义的查询意图类型
+ * @param <Q> 产品定义的类型化查询约束
  */
 public final class DefaultQueryAuthorizationPlanner<I, Q> implements QueryAuthorizationPlanner<I, Q> {
 
@@ -63,8 +62,8 @@ public final class DefaultQueryAuthorizationPlanner<I, Q> implements QueryAuthor
     @Override
     public AuthorizedQueryPlan<Q> plan(QueryAuthorizationRequest<I> request) {
         if (request.accessMode() == AccessMode.PUBLIC_PROJECTION) {
-            // PUBLIC queries are handled by the product's PublicAccessPolicy at the adapter level;
-            // the query planner only serves AUTHENTICATED collection queries in the first version.
+            // PUBLIC 查询由产品的 PublicAccessPolicy 在适配器层处理；
+            // 第一版查询规划器只服务 AUTHENTICATED 集合查询。
             return new AuthorizedQueryPlan.Denied<>(
                     AuthorizationReasonCodes.AUTHENTICATED_REQUIRED.value(), policyVersion);
         }
@@ -81,19 +80,19 @@ public final class DefaultQueryAuthorizationPlanner<I, Q> implements QueryAuthor
                     AuthorizationReasonCodes.UNKNOWN_PERMISSION.value(), policyVersion);
         }
 
-        // Resource type mismatch: the permission targets a different resource type.
+        // 资源类型不匹配：权限面向的是另一种资源类型。
         if (!perm.resourceType().equals(request.resourceType())) {
             return new AuthorizedQueryPlan.Denied<>(
                     AuthorizationReasonCodes.RESOURCE_TYPE_MISMATCH.value(), policyVersion);
         }
 
-        // System-only permissions require SERVICE.
+        // systemOnly 权限要求 SERVICE 主体。
         if (perm.systemOnly() && subject.subjectRef().type() != SubjectType.SERVICE) {
             return new AuthorizedQueryPlan.Denied<>(
                     AuthorizationReasonCodes.SYSTEM_ONLY.value(), policyVersion);
         }
 
-        // Scope ceiling.
+        // scope ceiling 校验。
         boolean hasScope = subject.scopeCeiling().stream()
                 .anyMatch(s -> scopeCeiling.permits(s, permission));
         if (!hasScope) {
@@ -101,8 +100,8 @@ public final class DefaultQueryAuthorizationPlanner<I, Q> implements QueryAuthor
                     AuthorizationReasonCodes.SCOPE_CEILING.value(), policyVersion);
         }
 
-        // Grant path: only BINDING_REQUIRED and BINDING_OR_RELATION paths support collection queries
-        // (RELATION_DERIVED queries require per-resource facts, which defeats the purpose of query planning).
+        // 授权路径：只有 BINDING_REQUIRED 与 BINDING_OR_RELATION 支持集合查询
+        //（RELATION_DERIVED 查询需要逐资源事实，违背查询规划的目的）。
         GrantPath path = domainPolicy.pathFor(permission);
         if (path == null) {
             return new AuthorizedQueryPlan.Denied<>(
@@ -113,7 +112,7 @@ public final class DefaultQueryAuthorizationPlanner<I, Q> implements QueryAuthor
                     AuthorizationReasonCodes.NO_BINDING.value(), policyVersion);
         }
 
-        // Collect live bindings that grant this permission and accumulate the constraint.
+        // 收集授予该权限的 live Binding 并累加查询约束。
         Set<SubjectBinding> liveBindings = bindingResolver.liveBindings(subject.subjectRef());
         @Nullable Q constraint = null;
         int contributingBindings = 0;

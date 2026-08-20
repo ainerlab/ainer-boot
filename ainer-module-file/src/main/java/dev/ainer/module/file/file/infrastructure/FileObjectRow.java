@@ -3,7 +3,7 @@ package dev.ainer.module.file.file.infrastructure;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Row mapping for {@code ainer_file_object}. */
+/** {@code ainer_file_object} 的行映射。 */
 public class FileObjectRow {
     private UUID id;
     private String storageKey;

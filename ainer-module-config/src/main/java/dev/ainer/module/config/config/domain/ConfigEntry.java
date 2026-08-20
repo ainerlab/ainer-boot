@@ -6,11 +6,10 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * A dynamic configuration entry scoped by namespace and key (ADR-0038).
+ * 以 namespace 和 key 定界的动态配置条目（ADR-0038）。
  *
- * <p>Non-secret entries store the raw value in {@code value}. Secret entries store an AES-GCM
- * encrypted ciphertext in {@code encryptedValue} and leave {@code value} null — the plaintext is
- * never persisted for secrets.
+ * <p>非 secret 条目把原始值存在 {@code value}。secret 条目把 AES-GCM 加密后的密文存在
+ * {@code encryptedValue} 并让 {@code value} 为 null——secret 的明文绝不持久化。
  */
 public record ConfigEntry(
         UUID id,

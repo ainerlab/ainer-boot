@@ -26,9 +26,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 /**
- * Notification management API (ADR-0040). Scopes: {@code notification.read} (templates/records),
- * {@code notification.manage} (template lifecycle), {@code notification.submit} (direct sends).
- * Record listings omit rendered title/body — recipient and content are PII.
+ * 通知管理 API（ADR-0040）。scope：{@code notification.read}（模板/记录）、
+ * {@code notification.manage}（模板生命周期）、{@code notification.submit}（直接发送）。
+ * 记录列表省略已渲染的 title/body——收件人与内容属于 PII。
  */
 @RestController
 @RequestMapping("/api/notifications")
@@ -44,7 +44,7 @@ public class NotificationManagementController {
         this.service = service;
     }
 
-    // ---- Templates ----
+    // ---- 模板 ----
 
     @PostMapping("/templates")
     public ResponseEntity<ApiResponse<NotificationApiDtos.NotificationTemplateResponse>> createTemplate(
@@ -102,7 +102,7 @@ public class NotificationManagementController {
                 RequestIds.currentOrCreate(request));
     }
 
-    // ---- Direct submission ----
+    // ---- 直接提交 ----
 
     @PostMapping("/messages")
     public ResponseEntity<ApiResponse<java.util.Map<String, UUID>>> submitDirect(
@@ -118,7 +118,7 @@ public class NotificationManagementController {
                         RequestIds.currentOrCreate(request)));
     }
 
-    // ---- Delivery records ----
+    // ---- 投递记录 ----
 
     @GetMapping("/records")
     public ApiResponse<NotificationApiDtos.NotificationRecordPageResponse> pageRecords(

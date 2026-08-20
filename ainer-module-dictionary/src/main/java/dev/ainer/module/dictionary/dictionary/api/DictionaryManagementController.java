@@ -25,9 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 /**
- * Dictionary management API (ADR-0040). Scopes ({@code dictionary.read} / {@code dictionary.manage})
- * are enforced in the application service against the verified principal; every mutation writes a
- * same-transaction audit row.
+ * 字典管理 API（ADR-0040）。scope（{@code dictionary.read} / {@code dictionary.manage}）
+ * 由应用服务针对已验证主体强制检查；每次变更都写入同事务审计行。
  */
 @RestController
 @RequestMapping("/api/dictionaries")
@@ -43,7 +42,7 @@ public class DictionaryManagementController {
         this.service = service;
     }
 
-    // ---- Types ----
+    // ---- 类型 ----
 
     @PostMapping("/types")
     public ResponseEntity<ApiResponse<DictionaryApiDtos.DictionaryTypeResponse>> createType(
@@ -111,7 +110,7 @@ public class DictionaryManagementController {
                 RequestIds.currentOrCreate(request));
     }
 
-    // ---- Items ----
+    // ---- 字典项 ----
 
     @PostMapping("/types/{typeId}/items")
     public ResponseEntity<ApiResponse<DictionaryApiDtos.DictionaryItemResponse>> createItem(

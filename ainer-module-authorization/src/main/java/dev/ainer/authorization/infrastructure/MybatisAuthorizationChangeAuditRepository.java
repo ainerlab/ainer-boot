@@ -5,7 +5,7 @@ import dev.ainer.authorization.application.AuthorizationChangeAuditRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * MyBatis-backed implementation of {@link AuthorizationChangeAuditRepository} (ADR-0030 §11.7).
+ * {@link AuthorizationChangeAuditRepository} 的 MyBatis 实现（ADR-0030 §11.7）。
  */
 @Repository
 public class MybatisAuthorizationChangeAuditRepository implements AuthorizationChangeAuditRepository {

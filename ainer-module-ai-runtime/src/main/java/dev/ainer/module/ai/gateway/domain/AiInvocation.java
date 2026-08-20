@@ -5,6 +5,13 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * 一次 AI 模型调用的审计聚合根：记录主体、请求、模型、策略决策、prompt 指纹、
+ * Token 用量（预估/实际）、费用、耗时、结果状态与供应商请求标识。
+ *
+ * <p>按治理要求不保存 prompt 与输出正文；prompt 只保留 SHA-256 指纹。
+ * 通过工厂方法 {@code started} / {@code rejected} 构造初始与被拒绝状态。
+ */
 public record AiInvocation(
         UUID id,
         String subjectId,

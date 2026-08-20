@@ -9,6 +9,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.util.UUID;
 
+/**
+ * Workspace 授权审计的写入服务，记录每次授权检查的 ALLOWED/DENIED 决策。
+ *
+ * <p>写入使用 {@code REQUIRES_NEW} 独立事务：被拒绝的操作随后抛出异常并回滚业务事务时，
+ * DENY 审计必须仍然落库。审计内容只包含稳定标识（操作者、目标主体、动作、决策、reason
+ * code），不保存 Token、prompt 或资源正文。
+ */
 @Service
 public class WorkspaceAuthorizationAuditService {
 

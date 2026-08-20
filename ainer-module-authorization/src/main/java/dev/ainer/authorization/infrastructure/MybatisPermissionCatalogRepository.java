@@ -10,9 +10,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 
 /**
- * MyBatis-backed implementation of {@link PermissionCatalogRepository} (ADR-0030 S1).
- * The catalog is a management projection; the in-memory PermissionRegistry remains the authority
- * at decision time.
+ * {@link PermissionCatalogRepository} 的 MyBatis 实现（ADR-0030 S1）。目录是管理投影；
+ * 决策时的权威仍是内存态 PermissionRegistry。
  */
 @Repository
 public class MybatisPermissionCatalogRepository implements PermissionCatalogRepository {

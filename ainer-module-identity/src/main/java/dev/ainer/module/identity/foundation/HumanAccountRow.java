@@ -4,8 +4,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Mutable persistence row for {@link HumanAccount} (MyBatis plain-POJO mapping against
- * {@code ainer_identity_human_account}). ORM constraint: a normal mutable class, not a record.
+ * {@link HumanAccount} 的可变持久化行（MyBatis 普通 POJO 映射，对应表
+ * {@code ainer_identity_human_account}）。受 ORM 约束使用普通可变类而非 record。
  */
 public class HumanAccountRow {
 

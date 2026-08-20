@@ -15,12 +15,12 @@ import org.springframework.context.annotation.Configuration;
 import java.time.Clock;
 
 /**
- * Module configuration for the dynamic config slice (ADR-0038). Enabled by default; disable with
- * {@code ainer.config.enabled=false}.
+ * 动态配置切片的模块配置（ADR-0038）。默认启用，可通过 {@code ainer.config.enabled=false}
+ * 关闭。
  *
- * <p>Secret encryption uses {@link AesGcmEncryptor} by default, keyed by
- * {@code ainer.config.encryption-key} (base64-encoded AES-256 key). Products override
- * {@link ConfigEncryptionPort} with KMS/envelope implementations.
+ * <p>secret 加密默认使用 {@link AesGcmEncryptor}，密钥来自
+ * {@code ainer.config.encryption-key}（base64 编码的 AES-256 密钥）。产品可用 KMS/密钥信封
+ * 实现覆盖 {@link ConfigEncryptionPort}。
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "ainer.config", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -35,17 +35,17 @@ public class ConfigModuleConfiguration {
     }
 
     /**
-     * Default AES-GCM encryption port for secret config values. The key must be supplied via
-     * {@code ainer.config.encryption-key} (base64-encoded, 32 bytes for AES-256).
-     * If no key is configured, a temporary ephemeral key is generated (NOT suitable for production —
-     * secrets encrypted with it become undecryptable after restart).
+     * secret 配置值的默认 AES-GCM 加密端口。密钥必须通过
+     * {@code ainer.config.encryption-key} 提供（base64 编码，AES-256 需 32 字节）。
+     * 未配置密钥时会生成临时一次性密钥（不适合生产——
+     * 用它加密的 secret 在重启后将无法解密）。
      */
     @Bean
     @ConditionalOnMissingBean(ConfigEncryptionPort.class)
     public ConfigEncryptionPort defaultConfigEncryptionPort(
             @Value("${ainer.config.encryption-key:}") String base64Key) {
         if (base64Key == null || base64Key.isBlank()) {
-            // Ephemeral key for development only — not persistent across restarts
+            // 仅开发用的一次性密钥——重启后不保留
             byte[] ephemeral = new byte[32];
             new java.security.SecureRandom().nextBytes(ephemeral);
             return new AesGcmConfigEncryptionPort(new AesGcmEncryptor(ephemeral));

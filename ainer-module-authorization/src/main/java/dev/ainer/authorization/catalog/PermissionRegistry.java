@@ -10,10 +10,9 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * In-memory Permission catalog built from {@link PermissionContributor} registrations (ADR-0030 §3.2).
- * A duplicate code with an identical definition is idempotent; a duplicate code with a differing
- * definition is a startup-failing conflict. The registry is the authority for Permission metadata at
- * decision time; the database catalog is only a management projection of these registered definitions.
+ * 由 {@link PermissionContributor} 注册构建的内存态权限目录（ADR-0030 §3.2）。同 code 且
+ * 定义完全相同的重复注册是幂等的；同 code 但定义不同的注册是启动即失败的冲突。决策时
+ * 该注册表是权限元数据的权威；数据库目录只是这些已注册定义的管理投影。
  */
 public final class PermissionRegistry {
 

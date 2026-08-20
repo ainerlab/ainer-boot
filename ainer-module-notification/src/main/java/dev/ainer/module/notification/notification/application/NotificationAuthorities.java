@@ -1,17 +1,17 @@
 package dev.ainer.module.notification.notification.application;
 
 /**
- * Scope constants for the notification module (ADR-0040).
+ * 通知模块的 scope 常量（ADR-0040）。
  */
 public final class NotificationAuthorities {
 
-    /** Page templates and delivery records. */
+    /** 分页查询模板与投递记录。 */
     public static final String READ = "notification.read";
 
-    /** Create/update/disable templates. */
+    /** 创建/更新/禁用模板。 */
     public static final String MANAGE = "notification.manage";
 
-    /** Submit notification intents for delivery. */
+    /** 提交通知意图以供投递。 */
     public static final String SUBMIT = "notification.submit";
 
     private NotificationAuthorities() {

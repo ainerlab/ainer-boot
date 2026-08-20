@@ -3,14 +3,13 @@ package dev.ainer.authorization.domain;
 import java.util.Objects;
 
 /**
- * Typed authorization challenge (ADR-0030 §6.3). A CHALLENGE outcome means the action must not execute
- * until the challenge is satisfied and the decision re-evaluated with the new authentication result.
- * S0 only implements {@link AuthenticationChallenge}; transaction confirmation and human approval are
- * reserved type boundaries, not active values.
+ * 类型化授权挑战（ADR-0030 §6.3）。CHALLENGE 结果表示在挑战被满足并携带新的认证结果
+ * 重新求值之前，动作不得执行。S0 只实现 {@link AuthenticationChallenge}；交易确认与
+ * 人工审批是预留的类型边界，不是活跃取值。
  */
 public sealed interface Challenge permits Challenge.AuthenticationChallenge {
 
-    /** Requires the subject to complete recent strong authentication (RFC 9470 Step-up). */
+    /** 要求主体完成近期强认证（RFC 9470 Step-up）。 */
     record AuthenticationChallenge(AuthorizationContext.Assurance requiredAssurance) implements Challenge {
 
         public AuthenticationChallenge {

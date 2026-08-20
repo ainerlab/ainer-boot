@@ -4,11 +4,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Persistence port for {@link Credential} material (ADR-0033 Greenfield §4, execution plan 缺口 A).
+ * {@link Credential} 材料的持久化端口（ADR-0033 Greenfield §4，执行计划 缺口 A）。
  *
- * <p>Keyed by account + type: at most one ACTIVE material per {@code (accountId, type)}. Rotation is
- * expressed by {@link #revokeActive} followed by {@link #save} of a fresh ACTIVE credential, never by
- * mutating the old material. The port exposes only the typed aggregate.
+ * <p>以账号 + 类型为键：每个 {@code (accountId, type)} 至多一份 ACTIVE 材料。轮换通过
+ * {@link #revokeActive} 再 {@link #save} 新的 ACTIVE 凭证表达，绝不原地修改旧材料。
+ * 该端口只暴露类型化聚合。
  */
 public interface CredentialRepository {
 
@@ -16,9 +16,9 @@ public interface CredentialRepository {
 
     Optional<Credential> findActive(UUID accountId, CredentialType type);
 
-    /** Revolves the current ACTIVE material for (account, type), if any. Returns rows affected (0 or 1). */
+    /** 吊销 (account, type) 当前的 ACTIVE 材料（如存在）。返回受影响行数（0 或 1）。 */
     int revokeActive(UUID accountId, CredentialType type, java.time.Instant rotatedAt);
 
-    /** Next PostgreSQL UUIDv7 primary key for the credential aggregate. */
+    /** 凭证聚合的下一个 PostgreSQL UUIDv7 主键。 */
     UUID nextUuidV7();
 }

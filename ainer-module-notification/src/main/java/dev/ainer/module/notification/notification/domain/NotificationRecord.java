@@ -8,8 +8,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Append-or-update delivery record tracking the full lifecycle of a single notification send
- * (ADR-0038). Used by the SKIP LOCKED queue claimer and the retry scheduler.
+ * 追加或更新的投递记录，跟踪单条通知发送的完整生命周期（ADR-0038）。
+ * 供 SKIP LOCKED 队列领取器与重试调度器使用。
  */
 public record NotificationRecord(
         UUID id,

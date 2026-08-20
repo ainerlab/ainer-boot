@@ -1,15 +1,15 @@
 package dev.ainer.module.dictionary.dictionary.application;
 
 /**
- * Scope constants for the dictionary module (ADR-0040). Checked imperatively via
- * {@code AuthenticatedPrincipal.hasScope(...)} in the application service.
+ * 字典模块的 scope 常量（ADR-0040）。由应用服务通过
+ * {@code AuthenticatedPrincipal.hasScope(...)} 命令式检查。
  */
 public final class DictionaryAuthorities {
 
-    /** Read types/items and resolve cached projections. */
+    /** 读取类型/字典项并解析缓存投影。 */
     public static final String READ = "dictionary.read";
 
-    /** Create/update/disable types and items. */
+    /** 创建/更新/禁用类型与字典项。 */
     public static final String MANAGE = "dictionary.manage";
 
     private DictionaryAuthorities() {

@@ -15,6 +15,14 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+/**
+ * 无主 Workspace 的 OWNER 恢复服务，实现 request/approve 两阶段流程。
+ *
+ * <p>只有当 Workspace 存在 REVOKED OWNER 且没有任何 ACTIVE OWNER 时才允许发起恢复；
+ * 申请与批准必须来自不同的 SERVICE 主体，两阶段都要重新校验目标仍是 ACTIVE 的非 OWNER
+ * 成员。恢复在锁定 Workspace 行（{@code FOR UPDATE}）的事务内提升新 OWNER，并写入
+ * 安全操作审计；请求带 TTL，过期后不可再批准。
+ */
 @Service
 public class WorkspaceOwnerRecoveryService {
 

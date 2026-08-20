@@ -21,11 +21,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Application service for submitting notification intents and managing templates (ADR-0040
- * management hardening). Template management requires {@code notification.manage}, reads
- * {@code notification.read}, submission {@code notification.submit}; template mutations write
- * same-transaction {@link NotificationAudit} rows. Delivery facts live in
- * {@code ainer_notification_record} and are paged for operations.
+ * 提交通知意图与管理模板的应用服务（ADR-0040 管理面硬化）。模板管理要求
+ * {@code notification.manage}，读取要求 {@code notification.read}，提交要求
+ * {@code notification.submit}；模板变更写入同事务的 {@link NotificationAudit} 行。
+ * 投递事实保存在 {@code ainer_notification_record}，分页提供给运维。
  */
 @Service
 @Transactional
@@ -47,16 +46,16 @@ public class NotificationApplicationService {
         this.clock = clock;
     }
 
-    // ---- Submission ----
+    // ---- 提交 ----
 
-    /** Submit over the managed surface: requires {@code notification.submit}. */
+    /** 经管理面提交：要求 {@code notification.submit}。 */
     public UUID submit(AuthenticatedPrincipal principal, @Nullable String requestId,
             NotificationIntent intent) {
         requireScope(principal, NotificationAuthorities.SUBMIT);
         return submitInternal(intent);
     }
 
-    /** Internal submission path (product code, no HTTP principal involved). */
+    /** 内部提交路径（产品代码，不涉及 HTTP 主体）。 */
     public UUID submit(NotificationIntent intent) {
         return submitInternal(intent);
     }
@@ -70,7 +69,7 @@ public class NotificationApplicationService {
         return recordRepository.save(record);
     }
 
-    // ---- Template management ----
+    // ---- 模板管理 ----
 
     public UUID createTemplate(
             AuthenticatedPrincipal principal, @Nullable String requestId, String code,
@@ -132,7 +131,7 @@ public class NotificationApplicationService {
         return templateRepository.findPage(normalizeStatus(status), (long) (page - 1) * size, size);
     }
 
-    // ---- Delivery records (operations) ----
+    // ---- 投递记录（运维）----
 
     @Transactional(readOnly = true)
     public NotificationPageSlice<NotificationRecord> pageRecords(
@@ -142,7 +141,7 @@ public class NotificationApplicationService {
         return recordRepository.findPage(normalizeStatus(status), (long) (page - 1) * size, size);
     }
 
-    // ---- Internal ----
+    // ---- 内部方法 ----
 
     private NotificationTemplate getTemplateInternal(UUID id) {
         return templateRepository.findById(id).orElseThrow(
@@ -210,8 +209,8 @@ public class NotificationApplicationService {
     }
 
     /**
-     * Simple {@code {variable}} substitution. For complex needs (conditionals, loops), a dedicated
-     * template engine can be plugged in — the JSONB schema validates available variables.
+     * 简单的 {@code {variable}} 占位替换。更复杂的需求（条件、循环）可插入专用
+     * 模板引擎——JSONB schema 负责校验可用变量。
      */
     static String renderTemplate(String template, Map<String, Object> variables) {
         String result = template;

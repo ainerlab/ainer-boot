@@ -10,17 +10,18 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Typed, profile-qualified projection of a verified access token (ADR-0030 §2.2, ADR-0033 Greenfield §6.1).
+ * 已验证 access token 的类型化、按 token profile 限定的投影
+ * （ADR-0030 §2.2、ADR-0033 Greenfield §6.1）。
  *
- * <p>This is the canonical request-time principal for Foundation code. It pairs an authority-qualified
- * {@link PrincipalSubjectRef} with a closed {@link
- * TokenProfile}, claim-contract version, OAuth audience and scope ceiling, and authentication assurance. The
- * Workspace and isolation are resource facts, not principal attributes.
+ * <p>这是 Foundation 代码的规范请求期主体。它把带权威限定的
+ * {@link PrincipalSubjectRef} 与封闭的 {@link TokenProfile}、claim 契约版本、OAuth
+ * audience 与 scope 上限、认证保障等级配对。Workspace 与隔离是资源事实，
+ * 不是主体属性。
  *
- * <p>Invariants are enforced at construction: a {@code USER_*} profile requires a {@link HumanSubjectRef},
- * {@code SERVICE_V1} requires a {@link ServiceSubjectRef}. A workspace access ceiling (for
- * {@code USER_WORKSPACE_V1}) is introduced in a later slice with {@code WorkspaceRef}; until then a
- * workspace-scoped principal is still expressible via its profile and scope ceiling.
+ * <p>不变量在构造时强制执行：{@code USER_*} profile 必须配 {@link HumanSubjectRef}，
+ * {@code SERVICE_V1} 必须配 {@link ServiceSubjectRef}。workspace 访问上限
+ * （面向 {@code USER_WORKSPACE_V1}）将在后续切片随 {@code WorkspaceRef} 引入；
+ * 在此之前，带 workspace 范围的主体仍可通过其 profile 与 scope 上限表达。
  */
 public record AuthenticatedPrincipal(
         PrincipalSubjectRef principalSubjectRef,

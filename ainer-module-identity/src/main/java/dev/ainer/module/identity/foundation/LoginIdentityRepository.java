@@ -5,11 +5,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Persistence port for {@link LoginIdentity} bindings (ADR-0033 Greenfield §4).
+ * {@link LoginIdentity} 绑定的持久化端口（ADR-0033 Greenfield §4）。
  *
- * <p>The login lookup key is {@code (type, providerAuthority, normalizedIdentifier)}: authentication resolves
- * a credential to at most one binding, which in turn references exactly one {@link HumanAccount}. Equal raw
- * identifiers under different providers / authorities are distinct bindings and never collapse.
+ * <p>登录查找键是 {@code (type, providerAuthority, normalizedIdentifier)}：认证把一个
+ * 凭证解析到至多一个绑定，该绑定再精确引用一个 {@link HumanAccount}。不同 provider /
+ * authority 下的相同原始标识符是不同绑定，绝不等价合并。
  */
 public interface LoginIdentityRepository {
 

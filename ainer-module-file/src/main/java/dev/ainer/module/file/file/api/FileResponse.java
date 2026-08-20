@@ -6,7 +6,7 @@ import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Public projection of {@link FileObject} metadata (ADR-0040). Never exposes the storage key. */
+/** {@link FileObject} 元数据的对外投影（ADR-0040）。绝不暴露存储键。 */
 public record FileResponse(
         UUID id,
         String namespace,

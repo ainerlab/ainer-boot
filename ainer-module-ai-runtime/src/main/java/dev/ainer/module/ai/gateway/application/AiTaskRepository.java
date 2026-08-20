@@ -11,6 +11,9 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * AI Task 域的持久化端口：任务、上下文快照、任务运行、结果与反馈的写入与查询。
+ */
 public interface AiTaskRepository {
 
     void insertTask(AiTask task);

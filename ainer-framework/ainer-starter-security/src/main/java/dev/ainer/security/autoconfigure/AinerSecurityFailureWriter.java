@@ -11,6 +11,11 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * 安全链失败响应写出器：在认证/授权被拒绝时（401/403/503）以
+ * {@link ApiResponse#failure} 信封写出稳定错误码、默认消息与 requestId，
+ * 与业务错误响应保持同一响应契约。
+ */
 public final class AinerSecurityFailureWriter {
 
     private final ObjectMapper objectMapper;

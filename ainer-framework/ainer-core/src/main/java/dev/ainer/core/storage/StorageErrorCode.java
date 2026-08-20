@@ -3,7 +3,7 @@ package dev.ainer.core.storage;
 import dev.ainer.core.error.ErrorCode;
 
 /**
- * Error codes for {@link FileStoragePort} operations. Used with {@link dev.ainer.core.error.BusinessException}.
+ * {@link FileStoragePort} 操作的错误码，与 {@link dev.ainer.core.error.BusinessException} 配合使用。
  */
 public enum StorageErrorCode implements ErrorCode {
     STORE_FAILED("AINER.STORAGE.STORE_FAILED", "Failed to store file", 500),

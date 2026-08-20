@@ -3,7 +3,7 @@ package dev.ainer.authorization.infrastructure;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Row for {@code ainer_authorization_acting_grant}. */
+/** {@code ainer_authorization_acting_grant} 的行映射。 */
 public class ActingGrantRow {
 
     private UUID id;

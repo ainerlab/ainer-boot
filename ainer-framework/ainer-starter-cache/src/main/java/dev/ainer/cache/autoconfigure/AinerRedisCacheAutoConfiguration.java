@@ -15,9 +15,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Redis/Valkey cache configuration (ADR-0039). Active when {@code ainer.cache.type=redis} and
- * Spring Data Redis is on the classpath. Provides a Redis-backed {@link DistributedLockPort} using
- * {@code SET NX EX} + Lua-script release.
+ * Redis/Valkey 缓存装配（ADR-0039）。当 {@code ainer.cache.type=redis} 且 classpath
+ * 存在 Spring Data Redis 时激活。提供基于 Redis 的 {@link DistributedLockPort}：
+ * {@code SET NX EX} 加锁 + Lua 脚本释放。
  */
 @AutoConfiguration
 @ConditionalOnProperty(prefix = "ainer.cache", name = "type", havingValue = "redis")
@@ -37,8 +37,8 @@ public class AinerRedisCacheAutoConfiguration {
     }
 
     /**
-     * Redis SET NX EX + token-checked release via Lua script. Prevents a caller from releasing
-     * a lock it no longer owns (e.g. after TTL expiry and re-acquisition by another caller).
+     * Redis SET NX EX 加锁 + Lua 脚本校验 token 后释放。防止调用方释放已不属于自己的锁
+     * （例如 TTL 过期后锁已被其他调用方重新获取）。
      */
     static final class RedisDistributedLockPort implements DistributedLockPort {
 
@@ -68,8 +68,8 @@ public class AinerRedisCacheAutoConfiguration {
 
         @Override
         public void release(LockHandle handle) {
-            // Atomic token-checked release via Lua script: GET+DEL in a single Redis operation
-            // prevents race where another caller acquires the lock between our GET and DEL.
+            // 通过 Lua 脚本原子地校验 token 后释放：GET+DEL 合并为一次 Redis 操作，
+            // 避免其他调用方在我们的 GET 与 DEL 之间抢到锁的竞态。
             redis.execute((org.springframework.data.redis.core.RedisCallback<Long>) connection -> {
                 byte[] script = """
                         if redis.call("get", KEYS[1]) == ARGV[1] then

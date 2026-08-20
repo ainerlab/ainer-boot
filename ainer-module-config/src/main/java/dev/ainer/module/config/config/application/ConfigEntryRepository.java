@@ -7,7 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Persistence port for {@link ConfigEntry} (ADR-0038).
+ * {@link ConfigEntry} 的持久化端口（ADR-0038）。
  */
 public interface ConfigEntryRepository {
 
@@ -17,6 +17,6 @@ public interface ConfigEntryRepository {
 
     List<ConfigEntry> findByNamespace(String namespace);
 
-    /** Update value/version for an existing entry. Returns false if the key does not exist. */
+    /** 更新已存在条目的值/版本。键不存在时返回 false。 */
     boolean update(UUID id, String value, String encryptedValue, long expectedVersion, long newVersion);
 }

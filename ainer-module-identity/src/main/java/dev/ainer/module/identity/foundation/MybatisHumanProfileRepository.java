@@ -6,9 +6,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * PostgreSQL implementation of {@link HumanProfileRepository} (Greenfield foundation persistence, S2).
- * Mirrors the project's plain-MyBatis repository style. A profile is a 0:1 aggregate: upsert inserts when
- * absent and updates when present; both fail loudly (through the mapper) if the row is not affected.
+ * {@link HumanProfileRepository} 的 PostgreSQL 实现（Greenfield foundation 持久化，S2）。
+ * 沿用项目统一的纯 MyBatis 仓库风格。档案是 0:1 聚合：upsert 在缺失时插入、存在时更新；
+ * 两种路径（经 mapper）在未影响行时都会立即失败。
  */
 @Repository
 public class MybatisHumanProfileRepository implements HumanProfileRepository {

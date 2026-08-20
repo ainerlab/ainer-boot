@@ -13,6 +13,11 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.util.Objects;
 
+/**
+ * 从 Spring Security 上下文解析 {@link AuthenticatedPrincipal} 的适配器：仅接受已认证、
+ * 主体为 Jwt 且带 {@code token_profile} claim 的请求，否则按 401/403 抛出
+ * {@link BusinessException}；claim 解释全部委托给 {@link TokenProfileResolver}。
+ */
 final class SecurityContextAuthenticatedPrincipalResolver implements AuthenticatedPrincipalResolver {
 
     private final TokenProfileResolver tokenProfileResolver;

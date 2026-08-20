@@ -4,7 +4,7 @@ import dev.ainer.module.dictionary.dictionary.application.DictionaryAuditReposit
 import dev.ainer.module.dictionary.dictionary.domain.DictionaryAudit;
 import org.springframework.stereotype.Repository;
 
-/** MyBatis adapter for {@code ainer_dictionary_audit}. */
+/** {@code ainer_dictionary_audit} 的 MyBatis 适配器。 */
 @Repository
 public class MybatisDictionaryAuditRepository implements DictionaryAuditRepository {
 

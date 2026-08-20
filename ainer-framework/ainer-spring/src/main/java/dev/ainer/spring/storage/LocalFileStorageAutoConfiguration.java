@@ -9,10 +9,10 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 
 /**
- * Auto-configuration for the local-filesystem {@link FileStoragePort} adapter (ADR-0038).
+ * 本地文件系统 {@link FileStoragePort} 适配器的自动装配（ADR-0038）。
  *
- * <p>Enabled by default ({@code ainer.storage.local.enabled=true}). Products override the
- * {@link FileStoragePort} bean to supply S3/OSS/MinIO adapters.
+ * <p>默认启用（{@code ainer.storage.local.enabled=true}）。产品可覆盖
+ * {@link FileStoragePort} bean 以提供 S3/OSS/MinIO 适配器。
  */
 @AutoConfiguration
 @EnableConfigurationProperties(LocalFileStorageAutoConfiguration.LocalFileStorageProperties.class)

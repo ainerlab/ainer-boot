@@ -5,6 +5,10 @@ import dev.ainer.module.ai.gateway.domain.ModelMessage;
 import java.util.List;
 import java.util.regex.Pattern;
 
+/**
+ * 敏感数据策略：调用前对消息序列做密钥特征检测（PEM 私钥块、{@code sk-} API key、
+ * AWS AKIA 访问密钥），命中即拒绝发送给模型供应商。
+ */
 public final class SensitiveDataPolicy {
 
     private static final List<Pattern> DENIED_PATTERNS = List.of(

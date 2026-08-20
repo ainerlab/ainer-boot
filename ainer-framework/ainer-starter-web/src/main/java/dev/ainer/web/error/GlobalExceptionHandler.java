@@ -21,6 +21,14 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+/**
+ * 全局异常处理器：把异常映射为携带真实 HTTP 状态码的 {@link ApiResponse} 错误信封。
+ *
+ * <p>{@link BusinessException} 使用其错误码声明的状态码；参数校验类异常映射为 400，
+ * 静态资源缺失映射为 404，Spring {@link ErrorResponseException} 折算到最接近的标准错误码。
+ * 未知异常统一按 500 处理，只记录日志并返回稳定消息，不向客户端泄露堆栈或内部信息；
+ * 所有响应都携带 requestId。
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

@@ -22,18 +22,17 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * File storage application service (ADR-0040): upload/download/delete with metadata persistence,
- * size and content-type limits, SHA-256 checksum, and same-transaction change audit.
+ * 文件存储应用服务（ADR-0040）：上传/下载/删除，含元数据持久化、大小与内容类型限制、
+ * SHA-256 校验和，以及同事务变更审计。
  *
- * <p>Upload order: validate scope and limits → store bytes via {@link FileStoragePort} (the SPI
- * enforces path-traversal protection) → verify the actually-written size against the configured
- * ceiling → persist metadata + UPLOADED audit in one transaction. If the database write fails the
- * already-stored bytes are deleted as compensation (best effort).
+ * <p>上传顺序：校验 scope 与限制 → 通过 {@link FileStoragePort} 写入字节（SPI 强制
+ * 路径遍历防护）→ 用实际写入的大小对照配置上限复核 → 在一个事务中持久化元数据 +
+ * UPLOADED 审计。若数据库写入失败，已存储的字节会被删除作为补偿（尽力而为）。
  *
- * <p>Delete order: persist DELETED audit + delete metadata row in one transaction (the audit's
- * {@code file_id} is nulled by the FK), then remove the physical bytes. A crash between commit and
- * physical delete leaves an unreachable orphan file, never dangling metadata pointing at missing
- * bytes surfaced as a broken download (resolve-empty degrades to 404).
+ * <p>删除顺序：在一个事务中持久化 DELETED 审计 + 删除元数据行（审计的 {@code file_id}
+ * 由外键置空），随后再删除物理字节。提交与物理删除之间若发生崩溃，只会留下不可达的
+ * 孤立文件，绝不会留下指向缺失字节的悬空元数据、表现为损坏的下载
+ * （resolve 为空时降级为 404）。
  */
 @Service
 public class FileStorageApplicationService {
@@ -146,7 +145,7 @@ public class FileStorageApplicationService {
                 requestId,
                 clock.instant()));
         objectRepository.deleteById(object.id());
-        // false = orphan cleanup: bytes already gone, metadata removal still succeeds.
+        // 返回 false = 孤立文件清理场景：字节已不存在，元数据删除仍会成功。
         storagePort.delete(object.storageKey());
     }
 
@@ -185,7 +184,7 @@ public class FileStorageApplicationService {
         return value.strip();
     }
 
-    /** A resolved file plus its open content stream; the caller owns closing the stream. */
+    /** 已解析的文件及其打开的内容流；关闭流由调用方负责。 */
     public record DownloadedFile(FileObject object, InputStream content) {
     }
 }

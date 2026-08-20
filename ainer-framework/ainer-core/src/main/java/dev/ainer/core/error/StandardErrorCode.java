@@ -1,7 +1,7 @@
 package dev.ainer.core.error;
 
 /**
- * Errors shared by every Ainer application.
+ * 所有 Ainer 应用共享的错误码。
  */
 public enum StandardErrorCode implements ErrorCode {
 

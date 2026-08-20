@@ -7,6 +7,11 @@ import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 
+/**
+ * 把 Spring Security 已验证的 {@link Jwt} 转换为 Foundation 的
+ * {@link VerifiedJwtClaims} 输入契约。转换不做任何信任判断——签名、签发方与
+ * audience 验证在此之前已由安全链完成。
+ */
 final class JwtToVerifiedJwtClaims {
 
     private JwtToVerifiedJwtClaims() {

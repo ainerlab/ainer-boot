@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Validates globally stable error codes before an application starts serving traffic.
+ * 在应用开始对外服务前校验全局错误码的稳定性。
  */
 public final class ErrorCodeRegistry {
 

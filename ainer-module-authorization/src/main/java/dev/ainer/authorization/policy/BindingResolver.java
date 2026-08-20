@@ -10,19 +10,18 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Resolves a subject's live {@link SubjectBinding}s (ADR-0030 §4, §12.1). The S0 in-memory implementation is
- * a test fixture; S1 replaces it with a PostgreSQL-backed resolver. Revocation is reflected immediately:
- * a still-valid JWT cannot restore a revoked database grant, and there is no ALLOW cache in the first version.
+ * 解析主体的 live {@link SubjectBinding}（ADR-0030 §4、§12.1）。S0 的内存实现是测试
+ * 夹具；S1 用 PostgreSQL 支持的解析器替换。撤销立即生效：仍然有效的 JWT 无法恢复已
+ * 撤销的数据库授权，第一版也不存在 ALLOW 缓存。
  */
 public interface BindingResolver {
 
     Set<SubjectBinding> liveBindings(SubjectRef subject);
 
     /**
-     * Live set bindings whose scope covers the resource at {@code at} (ADR-0042 O2). The
-     * decision engine additionally checks requester membership per candidate — subject match
-     * happens through the set, not through this query. Default empty keeps S0 fixtures and
-     * external consumers source-compatible.
+     * {@code at} 时刻 scope 覆盖该资源的 live 集合 Binding（ADR-0042 O2）。决策引擎还会
+     * 对每个候选额外检查请求者的成员关系——主体匹配经由集合完成，而非经由该查询。
+     * 默认空实现保持 S0 夹具与外部消费者源码兼容。
      */
     default List<SubjectSetBinding> liveSetBindings(ResourceRef resource, Instant at) {
         return List.of();

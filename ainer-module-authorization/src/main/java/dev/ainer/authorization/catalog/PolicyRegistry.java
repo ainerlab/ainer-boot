@@ -6,15 +6,15 @@ import dev.ainer.authorization.policy.DomainAuthorizationPolicy;
 import java.util.Objects;
 
 /**
- * Validates at startup that every registered {@link dev.ainer.authorization.domain Permission} has a
- * declared {@link GrantPath} from the {@link DomainAuthorizationPolicy} (ADR-0030 §5.1, §3.2). If any
- * Permission is uncovered (no declared path), the application fails to start — this is the "fail closed
- * on unknown or conflicting policy" requirement.
+ * 启动时校验每个已注册 {@link dev.ainer.authorization.domain Permission} 都在
+ * {@link DomainAuthorizationPolicy} 中声明了 {@link GrantPath}（ADR-0030 §5.1、§3.2）。
+ * 若任何权限未被覆盖（无声明路径），应用启动失败——这是"对未知或冲突策略 fail closed"
+ * 的要求。
  */
 public final class PolicyRegistry {
 
     /**
-     * @throws IllegalStateException if any registered Permission has no declared GrantPath
+     * @throws IllegalStateException 当任何已注册权限没有声明 GrantPath 时
      */
     public void validate(PermissionRegistry permissions, DomainAuthorizationPolicy policy) {
         Objects.requireNonNull(permissions, "permissions");

@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** API models for the notification management surface (ADR-0040). */
+/** 通知管理面的 API 模型（ADR-0040）。 */
 public final class NotificationApiDtos {
 
     private NotificationApiDtos() {
@@ -72,8 +72,8 @@ public final class NotificationApiDtos {
     }
 
     /**
-     * Delivery record projection for operations. Title/body of the rendered message are omitted —
-     * recipients and content are PII and stay out of listings.
+     * 面向运维的投递记录投影。省略已渲染消息的 title/body——
+     * 收件人与内容属于 PII，不进入列表。
      */
     public record NotificationRecordResponse(
             UUID id,

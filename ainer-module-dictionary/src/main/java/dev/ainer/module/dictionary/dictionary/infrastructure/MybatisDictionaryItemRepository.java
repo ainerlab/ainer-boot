@@ -12,6 +12,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * {@link DictionaryItemRepository} 的 MyBatis 适配器，对应表 {@code ainer_dictionary_item}。
+ * 领域对象与行对象双向映射；乐观锁更新与状态迁移由 mapper 语句按版本条件完成，
+ * 影响行数转成 boolean 表示更新是否命中。
+ */
 @Repository
 public class MybatisDictionaryItemRepository implements DictionaryItemRepository {
 

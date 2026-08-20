@@ -3,16 +3,16 @@ package dev.ainer.authorization.domain;
 import java.util.Objects;
 
 /**
- * Authorization permission definition (ADR-0030 §3). A stable code plus controlled metadata. The code is
- * the identity; two Permissions with the same code but differing metadata are a startup-failing conflict.
+ * 授权权限定义（ADR-0030 §3）。一个稳定 code 加受控元数据。code 即身份：两个同 code
+ * 但元数据不同的 Permission 是启动即失败的冲突。
  *
- * @param code            stable permission code
- * @param action          business action verb, e.g. {@code read}/{@code publish}/{@code invoke}
- * @param resourceType    resource type the action targets
- * @param riskTier        risk tier driving ALLOW-vs-CHALLENGE routing
- * @param auditLevel      decision audit level
- * @param systemOnly      only system/platform services may hold/use it
- * @param agentDelegable  may enter an ADR-0031 ActingGrant; orthogonal to Role assignability
+ * @param code            稳定权限 code
+ * @param action          业务动作动词，例如 {@code read}/{@code publish}/{@code invoke}
+ * @param resourceType    动作面向的资源类型
+ * @param riskTier        风险层级，驱动 ALLOW 与 CHALLENGE 的分流
+ * @param auditLevel      决策审计级别
+ * @param systemOnly      仅系统/平台服务可持有或使用
+ * @param agentDelegable  可进入 ADR-0031 的 ActingGrant；与 Role 可分配性正交
  */
 public record Permission(
         PermissionCode code,

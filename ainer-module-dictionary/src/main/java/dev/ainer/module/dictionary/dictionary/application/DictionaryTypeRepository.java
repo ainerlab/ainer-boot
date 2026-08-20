@@ -10,7 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Persistence port for {@link DictionaryType} aggregates (ADR-0038/0040).
+ * {@link DictionaryType} 聚合的持久化端口（ADR-0038/0040）。
  */
 public interface DictionaryTypeRepository {
 
@@ -27,16 +27,16 @@ public interface DictionaryTypeRepository {
     Collection<DictionaryType> findAll();
 
     /**
-     * Partial update with optimistic locking; {@code null} fields keep their stored value.
-     * Returns false when the row does not exist or the version is stale.
+     * 乐观锁部分更新；{@code null} 字段保留库中已有值。
+     * 行不存在或版本过期时返回 false。
      */
     boolean update(UUID id, @Nullable String name, @Nullable String nameEn,
             @Nullable String description, @Nullable Integer sortIndex,
             long expectedVersion, long newVersion);
 
-    /** Status transition with optimistic locking. Returns false on missing row or stale version. */
+    /** 乐观锁状态迁移。行不存在或版本过期时返回 false。 */
     boolean updateStatus(UUID id, DictionaryStatus status, long expectedVersion, long newVersion);
 
-    /** Page through types, optionally filtered by status, ordered by sortIndex/code. */
+    /** 分页遍历类型，可按状态过滤，按 sortIndex/code 排序。 */
     DictionaryPageSlice<DictionaryType> findPage(@Nullable String status, long offset, int size);
 }

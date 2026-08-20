@@ -3,17 +3,16 @@ package dev.ainer.core.storage;
 import java.util.Objects;
 
 /**
- * Immutable metadata of a file stored through {@link FileStoragePort} (ADR-0038).
+ * 通过 {@link FileStoragePort} 存储的文件的不可变元数据（ADR-0038）。
  *
- * <p>The {@code storageKey} is the opaque, adapter-specific identifier used to retrieve or delete the
- * file later. Callers must not assume any structure in the key (it may be a path, a blob ID, or an S3
- * key depending on the adapter).
+ * <p>{@code storageKey} 是适配器专属的不透明标识，用于后续读取或删除。调用方不得假设 key
+ * 具有任何结构（依据适配器不同，它可能是路径、blob ID 或 S3 key）。
  *
- * @param storageKey   adapter-specific opaque identifier for retrieval/deletion
- * @param namespace    logical grouping (e.g. workspace or module scope) to isolate files
- * @param filename     original or generated filename (display only, not used for retrieval)
- * @param contentType  MIME type, or null if unknown
- * @param contentLength byte length of the stored content, or -1 if unknown
+ * @param storageKey   适配器专属的不透明标识，用于读取/删除
+ * @param namespace    用于隔离文件的逻辑分组（例如 workspace 或模块范围）
+ * @param filename     原始或生成的文件名（仅用于展示，不用于读取）
+ * @param contentType  MIME 类型，未知时为 null
+ * @param contentLength 已存储内容的字节长度，未知时为 -1
  */
 public record StoredFile(
         String storageKey,

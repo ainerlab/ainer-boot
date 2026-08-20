@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** MyBatis adapter for {@code ainer_authorization_subject_set_binding}（ADR-0042 O2）. */
+/** {@code ainer_authorization_subject_set_binding} 的 MyBatis 适配器（ADR-0042 O2）。 */
 @Repository
 public class MybatisSubjectSetBindingRepository implements SubjectSetBindingRepository {
 
