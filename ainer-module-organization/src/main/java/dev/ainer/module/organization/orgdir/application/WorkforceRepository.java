@@ -23,7 +23,7 @@ public interface WorkforceRepository {
 
     boolean existsOverlappingEngagement(UUID directoryId, String subjectKey, Instant validFrom, Instant validUntil);
 
-    void updateEngagementStatus(UUID id, String status, Instant validUntil, long version, Instant now);
+    boolean updateEngagementStatus(UUID id, String status, Instant validUntil, long version, Instant now);
 
     void insertUnitAssignment(UnitAssignment assignment);
 
@@ -31,7 +31,7 @@ public interface WorkforceRepository {
 
     List<UnitAssignment> findUnitAssignments(UUID engagementId);
 
-    void closeUnitAssignment(UUID id, Instant atTime, Instant now);
+    boolean closeUnitAssignment(UUID id, Instant atTime, Instant now);
 
     void insertPosition(OrgPosition position);
 
@@ -57,5 +57,5 @@ public interface WorkforceRepository {
      * 且父 Engagement ENABLED 并覆盖评估时间。validUntil 取岗位任职/任职关系最早到期。
      */
     Optional<LivePositionAssignee> findLivePositionAssigneeBySubject(
-            UUID positionId, String subjectIssuer, String subjectId, Instant atTime);
+            UUID workspaceId, UUID positionId, String subjectIssuer, String subjectId, Instant atTime);
 }

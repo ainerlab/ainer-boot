@@ -239,6 +239,7 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 | 文档 | 作用 |
 |---|---|
 | [`project-status.md`](project-status.md) | 当前阶段、完成项、验证记录、缺口和下一步 |
+| [`reviews/2026-08-19-commercial-grade-code-review.md`](reviews/2026-08-19-commercial-grade-code-review.md) | 商业级代码评审审计快照（三路语义评审：安全/正确性/契约一致性；已修复项与遗留 follow-up） |
 | [`ainer-boot-1.0-product.md`](ainer-boot-1.0-product.md) | 1.0 产品说明（合同快照：能力域与工具链、Stable/Incubating、质量与信任模型、LTS、参考消费者、快速开始） |
 | [`architecture.md`](architecture.md) | 模块、依赖、发行物、运行模式和数据所有权 |
 | [`design/paradigm-redesign.md`](design/paradigm-redesign.md) | 为什么不沿用旧脚手架范式 |

@@ -226,7 +226,8 @@
         JOIN ainer_org_engagement e
           ON e.workspace_id = pa.workspace_id AND e.directory_id = pa.directory_id
          AND e.id = pa.engagement_id
-        WHERE pa.position_id = #{positionId}
+        WHERE pa.workspace_id = #{workspaceId}
+          AND pa.position_id = #{positionId}
           AND e.subject_issuer = #{subjectIssuer}
           AND e.subject_id = #{subjectId}
           AND pa.status = 'ENABLED'

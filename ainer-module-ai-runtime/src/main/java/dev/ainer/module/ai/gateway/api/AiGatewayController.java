@@ -35,7 +35,6 @@ import java.util.concurrent.atomic.AtomicReference;
 @RequestMapping("/api/ai")
 public class AiGatewayController {
 
-    private static final String AI_INVOKE_AUTHORITY = "SCOPE_ai.invoke";
 
     private final AiGatewayApplicationService service;
     private final AiRuntimeProperties properties;
@@ -135,7 +134,7 @@ public class AiGatewayController {
 
     private void requireScope(AuthenticatedPrincipal principal) {
         if (!principal.hasScope("ai.invoke")) {
-            throw new BusinessException(AiGatewayErrorCode.INVALID_CONTEXT);
+            throw new BusinessException(dev.ainer.core.error.StandardErrorCode.FORBIDDEN);
         }
     }
 

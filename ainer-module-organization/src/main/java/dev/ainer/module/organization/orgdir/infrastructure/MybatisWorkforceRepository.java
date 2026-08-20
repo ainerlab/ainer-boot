@@ -69,9 +69,9 @@ public class MybatisWorkforceRepository implements WorkforceRepository {
     }
 
     @Override
-    public void updateEngagementStatus(
+    public boolean updateEngagementStatus(
             UUID id, String status, Instant validUntil, long version, Instant now) {
-        mapper.updateEngagementStatus(id, status, validUntil, version, now);
+        return mapper.updateEngagementStatus(id, status, validUntil, version, now) == 1;
     }
 
     @Override
@@ -92,8 +92,8 @@ public class MybatisWorkforceRepository implements WorkforceRepository {
     }
 
     @Override
-    public void closeUnitAssignment(UUID id, Instant atTime, Instant now) {
-        mapper.closeUnitAssignment(id, atTime, now);
+    public boolean closeUnitAssignment(UUID id, Instant atTime, Instant now) {
+        return mapper.closeUnitAssignment(id, atTime, now) == 1;
     }
 
     @Override
@@ -159,9 +159,9 @@ public class MybatisWorkforceRepository implements WorkforceRepository {
 
     @Override
     public Optional<LivePositionAssignee> findLivePositionAssigneeBySubject(
-            UUID positionId, String subjectIssuer, String subjectId, Instant atTime) {
+            UUID workspaceId, UUID positionId, String subjectIssuer, String subjectId, Instant atTime) {
         LivePositionAssigneeRow row = mapper.selectLivePositionAssigneeBySubject(
-                positionId, subjectIssuer, subjectId, atTime);
+                workspaceId, positionId, subjectIssuer, subjectId, atTime);
         if (row == null) {
             return Optional.empty();
         }

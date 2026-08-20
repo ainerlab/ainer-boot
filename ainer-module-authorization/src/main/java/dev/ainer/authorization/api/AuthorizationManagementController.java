@@ -263,7 +263,7 @@ public class AuthorizationManagementController {
             @PathVariable UUID grantId, HttpServletRequest request) {
         requireManagement();
         return ApiResponse.success(ActingGrantResponse.from(actingGrantService.findById(grantId)
-                .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.SET_BINDING_NOT_FOUND))),
+                .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.ACTING_GRANT_NOT_FOUND))),
                 RequestIds.currentOrCreate(request));
     }
 
@@ -276,7 +276,7 @@ public class AuthorizationManagementController {
         actingGrantService.revokeGrant(principal, grantId, body.reason(),
                 RequestIds.currentOrCreate(request));
         return ApiResponse.success(ActingGrantResponse.from(actingGrantService.findById(grantId)
-                .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.SET_BINDING_NOT_FOUND))),
+                .orElseThrow(() -> new BusinessException(AuthorizationErrorCode.ACTING_GRANT_NOT_FOUND))),
                 RequestIds.currentOrCreate(request));
     }
 

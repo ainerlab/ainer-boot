@@ -81,6 +81,10 @@ final class RecentStrongAuthenticationFilter extends OncePerRequestFilter {
         }
         if (authentication instanceof JwtAuthenticationToken token && meetsStepUp(token.getToken())) {
             increment(allowed);
+            // Publish the strong-auth verdict so the authorization context can distinguish a
+            // recent strong authentication (Assurance.RECENT_STRONG) from a plain session.
+            request.setAttribute(
+                    "dev.ainer.security.authorization.recentStrongAuthentication", Boolean.TRUE);
             filterChain.doFilter(request, response);
             return;
         }

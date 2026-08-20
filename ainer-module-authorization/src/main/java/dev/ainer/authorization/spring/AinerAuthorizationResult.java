@@ -41,7 +41,14 @@ public final class AinerAuthorizationResult implements AuthorizationResult {
         }
         // ALLOW with outstanding obligations is not grantable by the adapter alone (§8.6).
         // A future DecisionObligationExecutor will consume obligations; until then, deny.
-        return decision.obligations() == null || decision.obligations().isEmpty();
+        // A PublicProjection carried in the obligations slot is projected response data for
+        // PUBLIC_PROJECTION requests, not a pending obligation — it must not block the grant.
+        if (decision.obligations() == null || decision.obligations().isEmpty()) {
+            return true;
+        }
+        return decision.obligations().stream()
+                .allMatch(obligation -> obligation
+                        instanceof dev.ainer.authorization.domain.PublicProjection);
     }
 
     /** Stable decision id for audit correlation. */

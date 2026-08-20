@@ -13,15 +13,18 @@ import org.springframework.security.web.SecurityFilterChain;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Makes the starter's explicit opt-out deterministic instead of falling back to Boot's generated basic login.
+ * Explicit opt-out chain: assembled only when the host sets
+ * {@code ainer.security.resource-server.enabled=false}. The property has no default — an
+ * unconfigured application falls back to Spring Boot's generated default chain (everything
+ * requires authentication), never to this permissive one. Leaving this default fail-open would
+ * turn a missing property line into an anonymously readable service.
  */
 @AutoConfiguration(before = AinerResourceServerAutoConfiguration.class)
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @ConditionalOnProperty(
         prefix = "ainer.security.resource-server",
         name = "enabled",
-        havingValue = "false",
-        matchIfMissing = true)
+        havingValue = "false")
 public class AinerSecurityDisabledAutoConfiguration {
 
     @Bean

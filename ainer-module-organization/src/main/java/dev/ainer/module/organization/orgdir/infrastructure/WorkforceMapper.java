@@ -53,6 +53,7 @@ public interface WorkforceMapper {
     List<EngagementRow> selectEngagementsByIds(@Param("ids") List<UUID> ids);
 
     LivePositionAssigneeRow selectLivePositionAssigneeBySubject(
+            @Param("workspaceId") UUID workspaceId,
             @Param("positionId") UUID positionId,
             @Param("subjectIssuer") String subjectIssuer,
             @Param("subjectId") String subjectId,

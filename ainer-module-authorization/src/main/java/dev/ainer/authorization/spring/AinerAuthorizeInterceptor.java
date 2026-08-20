@@ -47,6 +47,14 @@ public final class AinerAuthorizeInterceptor implements HandlerInterceptor {
                 AuthorizationResult result = authorizationManager.authorize(
                         () -> SecurityContextHolder.getContext().getAuthentication(),
                         new RequestAuthorizationContext(request));
+                if (result != null && result instanceof AinerAuthorizationResult ainerResult
+                        && ainerResult.decision().outcome()
+                                == dev.ainer.authorization.domain.AuthorizationOutcome.CHALLENGE) {
+                    // HIGH-risk permission without recent strong authentication: the caller must
+                    // re-authenticate (401), not be told the action is forbidden (403).
+                    throw new BusinessException(StandardErrorCode.UNAUTHENTICATED,
+                            "该操作需要近期强认证后重试");
+                }
                 if (result == null || !result.isGranted()) {
                     throw new BusinessException(StandardErrorCode.FORBIDDEN);
                 }

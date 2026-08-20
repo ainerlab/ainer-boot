@@ -174,8 +174,10 @@ public class AuthorizationModuleConfiguration {
     @ConditionalOnMissingBean
     AinerRequestAuthorizationManager ainerRequestAuthorizationManager(
             AuthorizationService authorizationService,
-            AuthenticatedPrincipalResolver principalResolver) {
-        return new AinerRequestAuthorizationManager(authorizationService, principalResolver);
+            AuthenticatedPrincipalResolver principalResolver,
+            org.springframework.beans.factory.ObjectProvider<
+                    dev.ainer.authorization.application.AuthorizationDecisionAuditService> decisionAudit) {
+        return new AinerRequestAuthorizationManager(authorizationService, principalResolver, decisionAudit);
     }
 
     @Bean
