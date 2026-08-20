@@ -4,7 +4,12 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
-当前无尚未归入版本的用户可见变化。
+### Added
+
+- **OpenAPI 运行时文档（兼容性验证通过）**：springdoc 3.1.0（Apache-2.0）经 BOM 管理并
+  装配于 `ainer-server`——`/v3/api-docs` 与 Swagger UI 默认受资源服务器安全链保护（未认证
+  401，真 JWT 放行）；全模块装配测试验证 OpenAPI JSON 覆盖各业务模块路径。业务模块与
+  消费者不强制依赖。
 
 ## [1.0.0] - 2026-08-18
 

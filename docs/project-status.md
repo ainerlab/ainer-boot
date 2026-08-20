@@ -310,6 +310,23 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-19 OpenAPI 运行时文档 spike 关闭（springdoc 3.1.0 × Boot 4.1 兼容性验证通过）
+- **结论**：springdoc 3.1.0 与 Boot 4.1/Framework 7 兼容（官方 FAQ 确认 3.x 支持 Boot 4，
+  3.1.0 升级到 Boot 4.1.0 基线）。此前反复记录的「OpenAPI 运行时文档兼容性待验证」缺口关闭。
+- **装配**：BOM 注册 `org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0`（Apache-2.0，
+  已入 dependencies.md 台账），仅装配于 ainer-server 参考面；业务模块与消费者不强制依赖，
+  消费者可按坐标自行引入。
+- **安全默认 fail-closed**：`/v3/api-docs` 与 Swagger UI 资源默认受资源服务器安全链保护——
+  未认证 401，真 JWT 放行。不进入 publicPaths，无匿名文档泄露面。
+- **验证**：`AinerServerOpenApiTest`（全模块装配 + 真实 PostgreSQL + 真 RSA JWT）：匿名
+  `/v3/api-docs` 401 → 带 token 200 且 OpenAPI JSON 覆盖全部业务模块代表路径
+  （`/api/workspaces`、`/api/files`、`/api/organization`、`/api/knowledge`、
+  `/api/authorization`、`/api/ai/agents`）；Swagger UI 入口匿名被拦截。2/0/0/0，
+  ainer-server 全部 9 tests 0 skipped。
+- **边界**：本切片只证明兼容性与安全默认；各模块注解级文档增补（@Operation/@Schema 等的
+  渐进完善）与消费者侧 springdoc 引入指引属后续按需，不在本 spike。
+
+
 2026-08-19 1.0.x 测试真值补齐（评审暴露的两项代码债关闭）
 - **AI 网关**：`AiGatewayModuleIntegrationTest` 的按 token 字符串直接构造、不验签的测试
   decoder 已删除，替换为 `JwtTestSupport` 真链（RSA 验签 + issuer 校验）；post/get 辅助

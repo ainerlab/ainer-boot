@@ -14,6 +14,7 @@
 | Flyway Core / PostgreSQL | 12.4.0 | 数据库 migration | Apache-2.0 | `org.flywaydb:flyway-core`、`flyway-database-postgresql` |
 | PostgreSQL JDBC | 42.7.11 | PostgreSQL 驱动 | BSD-2-Clause | `org.postgresql:postgresql` |
 | Testcontainers | 2.0.5 | PostgreSQL 集成测试 | MIT | `org.testcontainers:*` |
+| springdoc-openapi | 3.1.0 | OpenAPI 运行时文档（`/v3/api-docs` + Swagger UI；官方支持 Boot 4.x，3.1.0 以 Boot 4.1.0 为基线；仅装配于 ainer-server，端点受资源服务器安全链保护，业务模块不强制依赖） | Apache-2.0 | `org.springdoc:springdoc-openapi-starter-webmvc-ui` |
 | ArchUnit | 1.4.2 | 包和分层边界测试 | Apache-2.0；其发布 POM 同时声明传递 ASM 的 BSD 许可证 | `com.tngtech.archunit:archunit` |
 | Micrometer Core | 1.17.0 | 在线校验、撤销传播与安全运营指标 API | Apache-2.0 | `io.micrometer:micrometer-core` |
 | Micrometer Prometheus Registry | 1.17.0 | 两个可执行发行物的 Prometheus 文本格式导出 | Apache-2.0 | `io.micrometer:micrometer-registry-prometheus` |
