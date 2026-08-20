@@ -3,9 +3,9 @@ package dev.ainer.authorization.domain;
 import java.util.Objects;
 
 /**
- * Public field projection descriptor (ADR-0030 §5.2, §6.5). Returned by {@code PublicAccessPolicy} when
- * anonymous/public access is allowed; the HTTP adapter must apply this projection before sending the
- * response. A bare boolean ALLOW without a projection is insufficient.
+ * 公开字段投影描述符（ADR-0030 §5.2、§6.5）。当匿名/公开访问被允许时由
+ * {@code PublicAccessPolicy} 返回；HTTP 适配器必须在发送响应前应用该投影。
+ * 没有投影的裸布尔 ALLOW 是不充分的。
  */
 public record PublicProjection(String descriptor) implements DecisionObligation {
 

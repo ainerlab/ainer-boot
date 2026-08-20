@@ -12,22 +12,21 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
- * Application core for the Greenfield Identity model (ADR-0033 Greenfield §3-§4, S1.2 spine, S2
- * credential store).
+ * Greenfield Identity 模型的应用核心（ADR-0033 Greenfield §3-§4、S1.2 主干、S2 凭证存储）。
  *
- * <p>Exercises {@link HumanAccount} + {@link LoginIdentity} + {@link Credential} + {@link HumanProfile}
- * end-to-end via the foundation repository ports. This is the registration and authentication core used by
- * the Authorization Server. It does not create Workspace membership as a side effect.
+ * <p>通过 foundation 仓库端口端到端驱动 {@link HumanAccount} + {@link LoginIdentity}
+ * + {@link Credential} + {@link HumanProfile}。这是授权服务器使用的注册与认证核心，
+ * 不会以副作用创建 Workspace 成员关系。
  *
- * <p>Collision and state failures throw {@link BusinessException} with dedicated
- * {@link IdentityErrorCode foundation error codes}. Identifier equality never auto-merges accounts — a
- * duplicate {@code (type, providerAuthority, normalizedIdentifier)} is a hard conflict. Credential material
- * is encoded with the project's delegating {@link PasswordEncoder} before it reaches the store; the
- * ACTIVE-only uniqueness of {@code (account, type)} is enforced by the credential store.
+ * <p>冲突与状态失败抛出携带专属 {@link IdentityErrorCode foundation 错误码} 的
+ * {@link BusinessException}。标识符相等绝不自动合并账号——重复的
+ * {@code (type, providerAuthority, normalizedIdentifier)} 是硬冲突。凭证材料在进入存储前
+ * 先用项目的委托式 {@link PasswordEncoder} 编码；{@code (account, type)} 的
+ * ACTIVE 唯一性由凭证存储强制。
  *
- * <p>Not annotated {@code @Service}: the {@code Supplier<UUID>} id source is bound to the foundation
- * repository's {@code nextUuidV7()} in {@code IdentityModuleConfiguration}, so the bean is declared explicitly
- * there rather than auto-wired with an ambiguous {@code Supplier}.
+ * <p>未标注 {@code @Service}：{@code Supplier<UUID>} ID 来源在
+ * {@code IdentityModuleConfiguration} 中绑定到 foundation 仓库的 {@code nextUuidV7()}，
+ * 因此 bean 在那里显式声明，而不是注入语义含糊的 {@code Supplier}。
  */
 public class IdentityFoundationService {
 
@@ -57,8 +56,8 @@ public class IdentityFoundationService {
     }
 
     /**
-     * Register a new HumanAccount together with its first verified LoginIdentity. Fails closed if the
-     * binding already exists; never merges into an existing account.
+     * 注册一个新 HumanAccount 及其首个已验证 LoginIdentity。绑定已存在时失败关闭
+     * （fail-closed）；绝不合并进既有账号。
      */
     public RegisteredAccount registerHumanAccount(
             IdentityAuthorityRef authority,
@@ -84,8 +83,8 @@ public class IdentityFoundationService {
     }
 
     /**
-     * Attach an additional verified LoginIdentity to an existing ACTIVE HumanAccount. The account must be
-     * authenticatable; a duplicate binding is a hard conflict.
+     * 向既有 ACTIVE HumanAccount 附加一个额外的已验证 LoginIdentity。账号必须可认证；
+     * 重复绑定是硬冲突。
      */
     public LoginIdentity linkLoginIdentity(
             UUID accountId,
@@ -112,7 +111,7 @@ public class IdentityFoundationService {
         return login;
     }
 
-    /** Resolve a credential to its binding, if any. Used by the authentication path (subject to account epoch). */
+    /** 把凭证解析到其绑定（如存在）。供认证路径使用（还需校验账号 epoch）。 */
     public Optional<LoginIdentity> findLogin(
             LoginIdentityType type,
             String providerAuthority,
@@ -121,9 +120,9 @@ public class IdentityFoundationService {
     }
 
     /**
-     * Register a new HumanAccount with its first verified LoginIdentity and an ACTIVE password credential.
-     * Fails closed if the binding already exists, and encodes the raw password with the delegating
-     * {@link PasswordEncoder} before it reaches the store. Returns a read-only projection for the caller.
+     * 注册一个新 HumanAccount，包含首个已验证 LoginIdentity 与一份 ACTIVE 密码凭证。
+     * 绑定已存在时失败关闭（fail-closed）；原始密码经委托式 {@link PasswordEncoder}
+     * 编码后才进入存储。返回只读投影供调用方使用。
      */
     public RegisteredAccount registerHumanAccountWithPassword(
             IdentityAuthorityRef authority,
@@ -143,9 +142,8 @@ public class IdentityFoundationService {
     }
 
     /**
-     * Resolve the ACTIVE password credential for an account via its LoginIdentity, together with the owning
-     * account. Empty when the binding or the credential is missing or revoked — the caller decides how to
-     * surface that as an authentication failure.
+     * 经 LoginIdentity 解析账号的 ACTIVE 密码凭证，连同所属账号一起返回。绑定或凭证
+     * 缺失、已吊销时返回 empty——由调用方决定如何把它呈现为认证失败。
      */
     public Optional<CredentialLookup> findPasswordCredentialForLogin(
             LoginIdentityType type,
@@ -160,9 +158,8 @@ public class IdentityFoundationService {
     }
 
     /**
-     * Rotate the ACTIVE password credential for an existing account: revokes the current material and stores
-     * a fresh ACTIVE one. Fails closed for unknown accounts, accounts that cannot authenticate, and accounts
-     * that carry no ACTIVE password credential to rotate.
+     * 轮换既有账号的 ACTIVE 密码凭证：吊销当前材料并存入新的 ACTIVE 材料。对未知账号、
+     * 不可认证的账号、没有可轮换 ACTIVE 密码凭证的账号一律失败关闭（fail-closed）。
      */
     public Credential rotatePassword(UUID accountId, String rawPassword) {
         Objects.requireNonNull(accountId, "accountId");
@@ -176,7 +173,7 @@ public class IdentityFoundationService {
     }
 
     /**
-     * Upsert the display profile of an account. Fails closed for unknown accounts.
+     * upsert 账号的展示档案。未知账号时失败关闭（fail-closed）。
      */
     public HumanProfile updateProfile(UUID accountId, String displayName, String avatarUrl) {
         Objects.requireNonNull(accountId, "accountId");
@@ -243,7 +240,7 @@ public class IdentityFoundationService {
     }
 
     /**
-     * Result of registering a HumanAccount: the new account together with its primary LoginIdentity.
+     * 注册 HumanAccount 的结果：新账号与其主 LoginIdentity。
      */
     public record RegisteredAccount(HumanAccount account, LoginIdentity primaryLogin) {
         public RegisteredAccount {
@@ -253,7 +250,7 @@ public class IdentityFoundationService {
     }
 
     /**
-     * An ACTIVE password credential resolved for an account, used by the authentication path.
+     * 为账号解析出的 ACTIVE 密码凭证，供认证路径使用。
      */
     public record CredentialLookup(HumanAccount account, Credential credential) {
         public CredentialLookup {

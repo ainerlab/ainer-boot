@@ -8,17 +8,15 @@ import dev.ainer.authorization.domain.ResourceRef;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Declares the authenticated grant path for an action and evaluates two independent facets
- * (ADR-0030 §5.1, §6.1):
+ * 为动作声明已认证授权路径，并求值两个相互独立的侧面（ADR-0030 §5.1、§6.1）：
  *
  * <ul>
- *   <li>{@link #relationGrants} — the relation-derived grant (owner/participant relation IS the authority).
- *   <li>{@link #resourceStateSatisfies} — the domain policy's resource state/relation condition that
- *       intersects with ALL grant paths.
+ *   <li>{@link #relationGrants} —— 关系派生授权（所有者/参与者关系即权威）。
+ *   <li>{@link #resourceStateSatisfies} —— 领域策略的资源状态/关系条件，与所有授权路径求交集。
  * </ul>
  *
- * The evaluator computes: {@code (bindingGrant ∪ relationGrant) ∩ resourceStateSatisfies} per the declared
- * {@link GrantPath}. Neither facet alone is sufficient; both must hold for the chosen path.
+ * 求值器按声明的 {@link GrantPath} 计算：{@code (bindingGrant ∪ relationGrant) ∩
+ * resourceStateSatisfies}。两个侧面单独都不充分；对选定路径必须同时成立。
  */
 public interface DomainAuthorizationPolicy {
 

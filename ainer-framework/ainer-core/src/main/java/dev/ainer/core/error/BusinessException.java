@@ -4,7 +4,7 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Expected business failure. The web adapter maps it to the error's real HTTP status.
+ * 预期内的业务失败。web 适配器会把它映射为该错误码对应的真实 HTTP 状态码。
  */
 public final class BusinessException extends RuntimeException {
 

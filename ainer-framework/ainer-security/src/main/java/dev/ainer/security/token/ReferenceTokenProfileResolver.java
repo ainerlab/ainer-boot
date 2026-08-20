@@ -11,13 +11,14 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Reference implementation of {@link TokenProfileResolver} (ADR-0033 Greenfield §6.1, S1.1 port).
+ * {@link TokenProfileResolver} 的参考实现（ADR-0033 Greenfield §6.1，S1.1 移植）。
  *
- * <p>Projects verified JWT claim maps to a typed {@link AuthenticatedPrincipal} using the closed
- * Greenfield profiles. It is fail-closed: unknown {@code token_profile}, unsupported
- * {@code claim_contract_version}, or an {@code actor_type} that disagrees with the profile all throw, so a
- * resolver can never silently admit an unprofiled or tenant-bearing token. This reference is used to validate
- * the contract; the Authorization Server provides the issuance/request-time wiring that feeds it real claims.
+ * <p>使用封闭的 Greenfield profile 把已验证 JWT claim Map 投影为类型化的
+ * {@link AuthenticatedPrincipal}。它是失败关闭（fail-closed）的：未知的
+ * {@code token_profile}、不支持的 {@code claim_contract_version}、与 profile 不一致的
+ * {@code actor_type} 都会抛异常，因此解析器绝不会静默放行未标注 profile 或携带 tenant
+ * 语义的 token。该参考实现用于契约验证；授权服务器提供签发/请求期接线，
+ * 向它输入真实 claims。
  */
 public class ReferenceTokenProfileResolver implements TokenProfileResolver {
 

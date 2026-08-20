@@ -11,6 +11,13 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+/**
+ * 请求关联过滤器：为每个请求解析或生成 requestId，写入请求属性、{@code X-Request-Id}
+ * 响应头与 MDC，保证日志与响应都可追踪同一请求。
+ *
+ * <p>优先复用入站 {@code X-Request-Id} 头（仅接受安全字符集且长度受限的值，防止日志
+ * 注入）；否则生成新的 UUID。
+ */
 public final class RequestIdFilter extends OncePerRequestFilter {
 
     public static final String MDC_KEY = "requestId";

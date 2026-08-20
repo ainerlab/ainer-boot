@@ -9,7 +9,7 @@ import org.springframework.security.web.access.intercept.RequestAuthorizationCon
 
 import java.util.function.Supplier;
 
-/** Requires a typed SERVICE token with the requested scope. */
+/** 要求类型化 SERVICE token（token_profile=SERVICE_V1 且契约版本匹配）并持有指定 scope。 */
 public final class ServiceScopeAuthorizationManager
         implements AuthorizationManager<RequestAuthorizationContext> {
 

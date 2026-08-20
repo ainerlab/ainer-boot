@@ -1,17 +1,16 @@
 /**
- * Greenfield typed principal contracts (ADR-0033 Greenfield §2.6, ADR-0030 §2.2).
+ * Greenfield 类型化主体契约（ADR-0033 Greenfield §2.6、ADR-0030 §2.2）。
  *
- * <p>Authority-qualified, typed references to authenticatable principals. These are the Foundation's
- * stable security contracts: a {@link dev.ainer.security.principal.PrincipalSubjectRef} is always
- * qualified by an {@link dev.ainer.security.principal.IdentityAuthorityRef} so that identical raw
- * {@code sub} values from different issuers, realms or deployments never collide. Only Human and Service
- * are credential principals; Agent appears as a separate attribution ref (ADR-0031) and is deliberately
- * not part of {@code PrincipalSubjectRef}.
+ * <p>带权威限定、类型化的可认证主体引用，是 Foundation 的稳定安全契约：
+ * {@link dev.ainer.security.principal.PrincipalSubjectRef} 总是被
+ * {@link dev.ainer.security.principal.IdentityAuthorityRef} 限定，使来自不同签发方、realm
+ * 或部署的相同原始 {@code sub} 值绝不冲突。只有 Human 与 Service 是凭证主体；Agent
+ * 作为独立的归因引用出现（ADR-0031），刻意不属于 {@code PrincipalSubjectRef}。
  *
- * <p>Package-level {@link org.jspecify.annotations.NullMarked} declares every type, parameter and return
- * value non-null unless explicitly annotated {@link org.jspecify.annotations.Nullable}.
+ * <p>包级 {@link org.jspecify.annotations.NullMarked} 声明所有类型、参数与返回值默认非空，
+ * 除非显式标注 {@link org.jspecify.annotations.Nullable}。
  *
- * <p>These contracts are the sole request-time principal vocabulary after the Greenfield cutover.
+ * <p>这些契约是 Greenfield 切换后请求期主体的唯一词汇表。
  */
 @NullMarked
 package dev.ainer.security.principal;

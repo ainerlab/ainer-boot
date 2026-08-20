@@ -9,13 +9,12 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Immutable authorization decision (ADR-0030 §6). {@link AuthorizationOutcome#CHALLENGE} means the action
- * must not execute until {@link #challenge()} is satisfied and the decision re-evaluated; it is never an
- * ALLOW. {@link #obligations()} carries typed constraints the caller must execute before the effect reaches
- * the client.
+ * 不可变的授权决策（ADR-0030 §6）。{@link AuthorizationOutcome#CHALLENGE} 表示动作在
+ * {@link #challenge()} 被满足并重新求值之前不得执行，它绝不是 ALLOW。{@link #obligations()}
+ * 携带调用方必须执行的类型化约束，效果触达客户端之前必须全部完成。
  *
- * <p>{@code decisionId} is a UUIDv7 (RFC 9562) — time-ordered for audit correlation, consistent with Ainer's
- * PostgreSQL 18 {@code uuidv7()} convention (ADR-0020).
+ * <p>{@code decisionId} 是 UUIDv7（RFC 9562）——时间有序以便审计关联，与 Ainer 的
+ * PostgreSQL 18 {@code uuidv7()} 约定一致（ADR-0020）。
  */
 public record AuthorizationDecision(
         UUID decisionId,

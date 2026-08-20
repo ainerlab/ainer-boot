@@ -3,7 +3,7 @@ package dev.ainer.authorization.infrastructure;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Row for {@code ainer_authorization_subject_set_binding}. */
+/** {@code ainer_authorization_subject_set_binding} 的行映射。 */
 public class SetBindingRow {
 
     private UUID id;

@@ -6,7 +6,7 @@ import org.apache.ibatis.annotations.Param;
 import java.util.UUID;
 
 /**
- * MyBatis mapper for {@code ainer_identity_credential} (Greenfield foundation persistence, S2).
+ * {@code ainer_identity_credential} 的 MyBatis mapper（Greenfield foundation 持久化，S2）。
  */
 @Mapper
 public interface CredentialMapper {
@@ -19,7 +19,7 @@ public interface CredentialMapper {
             @Param("accountId") UUID accountId,
             @Param("type") String type);
 
-    /** Marks the current ACTIVE material for (account, type) as REVOKED. Returns rows affected (0 or 1). */
+    /** 把 (account, type) 当前的 ACTIVE 材料置为 REVOKED。返回受影响行数（0 或 1）。 */
     int revokeActiveByAccountAndType(
             @Param("accountId") UUID accountId,
             @Param("type") String type,

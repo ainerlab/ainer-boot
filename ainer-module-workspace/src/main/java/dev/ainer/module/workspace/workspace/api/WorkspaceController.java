@@ -28,6 +28,14 @@ import org.springframework.web.bind.annotation.RestController;
 import java.net.URI;
 import java.util.UUID;
 
+/**
+ * Workspace 模块的 HTTP 入口，暴露工作空间与成员治理的 REST API。
+ *
+ * <p>所有端点先通过 {@code AuthenticatedPrincipalResolver} 解析已验证主体，再委托
+ * {@link WorkspaceApplicationService} 完成 scope 校验、成员关系检查与审计记录；控制器本身
+ * 不承载授权决策逻辑。每个响应均携带请求追踪标识，成员邀请在接受前只能保持 {@code PENDING}，
+ * OWNER 转移只能走专用的 ownership-transfers 端点。
+ */
 @Validated
 @RestController
 @RequestMapping("/api/workspaces")

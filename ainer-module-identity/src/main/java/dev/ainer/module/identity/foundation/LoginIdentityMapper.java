@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * MyBatis mapper for {@code ainer_identity_login_identity} (Greenfield foundation persistence, S1.2).
+ * {@code ainer_identity_login_identity} 的 MyBatis mapper（Greenfield foundation 持久化，S1.2）。
  */
 @Mapper
 public interface LoginIdentityMapper {

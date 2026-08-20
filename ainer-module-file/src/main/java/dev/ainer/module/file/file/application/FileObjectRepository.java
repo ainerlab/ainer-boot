@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Persistence port for {@link FileObject} metadata (ADR-0040).
+ * {@link FileObject} 元数据的持久化端口（ADR-0040）。
  */
 public interface FileObjectRepository {
 
@@ -17,18 +17,18 @@ public interface FileObjectRepository {
     Optional<FileObject> findById(UUID id);
 
     /**
-     * Page through metadata, optionally filtered by namespace, newest first.
+     * 分页遍历元数据，可按 namespace 过滤，最新在前。
      *
-     * @param namespace optional namespace filter; {@code null} or blank means all namespaces
-     * @param offset    zero-based row offset, computed by the caller from page/size
-     * @param size      page size (already validated to 1..100)
+     * @param namespace 可选的 namespace 过滤条件；{@code null} 或空白表示全部 namespace
+     * @param offset    从零开始的行偏移，由调用方按 page/size 计算
+     * @param size      页大小（调用方已校验为 1..100）
      */
     FilePageSlice findPage(@Nullable String namespace, long offset, int size);
 
-    /** Delete the metadata row. Returns false when the row does not exist. */
+    /** 删除元数据行。行不存在时返回 false。 */
     boolean deleteById(UUID id);
 
-    /** One page of metadata plus the total row count for pagination. */
+    /** 一页元数据及用于分页的总行数。 */
     record FilePageSlice(List<FileObject> items, long total) {
     }
 }

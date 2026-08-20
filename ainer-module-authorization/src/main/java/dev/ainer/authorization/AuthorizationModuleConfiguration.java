@@ -41,9 +41,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Module configuration for the authorization persistence slice (ADR-0030 S1). Assembled by the
- * host application via {@code @Import}. The feature is enabled by default and can be disabled
- * with {@code ainer.authorization.enabled=false}.
+ * 授权持久化切片的模块配置（ADR-0030 S1）。由宿主应用通过 {@code @Import} 装配。
+ * 特性默认启用，可通过 {@code ainer.authorization.enabled=false} 关闭。
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "ainer.authorization", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -70,9 +69,8 @@ public class AuthorizationModuleConfiguration {
     }
 
     /**
-     * Build the in-memory {@link PermissionRegistry} from all registered {@link PermissionContributor}s.
-     * The registry is the authority at decision time; the database catalog is only a management
-     * projection. This bean is the S0 decision-engine entry point.
+     * 从所有已注册的 {@link PermissionContributor} 构建内存态 {@link PermissionRegistry}。
+     * 该注册表是决策时的权威；数据库目录只是管理投影。此 bean 是 S0 决策引擎入口。
      */
     @Bean
     @ConditionalOnMissingBean
@@ -85,10 +83,10 @@ public class AuthorizationModuleConfiguration {
     }
 
     /**
-     * Default deny-all {@link ScopePermissionCeiling} (ADR-0030 §3.3). No OAuth scope maps to any
-     * permission until a product module registers an explicit ceiling. This enforces "a scope never
-     * becomes a permission implicitly by name equality" and the default-deny invariant.
-     * Product modules override this bean to declare real scope→permission ceilings.
+     * 默认全拒绝的 {@link ScopePermissionCeiling}（ADR-0030 §3.3）。在产品模块注册显式
+     * ceiling 之前，任何 OAuth scope 都不映射到任何权限。这强制保证"scope 绝不因名称
+     * 相同而隐式变成权限"以及默认拒绝不变量。产品模块通过覆盖此 bean 声明真实的
+     * scope→permission 上限。
      */
     @Bean
     @ConditionalOnMissingBean
@@ -97,9 +95,9 @@ public class AuthorizationModuleConfiguration {
     }
 
     /**
-     * Default deny-all {@link PublicAccessPolicy} (ADR-0030 §1, §5.2). No public access is granted
-     * until a product module registers an explicit policy. This is the anonymous-path default-deny.
-     * Product modules override this bean to declare public resources.
+     * 默认全拒绝的 {@link PublicAccessPolicy}（ADR-0030 §1、§5.2）。在产品模块注册显式
+     * 策略之前不授予任何公开访问，这是匿名路径的默认拒绝。产品模块通过覆盖此 bean
+     * 声明公开资源。
      */
     @Bean
     @ConditionalOnMissingBean
@@ -108,12 +106,11 @@ public class AuthorizationModuleConfiguration {
     }
 
     /**
-     * Default deny-all {@link DomainAuthorizationPolicy} (ADR-0030 §5.1). {@code pathFor} returns null
-     * for every permission, so the decision engine emits {@code UNKNOWN_POLICY} DENY for all
-     * authenticated requests until a product module registers a real policy. Combined with the
-     * deny-all ceiling and public policy, this guarantees end-to-end default-deny when the module is
-     * assembled without product configuration.
-     * Product modules override this bean to declare grant paths and relation/state facts.
+     * 默认全拒绝的 {@link DomainAuthorizationPolicy}（ADR-0030 §5.1）。{@code pathFor} 对
+     * 每个权限都返回 null，因此在产品模块注册真实策略之前，决策引擎对所有已认证请求都
+     * 发出 {@code UNKNOWN_POLICY} DENY。与全拒绝 ceiling、公开策略组合后，保证模块在
+     * 没有产品配置被装配时端到端默认拒绝。产品模块通过覆盖此 bean 声明授权路径与
+     * 关系/状态事实。
      */
     @Bean
     @ConditionalOnMissingBean
@@ -141,12 +138,12 @@ public class AuthorizationModuleConfiguration {
     }
 
     /**
-     * Assemble the {@link AuthorizationService} decision engine (ADR-0030 §6). Injects the registry,
-     * ceiling, public policy, domain policy, binding resolver and a policy version string.
-     * {@code @ConditionalOnMissingBean} allows product modules to replace the entire engine if needed.
+     * 装配 {@link AuthorizationService} 决策引擎（ADR-0030 §6）。注入注册表、ceiling、
+     * 公开策略、领域策略、Binding 解析器与策略版本字符串。{@code @ConditionalOnMissingBean}
+     * 允许产品模块在需要时替换整个引擎。
      *
-     * @param policyVersion stable version label for audit/decision correlation; defaults to a
-     *                      module-level constant, overridable via {@code ainer.authorization.policy-version}
+     * @param policyVersion 用于审计/决策关联的稳定版本标签；默认为模块级常量，
+     *                      可通过 {@code ainer.authorization.policy-version} 覆盖
      */
     @Bean
     @ConditionalOnMissingBean
@@ -164,9 +161,8 @@ public class AuthorizationModuleConfiguration {
     }
 
     /**
-     * Servlet endpoint adapter backed by the same decision service as application-level checks.
-     * It is only contributed when the host has a verified-principal resolver; pure decision-engine
-     * consumers remain independent of Spring Security runtime assembly.
+     * Servlet 端点适配器，与应用层检查共用同一个决策服务。只有当宿主存在已验证主体
+     * 解析器时才贡献此 bean；纯决策引擎消费者因此保持独立于 Spring Security 运行时装配。
      */
     @Bean
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)

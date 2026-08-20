@@ -5,16 +5,15 @@ import dev.ainer.authorization.domain.Permission;
 import java.util.Collection;
 
 /**
- * Persistence port for the {@link Permission} catalog projection (ADR-0030 S1). The authority at
- * decision time is the in-memory {@link dev.ainer.authorization.catalog.PermissionRegistry}; this
- * repository syncs the registered definitions to the database management projection.
+ * {@link Permission} 目录投影的持久化端口（ADR-0030 S1）。决策时的权威是内存态
+ * {@link dev.ainer.authorization.catalog.PermissionRegistry}；本仓储把已注册定义同步到
+ * 数据库管理投影。
  */
 public interface PermissionCatalogRepository {
 
     /**
-     * Upsert a permission definition into the catalog projection. If the code already exists with a
-     * differing definition, the conflict is surfaced for startup fail-closed handling; an identical
-     * re-registration is idempotent.
+     * 把权限定义 upsert 到目录投影。若 code 已存在但定义不同，冲突会上抛给启动
+     * fail-closed 处理；完全相同的重复注册是幂等的。
      */
     void upsert(Permission permission, String sourceModule);
 

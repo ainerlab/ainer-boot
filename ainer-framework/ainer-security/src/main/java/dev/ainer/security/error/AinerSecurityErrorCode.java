@@ -2,6 +2,12 @@ package dev.ainer.security.error;
 
 import dev.ainer.core.error.ErrorCode;
 
+/**
+ * Ainer 安全契约的错误码。
+ *
+ * <p>{@code ONLINE_VALIDATION_UNAVAILABLE}（503）用于高风险 API 的在线身份状态校验
+ * 失败关闭（fail-closed）场景：introspection 依赖不可用时不得回退为仅验证 JWT。
+ */
 public enum AinerSecurityErrorCode implements ErrorCode {
 
     ONLINE_VALIDATION_UNAVAILABLE(

@@ -7,6 +7,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * 通知模板的持久化端口（ADR-0040）。模板按编码唯一启用；
+ * 更新与状态迁移都基于乐观锁版本，供管理面与模板渲染路径使用。
+ */
 public interface NotificationTemplateRepository {
     UUID save(NotificationTemplate template);
     Optional<NotificationTemplate> findActiveByCode(String code);

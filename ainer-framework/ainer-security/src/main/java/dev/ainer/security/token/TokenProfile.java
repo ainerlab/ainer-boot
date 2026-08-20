@@ -3,16 +3,16 @@ package dev.ainer.security.token;
 import java.util.Objects;
 
 /**
- * Closed set of Ainer Foundation token profiles (ADR-0033 Greenfield §6.1).
+ * Ainer Foundation token profile 的封闭集合（ADR-0033 Greenfield §6.1）。
  *
- * <p>Each profile fixes how {@code sub}, {@code actor_type}, audience, scope and an optional workspace access
- * ceiling are interpreted together with a claim-contract version. The legacy {@code tenant_id} / tenant-roles
- * profile is deliberately not part of the Greenfield baseline; any token lacking a known profile / version
- * must fail closed at resolution time.
+ * <p>每个 profile 固定 {@code sub}、{@code actor_type}、audience、scope 与可选 workspace
+ * 访问上限的解释方式，并绑定一个 claim 契约版本。旧版 {@code tenant_id} / tenant-roles
+ * profile 刻意不属于 Greenfield 基线；任何缺少已知 profile / 版本的 token 必须在解析时
+ * 失败关闭（fail closed）。
  *
- * <p>Profiles are not freely combinable: a USER_NEUTRAL token never carries a workspace ceiling, a
- * USER_WORKSPACE token requires one, and a SERVICE token never represents a human. The wire value is carried
- * in the {@code token_profile} claim alongside {@code claim_contract_version}.
+ * <p>profile 不可自由组合：USER_NEUTRAL token 绝不携带 workspace 上限，USER_WORKSPACE
+ * token 必须携带，SERVICE token 绝不代表人类。线上值放在 {@code token_profile} claim 中，
+ * 与 {@code claim_contract_version} 并列。
  */
 public enum TokenProfile {
 
@@ -20,13 +20,13 @@ public enum TokenProfile {
     USER_WORKSPACE_V1("USER_WORKSPACE_V1"),
     SERVICE_V1("SERVICE_V1");
 
-    /** Claim name carrying the profile wire value. */
+    /** 携带 profile 线上值的 claim 名称。 */
     public static final String PROFILE_CLAIM = "token_profile";
 
-    /** Claim name carrying the claim-contract version. */
+    /** 携带 claim 契约版本的 claim 名称。 */
     public static final String CONTRACT_VERSION_CLAIM = "claim_contract_version";
 
-    /** Current claim-contract version of the Greenfield baseline. */
+    /** Greenfield 基线的当前 claim 契约版本。 */
     public static final String CURRENT_CONTRACT_VERSION = "1";
 
     private final String claimValue;
@@ -35,14 +35,14 @@ public enum TokenProfile {
         this.claimValue = claimValue;
     }
 
-    /** Canonical wire value placed in the {@code token_profile} claim. */
+    /** 写入 {@code token_profile} claim 的规范化线上值。 */
     public String claimValue() {
         return claimValue;
     }
 
     /**
-     * Resolve a profile from its wire value. Fail closed: blank or unknown values throw, so a resolver can
-     * never silently accept an unprofiled token.
+     * 从线上值解析 profile。失败关闭（fail closed）：空白或未知值直接抛异常，
+     * 因此解析器绝不会静默接受未标注 profile 的 token。
      */
     public static TokenProfile fromClaim(String value) {
         Objects.requireNonNull(value, "value");

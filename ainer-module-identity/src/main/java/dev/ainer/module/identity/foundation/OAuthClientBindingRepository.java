@@ -4,11 +4,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Persistence port for {@link OAuthClientBinding} (ADR-0033 Greenfield §2.6).
+ * {@link OAuthClientBinding} 的持久化端口（ADR-0033 Greenfield §2.6）。
  *
- * <p>The binding links a rotatable OAuth {@code client_id} to a stable {@link ServicePrincipal}. The
- * partial unique index on {@code (client_id) WHERE status = 'ACTIVE'} guarantees at most one active binding
- * per credential at a time; retired bindings are retained for audit and historical introspection.
+ * <p>绑定把可轮换的 OAuth {@code client_id} 连接到稳定的 {@link ServicePrincipal}。
+ * {@code (client_id) WHERE status = 'ACTIVE'} 上的部分唯一索引保证同一凭证任一时刻至多
+ * 一个活跃绑定；退役绑定保留供审计与历史 introspection。
  */
 public interface OAuthClientBindingRepository {
 
@@ -18,6 +18,6 @@ public interface OAuthClientBindingRepository {
 
     Optional<OAuthClientBinding> findByPrincipalId(UUID principalId);
 
-    /** Next PostgreSQL UUIDv7 primary key for a binding row. */
+    /** 绑定行的下一个 PostgreSQL UUIDv7 主键。 */
     UUID nextUuidV7();
 }

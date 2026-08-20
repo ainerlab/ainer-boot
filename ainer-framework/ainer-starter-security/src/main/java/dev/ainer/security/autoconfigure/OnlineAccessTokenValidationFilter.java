@@ -26,6 +26,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * 高风险请求的 access token 在线校验（introspection）门禁。失败关闭（fail-closed）：
+ * 仅作用于配置的受保护路径/方法；token introspection 判定为 inactive 时写出 401
+ * （UNAUTHENTICATED），introspection 依赖本身失败（网络/服务不可用）时写出 503
+ * （ONLINE_VALIDATION_UNAVAILABLE），绝不回退为仅验证 JWT，也不缓存 active 结果。
+ */
 final class OnlineAccessTokenValidationFilter extends OncePerRequestFilter {
 
     private static final String METRIC_PREFIX = "ainer.security.online.validation.";

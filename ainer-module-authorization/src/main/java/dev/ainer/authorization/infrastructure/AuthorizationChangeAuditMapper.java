@@ -4,15 +4,15 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 /**
- * MyBatis mapper for {@code ainer_authorization_change_audit} (ADR-0030 §11.7).
- * Append-only — insert is the sole write operation.
+ * {@code ainer_authorization_change_audit} 的 MyBatis mapper（ADR-0030 §11.7）。
+ * append-only——insert 是唯一的写操作。
  */
 @Mapper
 public interface AuthorizationChangeAuditMapper {
 
     /**
-     * Insert a change-audit row. The {@code id} column uses DB {@code DEFAULT uuidv7()} and is not
-     * supplied by the caller. Returns affected row count (must be 1).
+     * 插入一条变更审计行。{@code id} 列使用数据库 {@code DEFAULT uuidv7()}，
+     * 不由调用方提供。返回受影响行数（必须为 1）。
      */
     int insert(@Param("row") AuthorizationChangeAuditRow row);
 }

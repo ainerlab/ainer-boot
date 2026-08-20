@@ -3,7 +3,7 @@ package dev.ainer.module.notification.notification.application;
 import dev.ainer.module.notification.notification.domain.NotificationAudit;
 
 /**
- * Persistence port for append-only {@link NotificationAudit} rows (ADR-0040).
+ * 只追加 {@link NotificationAudit} 行的持久化端口（ADR-0040）。
  */
 public interface NotificationAuditRepository {
 

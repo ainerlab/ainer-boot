@@ -4,8 +4,8 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * A named bundle of permissions (ADR-0030 §4.1). {@code OWNER/ADMIN/MEMBER} are built-in Identity/Workspace
- * roles and are not migrated or duplicated by this model.
+ * 命名的权限集合（ADR-0030 §4.1）。{@code OWNER/ADMIN/MEMBER} 是 Identity/Workspace 的
+ * 内建角色，不迁移也不在本模型中复制。
  */
 public record Role(String code, String name, Set<PermissionCode> permissions) {
 

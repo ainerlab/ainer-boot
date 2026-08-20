@@ -17,12 +17,11 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Non-bypassable guard for generic Role and Binding administration.
+ * 通用 Role 与 Binding 管理的不可绕过守卫。
  *
- * <p>The controller calls this guard for management reads, while application mutation services call
- * it again at the transaction boundary. This keeps direct service invocations from bypassing the
- * anti-escalation rules. Hard invariants (non-GLOBAL, non-system-only and no self modification) are
- * enforced here in addition to the host's {@link GrantAdministrationPolicy}.
+ * <p>控制器在管理读取时调用本守卫，应用层变更服务在事务边界再次调用。这保证直接调用
+ * 服务也无法绕过防提权规则。除宿主的 {@link GrantAdministrationPolicy} 之外，硬性不变量
+ * （非 GLOBAL、非 system-only、禁止自我修改）在这里统一强制。
  */
 @Component
 public final class GrantAdministrationGuard {
@@ -45,7 +44,7 @@ public final class GrantAdministrationGuard {
         }
     }
 
-    /** Require SERVICE + management scope + the exact host-registered trusted manager. */
+    /** 要求 SERVICE 主体 + 管理 scope + 宿主注册的精确受信管理者。 */
     public void requireManager(AuthenticatedPrincipal actor) {
         if (!actor.isService()
                 || !actor.principalSubjectRef().authority().equals(actor.authority())
@@ -55,7 +54,7 @@ public final class GrantAdministrationGuard {
         }
     }
 
-    /** Validate a new Role's complete permission set against the assignable catalog. */
+    /** 按可分配目录校验新 Role 的完整权限集合。 */
     public void requireRoleCreation(
             AuthenticatedPrincipal actor, Set<PermissionCode> permissions) {
         requireManager(actor);
@@ -63,8 +62,8 @@ public final class GrantAdministrationGuard {
     }
 
     /**
-     * Validate a Role permission replacement and reject modification of any Role referenced by an
-     * ACTIVE Binding for the actor itself, including future-dated bindings.
+     * 校验 Role 权限替换，并拒绝修改任何被操作者自身 ACTIVE Binding（包括未来生效的
+     * Binding）引用的 Role。
      */
     public void requireRoleModification(
             AuthenticatedPrincipal actor, UUID roleId, Set<PermissionCode> permissions) {
@@ -79,7 +78,7 @@ public final class GrantAdministrationGuard {
         requireAssignablePermissions(actor, permissions);
     }
 
-    /** Validate target, Role permissions and scope before creating a Binding. */
+    /** 创建 Binding 前校验目标、Role 权限与 scope。 */
     public void requireBindingCreation(
             AuthenticatedPrincipal actor,
             SubjectRef target,
@@ -99,7 +98,7 @@ public final class GrantAdministrationGuard {
     }
 
     /**
-     * Validate a subject-set binding creation (ADR-0042 O2，承接 ADR-0032 §6 防提权）：
+     * 校验主体集合 Binding 的创建（ADR-0042 O2，承接 ADR-0032 §6 防提权）：
      * GLOBAL 不可授予；set 与 scope 必须同 Workspace；set 家族必须有已注册成员解析器；
      * 管理者当前不得是目标集合成员（自提权防护）；system-only 与 HIGH 风险权限不得
      * 通过集合授予；其余约束与直接 Binding 相同。
@@ -141,7 +140,7 @@ public final class GrantAdministrationGuard {
         }
     }
 
-    /** Validate a Binding mutation, including the generic API's no-self-modification invariant. */
+    /** 校验 Binding 变更，包含通用 API 的禁止自我修改不变量。 */
     public void requireBindingRevocation(
             AuthenticatedPrincipal actor, SubjectBindingRepository.PersistedBinding binding) {
         requireManager(actor);

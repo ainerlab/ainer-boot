@@ -8,6 +8,11 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * 从 Spring Security {@link Authentication} 构造 {@link AuthenticatedService} 的工厂：
+ * 仅接受 {@code actor_type=SERVICE} 的已验证 Jwt 主体，否则按 401/403 抛出
+ * {@link BusinessException}。
+ */
 public final class JwtAuthenticatedServiceFactory {
 
     private JwtAuthenticatedServiceFactory() {

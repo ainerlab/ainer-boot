@@ -1,7 +1,7 @@
 package dev.ainer.security.token;
 
 /**
- * Resolves the currently authenticated request into the typed Foundation principal.
+ * 把当前已认证请求解析为类型化的 Foundation 主体。
  */
 public interface AuthenticatedPrincipalResolver {
 

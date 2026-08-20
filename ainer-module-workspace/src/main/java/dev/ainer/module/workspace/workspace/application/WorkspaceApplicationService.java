@@ -18,6 +18,16 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Workspace 模块的应用服务，统一承载工作空间生命周期与成员治理的全部用例。
+ *
+ * <p>每个操作都按固定顺序执行：要求人员主体（{@code requireHuman}）、校验 scope 能力
+ * （scope 只表示能力范围，不替代资源成员关系检查）、校验操作者是 ACTIVE 的 OWNER/ADMIN
+ * 成员，再执行业务写入。所有授权决策（ALLOWED/DENIED）都会写入授权审计表；受保护写操作
+ * 在审计失败时不会静默继续。关键不变量：邀请在接受前只能是 {@code PENDING}；OWNER 不能
+ * 通过通用成员接口被授予、降级或移除；OWNER 转移在锁定 Workspace 的专用事务
+ * （{@code FOR UPDATE}）内先降级旧 OWNER、再提升新 OWNER 完成。
+ */
 @Service
 public class WorkspaceApplicationService {
 

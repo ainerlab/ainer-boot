@@ -4,8 +4,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Mutable persistence row for {@link ServicePrincipal} (MyBatis plain-POJO mapping against
- * {@code ainer_identity_service_principal}). ORM constraint: a normal mutable class, not a record.
+ * {@link ServicePrincipal} 的可变持久化行（MyBatis 普通 POJO 映射，对应表
+ * {@code ainer_identity_service_principal}）。受 ORM 约束使用普通可变类而非 record。
  */
 public class ServicePrincipalRow {
 

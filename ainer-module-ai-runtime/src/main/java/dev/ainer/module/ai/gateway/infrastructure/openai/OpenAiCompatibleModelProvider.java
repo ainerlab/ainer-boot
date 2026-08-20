@@ -31,6 +31,14 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * OpenAI 兼容 HTTP 模型提供方：以 chat/completions 协议对接任意兼容网关
+ * （OpenAI、DeepSeek 等）。
+ *
+ * <p>支持非流式与 SSE 流式两条路径；对响应体大小与流内容长度设置硬上限，
+ * 供应商错误分类为 {@link ProviderFailure}（限流/超时/不可用/协议错误），
+ * 错误正文不透出；usage 缺失时用 {@link TokenEstimator} 估算。
+ */
 public final class OpenAiCompatibleModelProvider implements ModelProvider {
 
     private static final int MAX_NON_STREAM_RESPONSE_BYTES = 2 * 1024 * 1024;

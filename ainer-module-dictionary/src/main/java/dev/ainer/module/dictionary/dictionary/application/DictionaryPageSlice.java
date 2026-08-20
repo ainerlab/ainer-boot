@@ -2,7 +2,7 @@ package dev.ainer.module.dictionary.dictionary.application;
 
 import java.util.List;
 
-/** Generic pagination slice for dictionary queries (items + total). */
+/** 字典查询的通用分页切片（items + total）。 */
 public record DictionaryPageSlice<T>(List<T> items, long total) {
 
     public DictionaryPageSlice {

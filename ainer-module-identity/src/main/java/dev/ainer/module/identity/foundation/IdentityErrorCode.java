@@ -2,7 +2,7 @@ package dev.ainer.module.identity.foundation;
 
 import dev.ainer.core.error.ErrorCode;
 
-/** Stable errors owned by the Account and principal foundation. */
+/** Account 与 principal foundation 拥有的稳定错误码。 */
 public enum IdentityErrorCode implements ErrorCode {
     HUMAN_ACCOUNT_NOT_FOUND("AINER.IDENTITY.HUMAN_ACCOUNT_NOT_FOUND", "人类安全账号不存在", 404),
     HUMAN_ACCOUNT_NOT_ACTIVE("AINER.IDENTITY.HUMAN_ACCOUNT_NOT_ACTIVE", "人类安全账号不可认证", 409),

@@ -12,16 +12,16 @@ import org.springframework.context.annotation.Configuration;
 import java.time.Clock;
 
 /**
- * Module configuration for the notification center (ADR-0038). Enabled by default; disable with
- * {@code ainer.notification.enabled=false}.
+ * 通知中心的模块配置（ADR-0038）。默认启用，可通过 {@code ainer.notification.enabled=false}
+ * 关闭。
  *
- * <p>Architecture highlights:
+ * <p>架构要点：
  * <ul>
- *   <li>PG {@code SKIP LOCKED} for lock-free queue claiming — no external MQ needed;</li>
- *   <li>Virtual threads + {@code StructuredTaskScope} for bounded concurrent delivery;</li>
- *   <li>Switch pattern matching for type-safe channel dispatch;</li>
- *   <li>Spring {@code RestClient} (Framework 7) for HTTP webhook delivery;</li>
- *   <li>JSONB template variables (PG 18).</li>
+ *   <li>PG {@code SKIP LOCKED} 实现无锁队列领取——无需外部 MQ；</li>
+ *   <li>虚拟线程 + {@code StructuredTaskScope} 实现有界并发投递；</li>
+ *   <li>switch 模式匹配实现类型安全的渠道路由；</li>
+ *   <li>Spring {@code RestClient}（Framework 7）实现 HTTP webhook 投递；</li>
+ *   <li>JSONB 模板变量（PG 18）。</li>
  * </ul>
  */
 @Configuration(proxyBeanMethods = false)

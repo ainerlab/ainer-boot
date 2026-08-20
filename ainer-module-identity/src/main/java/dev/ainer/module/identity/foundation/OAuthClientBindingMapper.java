@@ -6,8 +6,8 @@ import org.apache.ibatis.annotations.Param;
 import java.util.UUID;
 
 /**
- * MyBatis mapper for {@code ainer_identity_oauth_client_binding} (Greenfield foundation persistence, S1.1 spine).
- * Uses the project's plain-MyBatis style; {@code @Mapper} makes it self-discoverable.
+ * {@code ainer_identity_oauth_client_binding} 的 MyBatis mapper（Greenfield foundation 持久化，
+ * S1.1 主干）。采用项目统一的纯 MyBatis 风格；{@code @Mapper} 使其可自发现。
  */
 @Mapper
 public interface OAuthClientBindingMapper {

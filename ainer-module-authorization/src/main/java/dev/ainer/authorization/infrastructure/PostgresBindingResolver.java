@@ -18,13 +18,12 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * PostgreSQL-backed {@link BindingResolver} (ADR-0030 S1). Replaces the S0 in-memory fixture:
- * the decision engine now resolves live bindings from the persisted store. Revocation is
- * reflected immediately — there is no ALLOW cache, and a still-valid JWT cannot restore a
- * revoked database grant.
+ * PostgreSQL 支撑的 {@link BindingResolver}（ADR-0030 S1）。替换 S0 的内存夹具：
+ * 决策引擎现在从持久化存储解析 live Binding。撤销立即生效——没有 ALLOW 缓存，
+ * 仍然有效的 JWT 无法恢复已撤销的数据库授权。
  *
- * <p>GLOBAL bindings are only valid for SERVICE subjects; the S0 engine enforces this invariant
- * independently, so this resolver returns all live bindings without filtering by scope kind.
+ * <p>GLOBAL Binding 只对 SERVICE 主体有效；S0 引擎独立强制该不变量，因此本解析器
+ * 返回全部 live Binding 而不按 scope 种类过滤。
  */
 @Component
 public class PostgresBindingResolver implements BindingResolver {

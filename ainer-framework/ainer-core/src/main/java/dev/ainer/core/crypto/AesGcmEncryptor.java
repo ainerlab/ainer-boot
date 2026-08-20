@@ -10,16 +10,15 @@ import java.util.Base64;
 import java.util.Objects;
 
 /**
- * AES-GCM authenticated encryption for secret config values (ADR-0038 §3).
+ * 面向机密配置值的 AES-GCM 认证加密（ADR-0038 §3）。
  *
- * <p>Produces self-contained ciphertexts: each encryption generates a fresh 12-byte IV, and the
- * output format is {@code base64(iv || ciphertext+tag)}. Decryption requires the same key.
+ * <p>产出自包含密文：每次加密生成全新的 12 字节 IV，输出格式为
+ * {@code base64(iv || ciphertext+tag)}。解密必须使用同一把密钥。
  *
- * <p>The key is supplied by the product via configuration (e.g. a KMS-derived envelope key or a
- * base64-encoded 256-bit key). This class does NOT manage key rotation or KMS integration — those
- * are the product's responsibility. The Ainer default uses a single configured key.
+ * <p>密钥由产品通过配置提供（例如 KMS 派生的信封密钥，或 base64 编码的 256 位密钥）。
+ * 本类不负责密钥轮换或 KMS 集成——那是产品的职责。Ainer 默认只使用单一配置密钥。
  *
- * <p>Thread-safe: each encrypt/decrypt creates a new Cipher instance.
+ * <p>线程安全：每次加密/解密都创建新的 Cipher 实例。
  */
 public final class AesGcmEncryptor {
 
@@ -32,7 +31,7 @@ public final class AesGcmEncryptor {
     private final SecureRandom secureRandom = new SecureRandom();
 
     /**
-     * @param key raw AES key bytes (16/24/32 bytes for AES-128/192/256)
+     * @param key 原始 AES 密钥字节（AES-128/192/256 对应 16/24/32 字节）
      */
     public AesGcmEncryptor(byte[] key) {
         Objects.requireNonNull(key, "key");
@@ -43,14 +42,14 @@ public final class AesGcmEncryptor {
     }
 
     /**
-     * Create from a base64-encoded key string.
+     * 从 base64 编码的密钥字符串创建实例。
      */
     public static AesGcmEncryptor fromBase64Key(String base64Key) {
         return new AesGcmEncryptor(Base64.getDecoder().decode(base64Key));
     }
 
     /**
-     * Encrypt plaintext. Output format: {@code base64(iv[12] || ciphertext+tag)}.
+     * 加密明文。输出格式：{@code base64(iv[12] || ciphertext+tag)}。
      */
     public String encrypt(String plaintext) {
         Objects.requireNonNull(plaintext, "plaintext");
@@ -63,7 +62,7 @@ public final class AesGcmEncryptor {
 
             byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
 
-            // Combine iv + ciphertext
+            // 拼接 iv + ciphertext
             ByteBuffer buffer = ByteBuffer.allocate(iv.length + ciphertext.length);
             buffer.put(iv);
             buffer.put(ciphertext);
@@ -75,7 +74,7 @@ public final class AesGcmEncryptor {
     }
 
     /**
-     * Decrypt a value produced by {@link #encrypt}. Returns the original plaintext.
+     * 解密由 {@link #encrypt} 产出的值，返回原始明文。
      */
     public String decrypt(String encryptedValue) {
         Objects.requireNonNull(encryptedValue, "encryptedValue");

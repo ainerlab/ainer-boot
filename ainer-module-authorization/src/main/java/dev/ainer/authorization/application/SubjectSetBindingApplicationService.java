@@ -15,11 +15,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Application use cases for subject-set bindings (ADR-0042 O2). Set bindings share Role/Scope/
- * time/revocation semantics with direct bindings; the grant reaches a requesting subject only
- * through decision-time membership. Creation is guarded against indirect privilege escalation
- * (no GLOBAL, no system-only/HIGH-risk permissions, set↔scope workspace consistency, registered
- * set family, no self-membership).
+ * 主体集合 Binding 的应用用例（ADR-0042 O2）。集合 Binding 与直接 Binding 共享
+ * Role/Scope/时间/撤销语义；授权只有通过决策时的成员关系才到达请求主体。创建时做防
+ * 间接提权防护（禁止 GLOBAL、禁止 system-only/HIGH 风险权限、set 与 scope 的
+ * Workspace 一致性、集合族必须已注册、禁止自成员）。
  */
 @Service
 @Transactional

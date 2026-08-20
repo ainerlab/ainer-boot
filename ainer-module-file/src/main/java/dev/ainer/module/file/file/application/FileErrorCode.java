@@ -3,10 +3,10 @@ package dev.ainer.module.file.file.application;
 import dev.ainer.core.error.ErrorCode;
 
 /**
- * File-module error codes (ADR-0040). Uses the stable {@code AINER.FILE.<ERROR>} convention.
+ * 文件模块错误码（ADR-0040）。使用稳定的 {@code AINER.FILE.<ERROR>} 约定。
  *
- * <p>HTTP statuses carry transport truth: {@code 413} for oversize payloads, {@code 415} for
- * content types outside the allow-list.
+ * <p>HTTP 状态码承载传输层真实语义：超出大小上限返回 {@code 413}，内容类型不在
+ * 允许列表返回 {@code 415}。
  */
 public enum FileErrorCode implements ErrorCode {
     NOT_FOUND("AINER.FILE.NOT_FOUND", "文件不存在", 404),

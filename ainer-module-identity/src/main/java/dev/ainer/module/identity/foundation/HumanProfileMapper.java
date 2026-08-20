@@ -6,7 +6,7 @@ import org.apache.ibatis.annotations.Param;
 import java.util.UUID;
 
 /**
- * MyBatis mapper for {@code ainer_identity_human_profile} (Greenfield foundation persistence, S2).
+ * {@code ainer_identity_human_profile} 的 MyBatis mapper（Greenfield foundation 持久化，S2）。
  */
 @Mapper
 public interface HumanProfileMapper {

@@ -1,10 +1,10 @@
 package dev.ainer.module.identity.foundation;
 
 /**
- * Type-safe scan anchor for the Greenfield Identity foundation package. Referenced by
- * {@code IdentityModuleConfiguration}'s {@code @ComponentScan} / {@code @MapperScan} so the foundation
- * domain + persistence are wired alongside the legacy {@code account} package during the S1.2 coexistence
- * phase. Once the cutover removes the legacy package, this remains as the foundation scan anchor.
+ * Greenfield Identity foundation 包的类型安全扫描锚点。被
+ * {@code IdentityModuleConfiguration} 的 {@code @ComponentScan} / {@code @MapperScan} 引用，
+ * 使 foundation 领域 + 持久化在 S1.2 共存阶段与旧版 {@code account} 包一同装配。
+ * 切换移除旧包后，它仍作为 foundation 的扫描锚点保留。
  */
 public final class IdentityFoundationMarker {
     private IdentityFoundationMarker() {

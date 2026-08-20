@@ -7,11 +7,10 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Display profile of a {@link HumanAccount} (ADR-0033 Greenfield §4, execution plan 缺口 A).
+ * {@link HumanAccount} 的展示档案（ADR-0033 Greenfield §4，执行计划 缺口 A）。
  *
- * <p>A 0:1 attribute aggregate: an account has at most one profile, and a profile never exists without its
- * account. Only presentation-grade attributes live here (display name, avatar URL); identity-critical facts
- * stay on the account and its LoginIdentity bindings.
+ * <p>0:1 属性聚合：一个账号至多一个档案，档案绝不能脱离账号存在。这里只存放展示级
+ * 属性（显示名、头像 URL）；身份关键事实保存在账号及其 LoginIdentity 绑定上。
  */
 public record HumanProfile(
         UUID accountId,

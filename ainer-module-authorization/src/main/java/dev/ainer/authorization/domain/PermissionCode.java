@@ -3,9 +3,8 @@ package dev.ainer.authorization.domain;
 import java.util.Objects;
 
 /**
- * Stable, low-cardinality permission code (ADR-0030 §3.1), e.g. {@code platform.metrics.read} or
- * {@code merchant.listing.publish}. Product codes are registered by product consumers; Ainer only owns
- * platform codes.
+ * 稳定、低基数的权限 code（ADR-0030 §3.1），例如 {@code platform.metrics.read} 或
+ * {@code merchant.listing.publish}。产品 code 由产品消费者注册；Ainer 只拥有平台 code。
  */
 public record PermissionCode(String value) {
 

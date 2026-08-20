@@ -7,16 +7,16 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Credential material bound to a {@link HumanAccount} (ADR-0033 Greenfield §4, execution plan 缺口 A).
+ * 绑定到 {@link HumanAccount} 的凭证材料（ADR-0033 Greenfield §4，执行计划 缺口 A）。
  *
- * <p>This is the "dedicated credential storage" that {@link LoginIdentity} deliberately references without
- * storing: the opaque {@code credentialData} (password hash, WebAuthn public key reference or OIDC subject)
- * is persisted here, never in the binding. Authentication resolves a LoginIdentity to its account, then reads
- * the ACTIVE {@link CredentialType} material for that account.
+ * <p>这就是 {@link LoginIdentity} 刻意"引用而不存储"的专用凭证存储：不透明的
+ * {@code credentialData}（密码哈希、WebAuthn 公钥引用或 OIDC subject）保存在这里，
+ * 绝不出现在绑定上。认证时先由 LoginIdentity 解析到账号，再读取该账号的 ACTIVE
+ * {@link CredentialType} 材料。
  *
- * <p>Material must be rotated (never mutated): rotation marks the old ACTIVE credential {@code REVOKED} and
- * inserts a fresh ACTIVE one, so an account has at most one ACTIVE material per type at a time. The password
- * hash is encoded by the project's delegating {@code PasswordEncoder} before it reaches this record.
+ * <p>材料必须轮换而不是原地修改：轮换把旧的 ACTIVE 凭证置为 {@code REVOKED} 并插入
+ * 新的 ACTIVE 凭证，因此任一时刻一个账号每种类型至多有一份 ACTIVE 材料。密码哈希在
+ * 进入本 record 之前由项目的委托式 {@code PasswordEncoder} 编码。
  */
 public record Credential(
         UUID credentialId,
@@ -42,7 +42,7 @@ public record Credential(
         }
     }
 
-    /** Whether this material is usable for authentication. */
+    /** 该材料当前是否可用于认证。 */
     public boolean isActive() {
         return status == CredentialStatus.ACTIVE;
     }

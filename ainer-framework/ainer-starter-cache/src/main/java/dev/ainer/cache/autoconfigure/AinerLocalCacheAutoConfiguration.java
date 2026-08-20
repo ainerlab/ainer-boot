@@ -17,11 +17,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Default local cache configuration (ADR-0039). Active when {@code ainer.cache.type} is absent or
- * {@code local}. Uses Caffeine for Spring Cache and an in-memory map for the lock port.
+ * 默认本地缓存装配（ADR-0039）。当 {@code ainer.cache.type} 缺失或为 {@code local} 时激活：
+ * Spring Cache 使用 Caffeine，锁端口使用进程内 Map。
  *
- * <p>This is the zero-dependency baseline — no Redis required. Products switch to Redis by setting
- * {@code ainer.cache.type=redis} and providing a Redis connection.
+ * <p>这是零依赖基线——不需要 Redis。产品通过设置 {@code ainer.cache.type=redis}
+ * 并提供 Redis 连接切换到 Redis。
  */
 @AutoConfiguration
 @ConditionalOnProperty(prefix = "ainer.cache", name = "type", havingValue = "local", matchIfMissing = true)
@@ -44,8 +44,7 @@ public class AinerLocalCacheAutoConfiguration {
     }
 
     /**
-     * In-memory lock implementation — single-instance only. NOT suitable for multi-instance
-     * deployments; use Redis-backed lock for production.
+     * 进程内锁实现——仅限单实例。不适合多实例部署；生产环境请使用 Redis 锁。
      */
     static final class LocalDistributedLockPort implements DistributedLockPort {
         private final ConcurrentHashMap<String, LockHandle> locks = new ConcurrentHashMap<>();
@@ -58,7 +57,7 @@ public class AinerLocalCacheAutoConfiguration {
             if (existing != null) {
                 return Optional.empty();
             }
-            // schedule auto-expiry
+            // 安排到期自动释放
             Thread.ofVirtual().start(() -> {
                 try { Thread.sleep(ttl.toMillis()); } catch (InterruptedException e) { return; }
                 locks.remove(key, handle);

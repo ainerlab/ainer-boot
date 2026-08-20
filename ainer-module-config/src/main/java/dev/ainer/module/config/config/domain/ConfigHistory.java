@@ -7,7 +7,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Append-only record of a single configuration change (ADR-0038 §3 change audit).
+ * 单次配置变更的只追加记录（ADR-0038 §3 变更审计）。
  */
 public record ConfigHistory(
         UUID id,

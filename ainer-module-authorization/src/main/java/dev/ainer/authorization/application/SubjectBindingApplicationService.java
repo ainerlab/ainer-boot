@@ -14,13 +14,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Application use cases for {@link dev.ainer.authorization.domain.SubjectBinding} lifecycle
- * management (ADR-0030 S1). Bindings assign a persisted Role and a structured Scope to a subject
- * over a validity window. Revocation is a logical state transition — a still-valid JWT cannot
- * restore a revoked database grant.
+ * {@link dev.ainer.authorization.domain.SubjectBinding} 生命周期管理的应用用例
+ * （ADR-0030 S1）。Binding 在有效时间窗口内为主体分配持久化 Role 与结构化 Scope。
+ * 撤销是逻辑状态迁移——仍然有效的 JWT 无法恢复已撤销的数据库授权。
  *
- * <p>Management mutations are audited via {@link AuthorizationChangeAuditService} in the same
- * transaction (ADR-0030 §11.7).
+ * <p>管理变更通过 {@link AuthorizationChangeAuditService} 在同一事务内审计
+ * （ADR-0030 §11.7）。
  */
 @Service
 @Transactional
@@ -48,10 +47,9 @@ public class SubjectBindingApplicationService {
     }
 
     /**
-     * Create a new binding.
+     * 创建新 Binding。
      *
-     * @throws BusinessException if the manager/target/scope/Role permissions are not assignable or
-     *                           the role does not exist.
+     * @throws BusinessException 当管理者/目标/scope/Role 权限不可分配，或 Role 不存在时。
      */
     public UUID createBinding(
             AuthenticatedPrincipal actor, SubjectRef subject, UUID roleId, Scope scope,
@@ -68,9 +66,9 @@ public class SubjectBindingApplicationService {
     }
 
     /**
-     * Revoke a binding (logical, not physical delete).
+     * 撤销 Binding（逻辑撤销，不是物理删除）。
      *
-     * @throws BusinessException if the binding belongs to the actor, is not found, or is already revoked.
+     * @throws BusinessException 当 Binding 属于操作者自身、不存在，或已被撤销时。
      */
     public void revokeBinding(
             AuthenticatedPrincipal actor, UUID bindingId, @Nullable String reason,
@@ -86,8 +84,8 @@ public class SubjectBindingApplicationService {
     }
 
     /**
-     * Return all live bindings for a subject at the current time. Used by management queries and
-     * the decision engine's {@code BindingResolver}.
+     * 返回主体当前时刻的全部 live Binding。供管理查询与决策引擎的
+     * {@code BindingResolver} 使用。
      */
     @Transactional(readOnly = true)
     public List<SubjectBindingRepository.PersistedBinding> liveBindings(SubjectRef subject) {

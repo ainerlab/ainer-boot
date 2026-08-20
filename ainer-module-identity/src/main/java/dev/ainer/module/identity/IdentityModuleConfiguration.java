@@ -25,6 +25,10 @@ import java.time.Clock;
 import java.util.List;
 import java.util.function.Supplier;
 
+/**
+ * Identity 模块装配入口：扫描 foundation 组件与 MyBatis Mapper，注册时钟、密码编码器、
+ * 错误码贡献者与两个应用服务。可通过 {@code ainer.identity.enabled=false} 整体关闭。
+ */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "ainer.identity", name = "enabled", havingValue = "true", matchIfMissing = true)
 @org.springframework.context.annotation.ComponentScan(basePackageClasses = IdentityFoundationMarker.class)
@@ -49,8 +53,8 @@ public class IdentityModuleConfiguration {
     }
 
     /**
-     * Greenfield foundation application core (ADR-0033 Greenfield §3-§4). The id source binds to the account
-     * repository's {@code nextUuidV7()} so persisted identities use PostgreSQL UUIDv7 (ADR-0020).
+     * Greenfield foundation 应用核心（ADR-0033 Greenfield §3-§4）。ID 来源绑定到账号
+     * 仓库的 {@code nextUuidV7()}，使持久化身份使用 PostgreSQL UUIDv7（ADR-0020）。
      */
     @Bean
     @ConditionalOnMissingBean
@@ -73,8 +77,8 @@ public class IdentityModuleConfiguration {
     }
 
     /**
-     * Greenfield ServicePrincipal application core (ADR-0033 Greenfield §2.6). The id source binds to the
-     * principal repository's {@code nextUuidV7()}.
+     * Greenfield ServicePrincipal 应用核心（ADR-0033 Greenfield §2.6）。ID 来源绑定到
+     * principal 仓库的 {@code nextUuidV7()}。
      */
     @Bean
     @ConditionalOnMissingBean

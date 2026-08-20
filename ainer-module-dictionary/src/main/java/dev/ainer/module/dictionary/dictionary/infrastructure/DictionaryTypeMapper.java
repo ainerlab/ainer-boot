@@ -8,6 +8,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * {@code ainer_dictionary_type} 的 MyBatis mapper；SQL 位于 {@code mapper/dictionary/DictionaryTypeMapper.xml}。
+ * 更新与状态迁移语句携带 {@code expectedVersion}/{@code newVersion} 参数，由 XML 实现乐观锁条件更新。
+ */
 @Mapper
 public interface DictionaryTypeMapper {
     UUID insertReturningId(@Param("row") DictionaryTypeRow row, @Param("now") Instant now);

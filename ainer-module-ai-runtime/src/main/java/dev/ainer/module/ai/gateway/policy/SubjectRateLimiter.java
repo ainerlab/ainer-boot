@@ -5,6 +5,10 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 主体限流器：按 subjectId 做进程内固定窗口每分钟请求数限制；多实例部署需叠加
+ * 网关层或共享存储限流。
+ */
 public class SubjectRateLimiter {
 
     private final int limit;

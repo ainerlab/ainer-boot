@@ -3,7 +3,7 @@ package dev.ainer.module.dictionary.dictionary.application;
 import dev.ainer.core.error.ErrorCode;
 
 /**
- * Dictionary-module error codes (ADR-0040). Stable {@code AINER.DICTIONARY.<ERROR>} strings.
+ * 字典模块错误码（ADR-0040）。稳定的 {@code AINER.DICTIONARY.<ERROR>} 字符串。
  */
 public enum DictionaryErrorCode implements ErrorCode {
     TYPE_NOT_FOUND("AINER.DICTIONARY.TYPE_NOT_FOUND", "字典类型不存在", 404),

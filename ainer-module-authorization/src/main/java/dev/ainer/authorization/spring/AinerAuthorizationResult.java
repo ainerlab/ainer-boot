@@ -8,18 +8,18 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Spring Security {@link AuthorizationResult} backed by an Ainer {@link AuthorizationDecision}
- * (ADR-0037 §4). Preserves the decisionId, reasonCode and outcome so that challenge/deny scenarios
- * can be correlated in audit without flattening the richer Ainer decision into a boolean.
+ * 以 Ainer {@link AuthorizationDecision} 为底座的 Spring Security
+ * {@link AuthorizationResult}（ADR-0037 §4）。保留 decisionId、reasonCode 与结果，
+ * 使 challenge/deny 场景能在审计中关联，而不必把更丰富的 Ainer 决策压扁成布尔值。
  *
- * <p>{@link #isGranted()} returns {@code true} only for ALLOW with no outstanding obligations
- * (ADR-0030 §8.6: only ALLOW with empty obligations or fully-executed obligations may use the
- * AuthorizationManager alone). ALLOW with non-empty obligations is denied as OBLIGATION_UNHANDLED
- * until a {@code DecisionObligationExecutor} is implemented (future slice).
+ * <p>{@link #isGranted()} 只对没有未完成义务的 ALLOW 返回 {@code true}
+ * （ADR-0030 §8.6：只有义务为空或已全部执行的 ALLOW 才能单独使用
+ * AuthorizationManager）。带非空义务的 ALLOW 会以 OBLIGATION_UNHANDLED 拒绝，
+ * 直到未来切片实现 {@code DecisionObligationExecutor}。
  *
- * <p>This class lives in the {@code spring/} adapter boundary (ADR-0037 §3) and is the only type
- * in this package that references Spring Security. It must not be imported by {@code domain/},
- * {@code policy/}, {@code catalog/} or {@code application/} packages.
+ * <p>该类位于 {@code spring/} 适配器边界（ADR-0037 §3），是本包中唯一引用 Spring
+ * Security 的类型。不得被 {@code domain/}、{@code policy/}、{@code catalog/} 或
+ * {@code application/} 包导入。
  */
 public final class AinerAuthorizationResult implements AuthorizationResult {
 
@@ -29,7 +29,7 @@ public final class AinerAuthorizationResult implements AuthorizationResult {
         this.decision = Objects.requireNonNull(decision, "decision");
     }
 
-    /** The underlying Ainer decision. */
+    /** 底层的 Ainer 决策。 */
     public AuthorizationDecision decision() {
         return decision;
     }
@@ -39,10 +39,10 @@ public final class AinerAuthorizationResult implements AuthorizationResult {
         if (decision.outcome() != AuthorizationOutcome.ALLOW) {
             return false;
         }
-        // ALLOW with outstanding obligations is not grantable by the adapter alone (§8.6).
-        // A future DecisionObligationExecutor will consume obligations; until then, deny.
-        // A PublicProjection carried in the obligations slot is projected response data for
-        // PUBLIC_PROJECTION requests, not a pending obligation — it must not block the grant.
+        // 带未完成义务的 ALLOW 不能由适配器单独放行（§8.6）。
+        // 未来的 DecisionObligationExecutor 会消费义务；在那之前一律拒绝。
+        // 义务槽位中的 PublicProjection 是 PUBLIC_PROJECTION 请求的响应投影数据，
+        // 不是待执行义务——不得阻断放行。
         if (decision.obligations() == null || decision.obligations().isEmpty()) {
             return true;
         }
@@ -51,17 +51,17 @@ public final class AinerAuthorizationResult implements AuthorizationResult {
                         instanceof dev.ainer.authorization.domain.PublicProjection);
     }
 
-    /** Stable decision id for audit correlation. */
+    /** 用于审计关联的稳定决策 id。 */
     public UUID decisionId() {
         return decision.decisionId();
     }
 
-    /** Low-cardinality reason code (safe to log, not to leak to anonymous clients). */
+    /** 低基数 reason code（可安全写日志，但不得泄露给匿名客户端）。 */
     public String reasonCode() {
         return decision.reasonCode().value();
     }
 
-    /** The outcome (ALLOW / DENY / CHALLENGE). */
+    /** 决策结果（ALLOW / DENY / CHALLENGE）。 */
     public AuthorizationOutcome outcome() {
         return decision.outcome();
     }

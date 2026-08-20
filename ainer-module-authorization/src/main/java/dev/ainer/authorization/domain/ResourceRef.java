@@ -6,9 +6,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Reference to a concrete resource targeted by an authorization request (ADR-0030 §4.6, §6.2).
- * {@code workspaceId} is an optional access-context fact. Product ownership/home remains authoritative in
- * the owning module and is not reconstructed from this reference.
+ * 授权请求面向的具体资源引用（ADR-0030 §4.6、§6.2）。{@code workspaceId} 是可选的
+ * 访问上下文事实。产品归属/从属关系的权威仍在其所属模块中，不会从该引用反推重建。
  */
 public record ResourceRef(
         @Nullable UUID workspaceId,

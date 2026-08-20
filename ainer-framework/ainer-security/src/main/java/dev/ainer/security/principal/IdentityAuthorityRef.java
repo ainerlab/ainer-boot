@@ -5,18 +5,18 @@ import org.jspecify.annotations.Nullable;
 import java.util.Objects;
 
 /**
- * The interpretation scope of account / service-principal IDs (ADR-0033 Greenfield §2.2).
+ * 账号 / ServicePrincipal ID 的解释作用域（ADR-0033 Greenfield §2.2）。
  *
- * <p>An {@code IdentityAuthorityRef} qualifies a stable ID so that the same raw identifier issued under
- * different trust domains is never treated as the same object. It is a value object; v1 may be resolved
- * from a trusted {@code iss} claim without a persistent aggregate.
+ * <p>{@code IdentityAuthorityRef} 为稳定 ID 附加限定条件，使不同信任域签发的相同原始标识符
+ * 绝不会被当作同一对象。它是值对象；v1 可以从可信的 {@code iss} claim 解析得到，
+ * 不需要持久化聚合根。
  *
- * <p>{@code issuer} is the canonical trusted issuer (for example the OAuth {@code iss} URL). {@code realm}
- * is an optional discriminator used only when one issuer serves multiple realms, deployments or private
- * instances; absence means the issuer alone identifies the authority.
+ * <p>{@code issuer} 是规范化可信签发方（例如 OAuth {@code iss} URL）。{@code realm} 是可选的
+ * 区分器，仅当同一签发方服务多个 realm、部署或私有实例时使用；缺失表示仅凭 issuer 即可
+ * 标识该权威。
  *
- * <p>It is deliberately not a new Tenant: it owns no Workspace, member, plan, contract, organization or
- * isolation domain. A raw {@code sub}, email, phone number or bare UUID never implies an authority.
+ * <p>它刻意不是新的 Tenant：不拥有 Workspace、成员、套餐、合同、组织或任何隔离域。
+ * 裸的 {@code sub}、邮箱、手机号或光板 UUID 绝不隐含任何权威。
  */
 public record IdentityAuthorityRef(String issuer, @Nullable String realm) {
 
@@ -42,7 +42,7 @@ public record IdentityAuthorityRef(String issuer, @Nullable String realm) {
     }
 
     /**
-     * Convenience constructor for the common single-realm case.
+     * 常见单 realm 场景的便捷构造器。
      */
     public IdentityAuthorityRef(String issuer) {
         this(issuer, null);

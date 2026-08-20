@@ -1,7 +1,7 @@
 package dev.ainer.module.dictionary.dictionary.domain;
 
 /**
- * Status of a dictionary type or item.
+ * 字典类型或字典条目的状态。
  */
 public enum DictionaryStatus {
     ACTIVE,

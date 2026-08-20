@@ -8,6 +8,13 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * {@code ainer.security.resource-server.*} 配置属性。
+ *
+ * <p>{@code publicPaths} 定义免认证路径（默认仅平台信息与健康检查）；在线校验
+ * （OnlineValidation）配置 introspection 端点与受保护路径规则；StepUp 配置近期强认证
+ * 门禁。除显式列出的 publicPaths 外，其余路径一律要求认证。
+ */
 @ConfigurationProperties("ainer.security.resource-server")
 public class AinerResourceServerProperties {
 

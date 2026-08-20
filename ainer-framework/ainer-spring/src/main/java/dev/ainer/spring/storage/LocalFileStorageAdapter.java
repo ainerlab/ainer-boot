@@ -17,12 +17,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Local-filesystem {@link FileStoragePort} adapter (ADR-0038).
+ * 本地文件系统 {@link FileStoragePort} 适配器（ADR-0038）。
  *
- * <p><strong>Path traversal protection</strong>: namespace and storage key are sanitized — any
- * {@code ..} segment is rejected before resolving the target path. The storage key is a
- * server-generated UUID under the namespace directory to avoid collisions and to prevent original
- * filenames from entering the filesystem.
+ * <p><strong>路径穿越防护</strong>：namespace 与 storage key 都会做清洗——解析目标路径前
+ * 拒绝任何 {@code ..} 片段。storage key 是 namespace 目录下由服务端生成的 UUID，
+ * 既避免冲突，也防止原始文件名进入文件系统。
  */
 public class LocalFileStorageAdapter implements FileStoragePort {
 

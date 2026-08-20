@@ -9,6 +9,11 @@ import org.springframework.core.type.AnnotatedTypeMetadata;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * {@link ConditionalOnRuntimeMode} 的条件实现：比较 {@code ainer.runtime.mode} 属性与注解
+ * 期望的模式。属性缺失按 {@link RuntimeMode#MONOLITH} 处理；属性值非法时判定为不匹配，
+ * 让装配静默跳过而不是让启动失败。
+ */
 final class OnRuntimeModeCondition extends SpringBootCondition {
 
     static final String PROPERTY = "ainer.runtime.mode";

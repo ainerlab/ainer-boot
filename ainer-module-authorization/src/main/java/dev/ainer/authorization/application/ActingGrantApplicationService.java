@@ -25,12 +25,11 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * ActingGrant use cases and the delegation checkpoint (ADR-0043 A1). Issue enforces the
- * no-privilege-widening subset (permission registered &amp; agent-delegable &amp; within the
- * principal's live effective access; scope covered by a live binding; GLOBAL impossible). The
- * checkpoint re-resolves the grant, the principal's live bindings and the agent status at every
- * call — principal shrink, binding revocation, grant revocation or agent retirement deny the next
- * checkpoint immediately (pull-based, no cache).
+ * ActingGrant 用例与委托检查点（ADR-0043 A1）。签发时强制"不扩权子集"约束（权限已注册
+ * 且可委托给 agent、且在 principal 的 live 有效权限内；scope 被某个 live Binding 覆盖；
+ * GLOBAL 不可表达）。检查点在每次调用时重新解析授权、principal 的 live Binding 与 agent
+ * 状态——principal 权限收缩、Binding 撤销、授权撤销或 agent 退役都会让下一次检查点
+ * 立即拒绝（pull 式，无缓存）。
  */
 @Service
 @Transactional
@@ -64,7 +63,7 @@ public class ActingGrantApplicationService {
     }
 
     /**
-     * Issue a one-layer grant. Fails closed on any subset violation.
+     * 签发单层授权。任何子集约束被违反时一律 fail-closed。
      */
     public UUID issueGrant(
             AuthenticatedPrincipal actor, SubjectRef principal, UUID agentId, String agentVersion,
@@ -123,9 +122,9 @@ public class ActingGrantApplicationService {
     }
 
     /**
-     * Delegation checkpoint: does {@code permission} on {@code resource} pass through any live
-     * grant of {@code principal} executed by {@code agentId}? Pull-based: every call re-resolves
-     * grant validity, the principal's live bindings (no widening) and the agent status.
+     * 委托检查点：{@code principal} 由 {@code agentId} 执行的、对 {@code resource} 的
+     * {@code permission} 操作能否通过某条 live 授权？pull 式：每次调用都重新解析授权
+     * 有效性、principal 的 live Binding（防扩权）与 agent 状态。
      */
     @Transactional(readOnly = true)
     public DelegationCheck check(
@@ -179,7 +178,7 @@ public class ActingGrantApplicationService {
         };
     }
 
-    /** Checkpoint outcome with grant correlation for audit. */
+    /** 检查点结果，携带授权 ID 用于审计关联。 */
     public record DelegationCheck(boolean allowed, @Nullable UUID grantId, String reason) {
 
         static DelegationCheck allowed(UUID grantId) {

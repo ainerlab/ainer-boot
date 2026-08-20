@@ -4,9 +4,9 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * Reference to a trusted subject (ADR-0030 §2.6). {@code issuerNamespace} prevents identical {@code sub}
- * claims from different issuers colliding. Type is {@link SubjectType#USER} or {@link SubjectType#SERVICE}
- * in the first version.
+ * 可信主体引用（ADR-0030 §2.6）。{@code issuerNamespace} 防止不同 issuer 的相同
+ * {@code sub} 声明发生碰撞。第一版中类型只允许 {@link SubjectType#USER} 或
+ * {@link SubjectType#SERVICE}。
  */
 public record SubjectRef(String issuerNamespace, String subjectId, SubjectType type) {
 

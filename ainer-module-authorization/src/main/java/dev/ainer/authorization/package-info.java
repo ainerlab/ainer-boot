@@ -1,8 +1,7 @@
 /**
- * Ainer authorization decision core (ADR-0030). The {@link dev.ainer.authorization.AuthorizationService}
- * is Spring-free and consumes domain contracts plus policy ports; persistence, Spring and management
- * adapters attach at explicit boundaries in later slices. Package-level
- * {@link org.jspecify.annotations.NullMarked}.
+ * Ainer 授权决策核心（ADR-0030）。{@link dev.ainer.authorization.AuthorizationService}
+ * 不依赖 Spring，只消费领域契约与策略端口；持久化、Spring 与管理适配器在后续切片中以
+ * 显式边界接入。包级 {@link org.jspecify.annotations.NullMarked}。
  */
 @NullMarked
 package dev.ainer.authorization;

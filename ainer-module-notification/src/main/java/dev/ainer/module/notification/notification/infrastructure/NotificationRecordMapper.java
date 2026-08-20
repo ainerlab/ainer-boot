@@ -8,6 +8,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * {@code ainer_notification_record} 的 MyBatis mapper；SQL 位于 {@code mapper/notification/NotificationRecordMapper.xml}。
+ * 队列领取与结果回写语句是投递引擎（SKIP LOCKED + 指数退避重试）的数据层基础。
+ */
 @Mapper
 public interface NotificationRecordMapper {
 
@@ -16,8 +20,8 @@ public interface NotificationRecordMapper {
     NotificationRecordRow selectById(@Param("id") UUID id);
 
     /**
-     * PG 18 SKIP LOCKED claim: atomically selects pending records, locks them (SKIP LOCKED so
-     * concurrent claimers don't block), and flips status to SENDING — all in one statement.
+     * PG 18 SKIP LOCKED 领取：原子地选出待处理记录、加锁（SKIP LOCKED 使并发领取者
+     * 互不阻塞）并把状态翻转为 SENDING——全部在一条语句内完成。
      */
     List<NotificationRecordRow> claimPending(@Param("batchSize") int batchSize, @Param("now") Instant now);
 

@@ -16,6 +16,14 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * AI 调用审计服务：负责每次调用的预算预占（悲观锁 + 当日已发生费用核算）、
+ * 策略拒绝记录与终态回写（成功/失败）。
+ *
+ * <p>拒绝与终态回写使用 {@code REQUIRES_NEW} 独立事务提交，保证调用链异常时
+ * 审计行仍然落库；审计不保存 prompt 与输出正文，只记录模型、Token/费用、耗时、
+ * 结果状态与策略决策。
+ */
 @Service
 public class AiInvocationAuditService {
 

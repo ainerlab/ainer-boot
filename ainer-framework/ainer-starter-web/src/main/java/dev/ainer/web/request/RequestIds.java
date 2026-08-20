@@ -4,6 +4,12 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.UUID;
 
+/**
+ * 请求追踪标识（requestId）的存取入口。
+ *
+ * <p>约定 {@code X-Request-Id} 头与请求属性两个载体；{@link #currentOrCreate} 返回
+ * 当前 requestId，缺失时生成并回填，供错误信封在过滤器之外兜底使用。
+ */
 public final class RequestIds {
 
     public static final String HEADER = "X-Request-Id";

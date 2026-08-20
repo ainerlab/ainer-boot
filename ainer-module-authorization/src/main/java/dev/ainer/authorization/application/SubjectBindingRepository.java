@@ -12,25 +12,24 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Persistence port for {@link SubjectBinding} aggregates (ADR-0030 S1). Implemented by the
- * infrastructure layer; consumed by {@link SubjectBindingApplicationService} and the PostgreSQL
- * {@code BindingResolver}.
+ * {@link SubjectBinding} 聚合的持久化端口（ADR-0030 S1）。由基础设施层实现；由
+ * {@link SubjectBindingApplicationService} 与 PostgreSQL 的 {@code BindingResolver} 消费。
  */
 public interface SubjectBindingRepository {
 
     /**
-     * Persisted binding carrying its database identity and role reference alongside the domain value.
+     * 持久化 Binding，附带数据库身份、Role 引用与领域值。
      *
-     * @param id          database-generated UUIDv7 primary key
-     * @param subjectRef  who the binding is for
-     * @param roleId      the persisted role this binding references
-     * @param scope       structured scope (Global / Workspace / Resource)
-     * @param status      ACTIVE or REVOKED
-     * @param validFrom   validity window start (inclusive)
-     * @param validUntil  validity window end (exclusive), or null for open-ended
-     * @param version     optimistic-concurrency version
-     * @param revokedAt   when the binding was revoked, or null if active
-     * @param revokedReason free-text revocation reason, or null
+     * @param id          数据库生成的 UUIDv7 主键
+     * @param subjectRef  Binding 的归属主体
+     * @param roleId      该 Binding 引用的持久化 Role
+     * @param scope       结构化 scope（Global / Workspace / Resource）
+     * @param status      ACTIVE 或 REVOKED
+     * @param validFrom   有效窗口起点（含）
+     * @param validUntil  有效窗口终点（不含），开放式为 null
+     * @param version     乐观并发版本
+     * @param revokedAt   撤销时间，仍活跃时为 null
+     * @param revokedReason 自由文本撤销原因，可为 null
      */
     record PersistedBinding(
             UUID id,
@@ -51,27 +50,26 @@ public interface SubjectBindingRepository {
     Optional<PersistedBinding> findById(UUID id);
 
     /**
-     * Revoke (logically) the binding identified by {@code id}. Sets status to REVOKED, records the
-     * revocation timestamp and reason, and increments the version. Returns empty if the binding does
-     * not exist or is already revoked.
+     * 逻辑撤销 {@code id} 对应的 Binding。把状态置为 REVOKED、记录撤销时间与原因并递增
+     * 版本。Binding 不存在或已被撤销时返回空。
      *
-     * @param id        binding primary key
-     * @param revokedAt revocation timestamp
-     * @param reason    free-text reason stored in the audit trail
-     * @return the updated version if the revocation succeeded, or empty if not found / already revoked
+     * @param id        Binding 主键
+     * @param revokedAt 撤销时间戳
+     * @param reason    存入审计轨迹的自由文本原因
+     * @return 撤销成功时返回更新后的版本；不存在或已被撤销时返回空
      */
     Optional<Long> revoke(UUID id, Instant revokedAt, String reason);
 
     /**
-     * Return all ACTIVE bindings for the given subject whose validity window contains {@code at}.
-     * This is the query used by the PostgreSQL {@code BindingResolver}; revoked or expired bindings
-     * are excluded at the database level — there is no ALLOW cache.
+     * 返回给定主体全部有效窗口覆盖 {@code at} 的 ACTIVE Binding。这是 PostgreSQL
+     * {@code BindingResolver} 使用的查询；已撤销或已过期的 Binding 在数据库层就被排除
+     * ——不存在 ALLOW 缓存。
      */
     List<PersistedBinding> findLiveBindings(SubjectRef subject, Instant at);
 
     /**
-     * Return all bindings (including revoked/expired) for the given subject, ordered by creation.
-     * Used by management queries, not by the decision engine.
+     * 返回给定主体全部 Binding（含已撤销/已过期），按创建时间排序。供管理查询使用，
+     * 决策引擎不使用。
      */
     List<PersistedBinding> findAllBySubject(SubjectRef subject);
 }

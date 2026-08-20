@@ -4,7 +4,7 @@ import dev.ainer.module.notification.notification.application.NotificationAuditR
 import dev.ainer.module.notification.notification.domain.NotificationAudit;
 import org.springframework.stereotype.Repository;
 
-/** MyBatis adapter for {@code ainer_notification_audit}. */
+/** {@code ainer_notification_audit} 的 MyBatis 适配器。 */
 @Repository
 public class MybatisNotificationAuditRepository implements NotificationAuditRepository {
 

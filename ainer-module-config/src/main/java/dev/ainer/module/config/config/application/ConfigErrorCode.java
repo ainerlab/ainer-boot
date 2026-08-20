@@ -3,7 +3,7 @@ package dev.ainer.module.config.config.application;
 import dev.ainer.core.error.ErrorCode;
 
 /**
- * Config-module error codes (ADR-0040). Stable {@code AINER.CONFIG.<ERROR>} strings.
+ * 配置模块错误码（ADR-0040）。稳定的 {@code AINER.CONFIG.<ERROR>} 字符串。
  */
 public enum ConfigErrorCode implements ErrorCode {
     PLAINTEXT_ON_SECRET_KEY("AINER.CONFIG.PLAINTEXT_ON_SECRET_KEY", "已存在的 secret 键不能设置明文值", 409),

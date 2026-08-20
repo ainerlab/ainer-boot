@@ -14,21 +14,20 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import java.util.Objects;
 
 /**
- * Reads the {@link AinerAuthorize} annotation from the resolved handler method and executes the
- * {@link AinerRequestAuthorizationManager} before controller invocation (ADR-0037 §4).
+ * 从已解析的 handler 方法上读取 {@link AinerAuthorize} 注解，并在控制器调用前执行
+ * {@link AinerRequestAuthorizationManager}（ADR-0037 §4）。
  *
- * <p>Handler annotations are only available after Spring MVC resolves the handler, while the servlet
- * security filter chain runs earlier. The interceptor therefore invokes the standard Spring Security
- * {@code AuthorizationManager} itself instead of relying on request attributes being visible to an
- * earlier {@code AuthorizationFilter}. A denied result is translated to Ainer's generic forbidden
- * transport contract without exposing the decision id or reason code.
+ * <p>handler 注解只有在 Spring MVC 解析出 handler 之后才可见，而 servlet 安全过滤链
+ * 运行得更早。因此该拦截器自行调用标准 Spring Security {@code AuthorizationManager}，
+ * 而不是依赖更早的 {@code AuthorizationFilter} 能看到请求属性。被拒绝的结果会转换为
+ * Ainer 的通用禁止传输契约，不暴露决策 id 或 reason code。
  */
 public final class AinerAuthorizeInterceptor implements HandlerInterceptor {
 
-    /** Request attribute key for the resolved permission code. */
+    /** 已解析权限 code 的请求属性键。 */
     public static final String PERMISSION_ATTRIBUTE = "ainer.authorization.permission";
 
-    /** Request attribute key for the resolved access mode. */
+    /** 已解析访问模式的请求属性键。 */
     public static final String ACCESS_MODE_ATTRIBUTE = "ainer.authorization.accessMode";
 
     private final AinerRequestAuthorizationManager authorizationManager;
@@ -50,8 +49,8 @@ public final class AinerAuthorizeInterceptor implements HandlerInterceptor {
                 if (result != null && result instanceof AinerAuthorizationResult ainerResult
                         && ainerResult.decision().outcome()
                                 == dev.ainer.authorization.domain.AuthorizationOutcome.CHALLENGE) {
-                    // HIGH-risk permission without recent strong authentication: the caller must
-                    // re-authenticate (401), not be told the action is forbidden (403).
+                    // 高风险权限且缺少近期强认证：调用方必须重新认证（401），
+                    // 而不是被告知操作被禁止（403）。
                     throw new BusinessException(StandardErrorCode.UNAUTHENTICATED,
                             "该操作需要近期强认证后重试");
                 }
@@ -64,8 +63,7 @@ public final class AinerAuthorizeInterceptor implements HandlerInterceptor {
     }
 
     /**
-     * Convenience accessor for the permission attribute, used by the authorization manager or
-     * application services.
+     * 权限属性的便捷读取方法，供授权管理器或应用服务使用。
      */
     public static String resolvePermission(HttpServletRequest request) {
         Object value = request.getAttribute(PERMISSION_ATTRIBUTE);
@@ -73,7 +71,7 @@ public final class AinerAuthorizeInterceptor implements HandlerInterceptor {
     }
 
     /**
-     * Convenience accessor for the access mode attribute; defaults to {@link AccessMode#AUTHENTICATED}.
+     * 访问模式属性的便捷读取方法；默认 {@link AccessMode#AUTHENTICATED}。
      */
     public static AccessMode resolveAccessMode(HttpServletRequest request) {
         Object value = request.getAttribute(ACCESS_MODE_ATTRIBUTE);

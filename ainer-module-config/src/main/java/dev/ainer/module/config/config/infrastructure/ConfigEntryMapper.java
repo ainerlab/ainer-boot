@@ -6,6 +6,10 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * {@code ainer_config_entry} 的 MyBatis mapper；SQL 位于 {@code mapper/config/ConfigEntryMapper.xml}。
+ * {@code updateValue} 携带 {@code expectedVersion}/{@code newVersion} 参数，实现乐观锁条件更新。
+ */
 @Mapper
 public interface ConfigEntryMapper {
     UUID insertReturningId(@Param("row") ConfigEntryRow row, @Param("now") java.time.Instant now);

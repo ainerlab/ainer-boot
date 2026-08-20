@@ -4,6 +4,13 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Workspace 成员记录，绑定主体、角色与成员状态，是资源授权的成员关系事实来源。
+ *
+ * <p>关键不变量：邀请在受邀主体接受前只能是 {@code PENDING}（此时不允许有激活时间）；
+ * 只有 {@code ACTIVE} 成员才参与资源授权；OWNER 必然是 ACTIVE 且不能通过成员邀请接口
+ * 产生——OWNER 只能由创建时的首任所有者或专用转移/恢复流程产生。
+ */
 public record WorkspaceMember(
         UUID workspaceId,
         SubjectId subjectId,

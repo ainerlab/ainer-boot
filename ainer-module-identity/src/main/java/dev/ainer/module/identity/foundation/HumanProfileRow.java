@@ -6,8 +6,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Mutable persistence row for {@link HumanProfile} (MyBatis plain-POJO mapping against
- * {@code ainer_identity_human_profile}). {@code displayName} and {@code avatarUrl} are nullable.
+ * {@link HumanProfile} 的可变持久化行（MyBatis 普通 POJO 映射，对应表
+ * {@code ainer_identity_human_profile}）。{@code displayName} 与 {@code avatarUrl}
+ * 可为 null。
  */
 public class HumanProfileRow {
 

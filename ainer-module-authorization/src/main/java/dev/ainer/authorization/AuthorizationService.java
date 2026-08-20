@@ -25,16 +25,16 @@ import dev.ainer.authorization.policy.SubjectSetMembershipRegistry;
 import java.util.Objects;
 
 /**
- * Pure authorization decision evaluator (ADR-0030 §6). Implements the grant-path truth table with:
+ * 纯授权决策求值器（ADR-0030 §6）。实现授权路径真值表：
  * <ul>
- *   <li>Default deny, no PUBLIC→AUTHENTICATED or AUTHENTICATED→PUBLIC fall-back.
- *   <li>Resource-type check: {@code Permission.resourceType} must match {@code ResourceRef.resourceType}.
- *   <li>System-only enforcement: {@code systemOnly} permissions require a SERVICE subject.
- *   <li>Binding ownership defense: resolver-returned bindings must belong to the requesting subject.
- *   <li>GLOBAL scope restricted to SERVICE subjects.
- *   <li>Grant ∩ state intersection: BINDING_REQUIRED = binding ∧ state; RELATION_DERIVED = relation ∧ state;
- *       BINDING_OR_RELATION = (binding ∨ relation) ∧ state.
- *   <li>Risk收口 applied uniformly (including PUBLIC path): HIGH risk without recent strong auth → CHALLENGE.
+ *   <li>默认拒绝，不存在 PUBLIC→AUTHENTICATED 或 AUTHENTICATED→PUBLIC 的回退。</li>
+ *   <li>资源类型检查：{@code Permission.resourceType} 必须与 {@code ResourceRef.resourceType} 匹配。</li>
+ *   <li>systemOnly 强制：{@code systemOnly} 权限只允许 SERVICE 主体。</li>
+ *   <li>Binding 归属防御：解析器返回的 Binding 必须属于发起请求的主体。</li>
+ *   <li>GLOBAL scope 仅限 SERVICE 主体。</li>
+ *   <li>授权 ∩ 状态交集：BINDING_REQUIRED = binding ∧ state；RELATION_DERIVED = relation ∧ state；
+ *       BINDING_OR_RELATION = (binding ∨ relation) ∧ state。</li>
+ *   <li>风险收口统一应用（包括 PUBLIC 路径）：HIGH 风险且缺少近期强认证时返回 CHALLENGE。</li>
  * </ul>
  */
 public final class AuthorizationService {
@@ -48,8 +48,8 @@ public final class AuthorizationService {
     private final String policyVersion;
 
     /**
-     * Source-compatible constructor without set membership (ADR-0042 O2): behaves as if no
-     * subject-set family is supported — set bindings never contribute a grant (fail-closed).
+     * 不含集合成员关系的源码兼容构造器（ADR-0042 O2）：等价于不支持任何主体集合族——
+     * 集合 Binding 永不贡献授权（fail-closed）。
      */
     public AuthorizationService(
             PermissionRegistry permissionRegistry,
@@ -116,9 +116,9 @@ public final class AuthorizationService {
             return deny(request, AuthorizationReasonCodes.RESOURCE_TYPE_MISMATCH);
         }
 
-        // systemOnly permissions must never be served via the PUBLIC path (ADR-0030 §3.1/§5.1):
-        // systemOnly means "only controlled SERVICE may use/manage". A PUBLIC_PROJECTION request
-        // for a systemOnly permission is denied regardless of any PublicAccessPolicy.
+        // systemOnly 权限绝不能经由 PUBLIC 路径提供（ADR-0030 §3.1/§5.1）：
+        // systemOnly 意味着"只允许受控 SERVICE 使用/管理"。对 systemOnly 权限发起的
+        // PUBLIC_PROJECTION 请求无论 PublicAccessPolicy 如何裁决都一律拒绝。
         if (permission.systemOnly() && request.accessMode() == AccessMode.PUBLIC_PROJECTION) {
             return deny(request, AuthorizationReasonCodes.SYSTEM_ONLY);
         }
@@ -200,9 +200,9 @@ public final class AuthorizationService {
     }
 
     /**
-     * Subject-set grant path (ADR-0042 O2): a live set binding whose scope covers the resource
-     * grants only when the requester is a MEMBER at decision time (pull-based, no cache). GLOBAL
-     * scopes never ride a set binding (rejected at creation, excluded here defensively).
+     * 主体集合授权路径（ADR-0042 O2）：一条 live 且 scope 覆盖资源的集合 Binding，
+     * 只有当请求主体在决策时刻是该集合的 MEMBER 时才贡献授权（pull 式，无缓存）。
+     * GLOBAL scope 绝不搭载集合 Binding（创建时已拒绝，这里防御性再次排除）。
      */
     private boolean setBindingGrant(Requester.Authenticated subject, AuthorizationRequest request) {
         java.time.Instant at = request.context().evaluatedAt();

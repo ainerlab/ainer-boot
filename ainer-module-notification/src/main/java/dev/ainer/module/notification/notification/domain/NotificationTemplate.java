@@ -7,16 +7,16 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Reusable notification template with JSONB variable schema (ADR-0038).
+ * 带 JSONB 变量 schema 的可复用通知模板（ADR-0038）。
  *
- * @param id             database UUIDv7
- * @param code           unique template code (e.g. "welcome_email", "order_sms")
- * @param channel        target channel
- * @param titleTemplate  title with {@code {variable}} placeholders
- * @param bodyTemplate   body with {@code {variable}} placeholders
- * @param variablesSchema JSONB schema describing expected variables (for validation)
- * @param status         ACTIVE or DISABLED
- * @param version        optimistic-concurrency version
+ * @param id             数据库 UUIDv7
+ * @param code           唯一模板编码（如 "welcome_email"、"order_sms"）
+ * @param channel        目标渠道
+ * @param titleTemplate  含 {@code {variable}} 占位符的标题
+ * @param bodyTemplate   含 {@code {variable}} 占位符的正文
+ * @param variablesSchema 描述预期变量的 JSONB schema（用于校验）
+ * @param status         ACTIVE 或 DISABLED
+ * @param version        乐观并发版本
  */
 public record NotificationTemplate(
         UUID id,

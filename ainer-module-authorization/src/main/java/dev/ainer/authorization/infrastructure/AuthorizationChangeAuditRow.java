@@ -6,8 +6,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Row mapping for {@code ainer_authorization_change_audit}. The {@code id} is DB-generated
- * (UUIDv7 DEFAULT) and therefore not set on insert.
+ * {@code ainer_authorization_change_audit} 的行映射。{@code id} 由数据库生成
+ * （UUIDv7 DEFAULT），插入时不设置。
  */
 public class AuthorizationChangeAuditRow {
 

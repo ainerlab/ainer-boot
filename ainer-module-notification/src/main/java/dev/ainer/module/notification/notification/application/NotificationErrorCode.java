@@ -3,7 +3,7 @@ package dev.ainer.module.notification.notification.application;
 import dev.ainer.core.error.ErrorCode;
 
 /**
- * Notification-module error codes (ADR-0040). Stable {@code AINER.NOTIFICATION.<ERROR>} strings.
+ * 通知模块错误码（ADR-0040）。稳定的 {@code AINER.NOTIFICATION.<ERROR>} 字符串。
  */
 public enum NotificationErrorCode implements ErrorCode {
     TEMPLATE_NOT_FOUND("AINER.NOTIFICATION.TEMPLATE_NOT_FOUND", "通知模板不存在", 404),

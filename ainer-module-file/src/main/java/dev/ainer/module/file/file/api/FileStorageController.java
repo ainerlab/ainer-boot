@@ -28,9 +28,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 /**
- * File storage management API (ADR-0040). Upload is multipart; download streams bytes with the
- * original filename via {@code Content-Disposition}. Scopes ({@code file.read} / {@code file.write})
- * are enforced in the application service against the verified principal.
+ * 文件存储管理 API（ADR-0040）。上传为 multipart；下载通过 {@code Content-Disposition}
+ * 以原始文件名流式返回字节。scope（{@code file.read} / {@code file.write}）由应用服务
+ * 针对已验证主体强制检查。
  */
 @RestController
 @RequestMapping("/api/files")
@@ -98,7 +98,7 @@ public class FileStorageController {
         return ApiResponse.success(null, RequestIds.currentOrCreate(request));
     }
 
-    /** Stored content types passed the upload allow-list; parse defensively regardless. */
+    /** 已入库的内容类型虽通过了上传允许列表校验，这里仍做防御性解析。 */
     private static MediaType safeMediaType(@Nullable String contentType) {
         if (contentType == null || contentType.isBlank()) {
             return MediaType.APPLICATION_OCTET_STREAM;

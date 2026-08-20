@@ -1,14 +1,13 @@
 package dev.ainer.authorization.domain;
 
 /**
- * Audit level attached to a Permission (ADR-0030 §3.1, §12). Controls whether a decision is persisted to
- * the authorization decision audit.
+ * 权限上附带的审计级别（ADR-0030 §3.1、§12）。控制一次决策是否持久化到授权决策审计。
  */
 public enum AuditLevel {
-    /** No decision row written (typical for bulk public reads). */
+    /** 不写决策行（典型场景是批量公开读取）。 */
     NONE,
-    /** Decision row written only for ALLOW of protected actions /DENY/CHALLENGE. */
+    /** 仅对受保护动作的 ALLOW / DENY / CHALLENGE 写决策行。 */
     ON_DECISION,
-    /** Every evaluation audited. */
+    /** 每次求值都审计。 */
     ALWAYS
 }

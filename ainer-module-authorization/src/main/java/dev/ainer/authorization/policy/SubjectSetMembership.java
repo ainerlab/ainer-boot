@@ -6,9 +6,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Decision-time membership evaluation result for one requester against one
- * {@link dev.ainer.authorization.domain.SubjectSetRef}（ADR-0042 §3 pull-based resolution）。
- * {@code UNAVAILABLE} is fail-closed: it never grants.
+ * 决策时对单个请求者与单个 {@link dev.ainer.authorization.domain.SubjectSetRef} 的成员
+ * 关系求值结果（ADR-0042 §3 pull 式解析）。{@code UNAVAILABLE} 是 fail-closed：
+ * 绝不授予。
  */
 public record SubjectSetMembership(
         Status status,

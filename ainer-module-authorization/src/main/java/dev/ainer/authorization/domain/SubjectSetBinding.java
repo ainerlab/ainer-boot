@@ -7,11 +7,10 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Assigns a {@link Role} and precise {@link Scope} to a {@link SubjectSetRef} over a validity
- * window (ADR-0042 O2）。Shares Role/Scope/time/revocation semantics with direct
- * {@link SubjectBinding}s; the requesting subject gains the grant only through decision-time set
- * membership. GLOBAL scopes and system-only/HIGH-risk permissions are rejected at creation — the
- * engine additionally never serves GLOBAL from a set binding.
+ * 在有效时间窗口内为 {@link SubjectSetRef} 分配 {@link Role} 与精确 {@link Scope}
+ * （ADR-0042 O2）。与直接 {@link SubjectBinding} 共享 Role/Scope/时间/撤销语义；
+ * 请求主体只有通过决策时的集合成员关系才获得授权。GLOBAL scope 与 system-only/HIGH
+ * 风险权限在创建时即被拒绝——引擎另外也绝不经集合 Binding 提供 GLOBAL。
  */
 public record SubjectSetBinding(
         UUID id,

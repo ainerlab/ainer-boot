@@ -1,12 +1,12 @@
 package dev.ainer.authorization.application;
 
 /**
- * Persistence port for {@link AuthorizationDecisionAudit} (ADR-0030 §12.4). Append-only.
+ * {@link AuthorizationDecisionAudit} 的持久化端口（ADR-0030 §12.4）。append-only。
  */
 public interface AuthorizationDecisionAuditRepository {
 
     /**
-     * Insert a single decision-audit row. Throws on failure.
+     * 插入单条决策审计行。失败时抛出异常。
      */
     void insert(AuthorizationDecisionAudit audit);
 }

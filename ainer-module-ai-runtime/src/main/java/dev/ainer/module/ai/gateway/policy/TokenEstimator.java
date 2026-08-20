@@ -5,6 +5,10 @@ import dev.ainer.module.ai.gateway.domain.TokenUsage;
 
 import java.util.List;
 
+/**
+ * Token 估算器：按字符数（默认 4 字符/token 加消息开销）估算输入与输出 token，
+ * 用于调用前的预算预占。
+ */
 public final class TokenEstimator {
 
     private static final int CHARACTERS_PER_TOKEN = 4;

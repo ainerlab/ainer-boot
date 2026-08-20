@@ -3,7 +3,7 @@ package dev.ainer.module.dictionary.dictionary.infrastructure;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Row mapping for {@code ainer_dictionary_type}. */
+/** {@code ainer_dictionary_type} 的行映射。 */
 public class DictionaryTypeRow {
     private UUID id;
     private UUID parentId;

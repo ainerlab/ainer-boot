@@ -7,14 +7,14 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Controlled binding of one rotatable OAuth {@code client_id} to a stable {@link ServicePrincipal}
- * (ADR-0033 Greenfield §2.6).
+ * 一个可轮换的 OAuth {@code client_id} 到稳定 {@link ServicePrincipal} 的受控绑定
+ * （ADR-0033 Greenfield §2.6）。
  *
- * <p>A ServicePrincipal may hold 1..n OAuthClientBindings, but at most one {@code ACTIVE} binding per
- * {@code client_id} at a time (partial unique index on {@code (client_id) WHERE status = 'ACTIVE'}).
- * Rotating a credential retires the prior binding and creates a fresh ACTIVE one; the retired record stays
- * for audit and so historical tokens remain introspectable. Credential material (client secret) is NOT
- * stored here — it lives in the OAuth registered-client store referenced by {@code client_id}.
+ * <p>一个 ServicePrincipal 可持有 1..n 个 OAuthClientBinding，但同一 {@code client_id}
+ * 任一时刻至多一个 {@code ACTIVE} 绑定（基于 {@code (client_id) WHERE status = 'ACTIVE'}
+ * 的部分唯一索引）。轮换凭证时旧绑定退役并创建新的 ACTIVE 绑定；退役记录保留供审计，
+ * 且历史 token 仍可被 introspection。凭证材料（client secret）不存储在这里——存放在
+ * {@code client_id} 引用的 OAuth registered-client 存储中。
  */
 public record OAuthClientBinding(
         UUID bindingId,
@@ -38,7 +38,7 @@ public record OAuthClientBinding(
         }
     }
 
-    /** Whether this binding currently admits the linked client_id. */
+    /** 该绑定当前是否允许所关联的 client_id 通过。 */
     public boolean isActive() {
         return status == OAuthClientBindingStatus.ACTIVE;
     }

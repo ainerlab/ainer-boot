@@ -1,7 +1,7 @@
 package dev.ainer.spring.runtime;
 
 /**
- * Selects in-process or remote infrastructure adapters inside a concrete distribution.
+ * 在具体发行版内选择进程内或远程基础设施适配器。
  */
 public enum RuntimeMode {
     MONOLITH,

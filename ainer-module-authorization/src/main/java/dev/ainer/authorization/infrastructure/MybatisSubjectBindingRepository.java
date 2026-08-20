@@ -13,7 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * MyBatis-backed implementation of {@link SubjectBindingRepository} (ADR-0030 S1).
+ * {@link SubjectBindingRepository} 的 MyBatis 实现（ADR-0030 S1）。
  */
 @Repository
 public class MybatisSubjectBindingRepository implements SubjectBindingRepository {

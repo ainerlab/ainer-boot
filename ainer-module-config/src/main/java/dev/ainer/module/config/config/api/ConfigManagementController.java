@@ -22,9 +22,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * Config management API (ADR-0040). Writes require {@code config.manage}, reads
- * {@code config.read}; secret plaintext is accepted once and never echoed back — history records
- * store {@code [encrypted]} instead of the plaintext.
+ * 配置管理 API（ADR-0040）。写入要求 {@code config.manage}，读取要求
+ * {@code config.read}；secret 明文只接受一次且绝不回显——历史记录存储
+ * {@code [encrypted]} 占位而非明文。
  */
 @RestController
 @RequestMapping("/api/configs")

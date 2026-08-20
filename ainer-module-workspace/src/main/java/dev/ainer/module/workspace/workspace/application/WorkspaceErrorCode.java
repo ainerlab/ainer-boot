@@ -2,6 +2,13 @@ package dev.ainer.module.workspace.workspace.application;
 
 import dev.ainer.core.error.ErrorCode;
 
+/**
+ * Workspace 模块的错误码集合，统一采用 {@code AINER.WORKSPACE.<ERROR>} 稳定字符串约定。
+ *
+ * <p>每个错误码绑定真实的 HTTP status（404/403/409/422/503 等），由框架错误装配转换为
+ * 传输层语义；不使用 hash 分配或手工数字段位。错误消息不携带资源细节，避免向非成员
+ * 泄露 Workspace 存在性。
+ */
 public enum WorkspaceErrorCode implements ErrorCode {
     NOT_FOUND("AINER.WORKSPACE.NOT_FOUND", "工作空间不存在", 404),
     INVALID_NAME("AINER.WORKSPACE.INVALID_NAME", "工作空间名称不合法", 422),

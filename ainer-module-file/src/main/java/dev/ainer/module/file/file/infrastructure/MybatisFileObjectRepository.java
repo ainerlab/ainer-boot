@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** MyBatis adapter for {@code ainer_file_object}. */
+/** {@code ainer_file_object} 的 MyBatis 适配器。 */
 @Repository
 public class MybatisFileObjectRepository implements FileObjectRepository {
 

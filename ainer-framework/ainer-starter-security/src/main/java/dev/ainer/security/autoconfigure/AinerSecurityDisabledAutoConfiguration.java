@@ -13,11 +13,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Explicit opt-out chain: assembled only when the host sets
- * {@code ainer.security.resource-server.enabled=false}. The property has no default — an
- * unconfigured application falls back to Spring Boot's generated default chain (everything
- * requires authentication), never to this permissive one. Leaving this default fail-open would
- * turn a missing property line into an anonymously readable service.
+ * 显式退出的安全链：仅当宿主设置 {@code ainer.security.resource-server.enabled=false} 时装配。
+ * 该属性没有默认值——未配置的应用回退到 Spring Boot 生成的默认链（所有请求都要求认证），
+ * 绝不会回退到这条宽松链。若这里默认 fail-open，缺失一行配置就会把服务变成可匿名读取。
  */
 @AutoConfiguration(before = AinerResourceServerAutoConfiguration.class)
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)

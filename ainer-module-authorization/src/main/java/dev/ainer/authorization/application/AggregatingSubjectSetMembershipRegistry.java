@@ -11,9 +11,9 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 
 /**
- * Default {@link SubjectSetMembershipRegistry}: aggregates every product-provided
- * {@link SubjectSetMembershipResolver}. Families without a provider are unsupported and every
- * membership evaluation is fail-closed ({@code UNAVAILABLE}).
+ * 默认的 {@link SubjectSetMembershipRegistry}：聚合所有产品提供的
+ * {@link SubjectSetMembershipResolver}。没有提供者的集合族不受支持，
+ * 每次成员关系求值都 fail-closed（返回 {@code UNAVAILABLE}）。
  */
 @Component
 public class AggregatingSubjectSetMembershipRegistry implements SubjectSetMembershipRegistry {

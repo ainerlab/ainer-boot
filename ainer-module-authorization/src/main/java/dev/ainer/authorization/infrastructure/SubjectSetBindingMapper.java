@@ -25,7 +25,7 @@ public interface SubjectSetBindingMapper {
 
     List<SetBindingRow> selectLive(@Param("resource") ResourceFilter resource, @Param("at") Instant at);
 
-    /** SQL-side resource filter parameters for live set-binding queries. */
+    /** live 集合 Binding 查询的 SQL 侧资源过滤参数。 */
     class ResourceFilter {
         private final java.util.UUID workspaceId;
         private final String resourceType;

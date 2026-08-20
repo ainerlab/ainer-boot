@@ -5,7 +5,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.util.UrlPathHelper;
 
-/** Matches the configured Prometheus management endpoint without requiring Actuator classes. */
+/** 匹配配置的 Prometheus 管理端点路径，且不依赖 Actuator 类。 */
 public final class PrometheusEndpointRequestMatcher implements RequestMatcher {
 
     private static final String BASE_PATH_PROPERTY = "management.endpoints.web.base-path";

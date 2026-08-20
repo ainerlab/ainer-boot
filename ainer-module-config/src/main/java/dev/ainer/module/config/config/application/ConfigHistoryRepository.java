@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Persistence port for {@link ConfigHistory} (ADR-0038). Append-only.
+ * {@link ConfigHistory} 的持久化端口（ADR-0038）。只追加。
  */
 public interface ConfigHistoryRepository {
 

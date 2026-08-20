@@ -8,12 +8,12 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.stereotype.Component;
 
 /**
- * Default {@link ChannelSender} that logs notifications instead of sending them. Provides one
- * sender per channel as a fallback — products override with real adapters (SMS gateway, SMTP,
- * push service, webhook {@code RestClient}).
+ * 默认的 {@link ChannelSender}：把通知记录到日志而非真正发送。为每个渠道提供一个
+ * 兜底 sender——产品用真实适配器（短信网关、SMTP、push 服务、webhook
+ * {@code RestClient}）覆盖。
  *
- * <p>Each bean is named by channel (e.g. {@code smsSender}) so products can override individual
- * channels while keeping others as logging fallbacks.
+ * <p>每个 Bean 按渠道命名（如 {@code smsSender}），产品可只覆盖单个渠道，
+ * 其余渠道保留日志兜底。
  */
 public sealed class LoggingChannelSender implements ChannelSender
         permits LoggingChannelSender.Sms, LoggingChannelSender.Email,

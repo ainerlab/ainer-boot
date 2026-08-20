@@ -13,6 +13,11 @@
 
 ## 2. Java 与构建
 
+- **注释语言统一中文**（2026-08-19 决策）：`src/main/java` 的类级 javadoc 与方法级
+  注释使用中文；技术名词、类名/方法名、SQL 关键字、RFC/ADR 编号与 `@code`/`@link`
+  标签保留英文原文。错误码默认消息、日志中的业务语义同样使用中文。理由：付费客户与
+  维护团队为中文团队（文档、错误消息、协作语言均已中文），英文注释在中文团队维护下
+  会退化为翻译腔或被忽视。存量英文注释按模块批次翻译，不阻塞合并；新增代码一律中文。
 - JDK 25；Ainer 生产者构建统一使用 Maven Wrapper 锁定的 Maven 4.0.0-rc-6 preview，
   根 POM 使用 Enforcer 校验。不得用开发机全局 Maven 替代 Wrapper。
 - 使用 `maven.compiler.release=25` 和 `-parameters`。

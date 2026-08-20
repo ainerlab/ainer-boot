@@ -7,9 +7,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Append-only change audit for notification template management (ADR-0040). Delivery itself is
- * audited by the {@code ainer_notification_record} facts; this table records who changed which
- * template, in the same transaction as the mutation.
+ * 通知模板管理的只追加变更审计（ADR-0040）。投递本身由 {@code ainer_notification_record}
+ * 事实记录审计；本表记录谁改了哪个模板，与业务变更同事务写入。
  */
 public record NotificationAudit(
         UUID id,

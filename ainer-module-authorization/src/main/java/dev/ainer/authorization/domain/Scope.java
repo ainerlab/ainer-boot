@@ -4,21 +4,21 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Authorization scope bound to a {@link SubjectBinding} (ADR-0030 §4.2). The first version supports only
- * these three scope kinds; nested/recursive scopes and arbitrary JSON conditions are explicitly out of scope.
+ * 绑定到 {@link SubjectBinding} 的授权 scope（ADR-0030 §4.2）。第一版只支持这三种 scope
+ * 种类；嵌套/递归 scope 与任意 JSON 条件被显式排除在外。
  *
- * <p>Workspace and resource scopes are independent typed ceilings. Resource ownership is supplied by the
- * product resolver, not inferred from a universal parent concept.
+ * <p>Workspace 与 Resource scope 是相互独立的类型化上限。资源归属由产品解析器提供，
+ * 不从某个全局父概念推导。
  */
 public sealed interface Scope permits Scope.Global, Scope.Workspace, Scope.Resource {
 
     /**
-     * Whether this scope authoritatively covers the given resource (ADR-0030 §6.2). No recursive parent
-     * traversal, path wildcards or scope trees in the first version.
+     * 该 scope 是否权威地覆盖给定资源（ADR-0030 §6.2）。第一版不做递归父级遍历、
+     * 路径通配或 scope 树。
      */
     boolean covers(ResourceRef resource);
 
-    /** Platform-global scope; only controlled platform services may hold it. */
+    /** 平台全局 scope；仅受控的平台服务可持有。 */
     record Global() implements Scope {
         @Override
         public boolean covers(ResourceRef resource) {
@@ -26,7 +26,7 @@ public sealed interface Scope permits Scope.Global, Scope.Workspace, Scope.Resou
         }
     }
 
-    /** Scoped to exactly one Workspace. */
+    /** 恰好限定到一个 Workspace。 */
     record Workspace(UUID workspaceId) implements Scope {
         public Workspace {
             Objects.requireNonNull(workspaceId, "workspaceId");
@@ -38,7 +38,7 @@ public sealed interface Scope permits Scope.Global, Scope.Workspace, Scope.Resou
         }
     }
 
-    /** Scoped to one concrete resource, anchored to the workspace that owns it. */
+    /** 限定到一个具体资源，锚定到拥有该资源的 Workspace。 */
     record Resource(UUID workspaceId, ResourceType resourceType, UUID resourceId) implements Scope {
         public Resource {
             Objects.requireNonNull(workspaceId, "workspaceId");

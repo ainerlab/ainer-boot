@@ -11,16 +11,15 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Records authorization decisions to the append-only decision audit (ADR-0030 §12.4).
+ * 把授权决策记录到 append-only 决策审计（ADR-0030 §12.4）。
  *
- * <p>Unlike {@link AuthorizationChangeAuditService}, which is called within the management mutation
- * transaction, decision audit writes use {@code REQUIRES_NEW}: the decision itself is pure logic and
- * not part of a business transaction; a DENY must be recorded even if the caller later throws. The
- * caller (application service or Spring Security adapter) decides whether to record based on the
- * triggering {@code Permission.auditLevel} — not every read is audited.
+ * <p>与在管理变更事务内调用的 {@link AuthorizationChangeAuditService} 不同，决策审计写入
+ * 使用 {@code REQUIRES_NEW}：决策本身是纯逻辑，不属于业务事务；即使调用方随后抛出异常，
+ * DENY 也必须被记录。调用方（应用服务或 Spring Security 适配器）根据触发权限的
+ * {@code Permission.auditLevel} 决定是否记录——并非每次读取都审计。
  *
- * <p>{@link AuthorizationService} stays Spring-free and does not call this service directly. The
- * caller invokes {@link #recordIfApplicable} after receiving the {@link AuthorizationDecision}.
+ * <p>{@link AuthorizationService} 保持无 Spring 且不直接调用本服务。调用方在收到
+ * {@link AuthorizationDecision} 后自行调用 {@link #recordIfApplicable}。
  */
 @Service
 public class AuthorizationDecisionAuditService {
@@ -32,14 +31,13 @@ public class AuthorizationDecisionAuditService {
     }
 
     /**
-     * Record a decision for an authenticated request. Anonymous/PUBLIC decisions are not recorded
-     * here (the decision_audit table requires non-null requester fields; PUBLIC audit is handled
-     * separately per ADR §12.4).
+     * 记录一次已认证请求的决策。匿名/PUBLIC 决策不在此记录（decision_audit 表要求请求者
+     * 字段非空；PUBLIC 审计按 ADR §12.4 单独处理）。
      *
-     * @param request  the original authorization request
-     * @param decision the decision returned by {@link dev.ainer.authorization.AuthorizationService}
-     * @param requestId request trace id, or null
-     * @param traceId   distributed trace id, or null
+     * @param request   原始授权请求
+     * @param decision  {@link dev.ainer.authorization.AuthorizationService} 返回的决策
+     * @param requestId 请求追踪 id，可为 null
+     * @param traceId   分布式追踪 id，可为 null
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordIfApplicable(

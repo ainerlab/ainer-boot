@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Individual dictionary entry within a {@link DictionaryType} (ADR-0038).
+ * {@link DictionaryType} 内的单个字典条目（ADR-0038）。
  */
 public record DictionaryItem(
         UUID id,

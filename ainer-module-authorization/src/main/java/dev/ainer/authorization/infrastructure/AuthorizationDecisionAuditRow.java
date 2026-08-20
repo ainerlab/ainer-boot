@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Row mapping for {@code ainer_authorization_decision_audit}.
+ * {@code ainer_authorization_decision_audit} 的行映射。
  */
 public class AuthorizationDecisionAuditRow {
 

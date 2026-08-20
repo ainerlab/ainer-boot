@@ -6,13 +6,13 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * The authorization requester (ADR-0030 §2.3). {@link Authenticated} carries a verified principal plus its
- * OAuth scope ceiling; {@link Anonymous} is an unauthenticated caller and is never a {@code PUBLIC} actor.
- * Anonymous callers may only use {@link AccessMode#PUBLIC_PROJECTION}.
+ * 授权请求的发起者（ADR-0030 §2.3）。{@link Authenticated} 携带已验证主体及其 OAuth
+ * scope 上限；{@link Anonymous} 是未认证调用方，永远不会成为 {@code PUBLIC} actor。
+ * 匿名调用方只能使用 {@link AccessMode#PUBLIC_PROJECTION}。
  */
 public sealed interface Requester permits Requester.Authenticated, Requester.Anonymous {
 
-    /** Authenticated principal facts resolved by the security layer (not by this module). */
+    /** 由安全层（而非本模块）解析出的已认证主体事实。 */
     record Authenticated(
             SubjectRef subjectRef,
             Set<String> scopeCeiling,
@@ -28,7 +28,7 @@ public sealed interface Requester permits Requester.Authenticated, Requester.Ano
         }
     }
 
-    /** Unauthenticated caller. */
+    /** 未认证调用方。 */
     record Anonymous() implements Requester {
     }
 }

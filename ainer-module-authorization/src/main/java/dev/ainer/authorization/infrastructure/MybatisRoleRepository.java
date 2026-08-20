@@ -15,7 +15,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * MyBatis-backed implementation of {@link RoleRepository} (ADR-0030 S1).
+ * {@link RoleRepository} 的 MyBatis 实现（ADR-0030 S1）。
  */
 @Repository
 public class MybatisRoleRepository implements RoleRepository {

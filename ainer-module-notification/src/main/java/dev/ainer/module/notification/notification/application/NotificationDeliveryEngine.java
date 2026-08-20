@@ -16,25 +16,24 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Async delivery engine for notifications (ADR-0038). The architectural centerpiece showcasing
- * JDK 25 + PG 18 synergy:
+ * 通知的异步投递引擎（ADR-0038）。体现 JDK 25 + PG 18 协同的架构核心：
  *
  * <ol>
- *   <li><b>PG {@code SKIP LOCKED} queue claiming</b> — {@link NotificationRecordRepository#claimPending}
- *       uses {@code SELECT ... FOR UPDATE SKIP LOCKED} to provide lock-free multi-consumer claiming
- *       without an external message queue. Multiple engine instances can run concurrently.</li>
- *   <li><b>JDK 25 {@code StructuredTaskScope}</b> — claimed batch is sent via
- *       {@code StructuredTaskScope.Joiner}, each send on a virtual thread. Bounded, structured,
- *       lifetime-bounded concurrency — no thread pool to manage, no leaked threads on failure.</li>
- *   <li><b>Switch pattern matching channel dispatch</b> — {@link ChannelSender} implementations are
- *       keyed by {@link NotificationChannel}; dispatch is a type-safe {@code Map} lookup, not
- *       if-else chains.</li>
- *   <li><b>Exponential backoff retry</b> — failed sends increment {@code retryCount} and schedule
- *       {@code nextRetryAt} with {@code 2^retryCount} seconds delay, up to {@code maxRetries}.</li>
+ *   <li><b>PG {@code SKIP LOCKED} 队列领取</b>——{@link NotificationRecordRepository#claimPending}
+ *       用 {@code SELECT ... FOR UPDATE SKIP LOCKED} 提供无锁多消费者领取，
+ *       无需外部消息队列。多个引擎实例可并发运行。</li>
+ *   <li><b>JDK 25 {@code StructuredTaskScope}</b>——领取的批次经
+ *       {@code StructuredTaskScope.Joiner} 发送，每次发送跑在虚拟线程上。
+ *       有界、结构化、生命周期受控的并发——无需管理线程池，失败时无线程泄漏。</li>
+ *   <li><b>switch 模式匹配渠道路由</b>——{@link ChannelSender} 实现按
+ *       {@link NotificationChannel} 索引；路由是类型安全的 {@code Map} 查找，
+ *       不是 if-else 链。</li>
+ *   <li><b>指数退避重试</b>——失败的发送递增 {@code retryCount} 并按
+ *       {@code 2^retryCount} 秒延迟排定 {@code nextRetryAt}，上限 {@code maxRetries}。</li>
  * </ol>
  *
- * <p>The engine runs on a fixed schedule ({@code @Scheduled}) but each send executes on a virtual
- * thread, so blocking channel I/O (SMTP, HTTP) never blocks platform threads.
+ * <p>引擎按固定调度运行（{@code @Scheduled}），但每次发送都在虚拟线程上执行，
+ * 因此阻塞式渠道 I/O（SMTP、HTTP）绝不会阻塞平台线程。
  */
 @Component
 public class NotificationDeliveryEngine {
@@ -52,14 +51,14 @@ public class NotificationDeliveryEngine {
             Clock clock) {
         this.recordRepository = recordRepository;
         this.clock = clock;
-        // Build a dispatch map from channel → sender (switch pattern matching friendly)
+        // 构建渠道 → sender 的路由 Map（便于 switch 模式匹配）
         this.senders = senderList.stream()
                 .collect(java.util.stream.Collectors.toMap(ChannelSender::channel, s -> s));
     }
 
     /**
-     * Periodically claim and deliver pending notifications. Runs on Spring's scheduler (virtual
-     * threads if {@code spring.threads.virtual.enabled=true}).
+     * 定期领取并投递待处理通知。运行在 Spring 调度器上（若
+     * {@code spring.threads.virtual.enabled=true} 则为虚拟线程）。
      */
     @Scheduled(fixedDelayString = "${ainer.notification.poll-interval-ms:5000}")
     public void deliverBatch() {
@@ -71,10 +70,10 @@ public class NotificationDeliveryEngine {
     }
 
     /**
-     * Deliver a batch using JDK 25 virtual threads via a per-task executor. Each notification is
-     * sent on its own virtual thread — blocking channel I/O (SMTP, HTTP) never blocks platform
-     * threads. {@code StructuredTaskScope} (JEP 505) will replace this once finalized to stable;
-     * the current approach uses the stable virtual thread API.
+     * 通过 per-task 执行器以 JDK 25 虚拟线程投递一个批次。每条通知在自己的虚拟线程上
+     * 发送——阻塞式渠道 I/O（SMTP、HTTP）绝不阻塞平台线程。
+     * {@code StructuredTaskScope}（JEP 505）转正稳定后将替换此实现；
+     * 当前方案使用稳定的虚拟线程 API。
      */
     private void deliverConcurrently(List<NotificationRecord> batch) {
         try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
@@ -111,7 +110,7 @@ public class NotificationDeliveryEngine {
     }
 
     /**
-     * Exponential backoff: 2^retryCount seconds (2s, 4s, 8s, 16s...).
+     * 指数退避：2^retryCount 秒（2s、4s、8s、16s……）。
      */
     private Instant nextRetryAt(int retryCount) {
         long delaySeconds = (long) Math.pow(2, retryCount + 1);

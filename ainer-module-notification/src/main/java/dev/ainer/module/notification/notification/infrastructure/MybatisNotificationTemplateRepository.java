@@ -13,6 +13,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * {@link NotificationTemplateRepository} 的 MyBatis 适配器，对应表 {@code ainer_notification_template}。
+ * variablesSchema 在 JSONB 与 Map 之间双向转换；更新与状态迁移基于乐观锁版本条件。
+ */
 @Repository
 public class MybatisNotificationTemplateRepository implements NotificationTemplateRepository {
 

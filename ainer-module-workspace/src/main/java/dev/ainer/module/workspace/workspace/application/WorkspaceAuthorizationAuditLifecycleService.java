@@ -10,6 +10,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Workspace 授权审计的生命周期运维服务：热表归档、SIEM 导出与运行状态查询。
+ *
+ * <p>归档前必须保证同 ID 归档记录已在同一事务中存在，归档表默认不删除。导出使用
+ * {@code (occurredAt, id)} 稳定游标按批推进，且每次导出都会写入一条安全操作审计，
+ * 记录导出方服务主体与导出条数，供事后追溯。
+ */
 @Service
 public class WorkspaceAuthorizationAuditLifecycleService {
 

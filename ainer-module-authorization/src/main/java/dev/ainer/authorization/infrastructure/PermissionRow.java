@@ -3,7 +3,7 @@ package dev.ainer.authorization.infrastructure;
 import java.time.Instant;
 
 /**
- * Row mapping for {@code ainer_authorization_permission}.
+ * {@code ainer_authorization_permission} 的行映射。
  */
 public class PermissionRow {
 

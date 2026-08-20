@@ -18,14 +18,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Application service for dynamic configuration (ADR-0038). Uses Spring Cache abstraction
- * (ADR-0039) — {@code @Cacheable} for read path, {@code @CacheEvict} on writes. Cache backend
- * is swappable: Caffeine (local, default) or Redis/Valkey (distributed).
+ * 动态配置的应用服务（ADR-0038）。使用 Spring Cache 抽象（ADR-0039）——
+ * 读路径 {@code @Cacheable}，写入时 {@code @CacheEvict}。缓存后端可替换：
+ * Caffeine（本地，默认）或 Redis/Valkey（分布式）。
  *
- * <p>Secret values are encrypted via {@link ConfigEncryptionPort} (AES-GCM default). The caller
- * supplies <strong>plaintext</strong> to {@link #setSecret}; the service encrypts it before
- * persistence. {@link #getSecret} decrypts and returns plaintext. The raw ciphertext is never
- * exposed to callers.
+ * <p>secret 值通过 {@link ConfigEncryptionPort} 加密（默认 AES-GCM）。调用方向
+ * {@link #setSecret} 提供<strong>明文</strong>；服务在持久化前完成加密。
+ * {@link #getSecret} 解密并返回明文。原始密文绝不暴露给调用方。
  */
 @Service
 @Transactional
@@ -49,7 +48,7 @@ public class ConfigApplicationService {
         this.clock = clock;
     }
 
-    // ---- Write ----
+    // ---- 写入 ----
 
     @CacheEvict(value = CACHE_CONFIG_ENTRY, key = "#namespace + ':' + #key")
     public void setValue(
@@ -76,8 +75,8 @@ public class ConfigApplicationService {
     }
 
     /**
-     * Set a secret config value. The {@code plaintext} is encrypted via {@link ConfigEncryptionPort}
-     * before persistence — the raw plaintext is never stored.
+     * 设置 secret 配置值。{@code plaintext} 在持久化前经 {@link ConfigEncryptionPort}
+     * 加密——绝不存储原始明文。
      */
     @CacheEvict(value = CACHE_CONFIG_ENTRY, key = "#namespace + ':' + #key")
     public void setSecret(
@@ -101,7 +100,7 @@ public class ConfigApplicationService {
         }
     }
 
-    // ---- Read (cached) ----
+    // ---- 读取（缓存）----
 
     @Cacheable(value = CACHE_CONFIG_ENTRY, key = "#namespace + ':' + #key", unless = "#result == null || !#result.isPresent()")
     @Transactional(readOnly = true)
@@ -120,8 +119,7 @@ public class ConfigApplicationService {
     }
 
     /**
-     * Get a secret config value as decrypted plaintext. The ciphertext is decrypted via
-     * {@link ConfigEncryptionPort}.
+     * 读取 secret 配置值并解密为明文。密文经 {@link ConfigEncryptionPort} 解密。
      */
     @Transactional(readOnly = true)
     public Optional<String> getSecret(String namespace, String key) {
@@ -135,7 +133,7 @@ public class ConfigApplicationService {
         return entryRepository.findByNamespace(namespace);
     }
 
-    /** Management read path: requires {@code config.read} on the verified principal. */
+    /** 管理读路径：要求已验证主体携带 {@code config.read}。 */
     @Transactional(readOnly = true)
     public List<ConfigEntry> getByNamespace(AuthenticatedPrincipal principal, String namespace) {
         requireRead(principal);
@@ -149,7 +147,7 @@ public class ConfigApplicationService {
                 .orElse(List.of());
     }
 
-    /** Management read path: requires {@code config.read} on the verified principal. */
+    /** 管理读路径：要求已验证主体携带 {@code config.read}。 */
     @Transactional(readOnly = true)
     public List<ConfigHistory> getHistory(
             AuthenticatedPrincipal principal, String namespace, String key) {
@@ -157,7 +155,7 @@ public class ConfigApplicationService {
         return getHistory(namespace, key);
     }
 
-    // ---- Internal ----
+    // ---- 内部方法 ----
 
     private static void requireManage(@Nullable AuthenticatedPrincipal principal) {
         if (principal != null && !principal.hasScope(ConfigAuthorities.MANAGE)) {

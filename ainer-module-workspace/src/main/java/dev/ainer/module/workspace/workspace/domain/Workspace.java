@@ -4,6 +4,12 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Workspace 聚合根，承载工作空间标识、名称与乐观并发版本。
+ *
+ * <p>版本号从 0 开始，每次 {@link #rename} 递增，用于检测并发修改；更新时间不允许早于
+ * 创建时间，也不允许回退。名称变更语义相同则返回自身，避免无意义的版本推进。
+ */
 public record Workspace(
         UUID id,
         WorkspaceName name,

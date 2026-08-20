@@ -12,13 +12,12 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Application use cases for Role management (ADR-0030 S1). Roles created here are persisted and
- * available for binding assignment. Permission codes must be present in the registered catalog
- * before they can be assigned to a role — administrators cannot grant permissions that application
- * code does not implement.
+ * Role 管理的应用用例（ADR-0030 S1）。这里创建的 Role 会被持久化，并可用于 Binding
+ * 分配。权限 code 必须先存在于已注册目录，才能被赋予 Role——管理员无法授予应用代码
+ * 未实现的权限。
  *
- * <p>Management mutations are audited via {@link AuthorizationChangeAuditService} in the same
- * transaction (ADR-0030 §11.7). An audit write failure rolls back the Role change.
+ * <p>管理变更通过 {@link AuthorizationChangeAuditService} 在同一事务内审计
+ * （ADR-0030 §11.7）。审计写失败会回滚 Role 变更。
  */
 @Service
 @Transactional
@@ -40,10 +39,9 @@ public class RoleApplicationService {
     }
 
     /**
-     * Create a new persisted role with the given code, display name and permission set.
+     * 以给定 code、显示名与权限集合创建新的持久化 Role。
      *
-     * @throws BusinessException if the manager is not trusted, the code is already in use, or a
-     *                           permission is unregistered/non-assignable.
+     * @throws BusinessException 当管理者不受信、code 已被占用，或某权限未注册/不可分配时。
      */
     public UUID createRole(
             AuthenticatedPrincipal actor, String code, String name, Set<PermissionCode> permissions,
@@ -60,10 +58,10 @@ public class RoleApplicationService {
     }
 
     /**
-     * Atomically replace the permissions of an existing role (optimistic version check).
+     * 原子替换既有 Role 的权限集合（乐观版本检查）。
      *
-     * @throws BusinessException if the manager is not trusted, the role is bound to the actor, the
-     *                           role/permission is invalid, or the version is stale.
+     * @throws BusinessException 当管理者不受信、Role 绑定到操作者自身、Role/权限不合法，
+     *                           或版本已过期时。
      */
     public void replacePermissions(
             AuthenticatedPrincipal actor, UUID roleId, Set<PermissionCode> permissions,
@@ -79,9 +77,9 @@ public class RoleApplicationService {
     }
 
     /**
-     * Look up a role by its database id.
+     * 按数据库 id 查找 Role。
      *
-     * @throws BusinessException if the role is not found.
+     * @throws BusinessException 当 Role 不存在时。
      */
     @Transactional(readOnly = true)
     public RoleRepository.RoleRecord getRole(UUID roleId) {

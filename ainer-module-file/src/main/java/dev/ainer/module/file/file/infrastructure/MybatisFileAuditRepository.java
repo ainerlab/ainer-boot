@@ -4,7 +4,7 @@ import dev.ainer.module.file.file.application.FileAuditRepository;
 import dev.ainer.module.file.file.domain.FileAudit;
 import org.springframework.stereotype.Repository;
 
-/** MyBatis adapter for {@code ainer_file_audit}. */
+/** {@code ainer_file_audit} 的 MyBatis 适配器。 */
 @Repository
 public class MybatisFileAuditRepository implements FileAuditRepository {
 

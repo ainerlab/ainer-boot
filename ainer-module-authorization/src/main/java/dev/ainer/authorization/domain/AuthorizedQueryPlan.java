@@ -6,25 +6,24 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Result of a collection-query authorization (ADR-0030 §7, S3). The authorization engine either
- * produces a typed query constraint {@code Q} that the product repository must apply to exclude
- * unauthorized rows, or denies the entire query.
+ * 集合查询授权的结果（ADR-0030 §7、S3）。授权引擎要么产出一个类型化查询约束 {@code Q}，
+ * 由产品仓储应用它排除未授权的行，要么整体拒绝该查询。
  *
- * <p>{@code Q} is product-defined — Ainer does not know product table names, column names or search
- * DSL. The product adapter translates {@code Q} to parameterized PostgreSQL or search-engine filter
- * conditions. Unpacking {@code Allowed} and ignoring {@code Denied} is a contract violation.
+ * <p>{@code Q} 由产品定义——Ainer 不知道产品的表名、列名或检索 DSL。产品适配器把
+ * {@code Q} 翻译为参数化的 PostgreSQL 或检索引擎过滤条件。解包 {@code Allowed} 却忽略
+ * {@code Denied} 属于违反契约。
  *
- * @param <Q> product-defined typed query constraint
+ * @param <Q> 产品定义的类型化查询约束
  */
 public sealed interface AuthorizedQueryPlan<Q> {
 
     /**
-     * The query is authorized. The product adapter must apply {@code constraint} to the database/search
-     * query so unauthorized rows are excluded at the data layer — not loaded into JVM and filtered later.
+     * 查询已获授权。产品适配器必须把 {@code constraint} 应用到数据库/检索查询上，
+     * 让未授权的行在数据层就被排除——而不是加载进 JVM 之后再过滤。
      *
-     * @param constraint     product-defined typed constraint (e.g. {@code allowedWorkspaceIds, publicOnly})
-     * @param obligations    obligations the adapter must consume (e.g. {@link PublicProjection})
-     * @param policyVersion  the engine's policy version for audit traceability
+     * @param constraint     产品定义的类型化约束（例如 {@code allowedWorkspaceIds, publicOnly}）
+     * @param obligations    适配器必须消费的义务（例如 {@link PublicProjection}）
+     * @param policyVersion  引擎的策略版本，用于审计可追溯
      */
     record Allowed<Q>(Q constraint, List<DecisionObligation> obligations, String policyVersion)
             implements AuthorizedQueryPlan<Q> {
@@ -37,10 +36,10 @@ public sealed interface AuthorizedQueryPlan<Q> {
     }
 
     /**
-     * The query is denied. The product adapter must not execute the query at all.
+     * 查询被拒绝。产品适配器根本不得执行该查询。
      *
-     * @param reasonCode    stable reason code (e.g. {@link AuthorizationReasonCodes#NO_BINDING})
-     * @param policyVersion the engine's policy version
+     * @param reasonCode    稳定 reason code（例如 {@link AuthorizationReasonCodes#NO_BINDING}）
+     * @param policyVersion 引擎的策略版本
      */
     record Denied<Q>(String reasonCode, String policyVersion) implements AuthorizedQueryPlan<Q> {
 

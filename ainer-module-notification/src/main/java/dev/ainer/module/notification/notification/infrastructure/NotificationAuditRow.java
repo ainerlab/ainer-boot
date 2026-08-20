@@ -3,7 +3,7 @@ package dev.ainer.module.notification.notification.infrastructure;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Row mapping for {@code ainer_notification_audit}. */
+/** {@code ainer_notification_audit} 的行映射。 */
 public class NotificationAuditRow {
     private UUID id;
     private String operation;

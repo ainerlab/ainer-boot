@@ -12,10 +12,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-/** Persistence port for {@link ActingGrant} aggregates (ADR-0043 A1). */
+/** {@link ActingGrant} 聚合的持久化端口（ADR-0043 A1）。 */
 public interface ActingGrantRepository {
 
-    /** Persisted grant carrying database identity alongside the domain value. */
+    /** 持久化授权，附带数据库身份的领域值。 */
     record PersistedGrant(
             UUID id,
             SubjectRef principal,
@@ -36,6 +36,6 @@ public interface ActingGrantRepository {
 
     Optional<Long> revoke(UUID id, Instant revokedAt, String reason);
 
-    /** Live grants whose principal matches and whose validity window contains {@code at}. */
+    /** principal 匹配且有效时间窗口覆盖 {@code at} 的 live 授权。 */
     List<PersistedGrant> findLiveGrants(SubjectRef principal, Instant at);
 }

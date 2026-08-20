@@ -6,14 +6,14 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Typed, verified authorization context (ADR-0030 §5.5). Only explicit fields are provided; there is no
- * arbitrary {@code Map<String,Object>}, SpEL, Rego, SQL or administrator-uploaded rule.
+ * 类型化的、已验证的授权上下文（ADR-0030 §5.5）。只提供显式字段；不存在任意
+ * {@code Map<String,Object>}、SpEL、Rego、SQL 或管理员上传的规则。
  *
- * @param evaluatedAt    decision time (also used for binding validity checks)
- * @param assurance      current authentication assurance strength
- * @param platformAppId  verified platform app / channel context, if any
- * @param requestId      correlation id, if any
- * @param traceId        trace id, if any
+ * @param evaluatedAt    决策时间（同时用于 Binding 有效性检查）
+ * @param assurance      当前认证保证强度
+ * @param platformAppId  已验证的平台应用/渠道上下文，可为空
+ * @param requestId      关联 id，可为空
+ * @param traceId        追踪 id，可为空
  */
 public record AuthorizationContext(
         Instant evaluatedAt,
@@ -27,7 +27,7 @@ public record AuthorizationContext(
         Objects.requireNonNull(assurance, "assurance");
     }
 
-    /** Authentication assurance strength (ADR-0030 §6.3). */
+    /** 认证保证强度（ADR-0030 §6.3）。 */
     public enum Assurance {
         NONE,
         RECENT_STRONG

@@ -5,7 +5,7 @@ import dev.ainer.authorization.application.AuthorizationDecisionAuditRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * MyBatis-backed implementation of {@link AuthorizationDecisionAuditRepository} (ADR-0030 §12.4).
+ * {@link AuthorizationDecisionAuditRepository} 的 MyBatis 实现（ADR-0030 §12.4）。
  */
 @Repository
 public class MybatisAuthorizationDecisionAuditRepository implements AuthorizationDecisionAuditRepository {
