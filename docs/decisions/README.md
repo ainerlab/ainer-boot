@@ -54,6 +54,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0044](0044-knowledge-foundation-implementation-baseline.md) | Accepted | Knowledge Foundation 实现基线（落实 ADR-0034：Greenfield 澄清 + K1 身份/版本 + K2 信任/生命周期两切片） |
 | [0045](0045-versioning-lts-and-patch-baseline.md) | Accepted | 版本策略、LTS 与补丁支持基线（相邻 minor 升级 + 一级回滚窗口 + patch 规则 + 兼容检查落地形态；v0.2.0 双消费者矩阵为首批证据） |
 | [0046](0046-1.0-lts-terms.md) | Accepted | 1.0 LTS 条款定稿（1.0.x 为首个 LTS 线；补丁规则沿用 ADR-0045；窗口与 EOL 评估条款） |
+| [0047](0047-task-scheduling-baseline.md) | Accepted | 任务调度模块基线（P4：延迟/周期执行 + SKIP LOCKED 队列 + 指数退避 + 管理面；泛化通知模块已验证模式） |
 
 ## 历史草案与审查记录
 

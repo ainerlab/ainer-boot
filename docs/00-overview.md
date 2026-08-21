@@ -98,6 +98,7 @@ ainer-initializer-cli                 P2 离线 CLI：preview / init / diff
 | 文档类型 | 回答的问题 | 权威文档 | 更新方式 |
 |---|---|---|---|
 | 产品入口 | Ainer 是什么，如何快速运行 | [`../README.md`](../README.md) | 用户可见能力变化时更新 |
+| 交接文档 | 接手项目所需的全部入口：定位、状态、架构速查、常见坑、待办 | [`handoff.md`](handoff.md) | 里程碑或重大变化时更新 |
 | 1.0 产品说明 | 1.0 合同快照：能力域、合同、质量模型、版本支持与快速开始 | [`ainer-boot-1.0-product.md`](ainer-boot-1.0-product.md) | 1.0 快照不滚动；能力变化走 CHANGELOG |
 | 当前状态 | 现在完成了什么、验证结果和缺口是什么 | [`project-status.md`](project-status.md) | 每个里程碑、发布候选或风险变化时更新 |
 | 长期规范 | 以后应当如何设计和实现 | `architecture.md`、`conventions.md` 等 | 代码与规范同一变更 |
@@ -117,8 +118,9 @@ ainer-initializer-cli                 P2 离线 CLI：preview / init / diff
 
 ### 4.1 新开发者或首次接手
 
-1. [`project-status.md`](project-status.md)
-2. [`development.md`](development.md)
+1. [`handoff.md`](handoff.md)——交接文档（先读这个）
+2. [`project-status.md`](project-status.md)
+3. [`development.md`](development.md)
 3. [`architecture.md`](architecture.md)
 4. [`conventions.md`](conventions.md)
 5. [`testing.md`](testing.md)
@@ -241,6 +243,7 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 | [`project-status.md`](project-status.md) | 当前阶段、完成项、验证记录、缺口和下一步 |
 | [`reviews/2026-08-19-commercial-grade-code-review.md`](reviews/2026-08-19-commercial-grade-code-review.md) | 商业级代码评审审计快照（三路语义评审：安全/正确性/契约一致性；已修复项与遗留 follow-up） |
 | [`ainer-boot-1.0-product.md`](ainer-boot-1.0-product.md) | 1.0 产品说明（合同快照：能力域与工具链、Stable/Incubating、质量与信任模型、LTS、参考消费者、快速开始） |
+| [`handoff.md`](handoff.md) | 项目交接文档（定位、当前状态、架构速查、必读 ADR、常见坑、发布操作、当前待办、AI 代理协作须知） |
 | [`architecture.md`](architecture.md) | 模块、依赖、发行物、运行模式和数据所有权 |
 | [`design/paradigm-redesign.md`](design/paradigm-redesign.md) | 为什么不沿用旧脚手架范式 |
 | [`design/ainer-scaffold-design.md`](design/ainer-scaffold-design.md) | Ainer Boot 产品定位、竞品能力矩阵、P0–P5 路线与长期架构设计 |

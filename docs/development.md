@@ -1,233 +1,210 @@
-# Ainer 本地开发手册
+# Ainer Boot 开发手册
 
-> 文档类型：开发操作 · 状态：生效 · 最近核对：2026-08-13 · 适用版本：`0.1.x`
+> 文档类型：开发操作 · 状态：生效 · 最近核对：2026-08-21 · 适用版本：`1.1.x`
+
+本文是 Ainer Boot 的日常开发操作手册。新开发者应先读 [`00-overview.md`](00-overview.md)
+了解文档地图，再按本文完成第一次构建与验证。架构决策背景见 [`architecture.md`](architecture.md)
+与 [`decisions/README.md`](decisions/README.md)；编码规范见 [`conventions.md`](conventions.md)。
 
 ## 1. 环境要求
 
-| 工具 | 要求 | 用途 |
+| 依赖 | 版本 | 说明 |
 |---|---|---|
-| JDK | 25，允许范围 `[25,26)` | 编译与运行 |
-| Maven Wrapper | 锁定 Maven 4.0.0-rc-6 preview | Reactor 构建、安装与发布 |
-| 系统 Maven | 3.9+，仅兼容门禁需要 | 验证下游 Maven 3 消费者 |
-| PostgreSQL | 18.x | 本地运行与迁移验证 |
-| Docker-compatible runtime | 建议安装 | 执行 PostgreSQL Testcontainers 集成测试 |
-| Git | 当前维护版本 | 版本控制 |
+| JDK | 25（LTS） | BellSoft Liberica 或 Temurin |
+| Maven | 仓库 Wrapper 4.0.0-rc-6（preview） | 生产者构建**必须**用 Wrapper；系统 Maven 3.9+ 只用于消费者兼容门禁 |
+| Docker | Colima / Docker Desktop / 原生 | PostgreSQL Testcontainers 必需 |
+| PostgreSQL | 18.x | 唯一业务数据库基线（Testcontainers 自动拉起） |
 
-JDK 和 Maven 版本由 Maven Enforcer 强制检查。Maven 4.0.0-rc-6 仍是 preview；生产者构建必须
-使用仓库内 Wrapper，不能用全局 Maven 替代。系统 Maven 3.9+ 只供
-`scripts/verify-maven-consumers.sh` 验证已安装制品的下游兼容性。未经单独兼容性验证，不承诺
-其他 JDK、数据库或 Windows 原生环境可用。Initializer 生成的消费者项目自带 Wrapper 3.3.4，
-固定 Maven 3.9.16；应在生成目录执行它自己的 `./mvnw`，不得借用本仓库的 Maven 4 Wrapper。
+macOS + Colima 的必需环境变量（缺一不可，详见 [`testing.md`](testing.md) §4）：
 
 ```bash
-java -version
-./mvnw --version
-git status --short --branch
+export DOCKER_HOST=unix:///Users/$(whoami)/.colima/default/docker.sock
+export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
 ```
 
 ## 2. 第一次验证
 
-从仓库根目录运行：
-
 ```bash
-./mvnw clean verify
+git clone git@github.com:ainerlab/ainer-boot.git
+cd ainer-boot
+./mvnw --version        # 确认 Maven 4.0.0-rc-6 + JDK 25
+./mvnw clean verify     # 全量 Reactor；需 Docker 在线
 ```
 
-如果 Docker 不可用，带 `disabledWithoutDocker = true` 的 Testcontainers 测试会跳过。此结果可用于本地快速开发，但不能作为发布候选的完整数据库验证，详见 [`testing.md`](testing.md)。
+成功标准：**所有模块 SUCCESS，测试 0 skipped**。结果汇总用 `./scripts/check-surefire-results.sh`。
 
-局部快速反馈可以执行 `./mvnw test`，或通过 `-pl ... -am` 限定模块执行 `test` / `verify`。
-`install` 不属于日常开发循环，只用于 golden consumer 或发布前的本地仓库消费验证。
+<details>
+<summary>常见首次构建问题</summary>
 
-## 3. Docker Compose 快速启动
+- **105 skipped**：Docker 不可达——检查上述两个环境变量是否已设
+- **Maven SHA 校验失败**：删除 `~/.m2/wrapper/` 后重试
+- **虚拟线程矩阵失败**：非阻塞 job，不影响主质量门禁
 
-仓库提供 `docker-compose.yml` 和 `.env.example`，一条命令拉起完整开发环境。
+</details>
 
-### 3.1 仅启动数据库（推荐日常开发）
+## 3. 本地运行
 
-大多数日常开发只需要一个 PostgreSQL，应用用 `./mvnw spring-boot:run` 在宿主机跑：
-
-```bash
-cp .env.example .env          # 按需修改密码
-docker compose up -d          # 只启动 postgres（默认 profile）
-```
-
-数据库连接信息（宿主机访问）：
-
-| 数据库 | JDBC URL | 用户 |
-|---|---|---|
-| 业务库（ainer-server） | `jdbc:postgresql://localhost:5432/ainer` | `ainer` |
-| 认证库（Authorization Server） | `jdbc:postgresql://localhost:5432/ainer_auth` | `ainer_auth` |
-
-然后按 §5 运行业务应用、§6 运行 Authorization Server。
-
-### 3.2 完整环境（PostgreSQL + 两个应用）
+**最快路径（推荐）**：Docker Compose 只起数据库，应用跑宿主机。
 
 ```bash
-cp .env.example .env
-bash scripts/generate-dev-keys.sh     # 生成 RSA 3072 签名密钥
-docker compose --profile full up -d --build
+docker compose up -d                     # PostgreSQL 双库（默认 profile）
+bash scripts/generate-dev-keys.sh        # 首次生成 RSA 签名密钥（幂等）
+
+# 业务 Server
+export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/ainer
+export SPRING_DATASOURCE_USERNAME=ainer
+export SPRING_DATASOURCE_PASSWORD=local-only-password
+./mvnw -pl ainer-server spring-boot:run
+
+# Authorization Server（另开终端）
+export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/ainer_auth
+export SPRING_DATASOURCE_USERNAME=ainer_auth
+export SPRING_DATASOURCE_PASSWORD=local-only-password
+./mvnw -pl ainer-authorization-server spring-boot:run
 ```
 
-启动后验证：
+**注意**：Authorization Server 代码强制 `https://` issuer。`docker compose --profile full`
+的一键全栈是实验性（AS 容器听 HTTP 但 issuer 是 https，RS discovery 通常无法闭环）——
+日常开发不要用 full。
 
-```bash
-curl http://localhost:8080/actuator/health      # 业务应用
-curl -k https://localhost:9000/.well-known/openid-configuration  # Authorization Server
-```
+**OpenAPI 文档**：业务 Server 启动后 `/v3/api-docs` 与 `/swagger-ui.html` 可用
+（需真 JWT 认证，springdoc 3.1.0）。
 
-> **本地 HTTPS issuer 注意**：Authorization Server 代码强制要求 issuer 为 `https://` URL
-> （`AinerAuthorizationServerConfiguration`）。Compose 内 AS 容器实际监听 HTTP，JWT 中的
-> issuer 字段为配置的 `https://localhost:9000`。如果 `ainer-server` 拉取 JWK 因自签证书失败，
-> 推荐改用 §3.1 的方式——只用 Compose 提供数据库，应用在宿主机通过 `./mvnw spring-boot:run`
-> 启动。生产部署见 `ops/dev/`（systemd + Let's Encrypt 真实 HTTPS）。
-
-> **full profile 已知限制（2026-08-11 复核）**：`--profile full` 的完整应用栈目前是**实验性**的，
-> 存在两个已知限制：(1) Dockerfile 在容器内通过 Maven Wrapper 下载 Maven 4.0.0-rc-6 preview
-> distribution，部分 Docker 环境（如 Colima 默认 daemon）会因 distribution SHA-256 校验失败而中断，
-> 这是 preview distribution + 容器网络环境的限制，非 Dockerfile 逻辑错误；(2) 即使构建通过，
-> RS↔AS 的 OIDC discovery/JWK 拉取在纯 Compose 内部网络难以闭环（issuer 声明 https 但容器监听 http）。
-> 因此 `--profile full` 主要用于验证镜像构建逻辑与 PostgreSQL 双库初始化，完整应用联调推荐用 §3.1 +
-> 宿主机 `./mvnw spring-boot:run`。如需在容器内完成 Maven 构建，可挂载宿主机已缓存的
-> `~/.m2/wrapper/dists` 或改用预装 Maven 的基础镜像（这些属后续优化，不在当前切片范围）。
-
-停止与清理：
-
-```bash
-docker compose down               # 停止容器，保留数据卷
-docker compose down -v            # 同时删除数据库数据卷
-```
-
-## 4. 模块职责
+## 4. 模块清单（27 个）
 
 ```text
-ainer-dependencies                  版本与依赖管理
-ainer-framework/ainer-core         无框架核心契约
-ainer-framework/ainer-spring       Spring 通用装配
-ainer-framework/ainer-security     无框架身份契约
-ainer-framework/ainer-starter-*    可复用自动配置
-ainer-module-identity              身份与租户账号
-ainer-module-workspace             租户资源与成员授权
-ainer-module-ai-runtime            模型网关与调用审计
-ainer-server                       业务应用发行物
-ainer-authorization-server         OAuth 2.1/OIDC 发行物
+── 基础设施 ──
+ainer-dependencies                  版本 BOM（parentless，签名独立）
+ainer-framework/ainer-core         零 Spring 核心契约（错误/响应/UUIDv7/存储端口）
+ainer-framework/ainer-spring       Spring 通用装配（运行模式/本地文件存储适配）
+ainer-framework/ainer-security     无框架身份契约（AuthenticatedPrincipal/token profile）
+ainer-framework/ainer-starter-web Web 自动配置（统一响应/全局异常/请求追踪）
+ainer-framework/ainer-starter-persistence  MyBatis-Plus + Flyway + UUID TypeHandler
+ainer-framework/ainer-starter-security    Resource Server 安全链（JWT 验签/401/403/503）
+ainer-framework/ainer-starter-cache       Spring Cache 抽象（Caffeine 默认/Redis 可选）
+ainer-framework/ainer-test-support        测试基座（JwtTestSupport/RestTestClient/PG 容器）
+
+── 业务模块 ──
+ainer-module-identity              HumanAccount/ServicePrincipal/Credential（ADR-0033）
+ainer-module-workspace             Workspace membership 治理 + OWNER 转移 + 审计
+ainer-module-ai-runtime            模型网关（SSE/预算/费用审计）+ Agent 注册表（ADR-0043）
+ainer-module-authorization         ADR-0037 混合授权（决策器/管理 API/SubjectSet/ActingGrant）
+ainer-module-dictionary            树形字典（多语言/缓存/管理 API）
+ainer-module-config                动态配置（热更新/版本史/AES-GCM secret）
+ainer-module-notification          多渠道通知（ChannelSender 端口/SKIP LOCKED 队列）
+ainer-module-file                  文件存储（SHA-256/限制/补偿/审计）
+ainer-module-organization          组织目录（Incubating：Unit/任职/岗位/SubjectSet 解析器）
+ainer-module-knowledge             Knowledge Foundation（Incubating：不可变 Revision/人工发布）
+ainer-module-task                  任务调度（Incubating：SKIP LOCKED 队列/退避重试）
+
+── 发行物 ──
+ainer-server                       业务 Resource Server（全模块装配）
+ainer-authorization-server         OAuth 2.1/OIDC Authorization Server
 ainer-offstate-app                 P1 最小可消费应用（无外部服务冒烟）
-ainer-initializer                  P2 离线确定性生成内核（Manifest v1，ADR-0035）
-ainer-initializer-cli              P2 离线 CLI：preview / init / diff
+ainer-initializer                  P2 确定性生成内核（Manifest v1）
+ainer-initializer-cli              P2 CLI（preview / init / diff）
 ```
 
-业务模块内部按 feature 组织 `api -> application -> domain`，infrastructure 实现 application/domain 定义的端口。framework 不得反向依赖业务模块。
+模块内部分层：`api → application → domain`，`infrastructure` 实现端口。framework 不依赖
+业务模块；业务模块之间通过显式契约交互。
 
-## 5. 运行业务应用
-
-准备一个空 PostgreSQL 数据库。Flyway 会在启动时执行 Workspace 和 AI runtime migration。
-
-```bash
-export SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/ainer
-export SPRING_DATASOURCE_USERNAME=ainer
-export SPRING_DATASOURCE_PASSWORD='local-only-password'
-export AINER_SECURITY_ISSUER_URI=https://auth.local.example
-export AINER_SECURITY_AUDIENCES=ainer-api
-./mvnw -pl ainer-server -am spring-boot:run
-```
-
-默认端口由 Spring Boot 决定，当前为 `8080`。健康检查：
+## 5. 日常开发循环
 
 ```bash
-curl -i http://127.0.0.1:8080/actuator/health
-curl -i http://127.0.0.1:8080/api/platform/info
-```
+# 定向开发（只跑受影响模块 + 依赖）
+./mvnw -pl ainer-module-<name> -am test
 
-Resource Server 默认启用。`AINER_SECURITY_RESOURCE_SERVER_ENABLED=false` 只用于隔离的公开端点验证，不是业务 API 的本地免认证模式。
-
-## 6. 运行 Authorization Server
-
-Authorization Server 使用独立数据库和外部 RSA PEM 密钥。完整安全说明见 [`security.md`](security.md)。
-
-```bash
-export SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/ainer_auth
-export SPRING_DATASOURCE_USERNAME=ainer_auth
-export SPRING_DATASOURCE_PASSWORD='local-only-password'
-export AINER_AUTHORIZATION_SERVER_ISSUER=https://auth.local.example
-export AINER_AUTHORIZATION_SIGNING_KEY_ID=ainer-local-1
-export AINER_AUTHORIZATION_PRIVATE_KEY_LOCATION=file:/absolute/path/to/private.pem
-export AINER_AUTHORIZATION_PUBLIC_KEY_LOCATION=file:/absolute/path/to/public.pem
-./mvnw -pl ainer-authorization-server -am spring-boot:run
-```
-
-默认监听 `9000`。issuer 必须是显式 HTTPS URL；私钥不得提交到仓库。
-
-Ainer Admin 本地联调需要 `dev` profile 下显式创建 public client 与开发身份，并通过同源入口
-复用浏览器 cookie session。固定 URI、环境变量、SDK 生成和完整 PKCE/logout 流程见
-[`ainer-admin-integration.md`](ainer-admin-integration.md)；不要为本地联调开启全局 CORS。
-
-## 7. 日常开发循环
-
-优先运行受影响模块及其依赖：
-
-```bash
-./mvnw -pl ainer-module-workspace -am test
-./mvnw -pl ainer-module-identity -am test
-./mvnw -pl ainer-module-ai-runtime -am test
-```
-
-提交前运行完整验证：
-
-```bash
+# 全量验证（合并前必须通过）
 ./mvnw clean verify
-git diff --check
-git status --short
+
+# 检查测试结果
+./scripts/check-surefire-results.sh
+
+# 消费者兼容门禁（涉及公开契约变化时）
+./scripts/verify-maven-consumers.sh
+./scripts/verify-initializer-consumer.sh
 ```
 
-修改数据库时，还要核对 migration 重放；修改 HTTP 时验证真实状态码、响应体和 `X-Request-Id`；修改身份时至少覆盖无 Token、错误 audience、错误 `token_profile` 和权限不足。
+**提交纪律**：`type(scope): 中文描述`；保持用户已有改动不回滚；`git diff --check` 通过。
 
-## 8. 新增业务能力
+## 6. 新增业务模块
 
-1. 确定所属业务能力与数据所有者。
-2. 在 application/domain 中定义稳定输入、结果、错误码和端口。
-3. 编写领域或应用测试，先覆盖允许与拒绝路径。
-4. 在 infrastructure 中实现 MyBatis/MyBatis-Plus、远程服务或 provider adapter。
-5. 在 api 中映射 HTTP，不把 Controller DTO 直接传入领域层。
-6. 增加 ArchUnit 规则或扩展现有规则，保护依赖方向。
-7. 更新文档、配置字典、数据库手册和状态快照。
+参照 `ainer-module-file`（最简洁完整）或 `ainer-module-organization`（含组织关系）。
 
-跨模块同步查询通过显式契约；反向通知通过可靠事件。不得为了复用而注入另一个模块的 Service 实现或直接查询对方表。
+1. **创建模块骨架**：pom（parent `ainer-boot`）+ FeatureMarker + ModuleConfiguration
+2. **注册到 Reactor**：根 pom `<modules>` + `ainer-dependencies` BOM + `scripts/release-artifacts.txt`
+   + `ainer-server` pom & `@Import` + off-state 测试排除属性 + 发布计数脚本三处硬编码更新
+3. **数据层**：Flyway migration（`V<yyyyMMdd>HHmm__<name>_baseline.sql`）；UUIDv7 CHECK；
+   复合 FK 防跨 Workspace 引用；append-only 审计表
+4. **领域层**：record + 枚举 + 校验（值对象模式；不可变；构造器校验）
+5. **应用层**：Repository 端口 + ApplicationService（scope 强制 + 错误码 + 同事务审计）
+6. **基础设施**：Row + Mapper 接口 + XML（显式 SQL，`#{}` 绑定）+ Mybatis Repository 适配
+7. **API**：Controller + DTO record（不暴露 entity/Row）+ 真实 HTTP 状态码
+8. **测试**：服务层集成（PG Testcontainers）+ 真 JWT HTTP（JwtTestSupport）
+9. **文档**：database.md 表清单 + 00-overview 模块树 + project-status 记录
 
-### 7.1 持久化开发
+### 关键模式（必须遵守）
 
-- 简单、单表且资源归属键清晰、等效的 CRUD/分页可以只在 infrastructure Mapper 使用
-  `BaseMapper`、Wrapper 与 MyBatis-Plus Page；Repository 端口不得暴露这些类型。
-- 复杂 PostgreSQL SQL、锁、CTE、`RETURNING`、审计和稳定游标继续写显式 Mapper
-  方法与 XML。现有 XML 不需要迁移。
-- Mapper XML 配置使用 `mybatis-plus.mapper-locations`；不要继续新增旧的
-  `mybatis.mapper-locations`。
-- 新增数据库生成 ID 的 Row 使用 `IdType.AUTO`，由 PostgreSQL `DEFAULT uuidv7()` 生成并
-  回填。不得使用 `ASSIGN_ID` / `ASSIGN_UUID`。
-- 无 tenant 拦截器；每个资源查询都必须显式绑定可信归属键（`workspace_id`/`account_id` 等）。
-  分页请求在 API 边界校验且最大单页 100。
-- 不默认使用 `IService`、`ServiceImpl`、ActiveRecord、逻辑删除或 MetaObject 自动填充。
-- 本轮没有引入 MyBatis-Plus 代码生成器；生成代码由 Project Initializer 的确定性
-  v1 模板提供（ADR-0035/ADR-0036）：manifest `entities` 触发 6 类 CRUD 模板文件，
-  主键走 PostgreSQL `DEFAULT uuidv7()` + `INSERT ... RETURNING id`，Mapper 只使用
-  `#{}` 绑定参数，生成物不含 `mybatis-plus-generator` 依赖。
+- **scope 检查**：应用服务内 `principal.hasScope("module.read")`（无 `SCOPE_` 前缀）
+- **错误码**：`AINER.<MODULE>.<ERROR>` 枚举 + 真实 HTTP 状态码
+- **时间精度**：PostgreSQL `timestamptz` 微秒精度——服务层时间入口统一
+  `truncatedTo(ChronoUnit.MICROS)`（Linux 纳秒时钟 + PG 截断会漂移）
+- **乐观锁**：CAS 返回 boolean，服务层失败抛 `CONCURRENT_MODIFICATION`（409）
+- **分页**：`page ≥ 1, 1 ≤ size ≤ 100`，越界 422 拒绝（不静默收敛）
+- **审计**：业务写成功**之后**写审计（REQUIRES_NEW 或同事务）
+- **注释**：中文（技术名词/类名/SQL/ADR 保留英文）
+- **跨测试隔离**：嵌套 `@TestConfiguration` / `@SpringBootConfiguration` 会泄漏——
+  所有测试 fixture bean 加 `@ConditionalOnProperty` 守卫
 
-完整规则见
-[ADR-0028](decisions/0028-mybatis-plus-infrastructure-baseline.md) 与
-[`database-design-standard.md`](database-design-standard.md)。
+## 7. 新增 Starter
 
-## 9. 新增 Starter
+1. `@AutoConfiguration` + `AutoConfiguration.imports`
+2. `@ConditionalOnMissingBean` 默认 Bean + 产品覆盖点
+3. `spring-configuration-metadata.json` 进消费者门禁
+4. 自动装配测试（含条件开/关正负例）
 
-- Starter 只封装通用装配，不放业务表、业务 DTO 或业务规则。
-- 使用 `@AutoConfiguration` 与 `AutoConfiguration.imports`。
-- 属性使用 `@ConfigurationProperties`，默认值必须安全。
-- 必须有启用、禁用、缺失依赖和错误配置测试。
-- 新依赖版本进入 `ainer-dependencies`，业务 POM 不单独写版本。
+## 8. 测试策略
 
-## 10. 完成定义
+| 层级 | 工具 | 要求 |
+|---|---|---|
+| 真实 JWT HTTP | `JwtTestSupport` + `RestTestClient` + PG Testcontainers | 401/403/201/409 全矩阵；真 RSA 验签链 |
+| 服务层集成 | PG Testcontainers | 不变量/并发/审计断言 |
+| 纯决策/领域 | JUnit + AssertJ | 无 Spring 上下文 |
 
-- 行为、错误和权限边界有自动化测试；
-- PostgreSQL 行为不使用 H2 代替；
-- 数据变更只通过新的 Flyway migration；
-- 配置、日志和错误不泄露秘密；
-- README、专题文档、ADR、状态和 Changelog 按影响更新；
-- 完整 Reactor 测试通过，并明确记录任何跳过项；
-- 没有无关文件或他人的修改被覆盖。
+**禁用**：H2、Mockito（仓内零依赖）、stub Principal（必须走真验签链）。
+
+完整规范见 [`testing.md`](testing.md)。
+
+## 9. 完成定义（Definition of Done）
+
+- [ ] 行为、错误和权限边界有自动化测试
+- [ ] PostgreSQL 行为不使用 H2 代替
+- [ ] 数据变更只通过新的 Flyway migration
+- [ ] 配置、日志和错误不泄露秘密
+- [ ] README、专题文档、ADR、状态和 Changelog 按影响更新
+- [ ] 注释使用中文（技术名词保留英文）
+- [ ] 完整 Reactor 测试通过（0 skipped）
+- [ ] `git diff --check` 通过
+- [ ] 没有无关文件或他人的修改被覆盖
+
+## 10. 参考消费者
+
+| 仓库 | 位置 | 用途 |
+|---|---|---|
+| `xq-platform-next` | `~/01-code/xq/xq-platform-next` | 完整升级链验证（rc.2→1.1.0 含回滚）；JWT/授权/SDK 纵向切片 |
+| `python-learning-service` | `/Users/xq/01-code/self/python-learning-service` | 冷仓接入验证（0.1.0→1.1.0）；Evidence 存档切片 |
+
+两者均通过版本化 BOM/Starter 消费远端制品，不含 Ainer 源码副本。
+
+## 11. 发布流程
+
+详见 [`releasing.md`](releasing.md)。摘要：
+
+1. 发布准备 PR（CHANGELOG + README + project-status 版本行）
+2. 合入 → dev CI 全绿 → annotated tag `v<version>` → release workflow
+3. 完整门禁：签名 deploy、全量制品远端读回验签、空仓消费者、Initializer 三通道、
+   SBOM/provenance、immutable Release
+4. 双消费者升级矩阵验证
+
+**注意**：GitHub Packages 私有仓库有存储配额（免费版 500MB，含 Actions 制品）。发布前
+确认配额充足；不足时清理旧版本或升级付费计划。

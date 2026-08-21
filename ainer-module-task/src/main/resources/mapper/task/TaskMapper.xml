@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.ainer.module.task.tasks.infrastructure.TaskMapper">
+
+    <resultMap id="DefinitionRowMap" type="dev.ainer.module.task.tasks.infrastructure.TaskDefinitionRow">
+        <id property="id" column="id"/>
+        <result property="taskType" column="task_type"/>
+        <result property="displayName" column="display_name"/>
+        <result property="handlerRef" column="handler_ref"/>
+        <result property="maxAttempts" column="max_attempts"/>
+        <result property="timeoutSeconds" column="timeout_seconds"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="JobRowMap" type="dev.ainer.module.task.tasks.infrastructure.TaskJobRow">
+        <id property="id" column="id"/>
+        <result property="taskType" column="task_type"/>
+        <result property="payloadJson" column="payload"/>
+        <result property="status" column="status"/>
+        <result property="attemptCount" column="attempt_count"/>
+        <result property="maxAttempts" column="max_attempts"/>
+        <result property="nextRunAt" column="next_run_at"/>
+        <result property="intervalSeconds" column="interval_seconds"/>
+        <result property="lockedBy" column="locked_by"/>
+        <result property="lockedAt" column="locked_at"/>
+        <result property="lastError" column="last_error"/>
+        <result property="createdByIssuer" column="created_by_issuer"/>
+        <result property="createdByType" column="created_by_type"/>
+        <result property="createdById" column="created_by_id"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="completedAt" column="completed_at"/>
+    </resultMap>
+
+    <insert id="insertDefinition">
+        INSERT INTO ainer_task_definition
+            (id, task_type, display_name, handler_ref, max_attempts, timeout_seconds,
+             status, created_at, updated_at)
+        VALUES
+            (#{id}, #{taskType}, #{displayName}, #{handlerRef}, #{maxAttempts},
+             #{timeoutSeconds}, #{status}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <select id="selectDefinitionByType" resultMap="DefinitionRowMap">
+        SELECT id, task_type, display_name, handler_ref, max_attempts, timeout_seconds,
+               status, created_at, updated_at
+        FROM ainer_task_definition WHERE task_type = #{taskType}
+    </select>
+
+    <select id="pageDefinitions" resultMap="DefinitionRowMap">
+        SELECT id, task_type, display_name, handler_ref, max_attempts, timeout_seconds,
+               status, created_at, updated_at
+        FROM ainer_task_definition
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countDefinitions" resultType="long">
+        SELECT count(*) FROM ainer_task_definition
+    </select>
+
+    <update id="updateDefinitionStatus">
+        UPDATE ainer_task_definition
+        SET status = #{status}, updated_at = #{now}
+        WHERE task_type = #{taskType}
+    </update>
+
+    <insert id="insertJob">
+        INSERT INTO ainer_task_job
+            (id, task_type, payload, status, attempt_count, max_attempts, next_run_at,
+             interval_seconds, created_by_issuer, created_by_type, created_by_id,
+             created_at, updated_at)
+        VALUES
+            (#{id}, #{taskType}, #{payloadJson}::jsonb, #{status}, #{attemptCount},
+             #{maxAttempts}, #{nextRunAt}, #{intervalSeconds},
+             #{createdByIssuer}, #{createdByType}, #{createdById},
+             #{createdAt}, #{updatedAt})
+    </insert>
+
+    <select id="selectJob" resultMap="JobRowMap">
+        SELECT id, task_type, payload::text AS payload, status, attempt_count, max_attempts,
+               next_run_at, interval_seconds, locked_by, locked_at, last_error,
+               created_by_issuer, created_by_type, created_by_id,
+               created_at, updated_at, completed_at
+        FROM ainer_task_job WHERE id = #{id}
+    </select>
+
+    <select id="pageJobs" resultMap="JobRowMap">
+        SELECT id, task_type, payload::text AS payload, status, attempt_count, max_attempts,
+               next_run_at, interval_seconds, locked_by, locked_at, last_error,
+               created_by_issuer, created_by_type, created_by_id,
+               created_at, updated_at, completed_at
+        FROM ainer_task_job
+        <where>
+            <if test="status != null">status = #{status}</if>
+            <if test="taskType != null">
+                <if test="status != null">AND</if>
+                task_type = #{taskType}
+            </if>
+        </where>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countJobs" resultType="long">
+        SELECT count(*) FROM ainer_task_job
+        <where>
+            <if test="status != null">status = #{status}</if>
+            <if test="taskType != null">
+                <if test="status != null">AND</if>
+                task_type = #{taskType}
+            </if>
+        </where>
+    </select>
+
+    <update id="completeJob">
+        UPDATE ainer_task_job
+        SET status = #{status}, last_error = #{lastError},
+            next_run_at = COALESCE(#{nextRunAt}, next_run_at),
+            updated_at = #{now},
+            completed_at = CASE WHEN #{status} IN ('SUCCEEDED','EXHAUSTED','CANCELLED')
+                               THEN #{now} ELSE completed_at END
+        WHERE id = #{id}
+    </update>
+
+    <update id="cancelJob">
+        UPDATE ainer_task_job
+        SET status = 'CANCELLED', completed_at = #{now}, updated_at = #{now}
+        WHERE id = #{id} AND status = 'PENDING'
+    </update>
+
+    <update id="retryJob">
+        UPDATE ainer_task_job
+        SET status = 'PENDING', next_run_at = #{nextRunAt}, updated_at = #{now}
+        WHERE id = #{id} AND status IN ('FAILED', 'EXHAUSTED')
+    </update>
+
+    <update id="resetZombieRunning">
+        UPDATE ainer_task_job
+        SET status = 'PENDING', locked_by = NULL, locked_at = NULL, updated_at = #{now}
+        WHERE status = 'RUNNING' AND locked_at &lt; #{cutoff}
+    </update>
+
+    <insert id="insertAudit">
+        INSERT INTO ainer_task_audit
+            (id, job_id, event, attempt, actor_issuer, actor_type, actor_id, detail, occurred_at)
+        VALUES
+            (#{id}, #{jobId}, #{event}, #{attempt}, #{actorIssuer}, #{actorType},
+             #{actorId}, #{detail}, #{occurredAt})
+    </insert>
+</mapper>

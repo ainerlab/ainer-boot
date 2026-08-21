@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "ainer.organization.enabled=false",
                 "ainer.ai.agents.enabled=false",
                 "ainer.knowledge.enabled=false",
+                "ainer.task.enabled=false",
                 "ainer.security.resource-server.enabled=true",
                 "management.endpoints.web.base-path=/management",
                 "spring.flyway.enabled=false",

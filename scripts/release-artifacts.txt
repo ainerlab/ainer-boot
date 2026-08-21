@@ -24,3 +24,4 @@ ainer-authorization-server jar -
 ainer-offstate-app jar -
 ainer-initializer jar -
 ainer-initializer-cli jar cli
+ainer-module-task jar -
