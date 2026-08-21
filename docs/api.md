@@ -1,6 +1,6 @@
 # Ainer HTTP API 契约
 
-> 文档类型：接口基线 · 状态：生效 · 最近核对：2026-08-07 · 适用版本：`0.1.x`
+> 文档类型：接口基线 · 状态：生效 · 最近核对：2026-08-21 · 适用版本：`1.1.x`
 
 本文记录当前 HTTP 契约和兼容规则。Ainer Admin 的机器可读子集位于
 `ainer-authorization-server/src/main/openapi/ainer-admin-v1.yaml`，由固定 Maven profile
