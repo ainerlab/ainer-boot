@@ -60,6 +60,10 @@
             <artifactId>ainer-module-knowledge</artifactId>
         </dependency>
         <dependency>
+            <groupId>dev.ainer</groupId>
+            <artifactId>ainer-module-task</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>

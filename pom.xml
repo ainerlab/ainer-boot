@@ -33,6 +33,7 @@
         <module>ainer-module-file</module>
         <module>ainer-module-organization</module>
         <module>ainer-module-knowledge</module>
+        <module>ainer-module-task</module>
         <module>ainer-server</module>
         <module>ainer-authorization-server</module>
         <module>ainer-offstate-app</module>
