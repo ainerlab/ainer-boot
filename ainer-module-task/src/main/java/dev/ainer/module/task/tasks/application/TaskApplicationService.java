@@ -6,6 +6,8 @@ import dev.ainer.core.uuid.Uuidv7;
 import dev.ainer.module.task.tasks.domain.TaskAudit;
 import dev.ainer.module.task.tasks.domain.TaskDefinition;
 import dev.ainer.module.task.tasks.domain.TaskJob;
+
+import java.util.UUID;
 import dev.ainer.security.token.AuthenticatedPrincipal;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
