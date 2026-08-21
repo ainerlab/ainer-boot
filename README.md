@@ -38,13 +38,17 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 
 当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
 
-[`v1.0.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.0.0) 是 **1.0 产品合同定稿**
-版本：ADR-0040 Stable/Incubating 清单逐项核对通过，G0–G4 门禁全部关闭；自 `0.2.0` 起零代码
-差异，使 1.x 兼容承诺（HTTP API/错误码/SPI/migration 只向前追加）正式生效。`1.0.x` 为首个
-LTS 线（ADR-0045/0046）。双参考消费者并存：`xq-platform-next`（`rc.2 → rc.3 → 0.1.0 →
-0.2.0` 含回滚）与 `python-learning-service`（`0.1.0 → 0.2.0` 冷仓接入 + Evidence 存档切片）。
-[`v0.2.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v0.2.0) 及更早版本保持不可变，
-作为升级链历史。完整产品说明（能力域、合同、质量模型与快速开始）见
+[`v1.1.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.1.0) 是当前稳定版本：
+商业级代码评审（PR #24–#27）的首次制品发布——安全 5 项（starter 默认 fail-closed、
+SubjectSet 跨工作区提权、决策审计接线等）+ 正确性 6 项（CAS 静默失效、审计顺序、分页
+越界等）+ 加性 API（引擎生产路径激活、OpenAPI 运行时文档、Knowledge 负载可读）。
+全部为加性变更与缺陷修复，无 schema 变化；`1.0.x` 作为 LTS 补丁线继续受支持（ADR-0045/0046）。
+双参考消费者并存：`xq-platform-next`（`rc.2 → … → 1.0.0` 完整升级链含回滚）与
+`python-learning-service`（`0.1.0 → 1.0.0` 冷仓接入）。
+[`v1.0.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.0.0) 保持不可变，作为
+1.1.0 的升级起点与 `1.0.x` LTS 线的基线。
+
+完整产品说明（能力域、合同、质量模型与快速开始）见
 [`docs/ainer-boot-1.0-product.md`](docs/ainer-boot-1.0-product.md)；动态门禁只以
 [`docs/project-status.md`](docs/project-status.md) 为准。
 
