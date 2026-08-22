@@ -99,6 +99,7 @@ ainer-initializer-cli                 P2 离线 CLI：preview / init / diff
 | 文档类型 | 回答的问题 | 权威文档 | 更新方式 |
 |---|---|---|---|
 | 产品入口 | Ainer 是什么，如何快速运行 | [`../README.md`](../README.md) | 用户可见能力变化时更新 |
+| 商业文档 | 为什么值得采购；分层/交付/销售物料 | [`commercial/`](commercial/README.md) | 能力发布或商业决策变化时更新 |
 | 交接文档 | 接手项目所需的全部入口：定位、状态、架构速查、常见坑、待办 | [`handoff.md`](handoff.md) | 里程碑或重大变化时更新 |
 | 1.0 产品说明 | 1.0 合同快照：能力域、合同、质量模型、版本支持与快速开始 | [`ainer-boot-1.0-product.md`](ainer-boot-1.0-product.md) | 1.0 快照不滚动；能力变化走 CHANGELOG |
 | 当前状态 | 现在完成了什么、验证结果和缺口是什么 | [`project-status.md`](project-status.md) | 每个里程碑、发布候选或风险变化时更新 |
@@ -284,6 +285,16 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 | [`design/organization-workforce-architecture-plan.md`](design/organization-workforce-architecture-plan.md) | 部门、员工任职、岗位、团队及 SubjectSet 授权集成详细方案（Proposed） |
 | [`design/ai-runtime-data-model.md`](design/ai-runtime-data-model.md) | Run、Invocation、Artifact 与业务结果的候选边界 |
 | [`design/knowledge-data-model.md`](design/knowledge-data-model.md) | Knowledge revision、chunk、索引代际与检索授权提案 |
+
+### 商业文档
+
+| 文档 | 作用 |
+|---|---|
+| [`commercial/README.md`](commercial/README.md) | 对外商业文档套件索引：阅读顺序、买家画像、待定商业决策清单 |
+| [`commercial/product-whitepaper.md`](commercial/product-whitepaper.md) | 产品白皮书（对外）：定位、问题论证、能力域价值、信任证据链、交付形态 |
+| [`commercial/edition-tiers.md`](commercial/edition-tiers.md) | 版本分层框架草案（Community/Pro/Enterprise 边界，基于能力矩阵推导） |
+| [`commercial/customer-delivery-guide.md`](commercial/customer-delivery-guide.md) | 客户交付指南：接入路径、验收基线、升级回滚、责任分界 |
+| [`commercial/sales-one-pager.md`](commercial/sales-one-pager.md) | 销售物料一页纸 |
 
 ### 运行、发布与迁移
 
