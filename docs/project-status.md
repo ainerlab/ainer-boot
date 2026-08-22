@@ -337,6 +337,12 @@ Ainer 项目签名 provenance 已通过。
   本机 Colima 需 `DOCKER_HOST=unix://~/.colima/default/docker.sock` +
   `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`）。全量 reactor 数字以
   下一次 `./mvnw clean verify` 为准。
+- **同日追加（评审遗留收口）**：决策审计统一执行 `AuditLevel.NONE` 过滤（过滤逻辑收口到
+  服务，未注册权限码 fail-safe 照常记录）；目录 upsert javadoc 对齐实际语义（跨启动定义漂移
+  为已知边界）；补 `ScopeRequestsTest` 5 项与决策审计过滤测试 3 项（授权模块 77→85）；
+  LivePath 测试装配移除无关的 Workspace/AiRuntime 模块导入（Clock 由授权模块自带，消除
+  bean 胜负依赖导入顺序）；平台权限清单留注风险分级为有意保守基线（HIGH 强度归产品决策）。
+  定向授权 85/0/0/0、server 14/0/0/0。
 
 2026-08-20 评审 follow-up 收口（M1/M2/M3 + L 系四项）
 - **M1**：管理 API 的 `buildScope` 拒绝保留 resourceType（`workspace.anchor`/`request`）——

@@ -222,11 +222,11 @@ class AinerServerAuthorizationLivePathTest {
     @EnableAutoConfiguration
     @org.springframework.context.annotation.Import({
             AinerServerAuthorizationPolicyConfiguration.class,
-            dev.ainer.module.workspace.WorkspaceModuleConfiguration.class,
-            dev.ainer.module.ai.AiRuntimeModuleConfiguration.class,
             dev.ainer.authorization.AuthorizationModuleConfiguration.class
     })
     static class TestApplication {
+
+        // Clock 由授权模块自带（authorizationClock），无需外部提供
 
         @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
                 name = "ainer.server.test-authz-live", havingValue = "true")

@@ -51,7 +51,14 @@ public class AinerServerAuthorizationPolicyConfiguration {
     /** 端点粗门禁的合成资源类型（与 AinerRequestAuthorizationManager#resolveResource 一致）。 */
     static final ResourceType REQUEST_RESOURCE = new ResourceType("request");
 
-    /** 平台 scope → 平台权限（恒等映射）：写入风险面标 MEDIUM，读取标 LOW。 */
+    /**
+     * 平台 scope → 平台权限（恒等映射）：写入风险面标 MEDIUM，读取标 LOW。
+     *
+     * <p>风险分级是有意保守的参考基线：全部 MEDIUM/LOW、不含 HIGH——HIGH 会触发
+     * CHALLENGE step-up 与「不得经集合授予」两道防线，哪些平台动作需要该强度属于产品
+     * 决策。产品部署应按自身敏感度重新分级（例如密钥管理、组织结构驱动授权的管理动作），
+     * 而非沿用本清单。
+     */
     private static final Set<PlatformPermission> PLATFORM_PERMISSIONS = Set.of(
             new PlatformPermission("workspace.read", false),
             new PlatformPermission("workspace.write", true),
