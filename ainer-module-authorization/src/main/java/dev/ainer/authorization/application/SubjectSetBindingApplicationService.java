@@ -61,6 +61,14 @@ public class SubjectSetBindingApplicationService {
         return bindingId;
     }
 
+    /** 创建立即生效的集合 Binding：生效时间由服务端时钟决定。 */
+    public UUID createSetBinding(
+            AuthenticatedPrincipal actor, SubjectSetRef set, UUID roleId, Scope scope,
+            @Nullable Instant validUntil, @Nullable String requestId, @Nullable String traceId) {
+        return createSetBinding(actor, set, roleId, scope,
+                Instant.now(clock), validUntil, requestId, traceId);
+    }
+
     public void revokeSetBinding(
             AuthenticatedPrincipal actor, UUID bindingId, @Nullable String reason,
             @Nullable String requestId, @Nullable String traceId) {

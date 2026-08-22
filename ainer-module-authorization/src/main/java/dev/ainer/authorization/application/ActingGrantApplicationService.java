@@ -104,6 +104,15 @@ public class ActingGrantApplicationService {
         return grantId;
     }
 
+    /** 签发立即生效的单层授权：生效时间由服务端时钟决定。 */
+    public UUID issueGrant(
+            AuthenticatedPrincipal actor, SubjectRef principal, UUID agentId, String agentVersion,
+            Set<PermissionCode> permissions, Scope scope,
+            @Nullable Instant validUntil, @Nullable String requestId) {
+        return issueGrant(actor, principal, agentId, agentVersion, permissions, scope,
+                Instant.now(clock), validUntil, requestId);
+    }
+
     public void revokeGrant(
             AuthenticatedPrincipal actor, UUID grantId, @Nullable String reason,
             @Nullable String requestId) {
