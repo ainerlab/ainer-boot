@@ -31,9 +31,6 @@ public interface TaskRepository {
 
     long countJobs(@Nullable String status, @Nullable String taskType);
 
-    /** SKIP LOCKED 领取到期的 PENDING 任务。 */
-    List<TaskJob> claimReadyJobs(String lockedBy, int batchSize, Instant now);
-
     boolean completeJob(UUID id, String status, @Nullable String lastError,
             @Nullable Instant nextRunAt, Instant now);
 
@@ -41,7 +38,11 @@ public interface TaskRepository {
 
     boolean retryJob(UUID id, Instant nextRunAt, Instant now);
 
-    int resetZombieRunning(Instant cutoff, Instant now);
+    /**
+     * 僵尸清扫：把 {@code locked_at} 早于「定义 {@code timeout_seconds} × multiplier」的
+     * RUNNING 任务重置回 PENDING 并清空租约，返回重置行数。
+     */
+    int resetZombieRunning(Instant now, int multiplier);
 
     void insertAudit(dev.ainer.module.task.tasks.domain.TaskAudit audit);
 }

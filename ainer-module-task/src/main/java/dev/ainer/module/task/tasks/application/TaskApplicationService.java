@@ -8,6 +8,8 @@ import dev.ainer.module.task.tasks.domain.TaskDefinition;
 import dev.ainer.module.task.tasks.domain.TaskJob;
 
 import java.util.UUID;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import dev.ainer.security.token.AuthenticatedPrincipal;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -30,14 +32,17 @@ import java.util.regex.Pattern;
 public class TaskApplicationService {
 
     private static final int MAX_PAGE_SIZE = 100;
-    private static final Pattern SAFE_TASK_TYPE = Pattern.compile("[a-z][a-z0-9-]{2,127}");
+    private static final Pattern SAFE_TASK_TYPE = Pattern.compile("[a-z][a-z0-9.-]{2,127}");
 
     private final TaskRepository repository;
     private final Clock clock;
+    private final ObjectMapper objectMapper;
 
-    public TaskApplicationService(TaskRepository repository, Clock clock) {
+    public TaskApplicationService(
+            TaskRepository repository, Clock clock, ObjectMapper objectMapper) {
         this.repository = repository;
         this.clock = clock;
+        this.objectMapper = objectMapper;
     }
 
     // ------------------------------------------------------------------ 定义
@@ -70,8 +75,8 @@ public class TaskApplicationService {
         } catch (org.springframework.dao.DuplicateKeyException duplicate) {
             throw new BusinessException(TaskErrorCode.DUPLICATE_TASK_TYPE);
         }
-        audit(null, "PAUSED".equals(definition.status()) ? "PAUSED" : "SUBMITTED",
-                null, principal, now, "definition registered: " + normalizedType);
+        audit(null, "REGISTERED", null, principal, now,
+                "definition registered: " + normalizedType);
         return definition;
     }
 
@@ -91,11 +96,20 @@ public class TaskApplicationService {
         return repository.countDefinitions();
     }
 
+    /**
+     * 变更任务类型启停状态。目标状态只允许 {@code ACTIVE} / {@code PAUSED}，
+     * 其他取值一律 422 拒绝，不允许把未知值静默解释为恢复。
+     */
     @Transactional
     public TaskDefinition changeDefinitionStatus(
             AuthenticatedPrincipal principal, @Nullable String requestId,
-            String taskType, boolean pause) {
+            String taskType, String requestedStatus) {
         requireManage(principal);
+        if (!"ACTIVE".equalsIgnoreCase(requestedStatus)
+                && !"PAUSED".equalsIgnoreCase(requestedStatus)) {
+            throw new BusinessException(TaskErrorCode.INVALID_STATUS);
+        }
+        boolean pause = "PAUSED".equalsIgnoreCase(requestedStatus);
         TaskDefinition definition = repository.findDefinitionByType(taskType)
                 .orElseThrow(() -> new BusinessException(TaskErrorCode.DEFINITION_NOT_FOUND));
         String newStatus = pause ? "PAUSED" : "ACTIVE";
@@ -126,16 +140,7 @@ public class TaskApplicationService {
         if (!definition.active()) {
             throw new BusinessException(TaskErrorCode.DEFINITION_PAUSED);
         }
-        if (payloadJson == null || payloadJson.isBlank()) {
-            payloadJson = "{}";
-        }
-        payloadJson = payloadJson.strip();
-        if (!payloadJson.startsWith("{") || !payloadJson.endsWith("}")) {
-            throw new BusinessException(TaskErrorCode.INVALID_PAYLOAD);
-        }
-        if (payloadJson.length() > 65536) {
-            throw new BusinessException(TaskErrorCode.INVALID_PAYLOAD);
-        }
+        payloadJson = normalizePayload(payloadJson);
         long delay = delaySeconds == null ? 0 : delaySeconds;
         if (delay < 0) {
             throw new BusinessException(TaskErrorCode.INVALID_INTERVAL);
@@ -217,6 +222,31 @@ public class TaskApplicationService {
     }
 
     // ------------------------------------------------------------------ 辅助
+
+    /**
+     * payload 规范化：空值归一为 {@code {}}；必须是 Jackson 可解析的 JSON 对象且不超过
+     * 64 KB，否则 422。避免非法 JSON 穿透到 JSONB 转换变成 500。
+     */
+    private String normalizePayload(@Nullable String payloadJson) {
+        if (payloadJson == null || payloadJson.isBlank()) {
+            return "{}";
+        }
+        String stripped = payloadJson.strip();
+        if (stripped.length() > 65536) {
+            throw new BusinessException(TaskErrorCode.INVALID_PAYLOAD);
+        }
+        try {
+            JsonNode tree = objectMapper.readTree(stripped);
+            if (tree == null || !tree.isObject()) {
+                throw new BusinessException(TaskErrorCode.INVALID_PAYLOAD);
+            }
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException(TaskErrorCode.INVALID_PAYLOAD);
+        }
+        return stripped;
+    }
 
     private void audit(@Nullable UUID jobId, String event, @Nullable Integer attempt,
             AuthenticatedPrincipal principal, Instant at, @Nullable String detail) {

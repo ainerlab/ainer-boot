@@ -1,5 +1,5 @@
--- Task scheduling module baseline (ADR-0047): delayed/periodic execution with
--- SKIP LOCKED queue claiming, exponential backoff retry, and append-only audit.
+-- 任务调度模块基线（ADR-0047）：延迟/周期执行、SKIP LOCKED 队列领取、指数退避重试与
+-- append-only 审计。
 
 CREATE TABLE ainer_task_definition (
     id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -46,9 +46,12 @@ CREATE TABLE ainer_task_job (
         FOREIGN KEY (task_type) REFERENCES ainer_task_definition (task_type)
 );
 
--- SKIP LOCKED 领取索引：只取到期 PENDING
+-- SKIP LOCKED 领取索引：到期 PENDING 与退避到期 FAILED
 CREATE INDEX idx_ainer_task_job_ready
     ON ainer_task_job (next_run_at) WHERE status = 'PENDING';
+
+CREATE INDEX idx_ainer_task_job_retry_ready
+    ON ainer_task_job (next_run_at) WHERE status = 'FAILED';
 
 CREATE INDEX idx_ainer_task_job_status_type
     ON ainer_task_job (status, task_type, created_at DESC);
@@ -58,7 +61,7 @@ CREATE INDEX idx_ainer_task_job_locked
 
 CREATE TABLE ainer_task_audit (
     id UUID PRIMARY KEY DEFAULT uuidv7(),
-    job_id UUID NOT NULL,
+    job_id UUID NULL,  -- 定义级事件（REGISTERED/PAUSED/RESUMED）无 job
     event VARCHAR(32) NOT NULL,
     attempt INT,
     actor_issuer VARCHAR(256),
@@ -68,8 +71,8 @@ CREATE TABLE ainer_task_audit (
     occurred_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT ck_ainer_task_audit_id_v7 CHECK (uuid_extract_version(id) = 7),
     CONSTRAINT ck_ainer_task_audit_event CHECK (event IN
-        ('SUBMITTED', 'CLAIMED', 'SUCCEEDED', 'FAILED', 'RETRY_SCHEDULED',
-         'EXHAUSTED', 'CANCELLED', 'PAUSED', 'RESUMED')),
+        ('REGISTERED', 'SUBMITTED', 'CLAIMED', 'SUCCEEDED', 'FAILED',
+         'RETRY_SCHEDULED', 'EXHAUSTED', 'CANCELLED', 'PAUSED', 'RESUMED')),
     CONSTRAINT ck_ainer_task_audit_actor CHECK (actor_type IS NULL OR actor_type IN ('USER', 'SERVICE')),
     CONSTRAINT fk_ainer_task_audit_job
         FOREIGN KEY (job_id) REFERENCES ainer_task_job (id)

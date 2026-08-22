@@ -115,14 +115,17 @@
         </where>
     </select>
 
+    <!-- 状态收口只允许从 RUNNING 迁移（CAS）：迟到的执行结果/超时看门狗竞争落败方更新 0 行 -->
     <update id="completeJob">
         UPDATE ainer_task_job
         SET status = #{status}, last_error = #{lastError},
             next_run_at = COALESCE(#{nextRunAt}, next_run_at),
+            locked_by = NULL,
+            locked_at = NULL,
             updated_at = #{now},
             completed_at = CASE WHEN #{status} IN ('SUCCEEDED','EXHAUSTED','CANCELLED')
                                THEN #{now} ELSE completed_at END
-        WHERE id = #{id}
+        WHERE id = #{id} AND status = 'RUNNING'
     </update>
 
     <update id="cancelJob">
@@ -137,10 +140,15 @@
         WHERE id = #{id} AND status IN ('FAILED', 'EXHAUSTED')
     </update>
 
+    <!-- 僵尸清扫：locked_at 早于「定义 timeout_seconds × multiplier」的 RUNNING 重置回 PENDING；
+         时间运算使用数据库时钟（now()），attempt_count 不回退（僵尸消耗一次尝试），由审计与日志可观测 -->
     <update id="resetZombieRunning">
-        UPDATE ainer_task_job
+        UPDATE ainer_task_job j
         SET status = 'PENDING', locked_by = NULL, locked_at = NULL, updated_at = #{now}
-        WHERE status = 'RUNNING' AND locked_at &lt; #{cutoff}
+        FROM ainer_task_definition d
+        WHERE j.task_type = d.task_type
+          AND j.status = 'RUNNING'
+          AND j.locked_at &lt; now() - make_interval(secs =&gt; d.timeout_seconds * #{multiplier})
     </update>
 
     <insert id="insertAudit">
