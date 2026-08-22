@@ -295,6 +295,7 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 | [`commercial/edition-tiers.md`](commercial/edition-tiers.md) | 版本分层框架草案（Community/Pro/Enterprise 边界，基于能力矩阵推导） |
 | [`commercial/customer-delivery-guide.md`](commercial/customer-delivery-guide.md) | 客户交付指南：接入路径、验收基线、升级回滚、责任分界 |
 | [`commercial/sales-one-pager.md`](commercial/sales-one-pager.md) | 销售物料一页纸 |
+| [`commercial/gap-analysis-and-next-steps.md`](commercial/gap-analysis-and-next-steps.md) | 可售性差距分析与发展路线建议（非权威，供排期讨论） |
 
 ### 运行、发布与迁移
 

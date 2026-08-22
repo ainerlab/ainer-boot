@@ -18,6 +18,7 @@
 2. [`edition-tiers.md`](edition-tiers.md) —— 版本分层框架草案（Community / Pro / Enterprise 能力边界）
 3. [`customer-delivery-guide.md`](customer-delivery-guide.md) —— 客户交付文档套件（接入、验收、运维交接的客户视角重组）
 4. [`sales-one-pager.md`](sales-one-pager.md) —— 销售物料一页纸
+5. [`gap-analysis-and-next-steps.md`](gap-analysis-and-next-steps.md) —— 可售性差距分析与发展路线建议（内部讨论用）
 
 ## 目标买家画像
 
