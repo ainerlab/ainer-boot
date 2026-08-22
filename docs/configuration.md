@@ -268,12 +268,13 @@ Prometheus registry 已随两个可执行发行物引入，但仓库没有部署
 缺 scope、任意持 scope 的未登记 SERVICE 均返回 403。端点与防提权错误语义见 [`api.md`](api.md) §8。
 
 参考装配（`ainer-server`）通过 `ainer.authorization.trusted-managers` 提供白名单的 YAML 形式：
-逗号分隔的 `<issuer>|<subjectId>` 复合键条目（例如
-`https://issuer.example|platform-ops`）。issuer 与主体必须成对声明，防止单一 issuer 部署演进为
-多 issuer 后同名 sub 被误信；不含 `|` 分隔符的条目永不匹配（fail-closed）。缺省为空 = 拒绝一切
-管理操作。白名单只声明"谁可以管理"，可分配目录本身仍由代码注册的策略决定；被拒绝的管理尝试
-会持久化为对 `authorization.manage` 的 DENY 决策审计，审计写入失败时异常传播、请求失败关闭，
-不会在缺少审计的情况下继续处理。产品部署应以自己的策略 bean 取代该参考实现。
+逗号分隔条目，支持两种写法——`<issuer>|<subjectId>` 复合键（精确声明，推荐），或裸
+`<subjectId>`（1.1.0 兼容写法，自动绑定本部署 resource server 的 issuer，未配置 issuer 时
+该条目失效）。issuer 与主体成对生效，防止单一 issuer 部署演进为多 issuer 后同名 sub 被
+误信。缺省为空 = 拒绝一切管理操作。白名单只声明"谁可以管理"，可分配目录本身仍由代码注册的
+策略决定；被拒绝的管理尝试会持久化为对 `authorization.manage` 的 DENY 决策审计，审计写入
+失败时异常传播、请求失败关闭，不会在缺少审计的情况下继续处理。产品部署应以自己的策略 bean
+取代该参考实现。
 
 RSA 签名密钥、撤销 epoch 和在线 introspection 配置属于 Authorization Server（§5），
 不在通用授权模块配置范围内。
