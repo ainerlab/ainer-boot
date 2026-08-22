@@ -193,6 +193,10 @@ public enum WorkspaceErrorCode implements ErrorCode {
 
 - 测试名称描述行为，不描述方法实现。
 - 修复缺陷必须先增加可复现测试。
+- **后台线程/调度器/队列消费者类代码（如执行引擎、轮询器、outbox 投递）必须附带
+  引擎级集成测试（真实 PostgreSQL + 端到端生命周期）才能合入**——仅覆盖管理面/API 的
+  测试不构成此类模块的验证（2026-08-22 评审教训：任务引擎四个缺陷全部位于管理面测试
+  盲区）。
 - 重要 Starter、数据库适配、认证和 AI provider 需要失败路径测试。
 - AI provider 合约至少覆盖请求字段、Bearer header、非流式、SSE、最终 usage、usage fallback、超时/限流和错误脱敏。
 - AI 数据集成测试至少覆盖 migration、预算并发暴露、拒绝/失败审计和租户隔离。
@@ -205,3 +209,7 @@ public enum WorkspaceErrorCode implements ErrorCode {
 ## 12. Git
 
 提交格式：`type(scope): 中文描述`。一次提交只表达一个可审查的意图，禁止把格式化、重构和新功能混在一起。
+
+以上规范由 CI 的 `scripts/check-commit-discipline.sh` 强制执行（PR 与 dev push 均检查）：
+提交信息必须匹配类型前缀格式；**`docs:` 类型提交只允许修改文档路径**——混入代码的
+「文档提交」（如历史上 bdfaf83 的教训）会被直接拒绝。
