@@ -13,6 +13,7 @@ import dev.ainer.authorization.domain.ResourceType;
 import dev.ainer.authorization.domain.RiskTier;
 import dev.ainer.authorization.domain.Scope;
 import dev.ainer.authorization.domain.SubjectRef;
+import dev.ainer.authorization.domain.SubjectType;
 import dev.ainer.authorization.policy.DomainAuthorizationPolicy;
 import dev.ainer.authorization.policy.GrantAdministrationPolicy;
 import dev.ainer.authorization.policy.ScopePermissionCeiling;
@@ -24,6 +25,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -36,8 +38,9 @@ import java.util.Set;
  * 的恒等天花板与 BINDING_REQUIRED 领域策略，并同步目录投影供管理 API 创建 Role/Binding。
  * 产品部署应以自己的领域策略覆盖或取代本参考实现。
  *
- * <p>管理面 fail-closed：{@code ainer.authorization.trusted-managers}（逗号分隔的 SERVICE
- * sub 白名单）为空时，一切授权管理操作拒绝——与组织模块 trusted-issuer 的缺省语义一致。
+ * <p>管理面 fail-closed：{@code ainer.authorization.trusted-managers}（逗号分隔的
+ * {@code <issuer>|<sub>} 复合键白名单）为空时，一切授权管理操作拒绝——与组织模块
+ * trusted-issuer 的缺省语义一致。
  */
 @Configuration(proxyBeanMethods = false)
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
@@ -66,6 +69,9 @@ public class AinerServerAuthorizationPolicyConfiguration {
             new PlatformPermission("organization.manage", true),
             new PlatformPermission("knowledge.read", false),
             new PlatformPermission("knowledge.manage", true),
+            new PlatformPermission("task.read", false),
+            new PlatformPermission("task.submit", true),
+            new PlatformPermission("task.manage", true),
             new PlatformPermission("ai.invoke", true),
             new PlatformPermission("ai.agents.manage", true));
 
@@ -106,7 +112,7 @@ public class AinerServerAuthorizationPolicyConfiguration {
 
     /** 平台权限走 BINDING_REQUIRED：主体必须持有授予该权限的 live Binding；状态检查恒真。 */
     @Bean
-    dev.ainer.authorization.policy.DomainAuthorizationPolicy ainerServerDomainPolicy() {
+    DomainAuthorizationPolicy ainerServerDomainPolicy() {
         return new DomainAuthorizationPolicy() {
             @Override
             public GrantPath pathFor(PermissionCode permission) {
@@ -142,14 +148,19 @@ public class AinerServerAuthorizationPolicyConfiguration {
     /**
      * 管理面白名单：只有配置声明的 SERVICE 主体（同时持 authorization.manage scope，
      * 由 GrantAdministrationGuard 强制）可以管理 Role/Binding。白名单为空时全部拒绝。
+     *
+     * <p>条目格式为 {@code <issuer>|<subjectId>} 复合键（与 configuration.md §7 的
+     * 「精确声明可信 issuer + sub」一致）：issuer 与主体成对声明，防止单一 issuer 部署
+     * 演进为多 issuer 后同名 sub 被误信。不含 {@code |} 分隔符的条目永不匹配（fail-closed）。
      */
     @Bean
     GrantAdministrationPolicy ainerServerGrantAdministrationPolicy(
             @Value("${ainer.authorization.trusted-managers:}") String trustedManagers) {
         Set<String> managers = new LinkedHashSet<>();
         for (String manager : trustedManagers.split(",")) {
-            if (!manager.isBlank()) {
-                managers.add(manager.strip());
+            String entry = manager.strip();
+            if (!entry.isEmpty() && entry.indexOf('|') > 0) {
+                managers.add(entry);
             }
         }
         return new GrantAdministrationPolicy() {
@@ -160,7 +171,8 @@ public class AinerServerAuthorizationPolicyConfiguration {
 
             @Override
             public boolean isTrustedManager(AuthenticatedPrincipal actor) {
-                return actor.isService() && managers.contains(actor.subjectId());
+                return actor.isService() && managers.contains(
+                        actor.authority().issuer() + "|" + actor.subjectId());
             }
 
             @Override
@@ -177,7 +189,7 @@ public class AinerServerAuthorizationPolicyConfiguration {
 
             @Override
             public boolean isTargetAssignable(AuthenticatedPrincipal actor, SubjectRef target) {
-                return target.type() == dev.ainer.authorization.domain.SubjectType.USER;
+                return target.type() == SubjectType.USER;
             }
         };
     }
@@ -186,11 +198,16 @@ public class AinerServerAuthorizationPolicyConfiguration {
      * 启动时把平台权限目录同步进 {@code ainer_authorization_permission} 管理投影（幂等
      * upsert）。决策权威是内存 PermissionRegistry；目录表只服务 Role 管理的外键与管理面
      * 查询——没有它，管理 API 创建 Role 会因外键失败。
+     *
+     * <p>同步源是容器内全部 {@link PermissionContributor} 的并集，与 PermissionRegistry
+     * 的内存权威同源：新增模块贡献者时目录自动跟进，不再依赖手工维护的硬编码清单。
      */
     @Bean
     ApplicationRunner ainerServerPermissionCatalogSync(
-            PermissionContributor contributor, PermissionCatalogRepository catalogRepository) {
-        return args -> contributor.contribute()
+            List<PermissionContributor> contributors,
+            PermissionCatalogRepository catalogRepository) {
+        return args -> contributors.stream()
+                .flatMap(contributor -> contributor.contribute().stream())
                 .forEach(permission -> catalogRepository.upsert(permission, "ainer-server"));
     }
 }
