@@ -285,7 +285,37 @@ subject 使用。
 
 模板变更同事务记录 `ainer_notification_audit`。错误码 `AINER.NOTIFICATION.*`。
 
-## 11. 兼容与变更
+## 11. 任务调度 API（ADR-0047）
+
+任务模块默认装配；scope 在应用服务内强制。`taskType` 全小写、以字母开头，可含数字/点/连字符。
+payload 必须是合法 JSON 对象且不超过 64 KB（否则 422 `AINER.TASK.INVALID_PAYLOAD`）。
+
+### 定义管理（`task.read` / `task.manage`）
+
+| Method | Path | Scope | 说明 |
+|---|---|---|---|
+| POST | `/api/tasks/definitions` | `task.manage` | 注册任务类型（201；409 `DUPLICATE_TASK_TYPE`） |
+| GET | `/api/tasks/definitions?page=&size=` | `task.read` | 分页（`size`≤100，越界 422） |
+| POST | `/api/tasks/definitions/{taskType}/status-changes` | `task.manage` | `{"status":"ACTIVE"\|"PAUSED"}`；其他取值 422 `INVALID_STATUS` |
+
+### 作业（`task.submit` 提交；读取/管理见 scope 列）
+
+| Method | Path | Scope | 说明 |
+|---|---|---|---|
+| POST | `/api/tasks/jobs` | `task.submit` | 提交作业：`delaySeconds` 延迟或 `intervalSeconds` 周期（201） |
+| GET | `/api/tasks/jobs/{id}` | `task.read` | 单个作业；不存在 404 |
+| GET | `/api/tasks/jobs?status=&taskType=&page=&size=` | `task.read` | 分页过滤 |
+| POST | `/api/tasks/jobs/{id}/cancellations` | `task.manage` | 取消 PENDING 作业；RUNNING/终态 409 |
+| POST | `/api/tasks/jobs/{id}/retries` | `task.manage` | 重试 FAILED/EXHAUSTED 作业；其余状态 409 |
+
+生命周期由执行引擎驱动：领取（RUNNING）→ 成功 SUCCEEDED 或退避 FAILED → 耗尽 EXHAUSTED；
+周期任务成功后回到 PENDING 并推进 `next_run_at`。超时按定义 `timeout_seconds` 由看门狗判 FAILED，
+不杀死执行线程——迟到的结果被丢弃，因此处理器必须幂等（at-least-once）。周期任务重试耗尽后
+进入终态 EXHAUSTED，需经 retries 端点人工恢复。SUBMITTED/CLAIMED/SUCCEEDED/RETRY_SCHEDULED/
+EXHAUSTED/CANCELLED/REGISTERED 等事件写入同事务或引擎侧 append-only 审计 `ainer_task_audit`；
+payload 正文不入库审计。错误码族 `AINER.TASK.*`。
+
+## 12. 兼容与变更
 
 - 新增可选响应字段通常向后兼容，客户端必须容忍未知字段；
 - 删除、改名、改变字段类型、收紧枚举或改变 status/error code 都需要发布说明；

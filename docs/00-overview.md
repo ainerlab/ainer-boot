@@ -67,6 +67,7 @@ ainer-server                          业务 Resource Server
 ├── ainer-module-file/                  # 文件存储（元数据/限制/审计，ADR-0040）
 ├── ainer-module-organization/         # 组织目录（Incubating：Unit/任职/岗位，ADR-0042）
 ├── ainer-module-knowledge/             # Knowledge Foundation（Incubating：不可变 Revision/人工发布门禁，ADR-0044）
+├── ainer-module-task/                  # 任务调度（Incubating：SKIP LOCKED 队列/退避重试，ADR-0047）
 ├── ainer-module-authorization        混合细粒度授权 + adapter + 审计（ADR-0037）
 ├── ainer-module-dictionary           树形字典 + 多语言 + Spring Cache（ADR-0040）
 ├── ainer-module-config               动态配置 + 类型安全 + 热更新 + 版本（ADR-0040）

@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-18 · 工程版本：`1.0.0`（已发布）；主线 `1.1.0` 发布中
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-22 · 工程版本：`1.0.0`（已发布）；主线 `1.1.0` 发布中
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -309,6 +309,34 @@ Ainer 项目签名 provenance 已通过。
   `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 
 ## 3. 最近验证记录
+
+2026-08-22 P4 任务调度引擎修复收口 + 商业级评审 follow-up（M5/分层/合规）
+- **P4 引擎（ainer-module-task）**：修复领取审计写入必然违反 v7 CHECK 的缺陷——领取、状态
+  迁移与 CLAIMED 审计合并为单条 CTE 语句（审计 ID 由数据库 `uuidv7()` 生成）；补齐 ADR-0047
+  §3 超时看门狗（按定义 timeout_seconds 判 FAILED，迟到结果由 `status='RUNNING'` CAS 丢弃，
+  at-least-once）；退避重试对象扩展到到期 FAILED 行；周期任务成功后回到 PENDING；僵尸清扫
+  改为每轮询执行并按「定义 timeout × 可配倍数」判定；引擎侧 SUCCEEDED/RETRY_SCHEDULED/
+  EXHAUSTED 生命周期审计；payload 以 Jackson 严格校验（非法 JSON 422 而非 500）；启停状态值
+  白名单（未知取值 422，不再静默解释为恢复）；移除说谎的 `claimReadyJobs` 端口方法。
+- **测试**：新增 `TaskEngineIntegrationTest` 6 项（成功/退避重试/无处理器耗尽/周期重置/超时/
+  僵尸，真实 PostgreSQL + 真 JWT HTTP 提交），`TaskHttpTest` 增至 9 项（补 INVALID_STATUS 与
+  非法 payload 契约）。task 模块 15/0/0/0。
+- **M5 授权生产路径 follow-up**：`trusted-managers` 升级为 `<issuer>|<subjectId>` 复合键
+  （缺省空仍 fail-closed，LivePath 测试同步）；守卫拒绝持久化为对 `authorization.manage` 的
+  DENY 决策审计（REQUIRES_NEW，审计失败阻断请求）；目录同步改为收集全部
+  `PermissionContributor` 并集；平台权限清单补入 task.read/task.submit/task.manage（18→21）；
+  LivePathTest 补 scope 天花板拦截负例与管理拒绝审计断言（5/0/0/0）。
+- **分层与合规**：`AuthorizationManagementController` 移除死依赖 roleRepository，scope 解析与
+  保留 resourceType 白名单下沉应用层 `ScopeRequests`，三个创建服务加性引入服务端时钟重载；
+  授权模块 77/0/0/0。2026-08-19 后新增英文注释全部中文化（knowledge/organization/task）。
+- **文档**：api.md §11 任务 API、configuration.md §7 白名单格式改写 + §8 任务配置键、
+  database.md 表前缀/migration 归属、README 能力表与工程结构、00-overview 模块图、
+  ADR-0047 增补实现校准节。knowledge baseline migration 的同分支修改（published_at 列）
+  属未发布序列内迭代，随本记录留痕；已应用过旧版本的本地库需 flyway repair 后再升级。
+- **验证**：授权模块 + ainer-server + task 模块定向全绿（含 Testcontainers 真实 PostgreSQL；
+  本机 Colima 需 `DOCKER_HOST=unix://~/.colima/default/docker.sock` +
+  `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`）。全量 reactor 数字以
+  下一次 `./mvnw clean verify` 为准。
 
 2026-08-20 评审 follow-up 收口（M1/M2/M3 + L 系四项）
 - **M1**：管理 API 的 `buildScope` 拒绝保留 resourceType（`workspace.anchor`/`request`）——

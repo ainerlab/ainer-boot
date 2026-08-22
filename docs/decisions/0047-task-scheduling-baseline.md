@@ -112,3 +112,20 @@ SKIP LOCKED + 退避模式但各自独立——不互相依赖。未来通知可
 - [ADR-0038（P4 范围）](0038-p4-scope-refinement-and-enterprise-base.md)
 - [ADR-0040（1.0 合同；P4 非目标）](0040-p3-enterprise-base-and-1.0-product-contract.md)
 - 通知模块 SKIP LOCKED 模式（ainer-module-notification）
+
+## 实现校准（2026-08-22，评审后落地记录）
+
+本节记录首次实现评审后的实现语义校准，不改变上述决策结论：
+
+- **派发键**：引擎按 `TaskHandler.taskType()`（即 `task_type`）派发；`handler_ref` 仅作为产品
+  自描述元数据存储，不参与派发，也不是 Spring bean 名解析入口。
+- **领取原子性**：SKIP LOCKED 领取、状态迁移与 CLAIMED 审计写入在同一条 SQL 语句内完成
+  （CTE），审计主键由数据库 `uuidv7()` 默认值生成。
+- **重试对象**：领取覆盖到期 PENDING 与退避到期（`next_run_at <= now`）的 FAILED 行；
+  周期任务成功后回到 PENDING 并推进 `next_run_at`，不进入终态。
+- **超时与僵尸**：看门狗按定义 `timeout_seconds` 把 RUNNING 判 FAILED（不杀线程，迟到结果由
+  `status='RUNNING'` 条件更新丢弃 → at-least-once，handler 必须幂等）；僵尸清扫每轮询执行，
+  判定 `locked_at < now() - timeout_seconds × ainer.task.engine.zombie-cutoff-multiplier`
+  （倍数可配、下限 2，替代本 ADR §3 原先写死的 ×2 与仅启动时清扫）。
+- **生命周期审计**：引擎侧 SUCCEEDED / RETRY_SCHEDULED / EXHAUSTED 写入审计
+  （actor 记录 system SERVICE + 引擎实例标识）；FAILED 事件保留给产品/后续切片使用。
