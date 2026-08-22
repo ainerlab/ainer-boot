@@ -39,7 +39,7 @@ subject、URL 或用户输入。
 
 | 发行物 | 逻辑数据库 | 所属 migration | 当前数据 |
 |---|---|---|---|
-| `ainer-server` | 业务库 `ainer` | Workspace（`V202608070310`）、AI runtime（`V202608070320`） | workspace、成员、授权审计热/归档、OWNER 恢复审计、AI invocation |
+| `ainer-server` | 业务库 `ainer` | Workspace（`V202608070310`）、AI runtime（`V202608070320`）、Authorization 模块（`V202608070340`）、Task（`V202608210100`）及 P3/Incubating 各模块 baseline | workspace、成员、授权审计热/归档、OWNER 恢复审计、AI invocation、授权目录/Binding/审计、任务定义/作业/审计 |
 | `ainer-authorization-server` | 身份库 `ainer_auth` | Identity（`V202608070300`）、OAuth authorization server（`V202608070330`） | HumanAccount、LoginIdentity、Credential、Profile、ServicePrincipal、client、authorization、consent、Passkey 协议/生命周期/恢复审计 |
 
 数据库名只是本地示例。生产可以改名，但两个发行物不得通过共享表形成隐式模块调用。未来拆服务时，每个模块保留自己的数据所有权，跨边界通过契约或可靠事件同步。
@@ -51,7 +51,8 @@ subject、URL 或用户输入。
 | `ainer_workspace*` | Workspace |
 | `ainer_ai_*` | AI runtime |
 | `ainer_identity_*` | Identity |
-| `ainer_authorization_*` | 通用授权（ADR-0030） |
+| `ainer_authorization_*` | 通用授权（ADR-0037） |
+| `ainer_task_*` | 任务调度（ADR-0047） |
 | `oauth2_*` | Authorization Server 协议存储 |
 | `ainer_oauth_*` | Authorization Server 的 Ainer-owned 生命周期与操作审计 |
 | `user_entities` / `user_credentials` | Spring Security WebAuthn 官方 JDBC 协议存储 |

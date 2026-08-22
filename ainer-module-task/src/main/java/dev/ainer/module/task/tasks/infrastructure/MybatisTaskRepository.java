@@ -97,13 +97,6 @@ public class MybatisTaskRepository implements TaskRepository {
     }
 
     @Override
-    public List<TaskJob> claimReadyJobs(String lockedBy, int batchSize, Instant now) {
-        // SKIP LOCKED 领取在 TaskExecutionEngine 的专用 SQL 中执行；此处为端口完整性
-        // 提供空实现（引擎直接使用 Mapper 的原生 SQL）。
-        return List.of();
-    }
-
-    @Override
     public boolean completeJob(UUID id, String status, @Nullable String lastError,
             @Nullable Instant nextRunAt, Instant now) {
         return mapper.completeJob(id, status, lastError, nextRunAt, now) == 1;
@@ -120,8 +113,8 @@ public class MybatisTaskRepository implements TaskRepository {
     }
 
     @Override
-    public int resetZombieRunning(Instant cutoff, Instant now) {
-        return mapper.resetZombieRunning(cutoff, now);
+    public int resetZombieRunning(Instant now, int multiplier) {
+        return mapper.resetZombieRunning(now, multiplier);
     }
 
     @Override

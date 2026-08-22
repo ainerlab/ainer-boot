@@ -66,6 +66,17 @@ public class SubjectBindingApplicationService {
     }
 
     /**
+     * 创建立即生效的新 Binding：生效时间由服务端时钟决定，调用方不再传入
+     * {@code Instant.now()}。
+     */
+    public UUID createBinding(
+            AuthenticatedPrincipal actor, SubjectRef subject, UUID roleId, Scope scope,
+            @Nullable Instant validUntil, @Nullable String requestId, @Nullable String traceId) {
+        return createBinding(actor, subject, roleId, scope,
+                Instant.now(clock), validUntil, requestId, traceId);
+    }
+
+    /**
      * 撤销 Binding（逻辑撤销，不是物理删除）。
      *
      * @throws BusinessException 当 Binding 属于操作者自身、不存在，或已被撤销时。

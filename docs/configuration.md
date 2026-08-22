@@ -265,13 +265,37 @@ Prometheus registry 已随两个可执行发行物引入，但仓库没有部署
 管理 API 端点（`/api/authorization/**`）要求 SERVICE principal + `authorization.manage` scope，
 并要求宿主提供唯一、代码注册且带版本的 `GrantAdministrationPolicy` bean，精确声明可信
 `issuer + sub`、assignable Permission/Scope/target。未提供时模块使用内建 deny-all 行为；Human、
-缺 scope、任意持 scope 的未登记 SERVICE 均返回 403。该策略刻意不提供 YAML 形式，避免通过漂移配置
-任意扩大授权目录。端点与防提权错误语义见 [`api.md`](api.md) §8。
+缺 scope、任意持 scope 的未登记 SERVICE 均返回 403。端点与防提权错误语义见 [`api.md`](api.md) §8。
+
+参考装配（`ainer-server`）通过 `ainer.authorization.trusted-managers` 提供白名单的 YAML 形式：
+逗号分隔的 `<issuer>|<subjectId>` 复合键条目（例如
+`https://issuer.example|platform-ops`）。issuer 与主体必须成对声明，防止单一 issuer 部署演进为
+多 issuer 后同名 sub 被误信；不含 `|` 分隔符的条目永不匹配（fail-closed）。缺省为空 = 拒绝一切
+管理操作。白名单只声明"谁可以管理"，可分配目录本身仍由代码注册的策略决定；被拒绝的管理尝试
+会持久化为对 `authorization.manage` 的 DENY 决策审计，审计写入失败时异常传播、请求失败关闭，
+不会在缺少审计的情况下继续处理。产品部署应以自己的策略 bean 取代该参考实现。
 
 RSA 签名密钥、撤销 epoch 和在线 introspection 配置属于 Authorization Server（§5），
 不在通用授权模块配置范围内。
 
-## 8. 新增配置检查表
+## 8. 任务调度模块（ADR-0047）
+
+`ainer.task.enabled`（默认 `true`）控制 `ainer-module-task` 的模块装配（定义/作业管理 API 与
+持久化）。执行引擎另有独立开关：
+
+| 键 | 默认 | 说明 |
+|---|---|---|
+| `ainer.task.engine.enabled` | `true` | 执行引擎开关；关闭后仅保留管理面，不轮询领取 |
+| `ainer.task.engine.poll-interval-ms` | `5000` | 轮询间隔，下限 100 |
+| `ainer.task.engine.batch-size` | `10` | 单次领取上限，1–100 |
+| `ainer.task.engine.retry-base-ms` | `10000` | 指数退避基数（`base × 2^(n-1)`），下限 1000 |
+| `ainer.task.engine.retry-max-ms` | `3600000` | 退避上限，不小于基数 |
+| `ainer.task.engine.zombie-cutoff-multiplier` | `3` | 僵尸 RUNNING 判定倍数（定义 `timeout_seconds × 倍数`），下限 2 |
+
+非法或缺失的键自动钳制到上述默认值。引擎按 `TaskHandler` 端口的 `taskType` 派发；超时语义、
+at-least-once 与幂等要求见 ADR-0047 §3。
+
+## 9. 新增配置检查表
 
 - 属性归属明确，并使用 `@ConfigurationProperties`；
 - 有安全默认值、边界验证和错误配置测试；

@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Clock;
@@ -19,6 +20,7 @@ import java.time.Clock;
 @ConditionalOnProperty(prefix = "ainer.task", name = "enabled", havingValue = "true", matchIfMissing = true)
 @ComponentScan(basePackageClasses = TaskFeatureMarker.class)
 @MapperScans(@MapperScan(basePackageClasses = TaskFeatureMarker.class, annotationClass = Mapper.class))
+@EnableConfigurationProperties(dev.ainer.module.task.tasks.application.TaskEngineProperties.class)
 public class TaskModuleConfiguration {
 
     @Bean

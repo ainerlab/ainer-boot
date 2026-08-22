@@ -27,8 +27,7 @@ import org.springframework.context.annotation.Import;
         OrganizationModuleConfiguration.class,
         AiAgentModuleConfiguration.class,
         KnowledgeModuleConfiguration.class,
-        TaskModuleConfiguration.class,
-        AinerServerAuthorizationPolicyConfiguration.class})
+        TaskModuleConfiguration.class})
 public class AinerServerApplication {
 
     public static void main(String[] args) {

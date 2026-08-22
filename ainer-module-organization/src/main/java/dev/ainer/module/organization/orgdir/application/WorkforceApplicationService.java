@@ -96,13 +96,13 @@ public class WorkforceApplicationService {
         try {
             repository.insertEngagement(engagement);
         } catch (DuplicateKeyException duplicate) {
-            // Unique-constraint races (employee number) surface as 23505.
+            // 工号唯一约束竞争以 23505 呈现。
             throw new BusinessException(isEmployeeNumberViolation(duplicate)
                     ? OrganizationErrorCode.DUPLICATE_EMPLOYEE_NUMBER
                     : OrganizationErrorCode.ENGAGEMENT_PERIOD_OVERLAP);
         } catch (org.springframework.dao.DataIntegrityViolationException integrity) {
-            // The tstzrange EXCLUDE constraint raises SQLState 23P01 (exclusion_violation), which
-            // Spring does not map to DuplicateKeyException — a concurrent overlap race lands here.
+            // tstzrange EXCLUDE 约束抛出 SQLState 23P01（exclusion_violation），Spring 不会把它
+            // 映射为 DuplicateKeyException——并发重叠竞争会落到这个分支。
             throw new BusinessException(isEmployeeNumberViolation(integrity)
                     ? OrganizationErrorCode.DUPLICATE_EMPLOYEE_NUMBER
                     : OrganizationErrorCode.ENGAGEMENT_PERIOD_OVERLAP);
@@ -154,7 +154,7 @@ public class WorkforceApplicationService {
         if (!repository.updateEngagementStatus(
                 engagementId, OrgStatus.SUSPENDED.name(), engagement.validUntil(),
                 engagement.version() + 1, now)) {
-            // Optimistic-lock CAS missed: the row changed concurrently — no state change and no audit.
+            // 乐观锁 CAS 未命中：行已被并发修改——不发生状态变更，也不写审计。
             throw new BusinessException(OrganizationErrorCode.CONCURRENT_MODIFICATION);
         }
         audit(principal, requestId, "ENGAGEMENT", engagementId, "SUSPENDED", now);
@@ -372,7 +372,7 @@ public class WorkforceApplicationService {
                 .orElseThrow(() -> new BusinessException(OrganizationErrorCode.ENGAGEMENT_NOT_FOUND));
     }
 
-    /** Distinguishes the employee-number unique constraint from the period EXCLUDE constraint. */
+    /** 区分工号唯一约束冲突与任职期 EXCLUDE 约束冲突。 */
     private static boolean isEmployeeNumberViolation(
             org.springframework.dao.DataIntegrityViolationException exception) {
         Throwable cause = exception;

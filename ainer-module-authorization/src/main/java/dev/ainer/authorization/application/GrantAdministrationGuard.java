@@ -21,7 +21,9 @@ import java.util.UUID;
  *
  * <p>控制器在管理读取时调用本守卫，应用层变更服务在事务边界再次调用。这保证直接调用
  * 服务也无法绕过防提权规则。除宿主的 {@link GrantAdministrationPolicy} 之外，硬性不变量
- * （非 GLOBAL、非 system-only、禁止自我修改）在这里统一强制。
+ * （非 GLOBAL、非 system-only、禁止自我修改）在这里统一强制。守卫拒绝会先写
+ * {@code REQUIRES_NEW} 决策审计（对 {@code authorization.manage} 的 DENY）再抛出，
+ * 使越权试探有持久化痕迹。
  */
 @Component
 public final class GrantAdministrationGuard {
@@ -31,14 +33,17 @@ public final class GrantAdministrationGuard {
     private final GrantAdministrationPolicy policy;
     private final PermissionRegistry permissionRegistry;
     private final SubjectBindingRepository bindingRepository;
+    private final ObjectProvider<AuthorizationDecisionAuditService> decisionAuditProvider;
 
     public GrantAdministrationGuard(
             ObjectProvider<GrantAdministrationPolicy> policyProvider,
             PermissionRegistry permissionRegistry,
-            SubjectBindingRepository bindingRepository) {
+            SubjectBindingRepository bindingRepository,
+            ObjectProvider<AuthorizationDecisionAuditService> decisionAuditProvider) {
         this.policy = policyProvider.getIfAvailable(GrantAdministrationGuard::denyAllPolicy);
         this.permissionRegistry = permissionRegistry;
         this.bindingRepository = bindingRepository;
+        this.decisionAuditProvider = decisionAuditProvider;
         if (policy.version() == null || policy.version().isBlank()) {
             throw new IllegalStateException("GrantAdministrationPolicy.version must be non-blank");
         }
@@ -46,12 +51,19 @@ public final class GrantAdministrationGuard {
 
     /** 要求 SERVICE 主体 + 管理 scope + 宿主注册的精确受信管理者。 */
     public void requireManager(AuthenticatedPrincipal actor) {
-        if (!actor.isService()
-                || !actor.principalSubjectRef().authority().equals(actor.authority())
-                || !actor.hasScope(MANAGE_SCOPE)
-                || !policy.isTrustedManager(actor)) {
-            throw new BusinessException(AuthorizationErrorCode.GRANT_ADMINISTRATION_DENIED);
+        if (actor.isService()
+                && actor.principalSubjectRef().authority().equals(actor.authority())
+                && actor.hasScope(MANAGE_SCOPE)
+                && policy.isTrustedManager(actor)) {
+            return;
         }
+        // 高价值授权决策持久化审计：fail-closed 防线被试探时留下 DENY 痕迹；
+        // 审计失败异常传播，不静默放行（REQUIRES_NEW 保证拒绝后仍存活）
+        AuthorizationDecisionAuditService decisionAudit = decisionAuditProvider.getIfAvailable();
+        if (decisionAudit != null) {
+            decisionAudit.recordManagementDenial(actor, policy.version(), null, null);
+        }
+        throw new BusinessException(AuthorizationErrorCode.GRANT_ADMINISTRATION_DENIED);
     }
 
     /** 按可分配目录校验新 Role 的完整权限集合。 */

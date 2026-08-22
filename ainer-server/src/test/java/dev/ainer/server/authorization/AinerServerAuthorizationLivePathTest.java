@@ -40,6 +40,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -57,7 +58,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         properties = {
                 "mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml",
                 "spring.main.banner-mode=off",
-                "ainer.authorization.trusted-managers=platform-ops",
+                "ainer.authorization.trusted-managers=https://auth.ainer.test|platform-ops",
                 "ainer.server.test-authz-live=true"
         })
 @AutoConfigureTestRestTemplate
@@ -141,7 +142,7 @@ class AinerServerAuthorizationLivePathTest {
         Integer synced = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ainer_authorization_permission WHERE source_module = 'ainer-server'",
                 Integer.class);
-        assertThat(synced).isEqualTo(18);
+        assertThat(synced).isEqualTo(21);
     }
 
     @Test
@@ -187,11 +188,31 @@ class AinerServerAuthorizationLivePathTest {
                 {"code": "rogue", "name": "Rogue", "permissions": ["workspace.read"]}
                 """);
         assertThat(response.status().value()).isEqualTo(403);
+        assertThat(response.jsonPath("$.code"))
+                .isEqualTo("AINER.AUTHORIZATION.GRANT_ADMINISTRATION_DENIED");
+
+        // 拒绝本身持久化为对 authorization.manage 的 DENY 决策审计（可告警、可回溯）
+        Integer denials = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_authorization_decision_audit "
+                        + "WHERE permission_code = 'authorization.manage' "
+                        + "AND outcome = 'DENY' AND requester_id = 'rogue-manager'",
+                Integer.class);
+        assertThat(denials).isEqualTo(1);
+    }
+
+    @Test
+    void scopeCeilingDeniesUnregisteredPermission() {
+        // 天花板拦截半边：仅持 workspace scope 的 USER 请求 organization.manage → DENY
+        assertThat(decideAsUser("platform-user-2", "organization.manage").outcome())
+                .isEqualTo(AuthorizationOutcome.DENY);
+        // 同主体请求清单内但未授 Binding 的权限同样 DENY（BINDING_REQUIRED）
+        assertThat(decideAsUser("platform-user-2", "workspace.read").outcome())
+                .isEqualTo(AuthorizationOutcome.DENY);
     }
 
     @Test
     void requestWithoutTokenIsUnauthorized() {
-        restTemplate.getRestTemplate().setInterceptors(java.util.List.of());
+        restTemplate.getRestTemplate().setInterceptors(List.of());
         ResponseEntity<String> response = restTemplate.getForEntity(
                 "http://localhost:" + port + "/api/authorization/permissions", String.class);
         assertThat(response.getStatusCode().value()).isEqualTo(401);
@@ -201,11 +222,11 @@ class AinerServerAuthorizationLivePathTest {
     @EnableAutoConfiguration
     @org.springframework.context.annotation.Import({
             AinerServerAuthorizationPolicyConfiguration.class,
-            dev.ainer.module.workspace.WorkspaceModuleConfiguration.class,
-            dev.ainer.module.ai.AiRuntimeModuleConfiguration.class,
             dev.ainer.authorization.AuthorizationModuleConfiguration.class
     })
     static class TestApplication {
+
+        // Clock 由授权模块自带（authorizationClock），无需外部提供
 
         @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
                 name = "ainer.server.test-authz-live", havingValue = "true")

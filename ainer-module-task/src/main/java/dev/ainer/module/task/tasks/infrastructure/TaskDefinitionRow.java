@@ -3,7 +3,7 @@ package dev.ainer.module.task.tasks.infrastructure;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Row for {@code ainer_task_definition}. */
+/** 持久化数据行：{@code ainer_task_definition}。 */
 public class TaskDefinitionRow {
     private UUID id;
     private String taskType;

@@ -26,7 +26,9 @@ class GrantAdministrationGuardTest {
         GrantAdministrationGuard guard = new GrantAdministrationGuard(
                 policies,
                 new PermissionRegistry(),
-                unusedBindingRepository());
+                unusedBindingRepository(),
+                new StaticListableBeanFactory()
+                        .getBeanProvider(AuthorizationDecisionAuditService.class));
         IdentityAuthorityRef authority = new IdentityAuthorityRef("https://auth.ainer.test");
         AuthenticatedPrincipal actor = new AuthenticatedPrincipal(
                 new ServiceSubjectRef(authority, "svc-management"),

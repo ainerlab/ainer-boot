@@ -33,6 +33,7 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 | `ainer-module-dictionary` / `ainer-module-config` / `ainer-module-notification` / `ainer-module-file` | ✅ | P3 企业基座四件套：管理 API、稳定错误码、scope、同事务审计（通知默认为日志发送器，真实渠道经 `ChannelSender` SPI 由产品实现） |
 | `ainer-module-organization` | ✅ Incubating | 组织目录：Unit/任职/分配/岗位 + `workforce.position#assignee` 成员解析（撤岗即失权，ADR-0042） |
 | `ainer-module-knowledge` | ✅ Incubating | Knowledge Foundation：不可变 Revision + SUPERSEDES 血缘 + 人工发布门禁（ADR-0044） |
+| `ainer-module-task` | ✅ Incubating | 任务调度：类型注册、延迟/周期执行、SKIP LOCKED 领取、指数退避、超时看门狗与管理 API（ADR-0047） |
 | `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、Workspace、AI Runtime、Authorization、P3 与 Incubating 模块装配 |
 | `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、typed token profile、RFC 7662/7009 与受审计 JDBC 协议仓库 |
 
@@ -173,6 +174,7 @@ ainer-boot/
 ├── ainer-module-workspace/
 ├── ainer-module-ai-runtime/
 ├── ainer-module-authorization/
+├── ainer-module-task/
 ├── ainer-server/
 ├── ainer-authorization-server/
 └── docs/

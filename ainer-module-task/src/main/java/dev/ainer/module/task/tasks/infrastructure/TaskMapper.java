@@ -39,7 +39,7 @@ public interface TaskMapper {
     int retryJob(@Param("id") UUID id, @Param("nextRunAt") Instant nextRunAt,
             @Param("now") Instant now);
 
-    int resetZombieRunning(@Param("cutoff") Instant cutoff, @Param("now") Instant now);
+    int resetZombieRunning(@Param("now") Instant now, @Param("multiplier") int multiplier);
 
     void insertAudit(@Param("id") UUID id, @Param("jobId") UUID jobId,
             @Param("event") String event, @Param("attempt") Integer attempt,

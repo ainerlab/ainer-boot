@@ -14,6 +14,7 @@ public enum TaskErrorCode implements ErrorCode {
     INVALID_TASK_TYPE("AINER.TASK.INVALID_TASK_TYPE", "任务类型标识不合法", 422),
     INVALID_PAYLOAD("AINER.TASK.INVALID_PAYLOAD", "任务载荷必须是合法 JSON 对象", 422),
     INVALID_INTERVAL("AINER.TASK.INVALID_INTERVAL", "周期间隔必须为正整数秒", 422),
+    INVALID_STATUS("AINER.TASK.INVALID_STATUS", "目标状态只允许 ACTIVE 或 PAUSED", 422),
     INVALID_PAGE("AINER.TASK.INVALID_PAGE", "分页参数不合法", 422);
 
     private final String code;

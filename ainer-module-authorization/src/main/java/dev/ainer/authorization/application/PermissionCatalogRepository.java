@@ -12,8 +12,11 @@ import java.util.Collection;
 public interface PermissionCatalogRepository {
 
     /**
-     * 把权限定义 upsert 到目录投影。若 code 已存在但定义不同，冲突会上抛给启动
-     * fail-closed 处理；完全相同的重复注册是幂等的。
+     * 把权限定义 upsert 到目录投影（{@code ON CONFLICT (code) DO UPDATE}，
+     * {@code definition_version} 递增）。完全相同的重复注册是幂等的；同批次内的同 code
+     * 定义冲突由内存态 {@link dev.ainer.authorization.catalog.PermissionRegistry} 在启动时
+     * fail-closed 拦截。已知边界：跨启动的定义漂移（已注册权限的元数据变更）会被投影
+     * 静默覆盖，不产生告警。
      */
     void upsert(Permission permission, String sourceModule);
 

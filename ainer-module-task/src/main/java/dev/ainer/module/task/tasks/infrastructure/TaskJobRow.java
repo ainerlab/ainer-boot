@@ -3,7 +3,7 @@ package dev.ainer.module.task.tasks.infrastructure;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Row for {@code ainer_task_job}. */
+/** 持久化数据行：{@code ainer_task_job}；{@code timeoutSeconds} 来自定义表的领取时快照。 */
 public class TaskJobRow {
 
     private UUID id;
@@ -23,6 +23,7 @@ public class TaskJobRow {
     private Instant createdAt;
     private Instant updatedAt;
     private Instant completedAt;
+    private Integer timeoutSeconds;
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
@@ -74,5 +75,8 @@ public class TaskJobRow {
 
     public Instant getCompletedAt() { return completedAt; }
     public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
+
+    public Integer getTimeoutSeconds() { return timeoutSeconds; }
+    public void setTimeoutSeconds(Integer timeoutSeconds) { this.timeoutSeconds = timeoutSeconds; }
 
 }
