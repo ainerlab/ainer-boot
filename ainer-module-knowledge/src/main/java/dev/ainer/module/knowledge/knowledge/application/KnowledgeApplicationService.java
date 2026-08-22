@@ -112,8 +112,8 @@ public class KnowledgeApplicationService {
         }
         Instant now = micros(clock.instant());
         UUID revisionId = Uuidv7.generate();
-        // Concurrent proposals race on (object_id, revision_number); the unique constraint is the
-        // arbiter — on conflict re-read the current max once instead of surfacing a 500.
+        // 并发提案会在 (object_id, revision_number) 上竞争；唯一约束是仲裁者——冲突时
+        // 重读一次当前最大版本号，而不是把竞态暴露为 500。
         KnowledgeRevision revision = insertWithRevisionNumberRetry(objectId, payloadMarkdown,
                 principal, now, safeSources, safeEvidence, revisionId);
         if (base != null) {
