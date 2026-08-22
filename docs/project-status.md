@@ -343,6 +343,11 @@ Ainer 项目签名 provenance 已通过。
   LivePath 测试装配移除无关的 Workspace/AiRuntime 模块导入（Clock 由授权模块自带，消除
   bean 胜负依赖导入顺序）；平台权限清单留注风险分级为有意保守基线（HIGH 强度归产品决策）。
   定向授权 85/0/0/0、server 14/0/0/0。
+- **同日追加（CHANGELOG 补账与配置兼容修正）**：发现 v1.1.0 发布时 CHANGELOG 未从
+  Unreleased 转正——补写 `[1.1.0]` 段（安全/修复/加性），本轮工作记入新 `[Unreleased]`；
+  `trusted-managers` 改为双格式兼容（`<issuer>|<sub>` 复合键精确采用，1.1.0 裸 sub 自动
+  绑定部署自身 issuer，匹配严格收紧、非破坏变更；畸形条目丢弃 fail-closed），解析逻辑
+  提取为可单测的静态方法并补 5 项测试（server 14→19）。
 
 2026-08-20 评审 follow-up 收口（M1/M2/M3 + L 系四项）
 - **M1**：管理 API 的 `buildScope` 拒绝保留 resourceType（`workspace.anchor`/`request`）——

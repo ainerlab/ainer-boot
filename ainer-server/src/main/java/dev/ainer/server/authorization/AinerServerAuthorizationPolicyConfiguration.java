@@ -156,20 +156,19 @@ public class AinerServerAuthorizationPolicyConfiguration {
      * 管理面白名单：只有配置声明的 SERVICE 主体（同时持 authorization.manage scope，
      * 由 GrantAdministrationGuard 强制）可以管理 Role/Binding。白名单为空时全部拒绝。
      *
-     * <p>条目格式为 {@code <issuer>|<subjectId>} 复合键（与 configuration.md §7 的
-     * 「精确声明可信 issuer + sub」一致）：issuer 与主体成对声明，防止单一 issuer 部署
-     * 演进为多 issuer 后同名 sub 被误信。不含 {@code |} 分隔符的条目永不匹配（fail-closed）。
+     * <p>条目格式（1.2 起双格式兼容，见 {@link #parseTrustedManagers}）：
+     * <ul>
+     *   <li>{@code <issuer>|<subjectId>} —— 精确 issuer+sub 复合键；</li>
+     *   <li>裸 {@code <subjectId>}（1.1.0 兼容）—— 绑定到本部署 resource server 的
+     *       issuer，语义严格强于 1.1.0 的 issuer 无关匹配。</li>
+     * </ul>
+     * 白名单为空或条目无法归一化时不匹配任何主体（fail-closed）。
      */
     @Bean
     GrantAdministrationPolicy ainerServerGrantAdministrationPolicy(
-            @Value("${ainer.authorization.trusted-managers:}") String trustedManagers) {
-        Set<String> managers = new LinkedHashSet<>();
-        for (String manager : trustedManagers.split(",")) {
-            String entry = manager.strip();
-            if (!entry.isEmpty() && entry.indexOf('|') > 0) {
-                managers.add(entry);
-            }
-        }
+            @Value("${ainer.authorization.trusted-managers:}") String trustedManagers,
+            @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri:}") String localIssuer) {
+        Set<String> managers = parseTrustedManagers(trustedManagers, localIssuer);
         return new GrantAdministrationPolicy() {
             @Override
             public String version() {
@@ -216,5 +215,28 @@ public class AinerServerAuthorizationPolicyConfiguration {
         return args -> contributors.stream()
                 .flatMap(contributor -> contributor.contribute().stream())
                 .forEach(permission -> catalogRepository.upsert(permission, "ainer-server"));
+    }
+
+    /**
+     * 解析白名单条目并归一化为 {@code issuer|sub} 集合。含 {@code |} 的条目按原样
+     * 采用；裸 sub 条目绑定 {@code fallbackIssuer}（本部署 resource server 的 issuer），
+     * 保持 1.1.0 裸 sub 写法兼容且匹配范围严格收紧。无法归一化的条目丢弃（fail-closed）。
+     */
+    static Set<String> parseTrustedManagers(String raw, String fallbackIssuer) {
+        Set<String> managers = new LinkedHashSet<>();
+        for (String entry : raw.split(",")) {
+            String normalized = entry.strip();
+            if (normalized.isEmpty()) {
+                continue;
+            }
+            int separator = normalized.indexOf('|');
+            if (separator > 0) {
+                managers.add(normalized);
+            } else if (separator < 0 && !fallbackIssuer.isBlank()) {
+                managers.add(fallbackIssuer + "|" + normalized);
+            }
+            // 以 | 开头（空 issuer 段）或无分隔符且无可用 issuer：丢弃，不产生可误配条目
+        }
+        return managers;
     }
 }

@@ -6,10 +6,57 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
-- **OpenAPI 运行时文档（兼容性验证通过）**：springdoc 3.1.0（Apache-2.0）经 BOM 管理并
-  装配于 `ainer-server`——`/v3/api-docs` 与 Swagger UI 默认受资源服务器安全链保护（未认证
-  401，真 JWT 放行）；全模块装配测试验证 OpenAPI JSON 覆盖各业务模块路径。业务模块与
-  消费者不强制依赖。
+- **任务调度模块 `ainer-module-task`（ADR-0047，Incubating）**：任务类型注册、延迟/周期
+  执行、PostgreSQL SKIP LOCKED 领取（领取与 CLAIMED 审计单条 CTE 原子完成）、指数退避重试、
+  按定义 `timeout_seconds` 的超时看门狗（at-least-once，handler 需幂等）、每轮询僵尸清扫与
+  引擎侧生命周期审计；管理 API `/api/tasks/**`（`task.read`/`task.manage`/`task.submit`，
+  错误码 `AINER.TASK.*`）。含真实 PostgreSQL 引擎集成测试。
+
+### Security
+
+- 授权管理守卫拒绝时持久化为对 `authorization.manage` 的 DENY 决策审计
+  （`REQUIRES_NEW`，审计失败阻断请求）。
+- `ainer.authorization.trusted-managers` 白名单升级为 issuer 绑定匹配：`<issuer>|<sub>`
+  复合键精确采用；1.1.0 裸 `<sub>` 写法继续兼容，自动绑定本部署 resource server 的
+  issuer（匹配范围较 1.1.0 严格收紧，非破坏变更）。缺省空仍为拒绝一切。
+
+### Changed
+
+- 决策审计的 `AuditLevel.NONE` 过滤统一收口到 `AuthorizationDecisionAuditService`
+  （此前由调用方自行判断，存在元数据静默失效隐患）；未注册权限码 fail-safe 照常记录。
+- `AuthorizationManagementController` 的 scope 解析与保留 resourceType 白名单下沉应用层
+  `ScopeRequests`；Binding/SetBinding/ActingGrant 创建服务新增服务端时钟加性重载（旧签名
+  保留兼容），Controller 不再决定生效时间。
+
+## [1.1.0] - 2026-08-20
+
+商业级代码评审首次制品发布（PR #24–#27）。**全部为加性变更与缺陷修复，无 schema 变化**；
+`1.0.x` 作为 LTS 补丁线继续受支持（ADR-0045/0046）。26 modules / 122 primary artifacts /
+415 tests。
+
+### Security
+
+- `ainer-starter-security` 在线校验默认 fail-closed（移除 `matchIfMissing`）。
+- SubjectSet 成员解析按声明 workspace 过滤，关闭跨工作区提权。
+- 授权决策审计接线到 MVC 授权管理器（`REQUIRES_NEW`，拒绝后审计仍存活）。
+- PUBLIC 投影误拒修复；CHALLENGE 映射真实 401 并把 step-up 强认证事实接入授权上下文。
+
+### Fixed
+
+- 组织模块乐观锁 CAS 静默失效改为 409 且不写假审计；EXCLUDE 约束 23P01 竞态分流；
+  Knowledge 版本号竞态重试；workspace 全部写方法的「已允许」审计移到业务成功之后。
+
+### Added
+
+- **授权引擎生产路径激活（M5）**：参考装配注册平台权限目录、scope 恒等天花板、
+  BINDING_REQUIRED 领域策略与管理面白名单（缺省空 = fail-closed），引擎不再是全 deny 死链。
+- **OpenAPI 运行时文档**：springdoc 3.1.0 装配于 `ainer-server`，`/v3/api-docs` 与 Swagger UI
+  默认受资源服务器安全链保护。业务模块与消费者不强制依赖。
+- Knowledge Revision 响应暴露 `payloadMarkdown`（K1 读语义闭环）。
+- 契约修复九项：AI 网关 scope 403、`AiAgentErrorCode`、`ACTING_GRANT` 独立错误码、
+  `SCOPE_` 前缀统一、分页 422 与回显钳制、`DUPLICATE_POSITION_CODE`、Knowledge sources/
+  evidence 校验、readOnly 方法补齐、死代码清除。
+- 注释语言统一中文（`src/main/java`）；成员响应域枚举 String 化等可读性拉齐。
 
 ## [1.0.0] - 2026-08-18
 
