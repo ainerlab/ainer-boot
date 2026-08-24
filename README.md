@@ -42,7 +42,9 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 [`v1.1.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.1.0) 是当前稳定版本：
 商业级代码评审（PR #24–#27）的首次制品发布——安全 5 项（starter 默认 fail-closed、
 SubjectSet 跨工作区提权、决策审计接线等）+ 正确性 6 项（CAS 静默失效、审计顺序、分页
-越界等）+ 加性 API（引擎生产路径激活、OpenAPI 运行时文档、Knowledge 负载可读）。
+越界等）+ 加性 API（引擎生产路径激活、OpenAPI 运行时文档、Knowledge 负载可读），并纳入
+评审遗留收口：任务调度模块 `ainer-module-task`（ADR-0047，Incubating）、授权管理守卫
+拒绝审计与 `trusted-managers` issuer 绑定匹配。
 全部为加性变更与缺陷修复，无 schema 变化；`1.0.x` 作为 LTS 补丁线继续受支持（ADR-0045/0046）。
 双参考消费者并存：`xq-platform-next`（`rc.2 → … → 1.0.0` 完整升级链含回滚）与
 `python-learning-service`（`0.1.0 → 1.0.0` 冷仓接入）。
