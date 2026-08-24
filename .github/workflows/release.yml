@@ -32,7 +32,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
-          cache: maven
+          # 发布构建不启用 Maven 缓存：免费版 Packages/Actions 共享 500MB 存储，
+          # 每次运行写回 ~180MB 缓存会把配额重新推过限（2026-08-24 402 事故根因之一，
+          # 见 docs/project-status.md）。冷启动多花几分钟换取存储确定性。
 
       - name: Verify locked Maven 4 distribution
         run: ./mvnw --version
