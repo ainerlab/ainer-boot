@@ -6,7 +6,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** trusted-managers 双格式解析契约：复合键精确采用；裸 sub 绑定部署自身 issuer（1.1.0 兼容）。 */
+/** trusted-managers 双格式解析契约：复合键精确采用；裸 sub 绑定部署自身 issuer（兼容既有配置写法）。 */
 class TrustedManagersParsingTest {
 
     @Test
