@@ -172,8 +172,11 @@ public class AuthorizationModuleConfiguration {
             AuthorizationService authorizationService,
             AuthenticatedPrincipalResolver principalResolver,
             org.springframework.beans.factory.ObjectProvider<
-                    dev.ainer.authorization.application.AuthorizationDecisionAuditService> decisionAudit) {
-        return new AinerRequestAuthorizationManager(authorizationService, principalResolver, decisionAudit);
+                    dev.ainer.authorization.application.AuthorizationDecisionAuditService> decisionAudit,
+            org.springframework.beans.factory.ObjectProvider<
+                    dev.ainer.authorization.spring.AuthorizationTargetResolver> targetResolvers) {
+        return new AinerRequestAuthorizationManager(
+                authorizationService, principalResolver, decisionAudit, targetResolvers);
     }
 
     @Bean

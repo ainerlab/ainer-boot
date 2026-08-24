@@ -181,11 +181,21 @@ SIEM 导出参数 `afterOccurredAt` 与 `afterId` 必须同时提供或同时省
 ### `@AinerAuthorize` 端点门禁
 
 产品 controller 可以在方法上声明 `@AinerAuthorize(permission="...")`。该注解是 controller 执行前
-的粗粒度门禁，不新增 HTTP endpoint，也不替代应用服务中的资源级授权。当前 permission 的
-`resourceType` 必须是 `request`，ALLOW 只有在 obligation 为空时才继续；DENY、CHALLENGE 或未处理
-obligation 返回统一 403。未认证请求仍返回 401。路径/请求体 target 解析、字段投影与方法级 AOP
-尚未进入 `0.1` 支持面。`PUBLIC_PROJECTION` 也不会绕过 Resource Server：宿主必须另行配置
-`public-paths`；即使路径开放，当前 projection obligation 尚无 executor，仍会失败关闭为 403。
+的门禁，不新增 HTTP endpoint，也不替代应用服务中的资源级授权。未认证请求返回 401；DENY 返回统一
+403；高风险权限缺少近期强认证时返回 401 并携带 RFC 9470 挑战头
+`WWW-Authenticate: Bearer error="insufficient_user_authentication"`。
+
+目标解析与投影语义：
+
+- 未注册 `AuthorizationTargetResolver` 时，目标固定为 `resourceType=request` 的合成资源，
+  permission 也必须以该类型注册。产品注册解析器 bean 后（第一个非空结果胜出），门禁按解析出的
+  类型化 `ResourceRef` 决策，类型不匹配一律 403。
+- ALLOW 携带的 `PublicProjection` 是响应投影数据而非待执行义务，不会阻断放行。完整决策通过请求
+  属性 `ainer.authorization.decision` 暴露，controller 必须自行消费投影描述符完成字段裁剪——
+  门禁本身不做字段投影。
+- `PUBLIC_PROJECTION` 也不会绕过 Resource Server：宿主必须另行配置 `public-paths` 并注册
+  `PublicAccessPolicy`，否则匿名请求失败关闭为 403。
+- 方法级 AOP 与 obligation executor 尚未进入支持面。
 
 ### 管理 API
 

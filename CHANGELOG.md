@@ -4,6 +4,15 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- **授权端点门禁增强（ADR-0037 后续切片首批）**：新增 `AuthorizationTargetResolver` SPI——产品注册
+  bean 后 `@AinerAuthorize` 门禁按解析出的类型化 `ResourceRef` 决策（第一个非空结果胜出，
+  resourceType 不匹配 fail-closed），不再局限于合成 request 资源；完整决策经请求属性
+  `ainer.authorization.decision` 暴露给 controller 供其消费公开投影描述符。CHALLENGE 拒绝现在
+  携带 RFC 9470 `WWW-Authenticate: Bearer error="insufficient_user_authentication"` 挑战头。
+- 授权模块补齐 ADR-0037 §3 声明的 ArchUnit 包边界守护（domain/policy/catalog/application 零
+  Spring Security/Servlet 依赖、spring/ 适配层无反向引用）。
 ## [1.1.0] - 2026-08-24
 
 商业级代码评审首次制品发布（PR #24–#27），并纳入评审遗留收口：P4 任务调度引擎

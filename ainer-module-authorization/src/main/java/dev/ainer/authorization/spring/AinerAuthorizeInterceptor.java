@@ -30,6 +30,15 @@ public final class AinerAuthorizeInterceptor implements HandlerInterceptor {
     /** 已解析访问模式的请求属性键。 */
     public static final String ACCESS_MODE_ATTRIBUTE = "ainer.authorization.accessMode";
 
+    /**
+     * CHALLENGE 结果对应的 RFC 9470 挑战响应头。错误值使用 OAuth/Bearer 既有
+     * {@code insufficient_user_authentication} 语义（RFC 9470 §4.1）；协议产物保持 ASCII，
+     * 中文说明经由响应体的 Ainer 错误信封传达。
+     */
+    public static final String WWW_AUTHENTICATE_CHALLENGE =
+            "Bearer error=\"insufficient_user_authentication\", "
+                    + "error_description=\"recent strong authentication required\"";
+
     private final AinerRequestAuthorizationManager authorizationManager;
 
     public AinerAuthorizeInterceptor(AinerRequestAuthorizationManager authorizationManager) {
@@ -50,7 +59,9 @@ public final class AinerAuthorizeInterceptor implements HandlerInterceptor {
                         && ainerResult.decision().outcome()
                                 == dev.ainer.authorization.domain.AuthorizationOutcome.CHALLENGE) {
                     // 高风险权限且缺少近期强认证：调用方必须重新认证（401），
-                    // 而不是被告知操作被禁止（403）。
+                    // 而不是被告知操作被禁止（403）。按 RFC 9470 附带标准挑战头，
+                    // 客户端据此回到 Authorization Server 完成 step-up 后重试。
+                    response.setHeader("WWW-Authenticate", WWW_AUTHENTICATE_CHALLENGE);
                     throw new BusinessException(StandardErrorCode.UNAUTHENTICATED,
                             "该操作需要近期强认证后重试");
                 }

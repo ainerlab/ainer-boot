@@ -25,6 +25,7 @@ import org.springframework.security.web.access.intercept.RequestAuthorizationCon
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -144,6 +145,83 @@ class AinerRequestAuthorizationManagerTest {
                 .hasMessage("resolver unavailable");
     }
 
+    @Test
+    void targetResolverProvidesTypedResourceRefForDecision() {
+        // 解析器返回 document 类型资源；权限也注册为 document 类型——类型匹配证明解析结果
+        // 真正进入决策（合成占位固定为 request 类型，会以 RESOURCE_TYPE_MISMATCH 拒绝）。
+        var manager = new AinerRequestAuthorizationManager(documentService(), resolver(servicePrincipal),
+                emptyAuditProvider(), providerOf(
+                (request, permission) -> Optional.of(new dev.ainer.authorization.domain.ResourceRef(
+                        null, DOCUMENT, RESOURCE_ID))));
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/documents/1");
+        request.setAttribute(AinerAuthorizeInterceptor.PERMISSION_ATTRIBUTE, "test.read");
+
+        AinerAuthorizationResult result = (AinerAuthorizationResult) manager.authorize(auth(), context(request));
+
+        assertThat(result.isGranted()).isTrue();
+        assertThat(result.reasonCode()).isEqualTo("AUTHORIZED");
+    }
+
+    @Test
+    void withoutTargetResolverSyntheticRequestResourceCausesTypeMismatchDeny() {
+        // 同一 document 权限：无解析器时回退合成 request 资源 → 类型不匹配 fail-closed。
+        var manager = new AinerRequestAuthorizationManager(documentService(), resolver(servicePrincipal),
+                emptyAuditProvider(), null);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/documents/1");
+        request.setAttribute(AinerAuthorizeInterceptor.PERMISSION_ATTRIBUTE, "test.read");
+
+        AinerAuthorizationResult result = (AinerAuthorizationResult) manager.authorize(auth(), context(request));
+
+        assertThat(result.isGranted()).isFalse();
+        assertThat(result.reasonCode()).isEqualTo("RESOURCE_TYPE_MISMATCH");
+    }
+
+    @Test
+    void firstNonEmptyTargetResolverWinsInBeanOrder() {
+        var losing = new dev.ainer.authorization.domain.ResourceRef(null, DOCUMENT, UUID.randomUUID());
+        var winning = new dev.ainer.authorization.domain.ResourceRef(null, DOCUMENT, RESOURCE_ID);
+        var manager = new AinerRequestAuthorizationManager(
+                grantOnlyOnResourceId(winning.resourceId()), resolver(servicePrincipal),
+                emptyAuditProvider(),
+                providerOf(
+                        (request, permission) -> Optional.empty(),
+                        (request, permission) -> Optional.of(winning)));
+        // losing 排在前面但返回 empty；若实现错误地取用 losing，策略会拒绝。
+        var request = new MockHttpServletRequest("GET", "/api/documents/1");
+        request.setAttribute(AinerAuthorizeInterceptor.PERMISSION_ATTRIBUTE, "test.read");
+
+        AinerAuthorizationResult result = (AinerAuthorizationResult) manager.authorize(auth(), context(request));
+
+        assertThat(result.isGranted()).isTrue();
+        assertThat(losing).isNotEqualTo(winning);
+    }
+
+    @Test
+    void targetResolverEmptyListFallsBackToSyntheticResource() {
+        var manager = new AinerRequestAuthorizationManager(allowAllService(), resolver(servicePrincipal),
+                emptyAuditProvider(), providerOf());
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/test");
+        request.setAttribute(AinerAuthorizeInterceptor.PERMISSION_ATTRIBUTE, "test.read");
+
+        AinerAuthorizationResult result = (AinerAuthorizationResult) manager.authorize(auth(), context(request));
+
+        assertThat(result.isGranted()).isTrue();
+    }
+
+    @Test
+    void targetResolverFailurePropagatesInsteadOfSilentFallback() {
+        var manager = new AinerRequestAuthorizationManager(allowAllService(), resolver(servicePrincipal),
+                emptyAuditProvider(), providerOf((request, permission) -> {
+                    throw new IllegalStateException("resolver broken");
+                }));
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/test");
+        request.setAttribute(AinerAuthorizeInterceptor.PERMISSION_ATTRIBUTE, "test.read");
+
+        assertThatThrownBy(() -> manager.authorize(auth(), context(request)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("resolver broken");
+    }
+
     // ---- fixtures ----
 
     private AuthorizationService allowAllService() {
@@ -256,6 +334,77 @@ class AinerRequestAuthorizationManagerTest {
             AuthorizationService service, AuthenticatedPrincipalResolver resolver) {
         return new AinerRequestAuthorizationManager(service, resolver,
                 emptyAuditProvider());
+    }
+
+    private static final dev.ainer.authorization.domain.ResourceType DOCUMENT =
+            new dev.ainer.authorization.domain.ResourceType("document");
+    private static final UUID RESOURCE_ID = UUID.fromString(
+            "018f6b2e-7c3a-7de1-9f4a-2b8e5d1c0a77");
+
+    /** document 类型权限 + 仅在目标 resourceId 匹配时授予的领域策略。 */
+    private AuthorizationService documentService() {
+        return grantOnlyOnResourceId(RESOURCE_ID);
+    }
+
+    private AuthorizationService grantOnlyOnResourceId(UUID expectedResourceId) {
+        return new AuthorizationService(
+                new PermissionRegistry().register(() -> Set.of(
+                        new Permission(new PermissionCode("test.read"), "read", DOCUMENT,
+                                RiskTier.LOW, AuditLevel.NONE, false, false))),
+                scopeCeiling(),
+                publicPolicy(),
+                new DomainAuthorizationPolicy() {
+                    @Override
+                    public dev.ainer.authorization.domain.GrantPath pathFor(PermissionCode permission) {
+                        return dev.ainer.authorization.domain.GrantPath.BINDING_OR_RELATION;
+                    }
+
+                    @Override
+                    public boolean relationGrants(
+                            dev.ainer.authorization.domain.Requester.Authenticated s, PermissionCode p,
+                            dev.ainer.authorization.domain.ResourceRef r,
+                            dev.ainer.authorization.domain.AuthorizationContext c) {
+                        return expectedResourceId.equals(r.resourceId());
+                    }
+
+                    @Override
+                    public boolean resourceStateSatisfies(
+                            dev.ainer.authorization.domain.Requester.Authenticated s, PermissionCode p,
+                            dev.ainer.authorization.domain.ResourceRef r,
+                            dev.ainer.authorization.domain.AuthorizationContext c) {
+                        return true;
+                    }
+                },
+                subject -> Set.of(),
+                TEST_VERSION);
+    }
+
+    @SafeVarargs
+    @SuppressWarnings("varargs")
+    private static org.springframework.beans.factory.ObjectProvider<AuthorizationTargetResolver>
+    providerOf(AuthorizationTargetResolver... resolvers) {
+        var list = java.util.List.of(resolvers);
+        return new org.springframework.beans.factory.ObjectProvider<>() {
+            @Override
+            public AuthorizationTargetResolver getObject() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public AuthorizationTargetResolver getObject(Object... args) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public AuthorizationTargetResolver getIfAvailable() {
+                return list.isEmpty() ? null : list.get(0);
+            }
+
+            @Override
+            public java.util.stream.Stream<AuthorizationTargetResolver> orderedStream() {
+                return list.stream();
+            }
+        };
     }
 
     private Supplier<org.springframework.security.core.Authentication> auth() {

@@ -13,6 +13,7 @@ import dev.ainer.core.error.BusinessException;
 import dev.ainer.security.token.AuthenticatedPrincipal;
 import dev.ainer.security.token.AuthenticatedPrincipalResolver;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.authorization.AuthorizationResult;
 import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.core.Authentication;
@@ -21,6 +22,7 @@ import org.springframework.security.web.access.intercept.RequestAuthorizationCon
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -34,7 +36,9 @@ import java.util.function.Supplier;
  *   <li>通过 {@link AuthenticatedPrincipalResolver} 解析 {@link AuthenticatedPrincipal}
  *       （从 SecurityContext 读取已验证 JWT）；</li>
  *   <li>从 {@link AinerAuthorizeInterceptor} 写入的请求属性读取权限 code 与访问模式；</li>
- *   <li>构建 {@link AuthorizationRequest} 并调用 {@link AuthorizationService#authorize}；</li>
+ *   <li>构建 {@link AuthorizationRequest} 并调用 {@link AuthorizationService#authorize}；
+ *       目标资源优先由已注册的 {@link AuthorizationTargetResolver} bean 链解析（第一个非空结果
+ *       胜出，ADR-0037 §4），没有解析器应答时回退到合成 {@code request} 资源占位；</li>
  *   <li>把 {@link AuthorizationDecision} 映射为 {@link AinerAuthorizationResult}。</li>
  * </ol>
  *
@@ -42,12 +46,11 @@ import java.util.function.Supplier;
  * 之后调用。它有意不作为更早的 servlet 过滤链中的兜底管理器安装，因为那一阶段还不存在
  * handler 注解。
  *
- * <p><strong>第一版限制</strong>：{@link ResourceRef} 是通用占位（若请求属性中存在
- * workspaceId 则使用之，否则合成一个"任意"资源）。把路径变量/请求体映射为具体
- * {@code ResourceRef} 的类型化 {@code AuthorizationTargetResolver} 属于未来切片
- * （ADR-0037 §4）。在此之前，该管理器适合粗粒度权限闸门（例如"必须持有
- * {@code authorization.manage}"），不适合逐资源归属检查——那类检查仍必须在应用服务中
- * 显式完成（ADR-0030 §8.4）。
+ * <p><strong>目标解析边界</strong>：未注册 {@link AuthorizationTargetResolver} 时，
+ * {@link ResourceRef} 是通用占位（若请求属性中存在 workspaceId 则使用之，否则合成一个
+ * "任意"资源），适合粗粒度权限闸门（例如"必须持有 {@code authorization.manage}"）。
+ * 需要逐资源归属检查的产品应注册类型化解析器提供真实 {@code ResourceRef}；即便如此，
+ * 高价值写操作仍必须在应用服务中显式授权（ADR-0030 §8.4）。
  *
  * <p>该类位于 {@code spring/} 适配器边界（ADR-0037 §3）。
  */
@@ -58,19 +61,40 @@ public final class AinerRequestAuthorizationManager
     public static final String RECENT_STRONG_AUTH_ATTRIBUTE =
             "dev.ainer.security.authorization.recentStrongAuthentication";
 
+    /** 可选的 workspace 归属请求属性键（合成占位回退路径仍消费它）。 */
+    public static final String WORKSPACE_ID_ATTRIBUTE = "ainer.authorization.workspaceId";
+
+    /**
+     * 完整 {@link dev.ainer.authorization.domain.AuthorizationDecision} 的请求属性键。
+     * 管理器在每次决策后写入；controller 可据此显式消费决策携带的公开投影描述符等数据，
+     * 而不必重新调用授权服务。
+     */
+    public static final String DECISION_ATTRIBUTE = "ainer.authorization.decision";
+
     private final AuthorizationService authorizationService;
     private final AuthenticatedPrincipalResolver principalResolver;
-    private final org.springframework.beans.factory.ObjectProvider<
+    private final ObjectProvider<
             dev.ainer.authorization.application.AuthorizationDecisionAuditService> decisionAudit;
+    private final ObjectProvider<AuthorizationTargetResolver> targetResolvers;
 
     public AinerRequestAuthorizationManager(
             AuthorizationService authorizationService,
             AuthenticatedPrincipalResolver principalResolver,
-            org.springframework.beans.factory.ObjectProvider<
+            ObjectProvider<
                     dev.ainer.authorization.application.AuthorizationDecisionAuditService> decisionAudit) {
+        this(authorizationService, principalResolver, decisionAudit, null);
+    }
+
+    public AinerRequestAuthorizationManager(
+            AuthorizationService authorizationService,
+            AuthenticatedPrincipalResolver principalResolver,
+            ObjectProvider<
+                    dev.ainer.authorization.application.AuthorizationDecisionAuditService> decisionAudit,
+            ObjectProvider<AuthorizationTargetResolver> targetResolvers) {
         this.authorizationService = Objects.requireNonNull(authorizationService, "authorizationService");
         this.principalResolver = Objects.requireNonNull(principalResolver, "principalResolver");
         this.decisionAudit = decisionAudit;
+        this.targetResolvers = targetResolvers;
     }
 
     @Override
@@ -91,7 +115,7 @@ public final class AinerRequestAuthorizationManager
                     dev.ainer.authorization.AuthorizationReasonCodes.AUTHENTICATED_REQUIRED,
                     "ainer-adapter", Instant.now()));
         }
-        ResourceRef resource = resolveResource(request);
+        ResourceRef resource = resolveResource(request, permissionCode);
         AuthorizationRequest authRequest = new AuthorizationRequest(
                 requester,
                 accessMode,
@@ -105,6 +129,7 @@ public final class AinerRequestAuthorizationManager
                         null));
 
         AuthorizationDecision decision = authorizationService.authorize(authRequest);
+        request.setAttribute(DECISION_ATTRIBUTE, decision);
         recordDecisionAudit(authRequest, decision, request);
         return new AinerAuthorizationResult(decision);
     }
@@ -157,12 +182,21 @@ public final class AinerRequestAuthorizationManager
     }
 
     /**
-     * 从请求解析 {@link ResourceRef}。第一版使用合成"任意资源"占位，workspaceId 可选地
-     * 来自请求属性（{@code ainer.authorization.workspaceId}）。类型化目标解析器属于
-     * 未来切片。
+     * 从请求解析 {@link ResourceRef}：优先按 bean 顺序询问已注册的
+     * {@link AuthorizationTargetResolver}（第一个非空结果胜出，ADR-0037 §4）；解析器抛出的
+     * 异常原样传播（故障组件不得静默降级为合成资源放行）。没有任何解析器应答时回退到合成
+     * "任意资源"占位，workspaceId 可选地来自请求属性（{@code ainer.authorization.workspaceId}）。
      */
-    private static ResourceRef resolveResource(HttpServletRequest request) {
-        Object wsId = request.getAttribute("ainer.authorization.workspaceId");
+    private ResourceRef resolveResource(HttpServletRequest request, String permissionCode) {
+        if (targetResolvers != null) {
+            for (AuthorizationTargetResolver resolver : targetResolvers.orderedStream().toList()) {
+                Optional<ResourceRef> resolved = resolver.resolve(request, permissionCode);
+                if (resolved.isPresent()) {
+                    return resolved.get();
+                }
+            }
+        }
+        Object wsId = request.getAttribute(WORKSPACE_ID_ATTRIBUTE);
         UUID workspaceId = wsId instanceof UUID u ? u : null;
         return new ResourceRef(workspaceId, new ResourceType("request"), UUID.nameUUIDFromBytes(
                 request.getRequestURI().getBytes(StandardCharsets.UTF_8)));
