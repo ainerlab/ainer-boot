@@ -123,7 +123,7 @@ ainer-core ← ainer-spring ← starter-* ← module-* ← server
 | `SCOPE_` 前缀不一致 | JWT 有 scope 但 403 | JWT scope claim 用裸值（无前缀）；常量也不带前缀 |
 | timestamptz 精度漂移 | CI 422（本地通过） | 服务层时间入口统一 `truncatedTo(ChronoUnit.MICROS)` |
 | 模块 `@MapperScan` 退避 | 自定义 mapper 不注册 | 授权模块的显式 `@MapperScan` 会让 MyBatis 自动扫描退避；宿主需自己声明 |
-| GitHub Packages 配额 | 发布 HTTP 402 | 清理旧版本 Maven 制品或升级付费计划 |
+| GitHub Packages 配额 | deploy HTTP 402 / 包内容 404 锁定 | 免费版 500MB 共享存储，包体已 ~377MB；发布前清空缓存（housekeeping 工作流每周兜底），发布构建已去缓存；根治需付费额度或删历史版本（见 project-status 2026-08-24 记录） |
 | jsonPath 数字断言 | `expected: 2L but was: 2` | jsonPath 返回 Integer 不是 Long |
 
 ## 7. 测试与质量
@@ -149,25 +149,29 @@ ainer-core ← ainer-spring ← starter-* ← module-* ← server
 ## 9. 发布操作
 
 1. 发布准备 PR（CHANGELOG + README + project-status 版本行）→ 合入 → dev CI 绿
-2. `git tag -a v<version> <merge-commit> -m "..."` → `git push origin v<version>`
-3. Release workflow 自动执行完整门禁（签名 deploy → 远端读回验签 → 空仓消费者 →
-   SBOM/provenance → immutable Release）
-4. 双消费者升级矩阵验证
+2. **确认存储配额**：`gh api /repos/ainerlab/ainer-boot/actions/caches --jq '.total_count'`
+   必须为 0；发布窗口内不要有并发 CI（它们会在结束时写缓存）
+3. `git tag -a v<version> <merge-commit> -m "..."` → `git push origin v<version>`
+4. Release workflow 自动执行完整门禁（签名 deploy → 远端读回验签 → 空仓消费者 →
+   SBOM/provenance → immutable Release）；发布构建已去 Maven 缓存，不会自我毒化
+5. 双消费者升级矩阵验证
 
-**发布前检查**：Packages 配额充足；目标版本远端不存在（404）。
+**发布前检查**：Packages 配额充足（包体基线 ~377MB + 本版 ~65MB < 500MB）；目标版本远端不存在（404）。
 
 ## 10. 当前待办
 
 | 优先级 | 事项 | 状态 |
 |---|---|---|
-| 高 | **1.1.0 发布完成** | 配额已恢复（清理 276MB Actions 制品）；tag 重打到 dev 头后重新触发 release workflow，成功后执行双消费者矩阵 |
-| 中 | 双消费者 `1.0.0 → 1.1.0` 升级矩阵 | 等 1.1.0 发布后执行（xq-platform-next + python-learning-service 均在本机） |
+| 高 | **解除 Packages 存储配额**（包内容已被锁定 404，影响现有消费者解析历史版本） | 需负责人决策：付费额度（推荐，成本可忽略）或批准删除 rc 链版本（需先修 ADR-0041）；详见 project-status.md 2026-08-24 记录 |
+| 高 | **1.1.0 发布收尾** | tag 已重打到 `8587519` 且 workflow 修复就绪；配额解除后 `gh run rerun 32711952544` 即可 |
+| 中 | 双消费者 `1.0.0 → 1.1.0` 升级矩阵 | 等 1.1.0 发布后执行（两仓库均在本机） |
 | 中 | 分支保护治理（GitHub Pro 或转 public） | 需负责人决策 |
 | 低 | Incubating → Stable 晋升评估 | 等第二个消费者兼容验证积累 |
 | 低 | AI Runtime A2-A4 / Knowledge Phase 2-4 | 按真实产品需求拉动 |
 
-已完成：P4 任务调度模块（ADR-0047）——引擎修复、超时看门狗与引擎级集成测试已于
-2026-08-22 收口（task 模块 15/0/0/0），并入 1.1.0。
+已完成：P4 任务调度模块（ADR-0047）并入 1.1.0；授权端点门禁类型化目标解析 +
+RFC 9470 挑战头 + ArchUnit 守护（ADR-0037 后续切片首批，PR #35）；CI 存储纪律
+（housekeeping 工作流 + 发布构建去缓存，PR #36）。
 
 ## 11. 关键文档地图
 

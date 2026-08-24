@@ -310,6 +310,38 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-24 v1.1.0 发布存储配额事故：根因、处置与当前边界（发布未完成）
+- **现象**：release workflow 五次在首个制品 deploy 处失败——GitHub Packages HTTP 402；
+  且包内容随后进入锁定状态（对 `maven.pkg.github.com` 的既有版本文件请求返回 404，
+  元数据 API 仍正常）。**锁定影响现有消费者对 1.0.0 等历史版本的依赖解析，需尽快解除。**
+- **量化盘点**（2026-08-24 实测）：
+  - Actions 制品 11 个共 276MB、Actions 缓存累计最高 1066MB+238MB+141MB（多次复发）、
+    已全部清空；
+  - Maven Packages 本体按权威清单逐文件 Range 探测为 **377MB / 约 1296 文件 / 6 个版本**
+    （两个发行物 fat jar 每版约 84MB，是主要占用；平均每版本足迹约 63MB）；
+  - 免费版共享存储 500MB：即使缓存归零，377MB 包体 + 计数滞后也使每次 deploy 贴线。
+- **根因链**：① CI 的 `setup-java cache: maven` 每次运行写回 ~180MB 缓存且失败运行也保存，
+  多分支累积至 GB 级击穿配额；② 发布 run 自身也带缓存，形成"清理→重跑→再毒化"循环；
+ ③ 包体基线 377MB 使余量只剩 ~123MB，任何并发写入即超限。
+- **已完成的修复**（PR #34/#36，均合入 dev）：
+  - 清空全部 Actions 制品与缓存（不可变 Release 的 16 个签名证据资产不受影响）；
+  - `release.yml` 移除 `cache: maven`——发布构建不再写回缓存；
+  - 新增 `.github/workflows/housekeeping.yml`：每周检查缓存总量超过 50MB 即清空；
+  - `verify-release-ref.sh` 要求 tag 指向默认分支头，而原 tag 之后 dev 已前进，故将
+    已合入工作并入 1.1.0 并把 tag 重打到 `8587519`（远端从未存在 1.1.0 制品与消费者，
+    无兼容性影响）；CHANGELOG [Unreleased] 折叠入 [1.1.0]。
+- **同批并入 1.1.0 的能力切片**（PR #35）：授权端点门禁新增 `AuthorizationTargetResolver`
+  类型化目标解析与 RFC 9470 挑战头；授权模块补齐 ADR-0037 §3 ArchUnit 包边界守护；
+  全量 reactor 本地验证 455 tests / 0 failure / 0 error / 0 skipped。
+- **剩余动作（需负责人决策或等待）**：
+  1. 解除配额：为组织添加付费额度（Packages 存储超量约 $0.008/GB/月，成本可忽略），
+     或等待删除操作的用量聚合回落（时点不可控）后重试；
+  2. 若选择不扩容：需另立决策删除 rc 链版本（rc.1 为 withdrawn、rc.2/rc.3 为升级链
+     历史起点，删除与 ADR-0041 保留条款冲突，必须先修 ADR）；
+  3. 存储解除后完成发布：确认缓存为空 → `gh run rerun 32711952544` → 双消费者
+     `1.0.0 → 1.1.0` 升级矩阵（xq-platform-next 与 python-learning-service 均在本机）。
+
+
 2026-08-22 P4 任务调度引擎修复收口 + 商业级评审 follow-up（M5/分层/合规）
 - **P4 引擎（ainer-module-task）**：修复领取审计写入必然违反 v7 CHECK 的缺陷——领取、状态
   迁移与 CLAIMED 审计合并为单条 CTE 语句（审计 ID 由数据库 `uuidv7()` 生成）；补齐 ADR-0047
