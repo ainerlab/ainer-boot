@@ -333,13 +333,12 @@ Ainer 项目签名 provenance 已通过。
 - **同批并入 1.1.0 的能力切片**（PR #35）：授权端点门禁新增 `AuthorizationTargetResolver`
   类型化目标解析与 RFC 9470 挑战头；授权模块补齐 ADR-0037 §3 ArchUnit 包边界守护；
   全量 reactor 本地验证 455 tests / 0 failure / 0 error / 0 skipped。
-- **剩余动作（需负责人决策或等待）**：
-  1. 解除配额：为组织添加付费额度（Packages 存储超量约 $0.008/GB/月，成本可忽略），
-     或等待删除操作的用量聚合回落（时点不可控）后重试；
-  2. 若选择不扩容：需另立决策删除 rc 链版本（rc.1 为 withdrawn、rc.2/rc.3 为升级链
-     历史起点，删除与 ADR-0041 保留条款冲突，必须先修 ADR）；
-  3. 存储解除后完成发布：确认缓存为空 → `gh run rerun 32711952544` → 双消费者
-     `1.0.0 → 1.1.0` 升级矩阵（xq-platform-next 与 python-learning-service 均在本机）。
+- **剩余动作**：
+  1. ~~解除配额~~ → **已决策（ADR-0048，选项 C）**：退役 rc 链三个版本的 Maven 制品
+     （释放约 190MB），保留 git tag、immutable Release 证据与消费者演练历史；
+  2. 删除执行并确认锁定解除后：`gh run rerun 32711952544` 完成 v1.1.0 发布；
+  3. 双消费者 `1.0.0 → 1.1.0` 升级矩阵（xq-platform-next 与 python-learning-service 均在本机）；
+  4. 后续存储预算规则：发布前缓存必须为 0；包体接近 450MB 时先做版本退役决策。
 
 
 2026-08-22 P4 任务调度引擎修复收口 + 商业级评审 follow-up（M5/分层/合规）
