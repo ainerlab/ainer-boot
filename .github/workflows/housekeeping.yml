@@ -1,0 +1,42 @@
+name: Housekeeping
+
+# 存储配额防复发：GitHub 免费版私有仓库的 Packages/Actions 共享 500MB 存储，
+# Maven 依赖缓存（setup-java cache: maven）会在多分支累积到 GB 级，曾导致
+# v1.1.0 发布 deploy 阶段 HTTP 402（2026-08-24 事故，见 docs/project-status.md）。
+# 本工作流每周检查缓存总量，超阈值即清空——缓存是纯性能优化，删除安全，
+# 下一次 CI 会自动重建；制品已由各上传步骤的 retention-days 自行管理。
+
+on:
+  schedule:
+    - cron: "23 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  purge-caches:
+    name: Purge Actions caches over quota threshold
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Delete caches when total size exceeds threshold
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AINER_CACHE_THRESHOLD_MB: "250"
+        run: |
+          set -euo pipefail
+          summary="$(gh api "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100")"
+          total_mb="$(printf '%s' "$summary" | jq '[.actions_caches[].size_in_bytes] | add // 0 | floor / 1048576 | round')"
+          count="$(printf '%s' "$summary" | jq '.total_count')"
+          echo "caches=$count total=${total_mb}MB threshold=${AINER_CACHE_THRESHOLD_MB}MB"
+          if [ "$total_mb" -lt "$AINER_CACHE_THRESHOLD_MB" ]; then
+            echo "under threshold; nothing to do"
+            exit 0
+          fi
+          printf '%s' "$summary" | jq -r '.actions_caches[].id' | while read -r id; do
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/caches/$id"
+            echo "deleted cache $id"
+          done
+          remaining="$(gh api "repos/$GITHUB_REPOSITORY/actions/caches" --jq '.total_count')"
+          echo "remaining caches after purge: $remaining"
