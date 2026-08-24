@@ -93,5 +93,11 @@
             <artifactId>spring-security-oauth2-jose</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- 包边界守护：ADR-0037 §3 要求 domain/policy/catalog/application 零 Spring Security 依赖 -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
