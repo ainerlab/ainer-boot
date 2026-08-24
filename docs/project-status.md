@@ -1399,10 +1399,12 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 ### 访问控制
 
-- 通用混合细粒度授权已按 ADR-0037 接受为 post-Greenfield Workspace 基线，但 `0.1` 的支持面仍有
-  明确边界：`@AinerAuthorize` 只有 endpoint 粗门禁，当前 synthetic target 固定
-  `resourceType=request`；`AuthorizationTargetResolver`、DecisionObligationExecutor、RFC 9470 challenge
-  和方法级 AOP 未实现。高价值写与资源 ownership 必须继续在 application service 显式授权；远端
+- 通用混合细粒度授权已按 ADR-0037 接受为 post-Greenfield Workspace 基线。端点门禁已支持
+  `AuthorizationTargetResolver` 类型化目标解析与 CHALLENGE 的 RFC 9470 挑战头（2026-08-24），
+  但 `DecisionObligationExecutor`（等待第二个真实义务类型出现，当前 sealed 层级只有
+  PublicProjection 投影数据）与方法级 AOP（当前零消费者）仍属后续切片；filter 链 step-up 向
+  RFC 9470 的迁移受设计文档 §8.2 action 级互斥清单约束，需先完成客户端/签发端合同测试。
+  高价值写与资源 ownership 必须继续在 application service 显式授权；远端
   不可变制品、Ainer Admin、外部产品关系/字段投影和生产撤权 SLA 尚未验收；
 - 组织与员工目录已按 ADR-0042 交付（O1 目录基线 + O2 SubjectSet，撤岗即失权端到端验证；
   详细方案中 pre-Greenfield 的 access-event 前置矩阵已被决策时实时解析取代）。Team/

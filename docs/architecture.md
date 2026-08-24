@@ -108,9 +108,18 @@ Spring 适配只位于 `dev.ainer.authorization.spring`。Servlet 安全过滤�
 `@AinerAuthorize` 并在 controller 执行前调用
 `AinerRequestAuthorizationManager<RequestAuthorizationContext>`。拒绝统一映射为 Ainer 403，决策 ID
 和内部 reason 不进入响应。不能把 MVC 注解属性假设为可供更早执行的 `AuthorizationFilter` 读取。
-首版只支持 `resourceType=request` 的粗粒度空-obligation gate；真实资源归属、高价值写与字段投影仍
-必须在应用服务显式授权。`AuthorizationTargetResolver`、`DecisionObligationExecutor`、RFC 9470 与
-方法级 AOP 是后续切片，不阻塞受控 RC，但不得宣称已支持。
+
+当前支持面与边界：
+
+- 未注册目标解析器时，门禁是 `resourceType=request` 的合成资源粗闸门；产品可注册
+  `AuthorizationTargetResolver` bean（第一个非空结果胜出）从请求解析类型化 `ResourceRef`，
+  其类型必须与 permission 注册的 resourceType 一致，否则 fail-closed 拒绝。
+- CHALLENGE（高风险权限缺少近期强认证）映射为 401 并携带 RFC 9470
+  `WWW-Authenticate: Bearer error="insufficient_user_authentication"` 挑战头。
+- ALLOW 携带的 `PublicProjection` 是响应投影数据而非待执行义务，不阻断放行；完整决策经请求属性
+  `ainer.authorization.decision` 暴露给 controller，由其显式消费投影描述符。
+- 高价值写与真实资源归属仍必须在应用服务显式授权；`DecisionObligationExecutor`（待出现第二个
+  真实义务类型）与方法级 AOP（当前零消费者）仍属后续切片，不得宣称已支持。
 
 本地隔离制品已由 Maven 3.9+ 与 Maven 4 Golden Consumer 验证。`0.1.0-rc.1` 只有一次远端签名
 deploy 记录，因 tag/source 不一致和证据不完整已撤回；合格的 immutable RC、远端空仓消费、外部
