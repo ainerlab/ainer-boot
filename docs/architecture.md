@@ -37,7 +37,8 @@ ainer-server                         JWT Resource Server、Actuator、平台/内
 ├── ainer-module-task                任务调度（Incubating，ADR-0047）
 ├── ainer-starter-security           JWT 验证、SecurityContext 投影、401/403
 ├── ainer-starter-persistence        MyBatis-Plus/MyBatis、Flyway、PostgreSQL、UUID
-└── ainer-starter-web                HTTP 异常与请求追踪
+├── ainer-starter-web                HTTP 异常与请求追踪
+└── ainer-starter-observability      Observation + requestId/trace MDC；OTLP 默认关
 
 ainer-authorization-server           独立 OAuth 2.1/OIDC 发行物、Identity 管理面、Passkey
 ├── ainer-module-identity            HumanAccount/ServicePrincipal/Credential foundation
@@ -48,6 +49,7 @@ ainer-starter-web -> ainer-spring -> ainer-core
 ainer-starter-persistence -> ainer-core
 ainer-starter-security -> ainer-security -> ainer-core
 ainer-starter-cache -> Spring Cache + Caffeine/Redis + 分布式锁
+ainer-starter-observability -> ObservationRegistry + requestId/trace MDC（OTLP 默认关）
 
 ainer-dependencies                   独立 BOM，统一依赖版本
 ```

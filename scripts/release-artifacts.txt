@@ -8,6 +8,7 @@ ainer-starter-web jar -
 ainer-starter-persistence jar -
 ainer-starter-security jar -
 ainer-starter-cache jar -
+ainer-starter-observability jar -
 ainer-test-support jar -
 ainer-module-identity jar -
 ainer-module-workspace jar -

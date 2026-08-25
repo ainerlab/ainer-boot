@@ -310,6 +310,11 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-25 最小观测 Starter
+- **C**：新增 `ainer-starter-observability`（Observation + requestId/trace MDC，OTLP 默认关）；
+  自动装配正负例；发布清单 27→28 project、127→132 主制品；`ainer-server` 与
+  `ainer-offstate-app` 按需依赖。
+
 2026-08-25 通知 WEBHOOK 首个真实渠道（默认关闭）
 - **交付**：`HttpWebhookChannelSender` 可选用 `RestClient` POST JSON；host 白名单、HTTPS
   （loopback HTTP 需显式允许）、解析地址拒绝私网/链路本地/ULA、不跟随重定向；提交期对

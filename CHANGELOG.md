@@ -6,6 +6,10 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **最小观测 Starter（`ainer-starter-observability`，ADR-0029 T1#6）**：默认桥接 Boot
+  `ObservationRegistry`，把 `requestId` 写入 `traceId` MDC；`ainer.observability.otlp.enabled`
+  默认关闭，开启只装配导出标记，不强制全链路 OTel，也不改写域 Micrometer counters。参考装配
+  `ainer-server` 与 `ainer-offstate-app` 按需依赖。发布清单 28 个 project / 132 个主制品。
 - **通知 WEBHOOK 真实投递（默认关闭）**：启用 `ainer.notification.webhook.enabled` 后，WEBHOOK
   渠道用 `RestClient` POST JSON `{title,body}`；host 白名单 + HTTPS（loopback HTTP 需显式允许）
   + 拒绝私网/链路本地/ULA 解析 + 不跟随重定向。日志与错误消息不含 URL/正文。未启用时仍是

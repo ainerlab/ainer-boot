@@ -132,10 +132,10 @@ tag workflow。私有制品的下游消费需要 `read:packages`；不得把 PAT
 - passphrase 不出现在 Maven CLI、POM、日志或 release assets；
 - 无口令私钥、缺 key、缺 passphrase 或 probe 失败均在 deploy 前关闭发布。
 
-Maven 4 的 23 个 project 同时发布 build POM 与 consumer POM；20 个 JAR project 发布
-main/sources/Javadoc，Initializer CLI 另有 classifier，共 107 个主制品。唯一清单维护在
+Maven 4 的 28 个 project 同时发布 build POM 与 consumer POM；JAR project 发布
+main/sources/Javadoc，Initializer CLI 另有 classifier，共 132 个主制品。唯一清单维护在
 `scripts/release-artifacts.txt`，合同测试会将其与实际 reactor POM 逐项比较；
-`verify-remote-release-artifacts.sh` 必须从 GitHub Packages 读回并验证全部 107 个签名，而非抽查。
+`verify-remote-release-artifacts.sh` 必须从 GitHub Packages 读回并验证全部 132 个签名，而非抽查。
 
 强制 release assets 包含：CycloneDX SBOM、`MAVEN-SHA256SUMS`、`MAVEN-SHA512SUMS`、Ainer
 release provenance、制品清单、公钥/fingerprint、证据 checksum 与各自 `.asc`。Ainer provenance 是项目签名的
@@ -145,7 +145,7 @@ in-toto Statement 形状来源记录，不等于 GitHub Attestation，也不代�
 ## 7. 发布记录与验证边界
 
 发布记录至少保存：源码 commit、tag/版本、workflow run、JDK/Maven、测试摘要、local/remote consumer、
-migration/回滚、107 个主制品 checksum、签名 fingerprint、SBOM、provenance 和批准人。
+migration/回滚、132 个主制品 checksum、签名 fingerprint、SBOM、provenance 和批准人。
 
 以下表述必须区分：
 
