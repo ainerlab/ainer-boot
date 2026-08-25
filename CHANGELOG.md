@@ -17,6 +17,13 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   携带 RFC 9470 `WWW-Authenticate: Bearer error="insufficient_user_authentication"` 挑战头。
 - 授权模块补齐 ADR-0037 §3 声明的 ArchUnit 包边界守护（domain/policy/catalog/application 零
   Spring Security/Servlet 依赖、spring/ 适配层无反向引用）。
+
+### Changed
+
+- Maven 4 同 reactor BOM import 告警已用
+  [ADR-0049](docs/decisions/0049-maven4-reactor-bom-import-warning.md)
+  定性：**暂不消除，等待 Maven 4 GA**。不改 parentless BOM 消费合同。
+
 ## [1.1.0] - 2026-08-24
 
 商业级代码评审首次制品发布（PR #24–#27），并纳入评审遗留收口：P4 任务调度引擎
