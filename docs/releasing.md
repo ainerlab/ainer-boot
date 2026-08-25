@@ -66,7 +66,7 @@ git diff --check
 git status --short --branch
 ```
 
-脚本默认使用 `AINER_ARTIFACT_SOURCE=local`，在隔离仓库安装 producer 后验证 23 个 consumer POM、
+脚本默认使用 `AINER_ARTIFACT_SOURCE=local`，在隔离仓库安装 producer 后验证 28 个 consumer POM、
 公开配置元数据、sources/Javadoc、Maven 3/4 Golden Consumer 和 Initializer。Initializer 的普通、
 PostgreSQL 与 CRUD 三通道必须执行各自生成的 Maven 3.9.16 Wrapper。发布后的远端门禁使用：
 
