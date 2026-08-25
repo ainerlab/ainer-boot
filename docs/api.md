@@ -343,7 +343,24 @@ payload 必须是合法 JSON 对象且不超过 64 KB（否则 422 `AINER.TASK.I
 EXHAUSTED/CANCELLED/REGISTERED 等事件写入同事务或引擎侧 append-only 审计 `ainer_task_audit`；
 payload 正文不入库审计。错误码族 `AINER.TASK.*`。
 
-## 12. 兼容与变更
+## 12. Knowledge API（ADR-0044）
+
+Knowledge 模块默认装配；scope 在应用服务内强制。参考装配另有 `@AinerAuthorize` 粗门禁，
+需对应 Binding；模块切片未装配拦截器时注解不生效。请求体/查询里的 `workspaceId` 不作为
+授权目标。仍不是按对象/修订 ID 的对象级授权合同。发布仍是人工门禁（SERVICE 调用 403）。
+
+| Method | Path | Scope | 说明 |
+|---|---|---|---|
+| POST | `/api/knowledge/objects` | `knowledge.manage` | 创建对象（201）；`kind` 须 namespaced |
+| GET | `/api/knowledge/objects?workspaceId=` | `knowledge.read` | 分页（`size`≤100） |
+| POST | `/api/knowledge/objects/{objectId}/revisions` | `knowledge.manage` | 提案不可变修订（201） |
+| POST | `/api/knowledge/revisions/{revisionId}/publications` | `knowledge.manage` | 人工发布；SERVICE 403 |
+| GET | `/api/knowledge/objects/{objectId}?asOf=` | `knowledge.read` | asOf 解析已发布 Revision |
+| GET | `/api/knowledge/revisions/{revisionId}` | `knowledge.read` | 读取修订 |
+
+错误码族 `AINER.KNOWLEDGE.*`。生命周期事件同事务 append-only。
+
+## 13. 兼容与变更
 
 - 新增可选响应字段通常向后兼容，客户端必须容忍未知字段；
 - 删除、改名、改变字段类型、收紧枚举或改变 status/error code 都需要发布说明；
