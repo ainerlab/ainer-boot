@@ -1,7 +1,9 @@
 package dev.ainer.module.task.tasks.api;
 
+import dev.ainer.authorization.spring.AinerAuthorize;
 import dev.ainer.core.web.ApiResponse;
 import dev.ainer.module.task.tasks.application.TaskApplicationService;
+import dev.ainer.module.task.tasks.application.TaskAuthorities;
 import dev.ainer.module.task.tasks.domain.TaskDefinition;
 import dev.ainer.module.task.tasks.domain.TaskJob;
 import dev.ainer.security.token.AuthenticatedPrincipal;
@@ -29,6 +31,8 @@ import java.util.UUID;
 /**
  * 任务管理 API（ADR-0047）：注册类型、提交作业（延迟/周期）、管理面操作。
  * scope 在应用服务内强制；动作名词端点（cancellations/retries/status-changes）。
+ * 参考装配另有 {@code @AinerAuthorize} 粗门禁（需 Binding）；模块切片未装配拦截器时
+ * 注解不生效。
  */
 @RestController
 @RequestMapping("/api/tasks")
@@ -92,6 +96,7 @@ public class TaskController {
     // ------------------------------------------------------------------ 定义
 
     @PostMapping("/definitions")
+    @AinerAuthorize(permission = TaskAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<DefinitionResponse>> registerDefinition(
             @Valid @RequestBody RegisterDefinitionRequest body, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -104,6 +109,7 @@ public class TaskController {
     }
 
     @GetMapping("/definitions")
+    @AinerAuthorize(permission = TaskAuthorities.READ)
     public ApiResponse<PageResponse<DefinitionResponse>> pageDefinitions(
             @RequestParam(name = "page", defaultValue = "1") long page,
             @RequestParam(name = "size", defaultValue = "20") long size,
@@ -119,6 +125,7 @@ public class TaskController {
     }
 
     @PostMapping("/definitions/{taskType}/status-changes")
+    @AinerAuthorize(permission = TaskAuthorities.MANAGE)
     public ApiResponse<DefinitionResponse> changeDefinitionStatus(
             @PathVariable("taskType") String taskType,
             @RequestBody StatusChangeRequest body,
@@ -132,6 +139,7 @@ public class TaskController {
     // ------------------------------------------------------------------ 作业
 
     @PostMapping("/jobs")
+    @AinerAuthorize(permission = TaskAuthorities.SUBMIT)
     public ResponseEntity<ApiResponse<JobResponse>> submitJob(
             @RequestBody SubmitJobRequest body, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -144,6 +152,7 @@ public class TaskController {
     }
 
     @GetMapping("/jobs/{id}")
+    @AinerAuthorize(permission = TaskAuthorities.READ)
     public ApiResponse<JobResponse> getJob(
             @PathVariable("id") UUID id, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -152,6 +161,7 @@ public class TaskController {
     }
 
     @GetMapping("/jobs")
+    @AinerAuthorize(permission = TaskAuthorities.READ)
     public ApiResponse<PageResponse<JobResponse>> pageJobs(
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "taskType", required = false) String taskType,
@@ -169,6 +179,7 @@ public class TaskController {
     }
 
     @PostMapping("/jobs/{id}/cancellations")
+    @AinerAuthorize(permission = TaskAuthorities.MANAGE)
     public ApiResponse<JobResponse> cancelJob(
             @PathVariable("id") UUID id, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -178,6 +189,7 @@ public class TaskController {
     }
 
     @PostMapping("/jobs/{id}/retries")
+    @AinerAuthorize(permission = TaskAuthorities.MANAGE)
     public ApiResponse<JobResponse> retryJob(
             @PathVariable("id") UUID id, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();

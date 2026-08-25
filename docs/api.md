@@ -313,7 +313,9 @@ subject 使用。
 
 ## 11. 任务调度 API（ADR-0047）
 
-任务模块默认装配；scope 在应用服务内强制。`taskType` 全小写、以字母开头，可含数字/点/连字符。
+任务模块默认装配；scope 在应用服务内强制。参考装配另有 `@AinerAuthorize` 粗门禁，需对应
+Binding；模块切片未装配拦截器时注解不生效。仍不是按作业 ID 的对象级授权合同。
+`taskType` 全小写、以字母开头，可含数字/点/连字符。
 payload 必须是合法 JSON 对象且不超过 64 KB（否则 422 `AINER.TASK.INVALID_PAYLOAD`）。
 
 ### 定义管理（`task.read` / `task.manage`）

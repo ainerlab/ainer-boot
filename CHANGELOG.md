@@ -6,6 +6,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **任务端点 `@AinerAuthorize` 粗门禁**：`/api/tasks` 定义/作业消费 `task.read` /
+  `task.manage` / `task.submit`；参考装配需对应 Binding。模块切片未装配拦截器时注解不生效。
+  仍不是按作业 ID 的对象级授权合同。
 - **字典端点 `@AinerAuthorize` 粗门禁**：`/api/dictionaries` 类型/项读写消费
   `dictionary.read` / `dictionary.manage`；参考装配需对应 Binding。模块切片未装配拦截器时
   注解不生效。仍不是按类型/项 ID 的对象级授权合同。

@@ -310,6 +310,11 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-25 任务端点授权粗门禁
+- **P3**：`TaskController` 消费 `@AinerAuthorize`（`task.read` / `task.manage` /
+  `task.submit`）。LivePath：无 Binding→403，有 `task.submit` Binding→200。模块 HTTP
+  切片未装配拦截器。**不是** 按作业 ID 的对象级合同。
+
 2026-08-25 字典端点授权粗门禁
 - **P3**：`DictionaryManagementController` 消费 `@AinerAuthorize`（`dictionary.read` /
   `dictionary.manage`）。LivePath：无 Binding→403，有 `dictionary.read` Binding→200。

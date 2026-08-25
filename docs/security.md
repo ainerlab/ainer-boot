@@ -134,11 +134,11 @@ Bearer Token 仍由 Resource Server 在更早阶段返回 401。
 更早执行的 `AuthorizationFilter` 读取。
 
 参考装配（`ainer-server`）已给 Workspace 读写/审计、文件读写、配置读写（含 secret 写入）、
-通知读写/提交、字典读写、`ai.invoke` 与 `ai.agents.manage` 接线 `@AinerAuthorize`，并注册
-Workspace 路径 `AuthorizationTargetResolver`。**不是** 1.x 资源级授权合同。网关仅在请求带
-`actingAgentId` 时调用 `ActingGrant.check`（缺 `workspaceId` 返回 422，拒绝不泄露 reason）。
-组织/知识/任务 Controller、把 permission 改成类型化 resourceType、方法级 AOP 与 obligation
-executor 仍留给后续。
+通知读写/提交、字典读写、任务读写/提交、`ai.invoke` 与 `ai.agents.manage` 接线
+`@AinerAuthorize`，并注册 Workspace 路径 `AuthorizationTargetResolver`。**不是** 1.x 资源级
+授权合同。网关仅在请求带 `actingAgentId` 时调用 `ActingGrant.check`（缺 `workspaceId` 返回
+422，拒绝不泄露 reason）。组织/知识 Controller、把 permission 改成类型化 resourceType、
+方法级 AOP 与 obligation executor 仍留给后续。
 
 `PUBLIC_PROJECTION` 不会自行把路径加入 Resource Server 的 `public-paths`。即使宿主同时开放路径并
 注册 `PublicAccessPolicy`，当前 public ALLOW 仍携带 projection obligation，而 0.1 adapter 尚未执行
