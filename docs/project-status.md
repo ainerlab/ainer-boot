@@ -310,10 +310,16 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+<<<<<<< HEAD
 2026-08-25 M2 延迟自提权 Alert
 - **E**：[ADR-0050](decisions/0050-delayed-self-elevation-alert.md) 选 Alert；入岗命中自建
   岗位集合绑定写 `DELAYED_SELF_ELEVATION` 与计数器，不自动撤销。PostgreSQL 集成对照：
   自建命中写审计，他人创建的绑定不写。
+=======
+2026-08-25 ArchUnit 扩覆盖与 ai-agent 分页拉齐
+- **A**：P3 / organization / knowledge / task / ai.agent / identity 补 ArchUnit；ai-agent
+  非法分页改为 422 `AINER.AI_AGENT.INVALID_PAGE`，信封与 file 对齐（`items/page/size/total`）。
+>>>>>>> origin/dev
 
 2026-08-25 通知 WEBHOOK 首个真实渠道（默认关闭）
 - **交付**：`HttpWebhookChannelSender` 可选用 `RestClient` POST JSON；host 白名单、HTTPS
