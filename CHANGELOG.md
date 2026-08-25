@@ -4,6 +4,11 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
+### Changed
+
+- **采用 MIT 并公开仓库（ADR-0051）**：根目录 `LICENSE` / `NOTICE`，根 POM 声明 MIT。
+  不授予 Ainer 商标权（ADR-0004）。供应链签名/SBOM/不可变 Release 门禁不变。
+
 ### Added
 
 - **组织端点 `@AinerAuthorize` 粗门禁**：`/api/organization` 目录/任职/岗位消费

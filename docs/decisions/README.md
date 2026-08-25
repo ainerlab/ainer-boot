@@ -58,6 +58,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0048](0048-packages-storage-governance-and-rc-artifacts-retirement.md) | Accepted | Packages 存储治理与 rc 链 Maven 制品退役（修订 ADR-0041 保留条款在存储预算约束下的适用；删除 rc.1/rc.2/rc.3 制品，保留 tag/Release 证据/git 历史） |
 | [0049](0049-maven4-reactor-bom-import-warning.md) | Accepted | Maven 4 同 reactor BOM import 告警：暂不消除，等待 Maven 4 GA（修订 ADR-0026 开放项；不改 parentless BOM 消费合同） |
 | [0050](0050-delayed-self-elevation-alert.md) | Accepted | 岗位集合绑定延迟自提权采用 Alert：入岗命中自建绑定写审计/指标，不自动撤销、不阻断入岗 |
+| [0051](0051-mit-license-and-public-repository.md) | Accepted | Ainer Boot 源码采用 MIT，GitHub 仓库公开（修订 ADR-0041 私有分发假设；不授予商标权） |
 
 ## 历史草案与审查记录
 

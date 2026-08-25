@@ -1,6 +1,6 @@
 # 参与 Ainer Boot 开发
 
-感谢参与 Ainer Boot。项目采用 clean-room 自主实现，目标是形成可长期维护、可独立授权和可商业交付的 AI 原生企业应用底座。
+感谢参与 Ainer Boot。项目采用 clean-room 自主实现，目标是形成可长期维护、可独立授权和可商业交付的 AI 原生企业应用底座。源码按 [MIT License](LICENSE) 许可（ADR-0051）；MIT 不授予 Ainer 商标权。
 
 ## 开始之前
 

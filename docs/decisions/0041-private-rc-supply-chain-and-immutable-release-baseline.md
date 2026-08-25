@@ -5,6 +5,8 @@
 - 决策者：Ainer 项目维护者
 - 取代：无
 - 被取代：无
+- 修订：[ADR-0051](0051-mit-license-and-public-repository.md) 修订本 ADR 的「私有分发」
+  假设（仓库改为 public、源码 MIT）。签名、SBOM、provenance 与不可变 Release 门禁不变。
 
 ## 背景
 

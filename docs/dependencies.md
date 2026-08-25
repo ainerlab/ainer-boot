@@ -4,6 +4,9 @@
 
 本台账记录 Ainer 主动选择的构建与运行基线，服务于 clean-room、商业发行和后续 SBOM 审计。版本来自当前 Maven Reactor 的有效依赖；许可证以 Maven Central 发布 POM、上游仓库许可证文件为依据。
 
+Ainer 自己撰写的源码与制品按 **MIT** 许可（见根目录 `LICENSE` / `NOTICE` 与
+[ADR-0051](decisions/0051-mit-license-and-public-repository.md)）。本表只列第三方。
+
 | 组件 | 当前版本 | 用途 | 许可证 | 来源坐标 |
 |---|---:|---|---|---|
 | Spring Boot | 4.1.0 | 平台 BOM、Web、JDBC、Actuator、测试 | Apache-2.0 | `org.springframework.boot:*` |
