@@ -6,6 +6,10 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **Workspace 路径目标解析（参考装配）**：`ainer-server` 注册 `AuthorizationTargetResolver`，
+  把 `/api/workspaces/{id}` 写入 `ResourceRef.workspaceId`（仍是 `resourceType=request`）。
+  对该工作区的 WORKSPACE Binding 才能过路径门禁；创建/列表无路径 id 时仍是粗闸门。
+  **不是** 1.x 资源级授权合同（所有权/成员仍由应用服务检查）。
 - **通知 EMAIL SMTP 投递（默认关闭）**：启用 `ainer.notification.email.enabled` 后，EMAIL
   渠道用 `JavaMailSender` 发送纯文本邮件；必须配置 `from` 与 `spring.mail.host`。地址与
   主题拒绝控制字符（防头注入）；日志与错误消息不含收件人。SMS/Push 仍由产品实现。

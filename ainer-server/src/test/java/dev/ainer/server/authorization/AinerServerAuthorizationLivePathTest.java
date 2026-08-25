@@ -32,6 +32,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import dev.ainer.authorization.spring.AinerAuthorize;
@@ -74,6 +75,8 @@ class AinerServerAuthorizationLivePathTest {
     private static final String AUDIENCE = "ainer-api";
     private static final UUID WORKSPACE_ID =
             UUID.fromString("019c7000-0000-7000-8000-000000000001");
+    private static final UUID OTHER_WORKSPACE_ID =
+            UUID.fromString("019c7000-0000-7000-8000-000000000099");
     private static final RSAKey RSA_JWK = JwtTestSupport.generateRsaKey();
 
     @Container
@@ -244,6 +247,30 @@ class AinerServerAuthorizationLivePathTest {
     }
 
     @Test
+    void workspacePathProbeRequiresBindingForThatWorkspace() {
+        authenticate(JwtTestSupport.signServiceJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-ops", "authorization.manage"));
+        RestResponse role = client.postJson("/api/authorization/roles", """
+                {"code": "workspace-reader-scoped", "name": "Workspace Reader Scoped",
+                 "permissions": ["workspace.read"]}
+                """);
+        assertThat(role.status().value()).isEqualTo(201);
+        String roleId = (String) role.jsonPath("$.data.id");
+        RestResponse binding = client.postJson("/api/authorization/bindings", """
+                {"issuer": "%s", "subjectType": "USER", "subjectId": "platform-user-1",
+                 "roleId": "%s", "scopeKind": "WORKSPACE", "workspaceId": "%s"}
+                """.formatted(ISSUER, roleId, WORKSPACE_ID));
+        assertThat(binding.status().value()).isEqualTo(201);
+
+        authenticate(JwtTestSupport.signUserJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-user-1", "workspace.read"));
+        RestResponse allowed = client.get("/api/workspaces/" + WORKSPACE_ID + "/authz-live-probe");
+        assertThat(allowed.status().value()).isEqualTo(200);
+        RestResponse denied = client.get("/api/workspaces/" + OTHER_WORKSPACE_ID + "/authz-live-probe");
+        assertThat(denied.status().value()).isEqualTo(403);
+    }
+
+    @Test
     void requestWithoutTokenIsUnauthorized() {
         restTemplate.getRestTemplate().setInterceptors(List.of());
         ResponseEntity<String> response = restTemplate.getForEntity(
@@ -256,7 +283,8 @@ class AinerServerAuthorizationLivePathTest {
     @Import({
             AinerServerAuthorizationPolicyConfiguration.class,
             dev.ainer.authorization.AuthorizationModuleConfiguration.class,
-            WorkspaceReadProbeController.class
+            WorkspaceReadProbeController.class,
+            WorkspaceScopedProbeController.class
     })
     static class TestApplication {
 
@@ -280,6 +308,19 @@ class AinerServerAuthorizationLivePathTest {
         @GetMapping
         @AinerAuthorize(permission = "workspace.read")
         public ResponseEntity<Void> peek() {
+            return ResponseEntity.ok().build();
+        }
+    }
+
+    @RestController
+    @RequestMapping("/api/workspaces")
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+            name = "ainer.server.test-authz-live", havingValue = "true")
+    static class WorkspaceScopedProbeController {
+
+        @GetMapping("/{workspaceId}/authz-live-probe")
+        @AinerAuthorize(permission = "workspace.read")
+        public ResponseEntity<Void> peekWorkspace(@PathVariable UUID workspaceId) {
             return ResponseEntity.ok().build();
         }
     }

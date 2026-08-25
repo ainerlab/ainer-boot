@@ -122,7 +122,8 @@ Spring 适配只位于 `dev.ainer.authorization.spring`。Servlet 安全过滤�
 
 - 未注册目标解析器时，门禁是 `resourceType=request` 的合成资源粗闸门；产品可注册
   `AuthorizationTargetResolver` bean（第一个非空结果胜出）从请求解析类型化 `ResourceRef`，
-  其类型必须与 permission 注册的 resourceType 一致，否则 fail-closed 拒绝。
+  其类型必须与 permission 注册的 resourceType 一致，否则 fail-closed 拒绝。参考装配已注册
+  Workspace 路径解析器：有 `{id}` 时 Binding 必须对上该工作区，无路径 id 时仍是粗闸门。
 - CHALLENGE（高风险权限缺少近期强认证）映射为 401 并携带 RFC 9470
   `WWW-Authenticate: Bearer error="insufficient_user_authentication"` 挑战头。
 - ALLOW 携带的 `PublicProjection` 是响应投影数据而非待执行义务，不阻断放行；完整决策经请求属性
