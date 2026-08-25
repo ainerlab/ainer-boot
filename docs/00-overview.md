@@ -64,7 +64,7 @@ ainer-server                          业务 Resource Server
 ├── ainer-module-authorization        混合细粒度授权 + adapter + 审计（ADR-0037）
 ├── ainer-module-dictionary           树形字典 + 多语言 + Spring Cache（ADR-0040）
 ├── ainer-module-config               动态配置 + 类型安全 + 热更新 + 版本（ADR-0040）
-├── ainer-module-notification         通知端口 + SKIP LOCKED 队列 + 可选 HTTP webhook（ADR-0040）
+├── ainer-module-notification         通知端口 + SKIP LOCKED 队列 + 可选 HTTP webhook / SMTP（ADR-0040）
 ├── ainer-module-file                 文件元数据 + 大小/类型限制 + 管理 API（ADR-0040）
 ├── ainer-module-organization         组织目录（Incubating，ADR-0042）
 ├── ainer-module-knowledge            Knowledge Foundation（Incubating，ADR-0044）

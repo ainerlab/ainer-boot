@@ -310,6 +310,12 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-25 通知 EMAIL SMTP 渠道（默认关闭）
+- **交付**：`SmtpMailChannelSender` 可选用 `JavaMailSender`；启用时必填 `from` 且必须存在
+  MailSender bean。提交期校验地址；主题拒绝 CR/LF。默认仍是日志 sender。
+- **验证**：`EmailAddressRulesTest` + `SmtpMailChannelSenderIntegrationTest`（真实 PostgreSQL
+  + 记录型 `JavaMailSender`：SENT / 失败重试且错误消息无地址）。
+
 2026-08-25 通知 WEBHOOK 首个真实渠道（默认关闭）
 - **交付**：`HttpWebhookChannelSender` 可选用 `RestClient` POST JSON；host 白名单、HTTPS
   （loopback HTTP 需显式允许）、解析地址拒绝私网/链路本地/ULA、不跟随重定向；提交期对
