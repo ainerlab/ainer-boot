@@ -1,7 +1,7 @@
 # Ainer Boot 产品白皮书
 
 > 面向：企业采购、平台架构师、技术决策者 · 对应版本：`v1.1.0`（当前稳定）
-> 状态：对外草案 v0.1 —— 许可与定价相关章节为占位，见文末「待定事项」
+> 状态：对外草案 v0.1 —— 源码许可已定为 MIT（ADR-0051）；定价与分层仍为占位
 
 ---
 
@@ -96,7 +96,7 @@ Project Initializer：声明式清单确定性生成独立项目（自带锁定�
 
 ## 7. 许可与商务（占位）
 
-- 许可模式：**待定**（当前私有/专有；公开发行需完成 LICENSE/NOTICE 与品牌决策）
+- 许可模式：**MIT**（见仓库 `LICENSE` / `NOTICE` 与 ADR-0051）。不授予 Ainer 商标权。
 - 版本分层（Community / Pro / Enterprise）：草案见
   [`edition-tiers.md`](edition-tiers.md)
 - 定价：待定

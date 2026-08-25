@@ -1,7 +1,7 @@
 # Ainer Boot 版本分层框架（草案）
 
-> 状态：**草案**——能力边界基于已交付代码事实与产品路线推导，定稿需商业决策
-> （定价、许可模式、支持 SLA）。本文不构成对外承诺。
+> 状态：**草案**——能力边界基于已交付代码事实与产品路线推导。源码许可已定为 MIT
+> （ADR-0051）；定稿仍需定价与支持 SLA。本文不构成对外承诺。
 > 事实来源：[`design/ainer-scaffold-design.md`](../ainer-scaffold-design.md) §3.3 能力矩阵、
 > [`project-status.md`](../project-status.md)
 
@@ -50,5 +50,5 @@
 
 1. Pro 层是否有独立存在价值（vs Community + Enterprise 两层制）
 2. Enterprise 服务型条目（咨询/演练/SLA）按订阅还是按项目计价
-3. Community 许可选择（影响「免费使用」的法律含义）
+3. Community 源码许可已定为 MIT（ADR-0051）；商标与官方背书仍按 ADR-0004
 4. 各层的支持响应承诺（工程团队产能约束下可兑现的 SLA）

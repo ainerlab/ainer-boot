@@ -13,6 +13,14 @@
     <description>AI-native enterprise application platform based on Spring Boot 4</description>
     <url>https://github.com/ainerlab/ainer-boot</url>
 
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
     <scm>
         <connection>scm:git:https://github.com/ainerlab/ainer-boot.git</connection>
         <developerConnection>scm:git:ssh://git@github.com/ainerlab/ainer-boot.git</developerConnection>

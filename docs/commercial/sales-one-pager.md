@@ -1,6 +1,6 @@
 # Ainer Boot —— 一页纸
 
-> 销售物料草案 v0.1 · 定价与许可待定 · 详细论证见
+> 销售物料草案 v0.1 · 源码 MIT（ADR-0051）· 定价待定 · 详细论证见
 > [`product-whitepaper.md`](product-whitepaper.md)
 
 ---
@@ -37,6 +37,10 @@
 
 Community（完整工程内核，当前可售实体）/ Pro（连接器与策略包，路线图）/
 Enterprise（SSO、控制台、HA 服务与 SLA，路线图）——边界草案见分层框架文档。
+
+## 许可
+
+源码 **MIT**（仓库 `LICENSE`）。不授予 Ainer 商标权。分层与定价仍为草案。
 
 ## 下一步
 

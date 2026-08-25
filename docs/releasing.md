@@ -28,8 +28,9 @@ Changelog 提供替代方案。Stable/Incubating/非目标边界以 ADR-0040 为
 
 1. `project-status.md` 已更新实际范围、未完成项和证据边界；
 2. `CHANGELOG.md` 的 `Unreleased` 已整理到目标版本；
-3. 相关 ADR 已接受，许可证台账已更新；私有/专有 RC 明确分发边界，公开发行另行完成
-   LICENSE/NOTICE、品牌资产和对外许可决策；
+3. 相关 ADR 已接受，许可证台账已更新；Ainer 源码许可为 MIT（ADR-0051），根目录
+   `LICENSE`/`NOTICE` 与根 POM `<licenses>` 必须与之一致；商标仍按 ADR-0004，不因
+   MIT 而宣称已取得商标；
 4. JDK 25 下 `./mvnw clean verify` 通过，PostgreSQL Testcontainers 为 `0 skipped`；
 5. 本地 non-SNAPSHOT Maven 3.9+/Maven 4 Golden Consumer 与 Initializer 三通道通过；
 6. Maven Artifact Plugin 的 build plan 与可重复构建比较通过；
@@ -82,8 +83,10 @@ AINER_VERSION="$AINER_VERSION" ./scripts/verify-initializer-consumer.sh
 
 ## 5. GitHub Packages 发布流程
 
-私有仓库当前发布到 `https://maven.pkg.github.com/ainerlab/ainer-boot`，repository id 为
-`github-packages`。`.github/workflows/release.yml` 只由 `v*` tag 触发，顺序固定为：
+发布坐标为 `https://maven.pkg.github.com/ainerlab/ainer-boot`，repository id 为
+`github-packages`。仓库按 ADR-0051 公开后，后续 deploy 的 package 可见性需在 GitHub
+Packages 侧单独核对，不得假设改仓库 visibility 会自动改已有私有版本。
+`.github/workflows/release.yml` 只由 `v*` tag 触发，顺序固定为：
 
 1. checkout 完整历史，验证 tag 是 annotated SemVer tag，且 peel 后 commit 同时等于 workflow 源码与
    当前默认分支头；
@@ -120,7 +123,8 @@ Attestations 时启用。未启用时，项目签名 provenance 仍是强制门�
 失败必须阻断，不允许 `continue-on-error`。
 
 本地手动发布需要在 Maven settings 为 `github-packages` 配置 `write:packages` 凭据，但常规发布只走
-tag workflow。私有制品的下游消费需要 `read:packages`；不得把 PAT 写入 POM、仓库或日志。
+tag workflow。公开 package 可匿名拉取；仍为 private 的既有版本需要 `read:packages`。
+不得把 PAT 写入 POM、仓库或日志。
 
 ## 6. 签名、制品清单与 provenance
 

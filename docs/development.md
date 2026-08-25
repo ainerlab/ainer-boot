@@ -207,5 +207,6 @@ ainer-initializer-cli              P2 CLI（preview / init / diff）
    SBOM/provenance、immutable Release
 4. 双消费者升级矩阵验证
 
-**注意**：GitHub Packages 私有仓库有存储配额（免费版 500MB，含 Actions 制品）。发布前
-确认配额充足；不足时清理旧版本或升级付费计划。
+**注意**：仓库按 ADR-0051 公开后，公开 Actions 与公开 Packages 不再计入免费版私有
+存储配额。既有私有 package 版本的可见性仍要在 GitHub Packages 侧核对；发布前确认
+目标可见性与配额，不足时按 ADR-0048 退役旧版本。

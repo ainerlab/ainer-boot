@@ -11,8 +11,8 @@
 通用企业 Java 脚手架：JDK 25 + Spring Boot 4.1 + PostgreSQL 18 的模块化单体，自带可信的
 身份、授权、工作区治理、AI 模型网关与企业基座。
 
-**商业定位**：付费客户将直接阅读源码——代码质量标准是「优秀的商业级脚手架」，不是「能跑
-就行」。仓库当前为私有/专有，公开发行/开源决策未做。
+**商业定位**：付费客户与社区都将阅读源码——代码质量标准是「优秀的商业级脚手架」，不是
+「能跑就行」。仓库按 MIT 公开（ADR-0051）；商标仍按 ADR-0004，分层定价仍是草案。
 
 **核心价值**：产品团队从「第一个业务提交」开始，而不是从「搭后台」开始。已通过 Project
 Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
@@ -51,8 +51,8 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
 
 | 仓库 | 位置 | 验证内容 |
 |---|---|---|
-| `xq-platform-next` | `~/01-code/xq/xq-platform-next` | Initializer 生成 + 完整升级链 `rc.2→1.1.0` 含回滚 + JWT/授权/SDK 纵向切片 |
-| `python-learning-service` | `/Users/xq/01-code/self/python-learning-service` | Initializer 生成 + 冷仓接入 `0.1.0→1.1.0` + Evidence 存档切片 |
+| `xq-platform-next` | 独立工程验证仓库 | Initializer 生成 + 完整升级链 `rc.2→1.1.0` 含回滚 + JWT/授权/SDK 纵向切片 |
+| `python-learning-service` | 独立工程验证仓库 | Initializer 生成 + 冷仓接入 `0.1.0→1.1.0` + Evidence 存档切片 |
 
 **重要**：两个消费者目前都是工程验证仓库，**没有部署运行，没有真实终端用户**。升级矩阵
 和兼容验证是工程证据（证明脚手架「可以被消费」），不是「正在被消费」。
@@ -66,8 +66,9 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
   路径 workspaceId）；**不是** 1.x 资源级授权合同，类型化 resourceType、obligation executor
   仍待做
 - 生产签发前必须启用在线校验与 step-up（脚手架默认关闭；见 `operations.md` 2.3 / §6）
-- GitHub Packages 私有仓库存储配额（免费版 500MB 含 Actions 制品，多次发布后可能耗尽）
-- 分支保护未启用（private + GitHub 免费版限制；升级 Pro 或转 public 可解锁）
+- 公开仓库后，Actions / 公开 Packages 不再占用免费版私有存储配额；既有私有 package
+  版本的可见性仍要在 GitHub Packages 侧核对（ADR-0051 / ADR-0048）
+- 分支保护仍未启用；仓库公开后免费版已可配置，需维护者在 GitHub 上打开
 
 ## 3. 快速上手
 

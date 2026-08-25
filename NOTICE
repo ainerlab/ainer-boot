@@ -1,0 +1,11 @@
+Ainer Boot
+Copyright (c) 2026 Ainer contributors
+
+This product is licensed under the MIT License. See the LICENSE file.
+
+The MIT License covers copyright in this repository. It does not grant rights
+in the Ainer name, logo, or other brand assets. Trademark status and naming
+rules remain those of ADR-0004.
+
+Third-party components remain under their own licenses. See
+docs/dependencies.md and the CycloneDX SBOM published with each GitHub Release.

@@ -202,7 +202,8 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 3. [`configuration.md`](configuration.md)
 4. [`public-origin-and-domain-strategy.md`](public-origin-and-domain-strategy.md)
 5. [`releasing.md`](releasing.md)
-6. [`project-status.md`](project-status.md) 的当前运行缺口
+6. [ADR-0051](decisions/0051-mit-license-and-public-repository.md)（MIT 与仓库公开）
+7. [`project-status.md`](project-status.md) 的当前运行缺口
 
 ### 4.8 旧系统迁移或 Boot 4 兼容
 
@@ -261,11 +262,13 @@ Maven 4 对根工程 import 同 reactor BOM 的模型 WARNING 以 ADR-0049 为�
 | [`decisions/0033-account-workspace-isolation-model-baseline-v2.md`](decisions/0033-account-workspace-isolation-model-baseline-v2.md) | ADR-0033 v2 迁移路线草案（Historical，不采用，保留为迁移备选语境） |
 | [`decisions/0034-knowledge-foundation-and-ai-context-model.md`](decisions/0034-knowledge-foundation-and-ai-context-model.md) | Knowledge Foundation、Content/Asset 边界与 AI Context Assembly 基线（Proposed） |
 | [`decisions/README.md`](decisions/README.md) | ADR 状态、索引和模板 |
+| [`decisions/0051-mit-license-and-public-repository.md`](decisions/0051-mit-license-and-public-repository.md) | ADR-0051：MIT 许可与仓库公开（不授予商标权） |
 
 ### 工程规范
 
 | 文档 | 作用 |
 |---|---|
+| [`../LICENSE`](../LICENSE) / [`../NOTICE`](../NOTICE) | MIT 许可与商标/第三方说明（ADR-0051） |
 | [`development.md`](development.md) | 环境、构建、运行和开发流程 |
 | [`conventions.md`](conventions.md) | 命名、分层、错误、Starter、安全和编码约定 |
 | [`dependencies.md`](dependencies.md) | 依赖版本、用途、许可证和升级纪律 |

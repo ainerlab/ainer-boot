@@ -10,9 +10,11 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 [Ainer Boot 产品定位、竞品能力矩阵与路线图](docs/design/ainer-scaffold-design.md)。
 
 品牌与活动技术标识现已统一为 Ainer，脚手架产品名为 **Ainer Boot**。`v1.0.0` 已发布
-（工程合同定稿，见 [`docs/ainer-boot-1.0-product.md`](docs/ainer-boot-1.0-product.md)）；
-仓库仍为私有、专有，公开发行/开源许可决策未做，正式决策、产品命名、
-域名状态、目标标识和迁移记录见 [ADR-0004：Ainer 品牌与技术命名基线](docs/decisions/0004-ainer-brand-and-naming-baseline.md)。
+（工程合同定稿，见 [`docs/ainer-boot-1.0-product.md`](docs/ainer-boot-1.0-product.md)）。
+本仓库按 [MIT License](LICENSE) 开源（[ADR-0051](docs/decisions/0051-mit-license-and-public-repository.md)）；
+MIT **不授予** Ainer 商标权。产品命名、域名状态与标识规则见
+[ADR-0004](docs/decisions/0004-ainer-brand-and-naming-baseline.md)。第三方依赖见
+[`NOTICE`](NOTICE) 与 [`docs/dependencies.md`](docs/dependencies.md)。
 
 ## 当前可用能力
 
