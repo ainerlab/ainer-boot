@@ -271,6 +271,33 @@ class AinerServerAuthorizationLivePathTest {
     }
 
     @Test
+    void fileProbeDeniesWithoutBindingAndAllowsWithFileBinding() {
+        authenticate(JwtTestSupport.signUserJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-user-1", "file.read"));
+        RestResponse denied = client.get("/api/authz-file-probe");
+        assertThat(denied.status().value()).isEqualTo(403);
+
+        authenticate(JwtTestSupport.signServiceJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-ops", "authorization.manage"));
+        RestResponse role = client.postJson("/api/authorization/roles", """
+                {"code": "file-reader-http", "name": "File Reader HTTP",
+                 "permissions": ["file.read"]}
+                """);
+        assertThat(role.status().value()).isEqualTo(201);
+        String roleId = (String) role.jsonPath("$.data.id");
+        RestResponse binding = client.postJson("/api/authorization/bindings", """
+                {"issuer": "%s", "subjectType": "USER", "subjectId": "platform-user-1",
+                 "roleId": "%s", "scopeKind": "WORKSPACE", "workspaceId": "%s"}
+                """.formatted(ISSUER, roleId, WORKSPACE_ID));
+        assertThat(binding.status().value()).isEqualTo(201);
+
+        authenticate(JwtTestSupport.signUserJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-user-1", "file.read"));
+        RestResponse allowed = client.get("/api/authz-file-probe");
+        assertThat(allowed.status().value()).isEqualTo(200);
+    }
+
+    @Test
     void requestWithoutTokenIsUnauthorized() {
         restTemplate.getRestTemplate().setInterceptors(List.of());
         ResponseEntity<String> response = restTemplate.getForEntity(
@@ -284,7 +311,8 @@ class AinerServerAuthorizationLivePathTest {
             AinerServerAuthorizationPolicyConfiguration.class,
             dev.ainer.authorization.AuthorizationModuleConfiguration.class,
             WorkspaceReadProbeController.class,
-            WorkspaceScopedProbeController.class
+            WorkspaceScopedProbeController.class,
+            FileReadProbeController.class
     })
     static class TestApplication {
 
@@ -321,6 +349,19 @@ class AinerServerAuthorizationLivePathTest {
         @GetMapping("/{workspaceId}/authz-live-probe")
         @AinerAuthorize(permission = "workspace.read")
         public ResponseEntity<Void> peekWorkspace(@PathVariable UUID workspaceId) {
+            return ResponseEntity.ok().build();
+        }
+    }
+
+    @RestController
+    @RequestMapping("/api/authz-file-probe")
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+            name = "ainer.server.test-authz-live", havingValue = "true")
+    static class FileReadProbeController {
+
+        @GetMapping
+        @AinerAuthorize(permission = "file.read")
+        public ResponseEntity<Void> peekFile() {
             return ResponseEntity.ok().build();
         }
     }
