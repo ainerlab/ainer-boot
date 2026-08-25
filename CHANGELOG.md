@@ -6,6 +6,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **通知端点 `@AinerAuthorize` 粗门禁**：`/api/notifications` 模板/记录/提交消费
+  `notification.read` / `notification.manage` / `notification.submit`；参考装配需对应 Binding。
+  模块切片未装配拦截器时注解不生效。仍不是按模板/记录 ID 的对象级授权合同。
 - **配置端点 `@AinerAuthorize` 粗门禁**：`/api/configs` 读写与 secret 写入消费
   `config.read` / `config.manage`；参考装配需对应 Binding。模块切片未装配拦截器时注解不生效。
   仍不是按 namespace/key 的对象级授权合同。

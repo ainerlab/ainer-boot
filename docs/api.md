@@ -296,6 +296,9 @@ subject 使用。
 
 ### Notification（`notification.read` / `manage` / `submit`）
 
+参考装配另有 `@AinerAuthorize` 粗门禁，需对应 Binding；模块切片未装配拦截器时注解不生效。
+仍不是按模板/记录 ID 的对象级授权合同。
+
 | Method | Path | Scope | 说明 |
 |---|---|---|---|
 | POST/GET | `/api/notifications/templates` | manage / read | 创建模板（409 重复）；`?status=` 分页 |
