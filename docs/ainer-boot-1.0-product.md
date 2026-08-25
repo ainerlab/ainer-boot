@@ -27,7 +27,7 @@
 | 常见脚手架的隐性成本 | Ainer Boot 1.0 的回答 |
 |---|---|
 | 登录/权限是演示级的，承载真实身份与授权需求前要推倒重写 | 独立 OAuth 2.1/OIDC Authorization Server、Passkey、真 JWT 端到端安全链 |
-| `user.dept_id + role + data_scope` 表达不了真实组织与多任职 | Workspace 成员治理 + ADR-0037 混合授权（RBAC+ReBAC+ABAC）+ 组织目录与岗位集合绑定（撤岗即失权） |
+| `user.dept_id + role + data_scope` 表达不了真实组织与多任职 | Workspace 成员治理 + ADR-0037 混合授权（RBAC+ReBAC+ABAC）；组织目录与 `workforce.position#assignee` 岗位集合绑定为 **Incubating**（撤岗即失权已验证，不承诺 API 稳定） |
 | 错误码、响应信封、分页各自为政 | 统一 `ApiResponse` 信封、真实 HTTP 状态码、`AINER.*` 稳定错误码、`X-Request-Id` 全响应追踪 |
 | 数据库方言混用，测试靠 H2 自欺 | PostgreSQL 18 唯一基线；集成测试全量真实库重放，CI 强制 **0 skipped** |
 | AI 能力是「再加一个 SDK」 | 治理式模型网关：预算/限流/Token 费用审计/脱敏，调用必经网关 |
@@ -60,8 +60,9 @@
 
 ### C. 工作区与治理（Stable）
 
-- Workspace membership 资源边界（OWNER/ADMIN/MEMBER），OWNER 专用锁定事务转移，无
-  OWNER 双人恢复
+- Workspace membership 资源边界（OWNER/ADMIN/MEMBER），OWNER 专用锁定事务转移；
+  无 ACTIVE OWNER 时提供**默认关闭**的双人恢复（只提升现有 ACTIVE 成员，不恢复已
+  REVOKED 的原 OWNER）
 - 授权审计热表 + 同库归档、稳定游标 SIEM 拉取
 
 ### D. 通用授权（Stable + Incubating）
@@ -70,9 +71,11 @@
   （Workspace/Resource/Global）、Spring Security adapter、管理 API、防提权矩阵、决策审计、
   类型化集合查询计划（Ainer 产出类型化约束 `Q`，由产品 Repository 翻译为参数化 SQL——
   Ainer 不输出 SQL）。**SubjectSet 集合绑定的决策引擎与管理 API**（创建防提权矩阵、决策时
-  实时成员解析）。**首版边界（ADR-0037）**：`@AinerAuthorize` 端点注解当前只支持
-  `resourceType=request` 的空-obligation 粗门禁；资源级 target resolver、方法级 AOP、
-  obligation 执行器与 RFC 9470 未交付——高价值写仍必须在应用服务内显式调用授权决策
+  实时成员解析）。`workforce.position#assignee` 集合族依赖组织目录，与组织模块同属
+  **Incubating**，不进入 1.x Stable 兼容承诺。**1.0.0 时点的 adapter 边界（ADR-0037）**：
+  `@AinerAuthorize` 只支持 `resourceType=request` 的空-obligation 粗门禁；资源级 target
+  resolver、方法级 AOP、obligation 执行器与 RFC 9470 均未交付——高价值写仍必须在应用
+  服务内显式调用授权决策。后续切片以 `project-status.md` / CHANGELOG 为准，不回写本快照。
 - **Incubating**：组织目录（部门/任职/调岗/岗位，含调岗单事务与任职期不重叠约束）、
   Agent 代行 A1（一层委托 + 委托检查点实时解析：Agent 退役/权限收缩/撤委托即拒）
 
