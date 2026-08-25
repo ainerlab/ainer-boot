@@ -6,6 +6,10 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **通知 WEBHOOK 真实投递（默认关闭）**：启用 `ainer.notification.webhook.enabled` 后，WEBHOOK
+  渠道用 `RestClient` POST JSON `{title,body}`；host 白名单 + HTTPS（loopback HTTP 需显式允许）
+  + 拒绝私网/链路本地/ULA 解析 + 不跟随重定向。日志与错误消息不含 URL/正文。未启用时仍是
+  开发用日志 sender；SMS/Email/Push 仍由产品实现 `ChannelSender`。
 - **授权端点门禁增强（ADR-0037 后续切片首批）**：新增 `AuthorizationTargetResolver` SPI——产品注册
   bean 后 `@AinerAuthorize` 门禁按解析出的类型化 `ResourceRef` 决策（第一个非空结果胜出，
   resourceType 不匹配 fail-closed），不再局限于合成 request 资源；完整决策经请求属性

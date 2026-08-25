@@ -310,6 +310,13 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-25 通知 WEBHOOK 首个真实渠道（默认关闭）
+- **交付**：`HttpWebhookChannelSender` 可选用 `RestClient` POST JSON；host 白名单、HTTPS
+  （loopback HTTP 需显式允许）、解析地址拒绝私网/链路本地/ULA、不跟随重定向；提交期对
+  非法 recipient 返回 400。默认仍是 `LoggingChannelSender`。SMS/Email/Push 仍由产品实现。
+- **验证**：`WebhookDestinationRulesTest`（无 Docker）+ `WebhookChannelSenderIntegrationTest`
+  （真实 PostgreSQL + JDK HttpServer 2xx SENT / 503 重试且错误消息无 URL）。
+
 2026-08-25 1.0 评审剩余文档与商业评审 H5' 收口
 - **1.0 快照**：岗位集合族标 Incubating；OWNER 恢复去歧义；总览去掉重复模块树；架构当前
   模块图补上 P3 / 组织 / Knowledge / 任务调度；§4/§5 不再把「进入 G3」写成当前阶段。

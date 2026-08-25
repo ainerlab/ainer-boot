@@ -107,6 +107,17 @@ P3 管理面 scope（ADR-0040，在应用服务内对已验证 principal 强制�
 | `notification.read` / `notification.manage` / `notification.submit` | notification | 模板与记录查询 / 模板生命周期 / 直接提交 |
 | `file.read` / `file.write` | file | 读取下载 / 上传删除 |
 
+Webhook 真实投递默认关闭（开发继续走日志 sender）。启用后 recipient 必须是白名单 host
+上的绝对 URL，生产必须 HTTPS；HTTP 仅允许显式开启后的 loopback。不跟随重定向。
+
+| 环境变量 | 默认值 | 生产说明 |
+|---|---|---|
+| `AINER_NOTIFICATION_WEBHOOK_ENABLED` | `false` | 用 HTTP POST 替换 WEBHOOK 渠道的日志兜底 |
+| `AINER_NOTIFICATION_WEBHOOK_ALLOWED_HOSTS` | 空 | 启用时必填；recipient host 必须完全匹配 |
+| `AINER_NOTIFICATION_WEBHOOK_CONNECT_TIMEOUT` | `2s` | 必须为正数 |
+| `AINER_NOTIFICATION_WEBHOOK_READ_TIMEOUT` | `2s` | 必须为正数 |
+| `AINER_NOTIFICATION_WEBHOOK_ALLOW_INSECURE_HTTP` | `false` | 仅 loopback 自动化测试允许 `true` |
+
 ## 4. AI runtime
 
 AI 默认关闭。启用时以下设置共同构成安全门禁：
