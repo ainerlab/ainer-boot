@@ -33,16 +33,19 @@ public class NotificationApplicationService {
     private final NotificationTemplateRepository templateRepository;
     private final NotificationRecordRepository recordRepository;
     private final NotificationAuditRepository auditRepository;
+    private final NotificationWebhookProperties webhookProperties;
     private final Clock clock;
 
     public NotificationApplicationService(
             NotificationTemplateRepository templateRepository,
             NotificationRecordRepository recordRepository,
             NotificationAuditRepository auditRepository,
+            NotificationWebhookProperties webhookProperties,
             Clock clock) {
         this.templateRepository = templateRepository;
         this.recordRepository = recordRepository;
         this.auditRepository = auditRepository;
+        this.webhookProperties = webhookProperties;
         this.clock = clock;
     }
 
@@ -168,6 +171,13 @@ public class NotificationApplicationService {
     private NotificationRecord newRecord(
             NotificationChannel channel, String recipient, String templateCode,
             String title, String body, Map<String, Object> payload) {
+        if (channel == NotificationChannel.WEBHOOK && webhookProperties.enabled()) {
+            try {
+                WebhookDestinationRules.validate(recipient, webhookProperties);
+            } catch (IllegalArgumentException exception) {
+                throw new BusinessException(NotificationErrorCode.INVALID_REQUEST);
+            }
+        }
         Instant now = clock.instant();
         return new NotificationRecord(
                 dev.ainer.core.uuid.Uuidv7.generate(), templateCode, channel, recipient, title, body, payload,

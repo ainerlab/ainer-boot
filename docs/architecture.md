@@ -90,7 +90,7 @@ ainer-boot/
 ├── ainer-module-authorization/           # ADR-0037：决策器、6 表持久化、管理/查询与 Spring 端点适配
 ├── ainer-module-dictionary/              # 树形字典 + 多语言 + Spring Cache（ADR-0040）
 ├── ainer-module-config/                  # 动态配置 + 类型安全 + 热更新 + 版本历史 + secret（ADR-0040）
-├── ainer-module-notification/            # ChannelSender 端口 + PG SKIP LOCKED 队列（ADR-0040）
+├── ainer-module-notification/            # ChannelSender 端口 + SKIP LOCKED 队列 + 可选 HTTP webhook（ADR-0040）
 ├── ainer-module-file/                    # 文件元数据 + 管理 API（ADR-0040）
 ├── ainer-module-organization/            # Incubating：组织目录（ADR-0042）
 ├── ainer-module-knowledge/               # Incubating：Knowledge Foundation（ADR-0044）
