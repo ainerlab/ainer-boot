@@ -61,7 +61,7 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
 
 - M2 延迟自提权已落地 **Alert**（ADR-0050）：入岗命中自建岗位集合绑定写审计/指标，不自动
   撤销、不阻断入岗；Recheck 冻结 / 禁止 bind-before-assignment 仍等真实 HR 消费者
-- M5' 参考装配已接线 Workspace/AI/文件 `@AinerAuthorize`、网关 `ActingGrant.check`，以及
+- M5' 参考装配已接线 Workspace/AI/文件/配置 `@AinerAuthorize`、网关 `ActingGrant.check`，以及
   Workspace 路径 `AuthorizationTargetResolver`（Binding 须对上路径 workspaceId）；**不是**
   1.x 资源级授权合同，其余 P3 Controller / 类型化 resourceType / obligation executor 仍待做
 - 生产签发前必须启用在线校验与 step-up（脚手架默认关闭；见 `operations.md` 2.3 / §6）

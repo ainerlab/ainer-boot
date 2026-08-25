@@ -310,6 +310,11 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-25 配置端点授权粗门禁
+- **P3**：`ConfigManagementController` 消费 `@AinerAuthorize`（`config.read` /
+  `config.manage`，含 secret 写入）。LivePath：无 Binding→403，有 `config.read`
+  Binding→200。模块 HTTP 切片未装配拦截器。**不是** 按 namespace/key 的对象级合同。
+
 2026-08-25 文件端点授权粗门禁
 - **P3**：`FileStorageController` 消费 `@AinerAuthorize`（`file.read` / `file.write`）。
   LivePath：无 Binding→403，有 `file.read` Binding→200。模块 HTTP 切片未装配拦截器。
