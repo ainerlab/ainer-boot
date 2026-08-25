@@ -6,6 +6,8 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **文件端点 `@AinerAuthorize` 粗门禁**：`/api/files` 读写消费 `file.read` / `file.write`；
+  参考装配需对应 Binding。模块切片未装配拦截器时注解不生效。仍不是对象级授权合同。
 - **Workspace 路径目标解析（参考装配）**：`ainer-server` 注册 `AuthorizationTargetResolver`，
   把 `/api/workspaces/{id}` 写入 `ResourceRef.workspaceId`（仍是 `resourceType=request`）。
   对该工作区的 WORKSPACE Binding 才能过路径门禁；创建/列表无路径 id 时仍是粗闸门。

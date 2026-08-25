@@ -1,6 +1,8 @@
 package dev.ainer.module.file.file.api;
 
+import dev.ainer.authorization.spring.AinerAuthorize;
 import dev.ainer.core.web.ApiResponse;
+import dev.ainer.module.file.file.application.FileAuthorities;
 import dev.ainer.module.file.file.application.FileStorageApplicationService;
 import dev.ainer.module.file.file.domain.FileObject;
 import dev.ainer.security.token.AuthenticatedPrincipal;
@@ -30,7 +32,8 @@ import java.util.UUID;
 /**
  * 文件存储管理 API（ADR-0040）。上传为 multipart；下载通过 {@code Content-Disposition}
  * 以原始文件名流式返回字节。scope（{@code file.read} / {@code file.write}）由应用服务
- * 针对已验证主体强制检查。
+ * 针对已验证主体强制检查。参考装配另有 {@code @AinerAuthorize} 粗门禁（需 Binding），
+ * 模块切片测试未装配拦截器时注解不生效。
  */
 @RestController
 @RequestMapping("/api/files")
@@ -47,6 +50,7 @@ public class FileStorageController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @AinerAuthorize(permission = FileAuthorities.WRITE)
     public ResponseEntity<ApiResponse<FileResponse>> upload(
             @RequestParam("namespace") String namespace,
             @RequestParam("file") MultipartFile file,
@@ -68,6 +72,7 @@ public class FileStorageController {
     }
 
     @GetMapping
+    @AinerAuthorize(permission = FileAuthorities.READ)
     public ApiResponse<FilePageResponse> page(
             @RequestParam(value = "namespace", required = false) @Nullable String namespace,
             @RequestParam(value = "page", defaultValue = "1") int page,
@@ -80,6 +85,7 @@ public class FileStorageController {
     }
 
     @GetMapping("/{id}/content")
+    @AinerAuthorize(permission = FileAuthorities.READ)
     public ResponseEntity<InputStreamResource> download(@PathVariable UUID id) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
         FileStorageApplicationService.DownloadedFile downloaded = service.download(principal, id);
@@ -92,6 +98,7 @@ public class FileStorageController {
     }
 
     @DeleteMapping("/{id}")
+    @AinerAuthorize(permission = FileAuthorities.WRITE)
     public ApiResponse<Void> delete(@PathVariable UUID id, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
         service.delete(principal, RequestIds.currentOrCreate(request), id);

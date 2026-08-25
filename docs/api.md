@@ -250,6 +250,8 @@ subject 使用。
 ## 9. 文件 API（ADR-0040）
 
 文件模块默认装配；所有端点要求认证，scope 在应用服务内强制（`file.read` 读取/下载，`file.write` 上传/删除）。
+参考装配另有 `@AinerAuthorize` 粗门禁，需对应 Binding；模块切片未装配拦截器时注解不生效。
+仍不是对象级（按文件 ID）授权合同。
 
 | Method | Path | Scope | 响应 | 说明 |
 |---|---|---|---|---|

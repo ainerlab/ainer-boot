@@ -310,6 +310,11 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-25 文件端点授权粗门禁
+- **P3**：`FileStorageController` 消费 `@AinerAuthorize`（`file.read` / `file.write`）。
+  LivePath：无 Binding→403，有 `file.read` Binding→200。模块 HTTP 切片未装配拦截器。
+  **不是** 对象级授权合同。
+
 2026-08-25 Workspace 路径目标解析
 - **参考装配**：`WorkspacePathAuthorizationTargetResolver` 把 `/api/workspaces/{id}` 写成
   `ResourceRef.workspaceId`（`resourceType=request`）。LivePath：同工作区 Binding→200，
