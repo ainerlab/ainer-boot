@@ -310,6 +310,11 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-25 M2 延迟自提权 Alert
+- **E**：[ADR-0050](decisions/0050-delayed-self-elevation-alert.md) 选 Alert；入岗命中自建
+  岗位集合绑定写 `DELAYED_SELF_ELEVATION` 与计数器，不自动撤销。PostgreSQL 集成对照：
+  自建命中写审计，他人创建的绑定不写。
+
 2026-08-25 通知 WEBHOOK 首个真实渠道（默认关闭）
 - **交付**：`HttpWebhookChannelSender` 可选用 `RestClient` POST JSON；host 白名单、HTTPS
   （loopback HTTP 需显式允许）、解析地址拒绝私网/链路本地/ULA、不跟随重定向；提交期对
@@ -321,8 +326,8 @@ Ainer 项目签名 provenance 已通过。
 - **1.0 快照**：岗位集合族标 Incubating；OWNER 恢复去歧义；总览去掉重复模块树；架构当前
   模块图补上 P3 / 组织 / Knowledge / 任务调度；§4/§5 不再把「进入 G3」写成当前阶段。
 - **H5'**：不改默认值。`operations.md` / `configuration.md` / `security.md` 把在线校验与
-  step-up 标为对外生产签发前必选项。M1/M3/L 系/M5 此前已关闭；仍开放的是 M2 延迟自提权
-  与 M5' 产品装配（见评审快照后续关闭表）。
+  step-up 标为对外生产签发前必选项。M1/M3/L 系/M5 此前已关闭；M2 延迟自提权已落地 Alert
+  切片（ADR-0050）。仍开放 M5' 产品装配（见评审快照后续关闭表）。
 - **未做**：重跑 `v1.1.0` 远端发布、双消费者冷仓升级矩阵（仍等 9/1 或 Spending limit >$0）。
 
 2026-08-24 v1.1.0 发布存储配额事故：根因、处置与当前边界（发布未完成）
@@ -457,8 +462,8 @@ Ainer 项目签名 provenance 已通过。
 - **验证**：全量 reactor 411/0/0/0（+1 跨工作区提权回归）。
 - **遗留 follow-up**（当时记录）：workspace ALLOWED 审计顺序（M3）、自提权创建后防护（M2）、
   合成锚点保留类型拒绝（M1）、生产装配 policy 注册（M5）、客户可读性拉齐（L 系）。
-  **后续**：M1/M3/L 系/M5 已于 2026-08-20 关闭，H5' 文档于 2026-08-25 关闭；仍开放 M2 延迟
-  自提权与 M5' 产品装配——详见评审快照后续关闭表。
+  **后续**：M1/M3/L 系/M5 已于 2026-08-20 关闭，H5' 文档于 2026-08-25 关闭；M2 Alert 于
+  2026-08-25 关闭切片。仍开放 M5' 产品装配——详见评审快照后续关闭表。
 
 
 2026-08-19 OpenAPI 运行时文档 spike 关闭（springdoc 3.1.0 × Boot 4.1 兼容性验证通过）

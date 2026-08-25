@@ -6,6 +6,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **M2 延迟自提权 Alert（ADR-0050）**：入岗命中「任职主体曾创建且仍 ACTIVE 的岗位集合绑定」
+  时写 `DELAYED_SELF_ELEVATION` 审计并递增 `ainer.organization.delayed_self_elevation`；不自动
+  撤销、不阻断入岗。UNAVAILABLE 创建拒绝保持不变。
 - **通知 WEBHOOK 真实投递（默认关闭）**：启用 `ainer.notification.webhook.enabled` 后，WEBHOOK
   渠道用 `RestClient` POST JSON `{title,body}`；host 白名单 + HTTPS（loopback HTTP 需显式允许）
   + 拒绝私网/链路本地/ULA 解析 + 不跟随重定向。日志与错误消息不含 URL/正文。未启用时仍是
@@ -17,6 +20,7 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   携带 RFC 9470 `WWW-Authenticate: Bearer error="insufficient_user_authentication"` 挑战头。
 - 授权模块补齐 ADR-0037 §3 声明的 ArchUnit 包边界守护（domain/policy/catalog/application 零
   Spring Security/Servlet 依赖、spring/ 适配层无反向引用）。
+
 ## [1.1.0] - 2026-08-24
 
 商业级代码评审首次制品发布（PR #24–#27），并纳入评审遗留收口：P4 任务调度引擎

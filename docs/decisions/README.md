@@ -1,6 +1,6 @@
 # Ainer 架构决策记录
 
-> 文档类型：决策索引 · 状态：生效 · 最近核对：2026-08-13
+> 文档类型：决策索引 · 状态：生效 · 最近核对：2026-08-25
 
 ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是实现日志，也不替代 API 或运行手册。
 
@@ -56,6 +56,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0046](0046-1.0-lts-terms.md) | Accepted | 1.0 LTS 条款定稿（1.0.x 为首个 LTS 线；补丁规则沿用 ADR-0045；窗口与 EOL 评估条款） |
 | [0047](0047-task-scheduling-baseline.md) | Accepted | 任务调度模块基线（P4：延迟/周期执行 + SKIP LOCKED 队列 + 指数退避 + 管理面；泛化通知模块已验证模式） |
 | [0048](0048-packages-storage-governance-and-rc-artifacts-retirement.md) | Accepted | Packages 存储治理与 rc 链 Maven 制品退役（修订 ADR-0041 保留条款在存储预算约束下的适用；删除 rc.1/rc.2/rc.3 制品，保留 tag/Release 证据/git 历史） |
+| [0050](0050-delayed-self-elevation-alert.md) | Accepted | 岗位集合绑定延迟自提权采用 Alert：入岗命中自建绑定写审计/指标，不自动撤销、不阻断入岗 |
 
 ## 历史草案与审查记录
 
