@@ -46,6 +46,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         properties = {
                 "ainer.organization.enabled=true",
                 "ainer.organization.trusted-issuer=https://auth.ainer.test",
+                // 本切片只验 JWT+scope；@AinerAuthorize 由 LivePath / SubjectSet 流测覆盖
+                "ainer.authorization.enabled=false",
                 "ainer.security.resource-server.enabled=true",
                 "mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml",
                 "spring.main.banner-mode=off"

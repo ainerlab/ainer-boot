@@ -68,9 +68,9 @@
 **仍开放（需产品或设计决策，本轮不改代码）**
 
 - **M2 Recheck / 禁止 bind-before-assignment**：ADR-0050 未选项，等真实 HR 流程消费者
-- **M5' 后续**：把 permission 改成类型化 resourceType、方法级 AOP、obligation executor、
-  组织 Controller；Workspace 路径解析器与文件/配置/通知/字典/任务/知识端点
-  粗门禁已在参考装配落地，仍不是 1.x 资源级授权合同
+- **M5' 后续**：把 permission 改成类型化 resourceType、方法级 AOP、obligation executor；
+  Workspace 路径解析器与已装配业务 Controller 粗门禁已在参考装配落地，仍不是 1.x
+  资源级授权合同
 
 ## 评审确认无问题的关键控制点
 

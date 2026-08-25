@@ -433,6 +433,33 @@ class AinerServerAuthorizationLivePathTest {
     }
 
     @Test
+    void organizationProbeDeniesWithoutBindingAndAllowsWithOrganizationBinding() {
+        authenticate(JwtTestSupport.signUserJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-user-1", "organization.read"));
+        RestResponse denied = client.get("/api/authz-organization-probe");
+        assertThat(denied.status().value()).isEqualTo(403);
+
+        authenticate(JwtTestSupport.signServiceJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-ops", "authorization.manage"));
+        RestResponse role = client.postJson("/api/authorization/roles", """
+                {"code": "organization-reader-http", "name": "Organization Reader HTTP",
+                 "permissions": ["organization.read"]}
+                """);
+        assertThat(role.status().value()).isEqualTo(201);
+        String roleId = (String) role.jsonPath("$.data.id");
+        RestResponse binding = client.postJson("/api/authorization/bindings", """
+                {"issuer": "%s", "subjectType": "USER", "subjectId": "platform-user-1",
+                 "roleId": "%s", "scopeKind": "WORKSPACE", "workspaceId": "%s"}
+                """.formatted(ISSUER, roleId, WORKSPACE_ID));
+        assertThat(binding.status().value()).isEqualTo(201);
+
+        authenticate(JwtTestSupport.signUserJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-user-1", "organization.read"));
+        RestResponse allowed = client.get("/api/authz-organization-probe");
+        assertThat(allowed.status().value()).isEqualTo(200);
+    }
+
+    @Test
     void requestWithoutTokenIsUnauthorized() {
         restTemplate.getRestTemplate().setInterceptors(List.of());
         ResponseEntity<String> response = restTemplate.getForEntity(
@@ -452,7 +479,8 @@ class AinerServerAuthorizationLivePathTest {
             NotificationSubmitProbeController.class,
             DictionaryReadProbeController.class,
             TaskSubmitProbeController.class,
-            KnowledgeReadProbeController.class
+            KnowledgeReadProbeController.class,
+            OrganizationReadProbeController.class
     })
     static class TestApplication {
 
@@ -567,6 +595,19 @@ class AinerServerAuthorizationLivePathTest {
         @GetMapping
         @AinerAuthorize(permission = "knowledge.read")
         public ResponseEntity<Void> peekKnowledge() {
+            return ResponseEntity.ok().build();
+        }
+    }
+
+    @RestController
+    @RequestMapping("/api/authz-organization-probe")
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+            name = "ainer.server.test-authz-live", havingValue = "true")
+    static class OrganizationReadProbeController {
+
+        @GetMapping
+        @AinerAuthorize(permission = "organization.read")
+        public ResponseEntity<Void> peekOrganization() {
             return ResponseEntity.ok().build();
         }
     }

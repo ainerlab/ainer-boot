@@ -61,10 +61,10 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
 
 - M2 延迟自提权已落地 **Alert**（ADR-0050）：入岗命中自建岗位集合绑定写审计/指标，不自动
   撤销、不阻断入岗；Recheck 冻结 / 禁止 bind-before-assignment 仍等真实 HR 消费者
-- M5' 参考装配已接线 Workspace/AI/文件/配置/通知/字典/任务/知识 `@AinerAuthorize`、网关
-  `ActingGrant.check`，以及 Workspace 路径 `AuthorizationTargetResolver`（Binding 须对上路径
-  workspaceId）；**不是** 1.x 资源级授权合同，组织 Controller、类型化 resourceType、
-  obligation executor 仍待做
+- M5' 参考装配已接线 Workspace/AI/文件/配置/通知/字典/任务/知识/组织 `@AinerAuthorize`、
+  网关 `ActingGrant.check`，以及 Workspace 路径 `AuthorizationTargetResolver`（Binding 须对上
+  路径 workspaceId）；**不是** 1.x 资源级授权合同，类型化 resourceType、obligation executor
+  仍待做
 - 生产签发前必须启用在线校验与 step-up（脚手架默认关闭；见 `operations.md` 2.3 / §6）
 - GitHub Packages 私有仓库存储配额（免费版 500MB 含 Actions 制品，多次发布后可能耗尽）
 - 分支保护未启用（private + GitHub 免费版限制；升级 Pro 或转 public 可解锁）

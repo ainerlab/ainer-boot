@@ -1,5 +1,6 @@
 package dev.ainer.module.organization.orgdir.api;
 
+import dev.ainer.authorization.spring.AinerAuthorize;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.core.web.ApiResponse;
@@ -19,6 +20,7 @@ import dev.ainer.module.organization.orgdir.api.OrganizationApiDtos.UnitAssignme
 import dev.ainer.module.organization.orgdir.api.OrganizationApiDtos.UnitMemberResponse;
 import dev.ainer.module.organization.orgdir.api.OrganizationApiDtos.UnitResponse;
 import dev.ainer.module.organization.orgdir.application.DirectoryApplicationService;
+import dev.ainer.module.organization.orgdir.application.OrganizationAuthorities;
 import dev.ainer.module.organization.orgdir.application.WorkforceApplicationService;
 import dev.ainer.module.organization.orgdir.domain.AssignmentKind;
 import dev.ainer.module.organization.orgdir.domain.UnitAssignment;
@@ -46,7 +48,9 @@ import java.util.stream.Collectors;
 
 /**
  * 组织目录管理 API（ADR-0042 O1）：命令式端点（create/transfer/suspend/terminate），分页
- * ≤100，scope 在应用服务内对已验证 principal 强制。
+ * ≤100，scope 在应用服务内对已验证 principal 强制。参考装配另有 {@code @AinerAuthorize}
+ * 粗门禁（需 Binding）；模块 HTTP 切片未装配拦截器时注解不生效。请求体/查询里的
+ * {@code workspaceId} 不作为授权目标输入。
  */
 @RestController
 @RequestMapping("/api/organization")
@@ -66,6 +70,7 @@ public class OrganizationManagementController {
     }
 
     @PostMapping("/directories")
+    @AinerAuthorize(permission = OrganizationAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<DirectoryResponse>> createDirectory(
             @RequestBody CreateDirectoryRequest body, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -77,6 +82,7 @@ public class OrganizationManagementController {
     }
 
     @GetMapping("/directories")
+    @AinerAuthorize(permission = OrganizationAuthorities.READ)
     public ApiResponse<PageResponse<DirectoryResponse>> pageDirectories(
             @RequestParam("workspaceId") UUID workspaceId,
             @RequestParam(name = "page", defaultValue = "1") long page,
@@ -93,6 +99,7 @@ public class OrganizationManagementController {
     }
 
     @PostMapping("/directories/{directoryId}/units")
+    @AinerAuthorize(permission = OrganizationAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<UnitResponse>> createUnit(
             @PathVariable("directoryId") UUID directoryId,
             @RequestBody CreateUnitRequest body,
@@ -106,6 +113,7 @@ public class OrganizationManagementController {
     }
 
     @GetMapping("/directories/{directoryId}/units")
+    @AinerAuthorize(permission = OrganizationAuthorities.READ)
     public ApiResponse<List<UnitResponse>> unitTree(
             @PathVariable("directoryId") UUID directoryId, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -115,6 +123,7 @@ public class OrganizationManagementController {
     }
 
     @PostMapping("/directories/{directoryId}/engagements")
+    @AinerAuthorize(permission = OrganizationAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<EngagementResponse>> engage(
             @PathVariable("directoryId") UUID directoryId,
             @RequestBody EngageRequest body,
@@ -129,6 +138,7 @@ public class OrganizationManagementController {
     }
 
     @GetMapping("/directories/{directoryId}/engagements")
+    @AinerAuthorize(permission = OrganizationAuthorities.READ)
     public ApiResponse<PageResponse<EngagementResponse>> pageEngagements(
             @PathVariable("directoryId") UUID directoryId,
             @RequestParam(name = "page", defaultValue = "1") long page,
@@ -145,6 +155,7 @@ public class OrganizationManagementController {
     }
 
     @PostMapping("/directories/{directoryId}/engagements/{engagementId}/suspensions")
+    @AinerAuthorize(permission = OrganizationAuthorities.MANAGE)
     public ApiResponse<EngagementResponse> suspendEngagement(
             @PathVariable("directoryId") UUID directoryId,
             @PathVariable("engagementId") UUID engagementId,
@@ -156,6 +167,7 @@ public class OrganizationManagementController {
     }
 
     @PostMapping("/directories/{directoryId}/engagements/{engagementId}/terminations")
+    @AinerAuthorize(permission = OrganizationAuthorities.MANAGE)
     public ApiResponse<EngagementResponse> terminateEngagement(
             @PathVariable("directoryId") UUID directoryId,
             @PathVariable("engagementId") UUID engagementId,
@@ -167,6 +179,7 @@ public class OrganizationManagementController {
     }
 
     @PostMapping("/directories/{directoryId}/unit-assignments")
+    @AinerAuthorize(permission = OrganizationAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<UnitAssignmentResponse>> assignUnit(
             @PathVariable("directoryId") UUID directoryId,
             @RequestBody AssignUnitRequest body,
@@ -181,6 +194,7 @@ public class OrganizationManagementController {
     }
 
     @PostMapping("/directories/{directoryId}/unit-assignments/{assignmentId}/transfers")
+    @AinerAuthorize(permission = OrganizationAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<UnitAssignmentResponse>> transferUnitAssignment(
             @PathVariable("directoryId") UUID directoryId,
             @PathVariable("assignmentId") UUID assignmentId,
@@ -196,6 +210,7 @@ public class OrganizationManagementController {
     }
 
     @PostMapping("/directories/{directoryId}/positions")
+    @AinerAuthorize(permission = OrganizationAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<PositionResponse>> createPosition(
             @PathVariable("directoryId") UUID directoryId,
             @RequestBody CreatePositionRequest body,
@@ -209,6 +224,7 @@ public class OrganizationManagementController {
     }
 
     @PostMapping("/directories/{directoryId}/position-assignments")
+    @AinerAuthorize(permission = OrganizationAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<PositionAssignmentResponse>> assignPosition(
             @PathVariable("directoryId") UUID directoryId,
             @RequestBody AssignPositionRequest body,
@@ -225,6 +241,7 @@ public class OrganizationManagementController {
 
     /** Unit 成员投影（决策时实时解析，ADR-0042 §3）。 */
     @GetMapping("/directories/{directoryId}/units/{unitId}/members")
+    @AinerAuthorize(permission = OrganizationAuthorities.READ)
     public ApiResponse<List<UnitMemberResponse>> unitMembers(
             @PathVariable("directoryId") UUID directoryId,
             @PathVariable("unitId") UUID unitId,
@@ -245,6 +262,7 @@ public class OrganizationManagementController {
     }
 
     @GetMapping("/directories/{directoryId}/positions/{positionId}/assignees")
+    @AinerAuthorize(permission = OrganizationAuthorities.READ)
     public ApiResponse<List<PositionAssignmentResponse>> positionAssignees(
             @PathVariable("directoryId") UUID directoryId,
             @PathVariable("positionId") UUID positionId,

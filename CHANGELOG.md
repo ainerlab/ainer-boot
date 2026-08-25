@@ -6,6 +6,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **组织端点 `@AinerAuthorize` 粗门禁**：`/api/organization` 目录/任职/岗位消费
+  `organization.read` / `organization.manage`；参考装配需对应 Binding。模块切片未装配拦截器时
+  注解不生效。请求体/查询 `workspaceId` 不作为授权目标。仍不是按目录/任职 ID 的对象级合同。
 - **知识端点 `@AinerAuthorize` 粗门禁**：`/api/knowledge` 对象/修订/发布消费
   `knowledge.read` / `knowledge.manage`；参考装配需对应 Binding。模块切片未装配拦截器时
   注解不生效。请求体/查询 `workspaceId` 不作为授权目标。仍不是按对象/修订 ID 的对象级合同。

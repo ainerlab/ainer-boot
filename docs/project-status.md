@@ -310,6 +310,13 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-25 组织端点授权粗门禁
+- **P3**：`OrganizationManagementController` 消费 `@AinerAuthorize`（`organization.read` /
+  `organization.manage`）。LivePath：无 Binding→403，有 `organization.read` Binding→200。
+  模块 HTTP 切片未装配拦截器。SubjectSet 流测装配拦截器，组织管理面走 RELATION_DERIVED
+  以免 UNKNOWN_POLICY。请求体/查询 `workspaceId` 不作为授权目标。**不是** 按目录/任职
+  ID 的对象级合同。
+
 2026-08-25 知识端点授权粗门禁
 - **P3**：`KnowledgeController` 消费 `@AinerAuthorize`（`knowledge.read` /
   `knowledge.manage`）。LivePath：无 Binding→403，有 `knowledge.read` Binding→200。
