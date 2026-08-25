@@ -59,7 +59,8 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
 
 ### 已知边界（记录在案，非缺陷）
 
-- M2 延迟自提权（先签集合绑定、再安排岗位——`check()` 实时复查部分兜底）
+- M2 延迟自提权已落地 **Alert**（ADR-0050）：入岗命中自建岗位集合绑定写审计/指标，不自动
+  撤销、不阻断入岗；Recheck 冻结 / 禁止 bind-before-assignment 仍等真实 HR 消费者
 - M5'（`@AinerAuthorize` 端点消费与 `ActingGrant.check` 网关接线属产品装配责任）
 - 生产签发前必须启用在线校验与 step-up（脚手架默认关闭；见 `operations.md` 2.3 / §6）
 - GitHub Packages 私有仓库存储配额（免费版 500MB 含 Actions 制品，多次发布后可能耗尽）

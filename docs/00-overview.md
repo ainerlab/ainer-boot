@@ -171,6 +171,7 @@ Foundation Roadmap 仍是 Proposed；其 mdpress-first 是有条件的路线建�
    与 ADR-0030 通用授权的内部切片 S0–S3 是**两套不同的 S 编号**；ADR-0030 已被
    [ADR-0037](decisions/0037-post-greenfield-authorization-baseline.md) 取代，13 项差距全闭合）
 4. [`decisions/README.md`](decisions/README.md) 中相关安全 ADR
+   （含 [ADR-0050](decisions/0050-delayed-self-elevation-alert.md) 延迟自提权 Alert）
 5. 集成官方参考管理应用时阅读
    [`ainer-admin-integration.md`](ainer-admin-integration.md) 与
    [ADR-0022](decisions/0022-ainer-admin-browser-integration-baseline.md)
@@ -214,21 +215,24 @@ ADR-0034 与两份 `design/` 文档均为 Proposed；前者拟冻结长期语义
 ### 4.9 构建、Consumer POM 或下游消费
 
 1. [ADR-0026](decisions/0026-maven-4-build-and-consumer-pom-baseline.md)
-2. [`development.md`](development.md)
-3. [`testing.md`](testing.md)
-4. [`releasing.md`](releasing.md)
-5. [`dependencies.md`](dependencies.md)
+2. [ADR-0049](decisions/0049-maven4-reactor-bom-import-warning.md)（同 reactor BOM import 告警：暂缓）
+3. [`development.md`](development.md)
+4. [`testing.md`](testing.md)
+5. [`releasing.md`](releasing.md)
+6. [`dependencies.md`](dependencies.md)
 
 先区分 Ainer 的 Maven 4 生产者构建与 Maven 3.9+/Maven 4 外部 consumer 门禁。POM 4.1 和
 `packaging=bom` 尚未进入当前实施范围，不能因 XML 精简而绕过安装后 POM 与真实下游验证。
+Maven 4 对根工程 import 同 reactor BOM 的模型 WARNING 以 ADR-0049 为准：保持现状，等待 GA。
 
 ### 4.10 Java 25 / Maven 4 / Spring Boot 4.1 能力利用
 
 1. [`reviews/java25-maven4-springboot41-capability-audit.md`](reviews/java25-maven4-springboot41-capability-audit.md)
 2. [ADR-0026](decisions/0026-maven-4-build-and-consumer-pom-baseline.md)
-3. [ADR-0029](decisions/0029-jdk25-boot4-modern-baseline.md)（Proposed）
-4. [`boot4-migration-notes.md`](boot4-migration-notes.md)
-5. [`project-status.md`](project-status.md) 中与 ADR-0029 / Maven 4 相关的缺口
+3. [ADR-0049](decisions/0049-maven4-reactor-bom-import-warning.md)
+4. [ADR-0029](decisions/0029-jdk25-boot4-modern-baseline.md)（Proposed）
+5. [`boot4-migration-notes.md`](boot4-migration-notes.md)
+6. [`project-status.md`](project-status.md) 中与 ADR-0029 / Maven 4 相关的缺口
 
 该审计是只读快照，回答“基线是否真正被利用、何处仍有遗留或重复基础设施”，不代替 ADR，也不
 把计划能力写成已交付。实施任何 finding 前先对照 ADR 与 `project-status.md`。
