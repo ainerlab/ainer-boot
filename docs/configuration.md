@@ -1,6 +1,6 @@
 # Ainer 配置与秘密管理
 
-> 文档类型：开发与运维规范 · 状态：生效 · 最近核对：2026-07-30 · 适用版本：`0.1.x`
+> 文档类型：开发与运维规范 · 状态：生效 · 最近核对：2026-08-25 · 适用版本：`1.0.x`
 
 ## 1. 原则
 
@@ -40,7 +40,7 @@ M4.3 高风险请求在线 Token 校验默认关闭：
 
 | 环境变量 | 默认值 | 生产说明 |
 |---|---|---|
-| `AINER_SECURITY_ONLINE_VALIDATION_ENABLED` | `false` | 启用选择性 RFC 7662 在线校验 |
+| `AINER_SECURITY_ONLINE_VALIDATION_ENABLED` | `false` | 本地/CI 保持关闭；**生产签发前必须按 [`operations.md`](operations.md) 2.3 启用** |
 | `AINER_SECURITY_ONLINE_VALIDATION_INTROSPECTION_URI` | 空 | 启用时必填，生产必须为 HTTPS `/oauth2/introspect` |
 | `AINER_SECURITY_ONLINE_VALIDATION_CLIENT_ID` | 空 | 无 tenant、无业务 scope 的专用 introspection client |
 | `AINER_SECURITY_ONLINE_VALIDATION_CLIENT_SECRET` | 空 | 启用时必填，secret 注入 |
@@ -57,7 +57,7 @@ M4.3 高风险请求在线 Token 校验默认关闭：
 
 | 环境变量 | 默认值 | 生产说明 |
 |---|---|---|
-| `AINER_SECURITY_STEP_UP_ENABLED` | `false` | 启用人员近期强认证门禁 |
+| `AINER_SECURITY_STEP_UP_ENABLED` | `false` | 本地/CI 保持关闭；**生产签发前必须启用**（默认保护所有权转移） |
 | `AINER_SECURITY_STEP_UP_MAX_AUTH_AGE` | `15m` | `auth_time` 最大年龄，必须大于 0 且不超过 24 小时 |
 | `AINER_SECURITY_STEP_UP_CLOCK_SKEW` | `60s` | 签发方/资源方时钟偏差容忍，范围 0..5 分钟 |
 | `AINER_SECURITY_STEP_UP_REQUIRED_AMR` | `mfa` | USER token 必须包含的全部 `amr` |

@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-24 · 工程版本：`1.0.0`（已发布）；主线 `1.1.0` 发布中
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-25 · 工程版本：`1.0.0`（已发布）；主线 `1.1.0` 发布中
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -310,6 +310,14 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-25 1.0 评审剩余文档与商业评审 H5' 收口
+- **1.0 快照**：岗位集合族标 Incubating；OWNER 恢复去歧义；总览去掉重复模块树；架构当前
+  模块图补上 P3 / 组织 / Knowledge / 任务调度；§4/§5 不再把「进入 G3」写成当前阶段。
+- **H5'**：不改默认值。`operations.md` / `configuration.md` / `security.md` 把在线校验与
+  step-up 标为对外生产签发前必选项。M1/M3/L 系/M5 此前已关闭；仍开放的是 M2 延迟自提权
+  与 M5' 产品装配（见评审快照后续关闭表）。
+- **未做**：重跑 `v1.1.0` 远端发布、双消费者冷仓升级矩阵（仍等 9/1 或 Spending limit >$0）。
+
 2026-08-24 v1.1.0 发布存储配额事故：根因、处置与当前边界（发布未完成）
 - **现象**：release workflow 五次在首个制品 deploy 处失败——GitHub Packages HTTP 402；
   且包内容随后进入锁定状态（对 `maven.pkg.github.com` 的既有版本文件请求返回 404，
@@ -440,9 +448,10 @@ Ainer 项目签名 provenance 已通过。
   SCOPE_ 前缀全域统一；分页 422 + 回显钳制；DUPLICATE_POSITION_CODE；knowledge sources/
   evidence 校验；readOnly 13 方法补齐；死代码清除。
 - **验证**：全量 reactor 411/0/0/0（+1 跨工作区提权回归）。
-- **遗留 follow-up**：workspace ALLOWED 审计顺序（M3，7 方法重构）、自提权创建后防护（M2）、
-  合成锚点保留类型拒绝（M1）、生产装配 policy 注册使引擎有活路径（M5）、客户可读性拉齐
-  批处理（L 系，含注释语言方向决策）——详见评审快照。
+- **遗留 follow-up**（当时记录）：workspace ALLOWED 审计顺序（M3）、自提权创建后防护（M2）、
+  合成锚点保留类型拒绝（M1）、生产装配 policy 注册（M5）、客户可读性拉齐（L 系）。
+  **后续**：M1/M3/L 系/M5 已于 2026-08-20 关闭，H5' 文档于 2026-08-25 关闭；仍开放 M2 延迟
+  自提权与 M5' 产品装配——详见评审快照后续关闭表。
 
 
 2026-08-19 OpenAPI 运行时文档 spike 关闭（springdoc 3.1.0 × Boot 4.1 兼容性验证通过）
@@ -1518,7 +1527,8 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
   consumer 和可重复构建门禁将其作为已知例外保留，不把告警宣称为已解决；
 - 已有 `.github/CODEOWNERS`，但 private 免费仓库仍缺受保护分支/必需审查的远端强制执行；
 - 没有生产备份恢复、容量测试、正式错误预算/告警路由和灾难恢复演练；
-- 没有稳定版兼容政策；许可证决策为暂不开源（私有/专有），未来若开源或对外发布再定商业/开源许可；付费产品交付系统未建立；
+- 1.x 兼容与 LTS 已由 ADR-0045/0046 成文；许可证决策为暂不开源（私有/专有），未来若开源或对外发布再定商业/开源许可；付费产品交付系统未建立；
+- GitHub Packages 免费额度按月度 GB·小时计，本月已耗尽：远端 deploy/读包锁定至 9/1 或 Spending limit >$0（ADR-0048）；本地开发与 git 不受影响；
 - Testcontainers 仍使用 `disabledWithoutDocker`；本机 Colima 与候选 CI 均已完整执行，候选 CI 已用
   `scripts/check-surefire-results.sh` 明确拒绝任何 skipped 测试，但该门禁尚未纳入受保护分支的
   必需检查。
@@ -1535,12 +1545,13 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 
 按
 [`Ainer Boot 产品定位、竞品能力矩阵与路线图`](design/ainer-scaffold-design.md)
-定义的全局产品化阶段，当前是 **G0 已冻结、G1 已关闭、G2 已关闭（`v0.1.0` 已发布并被真实
-消费者消费）、进入 G3（产品核心闭环）**：P3 企业基座（文件/字典/配置/通知 + 缓存 + 授权）
-全部进入 `0.1.0`；`xq-platform-next` 完成 `rc.2 → rc.3 → 0.1.0` 连续升级链与全部产品纵向
-切片。G3 剩余：最小 Agent/Tool/Context/Evaluation 治理、组织目录（ADR-0032 需 Greenfield
-重述，37 处 tenant 依赖）、Knowledge 两个语义切片（ADR-0034 基本兼容）。private 仓库分支
-保护仍缺远端强制执行。
+定义的全局产品化阶段，**G0–G4 已关闭，`v1.0.0` 已发布**：P3 企业基座、组织目录 O1/O2、
+Agent 代行 A1、Knowledge K1/K2 均已交付（后三者为 Incubating）。`xq-platform-next` 完成
+`rc.2 → rc.3 → 0.1.0 → 0.2.0 → 1.0.0` 连续升级链（含回滚）；`python-learning-service`
+完成 `0.1.0 → 1.0.0` 冷仓接入。`v1.1.0` 已打 annotated tag，远端 Packages 发布受本月
+GB·小时配额锁定，等 9/1 计费月重置或 Spending limit >$0 后重跑（ADR-0048）。private
+仓库分支保护仍缺远端强制执行。剩余能力只由真实消费者拉动（见 §5），不再把「进入 G3」
+写成当前阶段。
 
 ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -Denforcer.skip=true` 验证；正式
 `./mvnw clean verify`、零跳过门禁与 Testcontainers 集成仍待 Maven 4 RC6 官方发行包恢复后执行）：

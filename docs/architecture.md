@@ -1,6 +1,6 @@
 # Ainer 架构总览
 
-> 权威状态：`v1.0.0` 已发布（G0–G4 关闭）；授权 ADR-0037 + SubjectSet（0042）/ActingGrant（0043）扩展 · 核对 2026-08-19
+> 权威状态：`v1.0.0` 已发布（G0–G4 关闭）；`v1.1.0` 已打 tag、远端 Packages 发布待计费月重置 · 核对 2026-08-25
 
 ## 1. 系统定位
 
@@ -25,25 +25,29 @@ Ainer 同时承担三种职责：
 
 ```text
 ainer-server                         JWT Resource Server、Actuator、平台/内部端点
-├── ainer-module-workspace           Workspace 资源、成员生命周期、OWNER 转移、审计热/冷生命周期
-│   ├── ainer-starter-persistence    MyBatis-Plus/MyBatis、Flyway、PostgreSQL、UUID
-│   └── ainer-starter-web            HTTP 异常与请求追踪
-├── ainer-module-ai-runtime          模型端口、Provider、策略、SSE、费用审计
-│   ├── ainer-starter-persistence
-│   ├── ainer-security               typed 主体、scope/authority 契约
-│   └── ainer-starter-web
+├── ainer-module-workspace           Workspace 资源、成员生命周期、OWNER 转移、审计热/冷
+├── ainer-module-ai-runtime          模型网关、策略、SSE、费用审计、Agent 注册表
+├── ainer-module-authorization       ADR-0037 决策器、Binding/审计、端点 adapter
+├── ainer-module-dictionary          树形字典 + 多语言 + Spring Cache
+├── ainer-module-config              动态配置 + 版本史 + AES-GCM secret
+├── ainer-module-notification        ChannelSender 端口 + SKIP LOCKED 队列
+├── ainer-module-file                文件元数据 + 大小/类型限制 + 管理 API
+├── ainer-module-organization        组织目录（Incubating，ADR-0042）
+├── ainer-module-knowledge           Knowledge Foundation（Incubating，ADR-0044）
+├── ainer-module-task                任务调度（Incubating，ADR-0047）
 ├── ainer-starter-security           JWT 验证、SecurityContext 投影、401/403
-└── ainer-starter-web
+├── ainer-starter-persistence        MyBatis-Plus/MyBatis、Flyway、PostgreSQL、UUID
+└── ainer-starter-web                HTTP 异常与请求追踪
 
-ainer-authorization-server           独立 OAuth 2.1/OIDC 发行物、Identity 管理面、Passkey、
-                                     browser client 控制面
-├── ainer-module-identity             HumanAccount/ServicePrincipal/Credential foundation（去租户化）
+ainer-authorization-server           独立 OAuth 2.1/OIDC 发行物、Identity 管理面、Passkey
+├── ainer-module-identity            HumanAccount/ServicePrincipal/Credential foundation
 ├── Spring Security Authorization Server 7.1
 └── JDBC registered client / authorization / consent / WebAuthn credential
 
 ainer-starter-web -> ainer-spring -> ainer-core
 ainer-starter-persistence -> ainer-core
 ainer-starter-security -> ainer-security -> ainer-core
+ainer-starter-cache -> Spring Cache + Caffeine/Redis + 分布式锁
 
 ainer-dependencies                   独立 BOM，统一依赖版本
 ```
@@ -86,11 +90,14 @@ ainer-boot/
 ├── ainer-module-authorization/           # ADR-0037：决策器、6 表持久化、管理/查询与 Spring 端点适配
 ├── ainer-module-dictionary/              # 树形字典 + 多语言 + Spring Cache（ADR-0040）
 ├── ainer-module-config/                  # 动态配置 + 类型安全 + 热更新 + 版本历史 + secret（ADR-0040）
-├── ainer-module-notification/            # 多渠道通知 + PG SKIP LOCKED 队列 + virtual thread（ADR-0040）
-├── ainer-module-organization/            # Incubating：组织目录（Unit/任职/岗位 + position#assignee 解析，ADR-0042）
+├── ainer-module-notification/            # ChannelSender 端口 + PG SKIP LOCKED 队列（ADR-0040）
+├── ainer-module-file/                    # 文件元数据 + 管理 API（ADR-0040）
+├── ainer-module-organization/            # Incubating：组织目录（ADR-0042）
+├── ainer-module-knowledge/               # Incubating：Knowledge Foundation（ADR-0044）
+├── ainer-module-task/                    # Incubating：任务调度（ADR-0047）
 ├── ainer-module-workspace/               # 去租户化的资源授权参考切片（仅 workspace_id/成员关系）
 ├── ainer-module-ai-runtime/              # 模型网关、调用与费用审计
-├── ainer-server/                          # 业务 Resource Server（装配 workspace/ai/auth/dict/config/notif）
+├── ainer-server/                          # 业务 Resource Server（装配 workspace/ai/auth/P3/Incubating 模块）
 ├── ainer-authorization-server/            # 已落地的独立认证发行物
 └── ainer-app-*/                           # 满足明确拆分条件后创建的服务发行物
 ```
