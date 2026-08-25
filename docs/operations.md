@@ -1,6 +1,6 @@
 # Ainer 运行与故障处理手册
 
-> 文档类型：运行手册 · 状态：基础版 · 最近核对：2026-07-26 · 适用版本：`0.1.x`
+> 文档类型：运行手册 · 状态：基础版 · 最近核对：2026-08-25 · 适用版本：`1.0.x`
 
 本手册覆盖当前两个 Spring Boot 发行物的构建、启动和基础诊断。生产部署平台、监控后端、备份系统和灾难恢复尚未选型，因此未验证的命令不能写成生产 SOP。
 
@@ -29,6 +29,11 @@ ainer-authorization-server/target/ainer-authorization-server-0.1.0-SNAPSHOT.jar
 6. AI 启用时再验证 provider 连通性、预算与错误脱敏。
 
 当前没有自动化生产部署管线，上述顺序是验收要求，不代表已经形成可直接执行的生产发布脚本。
+
+脚手架默认关闭在线校验与 step-up，方便本地和 CI 不依赖 introspection。**对外生产签发前必须先
+按 2.3 启用高风险路径在线校验，并启用 step-up**（默认保护 Workspace 所有权转移）。人员撤销
+在 Authorization Server 侧已由 `securityEpoch` 即时生效；Resource Server 高风险写路径若保持
+默认关闭，仍会接受未过期 JWT，直到自然到期。关闭这两项属于安全降级，须独立批准并记录窗口。
 
 ### 2.1 人员撤销在线生效
 
@@ -60,7 +65,7 @@ OWNER 恢复、归档与 SIEM 导出全部默认关闭。首次上线按以下�
 
 ### 2.3 M4.3 选择性在线撤销上线顺序
 
-在线校验默认关闭。首次启用严格按以下顺序：
+在线校验默认关闭（本地/CI）。**生产签发是上线必选项**，不是可选增强。首次启用严格按以下顺序：
 
 1. 先发布含 revocation-aware authorization service 和专用 introspection client 限制的 Authorization Server，保持 Resource Server 在线校验关闭；
 2. 通过独立 bootstrap 或受审计的 Client 控制面建立专用 client，确认它没有 tenant、没有业务 scope，只有 `token.introspect` 与显式 introspection 标记；
@@ -203,6 +208,8 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 
 生产上线前必须另行完成并演练：
 
+- 按 2.3 启用 Resource Server 高风险路径在线校验（introspection client、HTTPS URI、超时与告警）；
+- 启用 step-up（至少覆盖默认的所有权转移路径；`REQUIRED_AMR` 与 IdP 实际因子一致）；
 - PostgreSQL 自动备份、保留期和加密；
 - point-in-time recovery 或等价恢复策略；
 - 身份库与业务库一致的恢复点选择；

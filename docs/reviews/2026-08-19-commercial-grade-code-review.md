@@ -2,7 +2,8 @@
 
 > 评审动机：Ainer Boot 目标为商业级脚手架——付费客户将直接阅读源码。标准是「优秀」，不是「可用」。
 > 方法：机械扫描 + 三路并行语义评审（最新三模块质量 / 安全关键链正确性 / 全模块 API 契约一致性）。
-> 本文件是审计快照：记录发现、已修复项与遗留 follow-up。
+> 本文件是审计快照：记录发现、已修复项与遗留 follow-up。后续关闭记在「后续关闭」小节，
+> 不改写 2026-08-19 原文。
 
 ## 已修复（本轮，全量 reactor 411/0/0/0）
 
@@ -41,6 +42,8 @@
 
 ## 遗留 follow-up（记录，按需排期）
 
+下表保留 2026-08-19 评审时的发现原文。**后续关闭**见下一小节，不要把本表仍当成待办。
+
 | # | 发现 | 严重度 | 说明 |
 |---|---|---|---|
 | M3 | workspace ALLOWED 审计先于业务写提交（REQUIRES_NEW），失败操作留下「已允许」审计 | Medium | 涉及 7 个方法重构，风险收益比需单独评估；DENY 路径语义正确 |
@@ -49,6 +52,22 @@
 | M5/M5' | 授权引擎在 ainer-server 生产装配中因无 policy/ceiling 注册而全 deny；`@AinerAuthorize` 在控制器零使用；ActingGrant.check 无生产调用方 | Medium | **M5 已于 2026-08-20 关闭**：参考装配注册 18 项平台权限 + 恒等天花板 + BINDING_REQUIRED 策略 + 管理面白名单 + 目录同步，`AinerServerAuthorizationLivePathTest` 证明 Binding→ALLOW→撤销→DENY 全链活。M5'（@AinerAuthorize 端点消费与 check() 网关接线）仍留给产品 |
 | L 系 | workspace 域枚举直出 API、@Nullable 缺失、内联 FQN、notification 匿名 Map 响应、ai-agent 分页无信封、注释语言中英文按模块分裂（基准英文 vs 新模块中文） | Low | 建议一次「客户可读性拉齐」批处理；注释语言方向（全中文或全英文）需负责人拍板 |
 | H5' | Access token 在线校验与 step-up 默认关闭（`AINER_SECURITY_*_ENABLED:false`） | Low | 撤销即时生效依赖 DB 直查（无缓存）已验证；在线校验建议在部署文档标注为上线必选项 |
+
+### 后续关闭（2026-08-20 / 2026-08-25）
+
+| # | 状态 | 关闭说明 |
+|---|---|---|
+| M1 | 已关闭（2026-08-20） | `ScopeRequests.buildScope` 拒绝保留 resourceType（`workspace.anchor` / `request`），`ScopeRequestsTest` 覆盖 |
+| M2 | 部分关闭（2026-08-20） | 成员解析 UNAVAILABLE 时拒绝创建集合绑定。延迟自提权（先签绑定再入岗）仍是已知边界，`check()` 实时复查部分兜底 |
+| M3 | 已关闭（2026-08-20） | 7 个写方法的 `auditAllowed` 移到业务写成功之后 |
+| M5 | 已关闭（2026-08-20） | 见上表原文；M5' 仍留给产品 |
+| L 系 | 已关闭（2026-08-19/20） | 注释统一中文；DTO/`@Nullable`/分页信封已拉齐 |
+| H5' | 已关闭（文档，2026-08-25） | 默认值仍为 `false`。`operations.md` / `configuration.md` / `security.md` 已把在线校验与 step-up 标为生产签发前必选项 |
+
+**仍开放（需产品或设计决策，本轮不改代码）**
+
+- **M2 剩余**：延迟自提权需要成员关系变化告警/复核钩子，不能只靠创建瞬间快照
+- **M5'**：`@AinerAuthorize` 端点消费与 `ActingGrant.check` 网关接线属产品装配责任
 
 ## 评审确认无问题的关键控制点
 

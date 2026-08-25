@@ -1,6 +1,6 @@
 # Ainer Identity 与 OAuth 2.1 使用基线
 
-> 适用版本：Greenfield S8（canonical Workspace/Identity）· 核对 2026-08-11
+> 适用版本：Greenfield S8（canonical Workspace/Identity）· 核对 2026-08-25
 
 ## 1. 已落地边界
 
@@ -60,7 +60,8 @@ M4.3 保留 JWT 本地签名、issuer、audience 和时间校验，并在认证�
 - Workspace 授权审计读取；
 - `/api/workspaces/**` 与 `/api/ai/**` 的 `POST`、`PUT`、`PATCH`、`DELETE`。
 
-普通读取继续只做本地 JWT 校验。在线校验默认关闭；启用示例：
+普通读取继续只做本地 JWT 校验。在线校验默认关闭，避免本地/CI 依赖 introspection。
+**对外生产签发前必须启用**（上线顺序见 [`operations.md`](operations.md) 2.3）。启用示例：
 
 ```bash
 export AINER_SECURITY_ONLINE_VALIDATION_ENABLED=true
@@ -319,6 +320,7 @@ M4.6 增加默认关闭的 Passkey/WebAuthn 协议基础。启用时：
 真实签名 ceremony 已用 webauthn4j 虚拟 authenticator 在自动化测试中端到端跑通（attestation
 + assertion 闭环、`amr=pwd,mfa,pop` 与凭证管理门禁均在 HTTP 层验证）。恢复码、管理员双人恢复、
 `require-invite` 首次 enrollment、登录 POST 限速和 Resource Server step-up 也已落地并默认关闭。
+step-up 与在线校验一样：**生产签发前必须启用**，默认保护 Workspace 所有权转移。
 恢复与 enrollment 的目标必须是对应 ACTIVE 的 HumanAccount；数据库
 复合唯一约束再防止孤立或跨 account 密钥记录。登录限流对 JSON/API 使用标准 Ainer 429 envelope，
 对明确接受 HTML 的 `POST /login` 使用同一品牌页面，并统一保留 `Retry-After`、`no-store`；
