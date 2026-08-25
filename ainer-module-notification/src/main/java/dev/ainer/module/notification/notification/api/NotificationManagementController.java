@@ -1,8 +1,10 @@
 package dev.ainer.module.notification.notification.api;
 
+import dev.ainer.authorization.spring.AinerAuthorize;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.core.web.ApiResponse;
 import dev.ainer.module.notification.notification.application.NotificationApplicationService;
+import dev.ainer.module.notification.notification.application.NotificationAuthorities;
 import dev.ainer.module.notification.notification.application.NotificationErrorCode;
 import dev.ainer.module.notification.notification.domain.NotificationChannel;
 import dev.ainer.module.notification.notification.domain.NotificationIntent;
@@ -28,7 +30,8 @@ import java.util.UUID;
 /**
  * 通知管理 API（ADR-0040）。scope：{@code notification.read}（模板/记录）、
  * {@code notification.manage}（模板生命周期）、{@code notification.submit}（直接发送）。
- * 记录列表省略已渲染的 title/body——收件人与内容属于 PII。
+ * 记录列表省略已渲染的 title/body——收件人与内容属于 PII。参考装配另有
+ * {@code @AinerAuthorize} 粗门禁（需 Binding）；模块切片未装配拦截器时注解不生效。
  */
 @RestController
 @RequestMapping("/api/notifications")
@@ -47,6 +50,7 @@ public class NotificationManagementController {
     // ---- 模板 ----
 
     @PostMapping("/templates")
+    @AinerAuthorize(permission = NotificationAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<NotificationApiDtos.NotificationTemplateResponse>> createTemplate(
             @RequestBody NotificationApiDtos.CreateTemplateRequest body,
             HttpServletRequest request) {
@@ -63,6 +67,7 @@ public class NotificationManagementController {
     }
 
     @GetMapping("/templates")
+    @AinerAuthorize(permission = NotificationAuthorities.READ)
     public ApiResponse<NotificationApiDtos.NotificationTemplatePageResponse> pageTemplates(
             @RequestParam(value = "status", required = false) @Nullable String status,
             @RequestParam(value = "page", defaultValue = "1") int page,
@@ -76,6 +81,7 @@ public class NotificationManagementController {
     }
 
     @PutMapping("/templates/{id}")
+    @AinerAuthorize(permission = NotificationAuthorities.MANAGE)
     public ApiResponse<NotificationApiDtos.NotificationTemplateResponse> updateTemplate(
             @PathVariable UUID id,
             @RequestBody NotificationApiDtos.UpdateTemplateRequest body,
@@ -90,6 +96,7 @@ public class NotificationManagementController {
     }
 
     @PostMapping("/templates/{id}/status-changes")
+    @AinerAuthorize(permission = NotificationAuthorities.MANAGE)
     public ApiResponse<NotificationApiDtos.NotificationTemplateResponse> changeTemplateStatus(
             @PathVariable UUID id,
             @RequestBody NotificationApiDtos.StatusChangeRequest body,
@@ -105,6 +112,7 @@ public class NotificationManagementController {
     // ---- 直接提交 ----
 
     @PostMapping("/messages")
+    @AinerAuthorize(permission = NotificationAuthorities.SUBMIT)
     public ResponseEntity<ApiResponse<SubmitResponse>> submitDirect(
             @RequestBody NotificationApiDtos.SubmitDirectRequest body,
             HttpServletRequest request) {
@@ -121,6 +129,7 @@ public class NotificationManagementController {
     // ---- 投递记录 ----
 
     @GetMapping("/records")
+    @AinerAuthorize(permission = NotificationAuthorities.READ)
     public ApiResponse<NotificationApiDtos.NotificationRecordPageResponse> pageRecords(
             @RequestParam(value = "status", required = false) @Nullable String status,
             @RequestParam(value = "page", defaultValue = "1") int page,
