@@ -1,7 +1,9 @@
 package dev.ainer.module.config.config.api;
 
+import dev.ainer.authorization.spring.AinerAuthorize;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.core.web.ApiResponse;
+import dev.ainer.module.config.config.application.ConfigAuthorities;
 import dev.ainer.module.config.config.application.ConfigApplicationService;
 import dev.ainer.module.config.config.application.ConfigErrorCode;
 import dev.ainer.module.config.config.domain.ConfigValueType;
@@ -24,7 +26,8 @@ import java.util.List;
 /**
  * 配置管理 API（ADR-0040）。写入要求 {@code config.manage}，读取要求
  * {@code config.read}；secret 明文只接受一次且绝不回显——历史记录存储
- * {@code [encrypted]} 占位而非明文。
+ * {@code [encrypted]} 占位而非明文。参考装配另有 {@code @AinerAuthorize} 粗门禁
+ * （需 Binding）；模块切片未装配拦截器时注解不生效。
  */
 @RestController
 @RequestMapping("/api/configs")
@@ -41,6 +44,7 @@ public class ConfigManagementController {
     }
 
     @PostMapping("/entries")
+    @AinerAuthorize(permission = ConfigAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<Void>> setValue(
             @RequestBody ConfigApiDtos.SetValueRequest body,
             HttpServletRequest request) {
@@ -52,6 +56,7 @@ public class ConfigManagementController {
     }
 
     @PostMapping("/secrets")
+    @AinerAuthorize(permission = ConfigAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<Void>> setSecret(
             @RequestBody ConfigApiDtos.SetSecretRequest body,
             HttpServletRequest request) {
@@ -63,6 +68,7 @@ public class ConfigManagementController {
     }
 
     @GetMapping("/entries")
+    @AinerAuthorize(permission = ConfigAuthorities.READ)
     public ApiResponse<ConfigApiDtos.ConfigEntryListResponse> listEntries(
             @RequestParam("namespace") String namespace,
             HttpServletRequest request) {
@@ -77,6 +83,7 @@ public class ConfigManagementController {
     }
 
     @GetMapping("/history")
+    @AinerAuthorize(permission = ConfigAuthorities.READ)
     public ApiResponse<ConfigApiDtos.ConfigHistoryListResponse> history(
             @RequestParam("namespace") String namespace,
             @RequestParam("key") String key,

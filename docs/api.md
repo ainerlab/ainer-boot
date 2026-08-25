@@ -282,6 +282,9 @@ subject 使用。
 
 ### Config（`config.read` / `config.manage`）
 
+参考装配另有 `@AinerAuthorize` 粗门禁，需对应 Binding；模块切片未装配拦截器时注解不生效。
+仍不是按 namespace/key 的对象级授权合同。
+
 | Method | Path | Scope | 说明 |
 |---|---|---|---|
 | POST | `/api/configs/entries` | manage | 设置明文值；对 secret 键返回 409 |

@@ -133,8 +133,8 @@ Bearer Token 仍由 Resource Server 在更早阶段返回 401。
 服务中显式调用授权端口。Handler 注解只能在 MVC 阶段取得，禁止把 request attribute 假设成能被
 更早执行的 `AuthorizationFilter` 读取。
 
-参考装配（`ainer-server`）已给 Workspace 读写/审计、文件读写、`ai.invoke` 与
-`ai.agents.manage` 接线 `@AinerAuthorize`，并注册 Workspace 路径
+参考装配（`ainer-server`）已给 Workspace 读写/审计、文件读写、配置读写（含 secret 写入）、
+`ai.invoke` 与 `ai.agents.manage` 接线 `@AinerAuthorize`，并注册 Workspace 路径
 `AuthorizationTargetResolver`。**不是** 1.x 资源级授权合同。网关仅在请求带 `actingAgentId`
 时调用 `ActingGrant.check`（缺 `workspaceId` 返回 422，拒绝不泄露 reason）。其余 P3
 Controller、把 permission 改成类型化 resourceType、方法级 AOP 与 obligation executor 仍留给
