@@ -10,9 +10,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * 默认的 {@link ChannelSender}：把通知记录到日志而非真正发送。为每个渠道提供一个
- * 兜底 sender。启用 {@code ainer.notification.webhook.enabled=true} 时，WEBHOOK
- * 渠道由 {@link HttpWebhookChannelSender} 覆盖；其余渠道仍可由产品用真实适配器
- * （短信网关、SMTP、push）替换。
+ * 兜底 sender。启用对应开关后，WEBHOOK / EMAIL 分别由
+ * {@link HttpWebhookChannelSender} / {@link SmtpMailChannelSender} 覆盖；SMS/Push
+ * 仍由产品用真实适配器替换。
  *
  * <p>每个 Bean 按渠道命名（如 {@code smsSender}），产品可只覆盖单个渠道，
  * 其余渠道保留日志兜底。
@@ -48,6 +48,7 @@ public sealed class LoggingChannelSender implements ChannelSender
 
     @Component("emailSender")
     @ConditionalOnMissingBean(name = "emailSender")
+    @ConditionalOnProperty(prefix = "ainer.notification.email", name = "enabled", havingValue = "false", matchIfMissing = true)
     public static final class Email extends LoggingChannelSender {
         public Email() { super(NotificationChannel.EMAIL); }
     }

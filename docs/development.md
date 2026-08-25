@@ -92,7 +92,7 @@ ainer-module-ai-runtime            模型网关（SSE/预算/费用审计）+ Ag
 ainer-module-authorization         ADR-0037 混合授权（决策器/管理 API/SubjectSet/ActingGrant）
 ainer-module-dictionary            树形字典（多语言/缓存/管理 API）
 ainer-module-config                动态配置（热更新/版本史/AES-GCM secret）
-ainer-module-notification          多渠道通知（ChannelSender 端口/SKIP LOCKED 队列）
+ainer-module-notification          多渠道通知（ChannelSender 端口/SKIP LOCKED 队列/可选 webhook 与 SMTP）
 ainer-module-file                  文件存储（SHA-256/限制/补偿/审计）
 ainer-module-organization          组织目录（Incubating：Unit/任职/岗位/SubjectSet 解析器）
 ainer-module-knowledge             Knowledge Foundation（Incubating：不可变 Revision/人工发布）

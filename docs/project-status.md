@@ -310,6 +310,12 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-25 通知 EMAIL SMTP 渠道（默认关闭）
+- **交付**：`SmtpMailChannelSender` 可选用 `JavaMailSender`；启用时必填 `from` 且必须存在
+  MailSender bean。提交期校验地址；主题拒绝 CR/LF。默认仍是日志 sender。
+- **验证**：`EmailAddressRulesTest` + `SmtpMailChannelSenderIntegrationTest`（真实 PostgreSQL
+  + 记录型 `JavaMailSender`：SENT / 失败重试且错误消息无地址）。
+
 2026-08-25 最小观测 Starter
 - **C**：新增 `ainer-starter-observability`（Observation + requestId/trace MDC，OTLP 默认关）；
   自动装配正负例；发布清单 27→28 project、127→132 主制品；`ainer-server` 与
@@ -338,7 +344,7 @@ Ainer 项目签名 provenance 已通过。
 2026-08-25 通知 WEBHOOK 首个真实渠道（默认关闭）
 - **交付**：`HttpWebhookChannelSender` 可选用 `RestClient` POST JSON；host 白名单、HTTPS
   （loopback HTTP 需显式允许）、解析地址拒绝私网/链路本地/ULA、不跟随重定向；提交期对
-  非法 recipient 返回 400。默认仍是 `LoggingChannelSender`。SMS/Email/Push 仍由产品实现。
+  非法 recipient 返回 400。默认仍是 `LoggingChannelSender`。SMS/Push 仍由产品实现。
 - **验证**：`WebhookDestinationRulesTest`（无 Docker）+ `WebhookChannelSenderIntegrationTest`
   （真实 PostgreSQL + JDK HttpServer 2xx SENT / 503 重试且错误消息无 URL）。
 

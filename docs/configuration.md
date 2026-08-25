@@ -118,6 +118,14 @@ Webhook 真实投递默认关闭（开发继续走日志 sender）。启用后 r
 | `AINER_NOTIFICATION_WEBHOOK_READ_TIMEOUT` | `2s` | 必须为正数 |
 | `AINER_NOTIFICATION_WEBHOOK_ALLOW_INSECURE_HTTP` | `false` | 仅 loopback 自动化测试允许 `true` |
 
+SMTP 邮件真实投递默认关闭。启用后必须提供 `from`，并装配 `JavaMailSender`
+（通常配置 `spring.mail.host`），否则启动失败。recipient / subject 拒绝控制字符。
+
+| 环境变量 | 默认值 | 生产说明 |
+|---|---|---|
+| `AINER_NOTIFICATION_EMAIL_ENABLED` | `false` | 用 SMTP 替换 EMAIL 渠道的日志兜底 |
+| `AINER_NOTIFICATION_EMAIL_FROM` | 空 | 启用时必填；合法 From 地址 |
+
 ## 4. AI runtime
 
 AI 默认关闭。启用时以下设置共同构成安全门禁：

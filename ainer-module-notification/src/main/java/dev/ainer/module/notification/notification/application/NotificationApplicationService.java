@@ -34,6 +34,7 @@ public class NotificationApplicationService {
     private final NotificationRecordRepository recordRepository;
     private final NotificationAuditRepository auditRepository;
     private final NotificationWebhookProperties webhookProperties;
+    private final NotificationEmailProperties emailProperties;
     private final Clock clock;
 
     public NotificationApplicationService(
@@ -41,11 +42,13 @@ public class NotificationApplicationService {
             NotificationRecordRepository recordRepository,
             NotificationAuditRepository auditRepository,
             NotificationWebhookProperties webhookProperties,
+            NotificationEmailProperties emailProperties,
             Clock clock) {
         this.templateRepository = templateRepository;
         this.recordRepository = recordRepository;
         this.auditRepository = auditRepository;
         this.webhookProperties = webhookProperties;
+        this.emailProperties = emailProperties;
         this.clock = clock;
     }
 
@@ -174,6 +177,13 @@ public class NotificationApplicationService {
         if (channel == NotificationChannel.WEBHOOK && webhookProperties.enabled()) {
             try {
                 WebhookDestinationRules.validate(recipient, webhookProperties);
+            } catch (IllegalArgumentException exception) {
+                throw new BusinessException(NotificationErrorCode.INVALID_REQUEST);
+            }
+        }
+        if (channel == NotificationChannel.EMAIL && emailProperties.enabled()) {
+            try {
+                EmailAddressRules.validate(recipient);
             } catch (IllegalArgumentException exception) {
                 throw new BusinessException(NotificationErrorCode.INVALID_REQUEST);
             }
