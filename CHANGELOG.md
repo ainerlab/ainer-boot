@@ -6,6 +6,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **字典端点 `@AinerAuthorize` 粗门禁**：`/api/dictionaries` 类型/项读写消费
+  `dictionary.read` / `dictionary.manage`；参考装配需对应 Binding。模块切片未装配拦截器时
+  注解不生效。仍不是按类型/项 ID 的对象级授权合同。
 - **通知端点 `@AinerAuthorize` 粗门禁**：`/api/notifications` 模板/记录/提交消费
   `notification.read` / `notification.manage` / `notification.submit`；参考装配需对应 Binding。
   模块切片未装配拦截器时注解不生效。仍不是按模板/记录 ID 的对象级授权合同。

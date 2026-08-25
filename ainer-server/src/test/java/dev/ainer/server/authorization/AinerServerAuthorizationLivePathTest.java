@@ -352,6 +352,33 @@ class AinerServerAuthorizationLivePathTest {
     }
 
     @Test
+    void dictionaryProbeDeniesWithoutBindingAndAllowsWithDictionaryBinding() {
+        authenticate(JwtTestSupport.signUserJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-user-1", "dictionary.read"));
+        RestResponse denied = client.get("/api/authz-dictionary-probe");
+        assertThat(denied.status().value()).isEqualTo(403);
+
+        authenticate(JwtTestSupport.signServiceJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-ops", "authorization.manage"));
+        RestResponse role = client.postJson("/api/authorization/roles", """
+                {"code": "dictionary-reader-http", "name": "Dictionary Reader HTTP",
+                 "permissions": ["dictionary.read"]}
+                """);
+        assertThat(role.status().value()).isEqualTo(201);
+        String roleId = (String) role.jsonPath("$.data.id");
+        RestResponse binding = client.postJson("/api/authorization/bindings", """
+                {"issuer": "%s", "subjectType": "USER", "subjectId": "platform-user-1",
+                 "roleId": "%s", "scopeKind": "WORKSPACE", "workspaceId": "%s"}
+                """.formatted(ISSUER, roleId, WORKSPACE_ID));
+        assertThat(binding.status().value()).isEqualTo(201);
+
+        authenticate(JwtTestSupport.signUserJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-user-1", "dictionary.read"));
+        RestResponse allowed = client.get("/api/authz-dictionary-probe");
+        assertThat(allowed.status().value()).isEqualTo(200);
+    }
+
+    @Test
     void requestWithoutTokenIsUnauthorized() {
         restTemplate.getRestTemplate().setInterceptors(List.of());
         ResponseEntity<String> response = restTemplate.getForEntity(
@@ -368,7 +395,8 @@ class AinerServerAuthorizationLivePathTest {
             WorkspaceScopedProbeController.class,
             FileReadProbeController.class,
             ConfigReadProbeController.class,
-            NotificationSubmitProbeController.class
+            NotificationSubmitProbeController.class,
+            DictionaryReadProbeController.class
     })
     static class TestApplication {
 
@@ -444,6 +472,19 @@ class AinerServerAuthorizationLivePathTest {
         @GetMapping
         @AinerAuthorize(permission = "notification.submit")
         public ResponseEntity<Void> peekNotificationSubmit() {
+            return ResponseEntity.ok().build();
+        }
+    }
+
+    @RestController
+    @RequestMapping("/api/authz-dictionary-probe")
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+            name = "ainer.server.test-authz-live", havingValue = "true")
+    static class DictionaryReadProbeController {
+
+        @GetMapping
+        @AinerAuthorize(permission = "dictionary.read")
+        public ResponseEntity<Void> peekDictionary() {
             return ResponseEntity.ok().build();
         }
     }
