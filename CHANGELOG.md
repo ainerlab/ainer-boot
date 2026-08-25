@@ -21,6 +21,15 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   携带 RFC 9470 `WWW-Authenticate: Bearer error="insufficient_user_authentication"` 挑战头。
 - 授权模块补齐 ADR-0037 §3 声明的 ArchUnit 包边界守护（domain/policy/catalog/application 零
   Spring Security/Servlet 依赖、spring/ 适配层无反向引用）。
+
+### Changed
+
+- **ai-agent 分页拉齐 file 基准**：非法 `page`/`size` 返回 422 `AINER.AI_AGENT.INVALID_PAGE`，
+  信封字段为 `items`/`page`/`size`/`total`，不再静默钳制。
+- **ArchUnit 扩覆盖**：P3（file/dictionary/config/notification）、Incubating
+  （organization/knowledge/task）、`ai.agent` 与 identity foundation（无 Web）按 workspace
+  模板守住分层与无环。
+
 ## [1.1.0] - 2026-08-24
 
 商业级代码评审首次制品发布（PR #24–#27），并纳入评审遗留收口：P4 任务调度引擎

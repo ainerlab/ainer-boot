@@ -315,6 +315,10 @@ Ainer 项目签名 provenance 已通过。
   自动装配正负例；发布清单 27→28 project、127→132 主制品；`ainer-server` 与
   `ainer-offstate-app` 按需依赖。
 
+2026-08-25 ArchUnit 扩覆盖与 ai-agent 分页拉齐
+- **A**：P3 / organization / knowledge / task / ai.agent / identity 补 ArchUnit；ai-agent
+  非法分页改为 422 `AINER.AI_AGENT.INVALID_PAGE`，信封与 file 对齐（`items/page/size/total`）。
+
 2026-08-25 通知 WEBHOOK 首个真实渠道（默认关闭）
 - **交付**：`HttpWebhookChannelSender` 可选用 `RestClient` POST JSON；host 白名单、HTTPS
   （loopback HTTP 需显式允许）、解析地址拒绝私网/链路本地/ULA、不跟随重定向；提交期对
