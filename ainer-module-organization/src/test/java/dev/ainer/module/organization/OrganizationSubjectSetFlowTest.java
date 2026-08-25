@@ -400,9 +400,17 @@ class OrganizationSubjectSetFlowTest {
                 name = "ainer.organization.test-subject-set-flow", havingValue = "true")
         @Bean
         dev.ainer.authorization.catalog.PermissionContributor orgflowPermissions() {
-            return () -> Set.of(new Permission(
-                    PROTECTED_WRITE, "write", PROTECTED_RESOURCE, RiskTier.MEDIUM,
-                    AuditLevel.ON_DECISION, false, false));
+            ResourceType requestResource = new ResourceType("request");
+            return () -> Set.of(
+                    new Permission(
+                            PROTECTED_WRITE, "write", PROTECTED_RESOURCE, RiskTier.MEDIUM,
+                            AuditLevel.ON_DECISION, false, false),
+                    new Permission(
+                            new PermissionCode("organization.read"), "read", requestResource,
+                            RiskTier.LOW, AuditLevel.ON_DECISION, false, true),
+                    new Permission(
+                            new PermissionCode("organization.manage"), "write", requestResource,
+                            RiskTier.MEDIUM, AuditLevel.ON_DECISION, false, true));
         }
 
         @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
@@ -410,8 +418,10 @@ class OrganizationSubjectSetFlowTest {
         @Bean
         @Primary
         ScopePermissionCeiling orgflowScopeCeiling() {
-            return (scope, permission) -> PROTECTED_SCOPE.equals(scope)
-                    && PROTECTED_WRITE.equals(permission);
+            return (scope, permission) -> (PROTECTED_SCOPE.equals(scope)
+                    && PROTECTED_WRITE.equals(permission))
+                    || (scope.equals(permission.value())
+                    && ("organization.read".equals(scope) || "organization.manage".equals(scope)));
         }
 
         @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
@@ -422,14 +432,23 @@ class OrganizationSubjectSetFlowTest {
             return new DomainAuthorizationPolicy() {
                 @Override
                 public GrantPath pathFor(PermissionCode permission) {
-                    return PROTECTED_WRITE.equals(permission) ? GrantPath.BINDING_REQUIRED : null;
+                    if (PROTECTED_WRITE.equals(permission)) {
+                        return GrantPath.BINDING_REQUIRED;
+                    }
+                    // 本测试装配拦截器；组织管理面走关系路径，不要求 Binding。
+                    if ("organization.read".equals(permission.value())
+                            || "organization.manage".equals(permission.value())) {
+                        return GrantPath.RELATION_DERIVED;
+                    }
+                    return null;
                 }
 
                 @Override
                 public boolean relationGrants(Requester.Authenticated subject,
                         PermissionCode permission, ResourceRef resource,
                         AuthorizationContext context) {
-                    return false;
+                    return "organization.read".equals(permission.value())
+                            || "organization.manage".equals(permission.value());
                 }
 
                 @Override

@@ -360,7 +360,26 @@ Knowledge 模块默认装配；scope 在应用服务内强制。参考装配另�
 
 错误码族 `AINER.KNOWLEDGE.*`。生命周期事件同事务 append-only。
 
-## 13. 兼容与变更
+## 13. 组织目录 API（ADR-0042）
+
+组织模块默认装配；scope 在应用服务内强制。参考装配另有 `@AinerAuthorize` 粗门禁，需对应
+Binding；模块切片未装配拦截器时注解不生效。请求体/查询里的 `workspaceId` 不作为授权目标。
+仍不是按目录/任职 ID 的对象级授权合同。入岗命中自建岗位集合绑定只写 Alert，不自动撤销。
+
+| Method | Path | Scope | 说明 |
+|---|---|---|---|
+| POST | `/api/organization/directories` | `organization.manage` | 创建目录（201） |
+| GET | `/api/organization/directories?workspaceId=` | `organization.read` | 分页 |
+| POST/GET | `/api/organization/directories/{directoryId}/units` | manage / read | 建单元；读树 |
+| POST/GET | `/api/organization/directories/{directoryId}/engagements` | manage / read | 入岗；分页 |
+| POST | `.../engagements/{id}/suspensions`、`.../terminations` | manage | 暂停/终止 |
+| POST | `.../unit-assignments`、`.../transfers` | manage | 分配/调岗 |
+| POST | `.../positions`、`.../position-assignments` | manage | 岗位与任职 |
+| GET | `.../units/{unitId}/members`、`.../positions/{id}/assignees` | read | 决策时实时成员投影 |
+
+错误码族 `AINER.ORGANIZATION.*`。变更同事务审计。
+
+## 14. 兼容与变更
 
 - 新增可选响应字段通常向后兼容，客户端必须容忍未知字段；
 - 删除、改名、改变字段类型、收紧枚举或改变 status/error code 都需要发布说明；
