@@ -310,6 +310,12 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-25 Workspace 路径目标解析
+- **参考装配**：`WorkspacePathAuthorizationTargetResolver` 把 `/api/workspaces/{id}` 写成
+  `ResourceRef.workspaceId`（`resourceType=request`）。LivePath：同工作区 Binding→200，
+  另一工作区 Binding→403；无路径 id 的 probe 仍任一 WORKSPACE Binding 即可。**不是**
+  1.x 资源级授权合同。
+
 2026-08-25 通知 EMAIL SMTP 渠道（默认关闭）
 - **交付**：`SmtpMailChannelSender` 可选用 `JavaMailSender`；启用时必填 `from` 且必须存在
   MailSender bean。提交期校验地址；主题拒绝 CR/LF。默认仍是日志 sender。

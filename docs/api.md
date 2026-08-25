@@ -192,7 +192,9 @@ SIEM 导出参数 `afterOccurredAt` 与 `afterId` 必须同时提供或同时省
 
 - 未注册 `AuthorizationTargetResolver` 时，目标固定为 `resourceType=request` 的合成资源，
   permission 也必须以该类型注册。产品注册解析器 bean 后（第一个非空结果胜出），门禁按解析出的
-  类型化 `ResourceRef` 决策，类型不匹配一律 403。
+  类型化 `ResourceRef` 决策，类型不匹配一律 403。参考装配注册 Workspace 路径解析器：
+  `/api/workspaces/{id}` 写入 `workspaceId`（类型仍是 `request`），对该工作区的 Binding
+  才能通过；无路径 id 时仍是粗闸门。
 - ALLOW 携带的 `PublicProjection` 是响应投影数据而非待执行义务，不会阻断放行。完整决策通过请求
   属性 `ainer.authorization.decision` 暴露，controller 必须自行消费投影描述符完成字段裁剪——
   门禁本身不做字段投影。

@@ -17,6 +17,7 @@ import dev.ainer.authorization.domain.SubjectType;
 import dev.ainer.authorization.policy.DomainAuthorizationPolicy;
 import dev.ainer.authorization.policy.GrantAdministrationPolicy;
 import dev.ainer.authorization.policy.ScopePermissionCeiling;
+import dev.ainer.authorization.spring.AuthorizationTargetResolver;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.security.token.AuthenticatedPrincipal;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,8 +34,8 @@ import java.util.Set;
  *
  * <p>授权模块的默认策略全部 deny-all（引擎 fail-closed）；没有本配置时，管理 API 与
  * 决策引擎在 ainer-server 中是一条全拒绝的死链。本配置把已装配模块的 scope 注册为
- * 平台权限目录（端点粗门禁用 {@code resourceType=request}，与
- * {@code AinerRequestAuthorizationManager} 合成的资源形状一致），建立 scope→permission
+ * 平台权限目录（端点门禁用 {@code resourceType=request}；Workspace 路径解析器填上
+ * {@code workspaceId}，其余仍与合成 request 形状一致），建立 scope→permission
  * 的恒等天花板与 BINDING_REQUIRED 领域策略，并同步目录投影供管理 API 创建 Role/Binding。
  * 产品部署应以自己的领域策略覆盖或取代本参考实现。
  *
@@ -83,6 +84,15 @@ public class AinerServerAuthorizationPolicyConfiguration {
             new PlatformPermission("ai.agents.manage", true));
 
     private record PlatformPermission(String code, boolean mutating) {
+    }
+
+    /**
+     * 把 {@code /api/workspaces/{id}} 写成 {@code ResourceRef.workspaceId}，使 WORKSPACE
+     * Binding 必须对上路径工作区。无路径 id 的创建/列表仍回退合成 request。
+     */
+    @Bean
+    AuthorizationTargetResolver ainerServerWorkspacePathTargetResolver() {
+        return new WorkspacePathAuthorizationTargetResolver();
     }
 
     @Bean

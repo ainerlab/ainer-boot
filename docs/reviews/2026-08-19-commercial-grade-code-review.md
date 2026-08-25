@@ -68,8 +68,8 @@
 **仍开放（需产品或设计决策，本轮不改代码）**
 
 - **M2 Recheck / 禁止 bind-before-assignment**：ADR-0050 未选项，等真实 HR 流程消费者
-- **M5' 后续**：通用 `AuthorizationTargetResolver` 框架、方法级 AOP、obligation executor、
-  其余 P3 Controller 一次喷完；当前只是参考装配粗门禁，不是 1.x 资源级授权合同
+- **M5' 后续**：把 permission 改成类型化 resourceType、方法级 AOP、obligation executor、
+  其余 P3 Controller；Workspace 路径解析器已在参考装配落地，仍不是 1.x 资源级授权合同
 
 ## 评审确认无问题的关键控制点
 

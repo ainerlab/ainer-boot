@@ -126,16 +126,18 @@ chain 先完成 JWT 认证；MVC 解析出 handler 后，拦截器读取方法�
 未执行 obligation 均失败关闭为统一 403，不把 decisionId 或内部 reason code 暴露给客户端；缺少
 Bearer Token 仍由 Resource Server 在更早阶段返回 401。
 
-首版注解只适用于低/中风险、`resourceType=request`、无 obligation 的 HTTP 粗门禁。它尚未解析路径
-变量或请求体为真实 `ResourceRef`，也不执行 FieldMask/RecheckBefore；高价值写、资源 ownership 和
-数据库查询范围必须继续在应用服务中显式调用授权端口。Handler 注解只能在 MVC 阶段取得，禁止把
-request attribute 假设成能被更早执行的 `AuthorizationFilter` 读取。
+首版注解只适用于低/中风险、`resourceType=request`、无 obligation 的 HTTP 门禁。参考装配会把
+`/api/workspaces/{id}` 路径变量写入 `ResourceRef.workspaceId`，使 WORKSPACE Binding 必须对上该
+工作区；创建/列表等无路径 id 的端点仍回退「持有该权限」粗闸门。它不把请求体解析为资源，
+也不执行 FieldMask/RecheckBefore；高价值写、资源 ownership 和数据库查询范围必须继续在应用
+服务中显式调用授权端口。Handler 注解只能在 MVC 阶段取得，禁止把 request attribute 假设成能被
+更早执行的 `AuthorizationFilter` 读取。
 
 参考装配（`ainer-server`）已给 Workspace 读写/审计、`ai.invoke` 与 `ai.agents.manage` 接线
-`@AinerAuthorize`；WORKSPACE Binding 在合成 `request` 资源上作为「持有该权限」粗门禁，**不是**
-1.x 资源级授权合同。网关仅在请求带 `actingAgentId` 时调用 `ActingGrant.check`（缺
-`workspaceId` 返回 422，拒绝不泄露 reason）。其余 P3 Controller、通用 TargetResolver 框架、
-方法级 AOP 与 obligation executor 仍留给后续。
+`@AinerAuthorize`，并注册 Workspace 路径 `AuthorizationTargetResolver`。**不是** 1.x 资源级
+授权合同。网关仅在请求带 `actingAgentId` 时调用 `ActingGrant.check`（缺 `workspaceId` 返回
+422，拒绝不泄露 reason）。其余 P3 Controller、把 permission 改成类型化 resourceType、方法级
+AOP 与 obligation executor 仍留给后续。
 
 `PUBLIC_PROJECTION` 不会自行把路径加入 Resource Server 的 `public-paths`。即使宿主同时开放路径并
 注册 `PublicAccessPolicy`，当前 public ALLOW 仍携带 projection obligation，而 0.1 adapter 尚未执行
