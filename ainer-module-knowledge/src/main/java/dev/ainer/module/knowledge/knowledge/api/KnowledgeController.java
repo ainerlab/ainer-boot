@@ -1,7 +1,9 @@
 package dev.ainer.module.knowledge.knowledge.api;
 
+import dev.ainer.authorization.spring.AinerAuthorize;
 import dev.ainer.core.web.ApiResponse;
 import dev.ainer.module.knowledge.knowledge.application.KnowledgeApplicationService;
+import dev.ainer.module.knowledge.knowledge.application.KnowledgeAuthorities;
 import dev.ainer.module.knowledge.knowledge.domain.KnowledgeObject;
 import dev.ainer.module.knowledge.knowledge.domain.KnowledgeRevision;
 import dev.ainer.security.token.AuthenticatedPrincipal;
@@ -25,7 +27,9 @@ import java.util.UUID;
 
 /**
  * Knowledge 管理 API（ADR-0044 K1/K2）：提案/发布（人工门禁）/supersede/asOf 解析。
- * 动作名词端点（publications）；scope 在应用服务内强制。
+ * 动作名词端点（publications）；scope 在应用服务内强制。参考装配另有
+ * {@code @AinerAuthorize} 粗门禁（需 Binding）；模块切片未装配拦截器时注解不生效。
+ * 请求体/查询里的 {@code workspaceId} 不作为授权目标输入。
  */
 @RestController
 @RequestMapping("/api/knowledge")
@@ -90,6 +94,7 @@ public class KnowledgeController {
     }
 
     @PostMapping("/objects")
+    @AinerAuthorize(permission = KnowledgeAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<ObjectResponse>> createObject(
             @RequestBody CreateObjectRequest body, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -101,6 +106,7 @@ public class KnowledgeController {
     }
 
     @GetMapping("/objects")
+    @AinerAuthorize(permission = KnowledgeAuthorities.READ)
     public ApiResponse<PageResponse<ObjectResponse>> pageObjects(
             @RequestParam("workspaceId") UUID workspaceId,
             @RequestParam(name = "page", defaultValue = "1") long page,
@@ -116,6 +122,7 @@ public class KnowledgeController {
     }
 
     @PostMapping("/objects/{objectId}/revisions")
+    @AinerAuthorize(permission = KnowledgeAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<RevisionResponse>> proposeRevision(
             @PathVariable("objectId") UUID objectId,
             @RequestBody ProposeRevisionRequest body,
@@ -137,6 +144,7 @@ public class KnowledgeController {
 
     /** 人工发布门禁：SERVICE/AI 调用一律 403（ADR-0044 不变式 #9）。 */
     @PostMapping("/revisions/{revisionId}/publications")
+    @AinerAuthorize(permission = KnowledgeAuthorities.MANAGE)
     public ApiResponse<RevisionResponse> publishRevision(
             @PathVariable("revisionId") UUID revisionId, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -147,6 +155,7 @@ public class KnowledgeController {
 
     /** asOf 解析：返回该时刻已发布的精确 Revision pin。 */
     @GetMapping("/objects/{objectId}")
+    @AinerAuthorize(permission = KnowledgeAuthorities.READ)
     public ApiResponse<RevisionResponse> resolveObject(
             @PathVariable("objectId") UUID objectId,
             @RequestParam(name = "asOf", required = false) Instant asOf,
@@ -158,6 +167,7 @@ public class KnowledgeController {
     }
 
     @GetMapping("/revisions/{revisionId}")
+    @AinerAuthorize(permission = KnowledgeAuthorities.READ)
     public ApiResponse<RevisionResponse> getRevision(
             @PathVariable("revisionId") UUID revisionId, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();

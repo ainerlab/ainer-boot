@@ -406,6 +406,33 @@ class AinerServerAuthorizationLivePathTest {
     }
 
     @Test
+    void knowledgeProbeDeniesWithoutBindingAndAllowsWithKnowledgeBinding() {
+        authenticate(JwtTestSupport.signUserJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-user-1", "knowledge.read"));
+        RestResponse denied = client.get("/api/authz-knowledge-probe");
+        assertThat(denied.status().value()).isEqualTo(403);
+
+        authenticate(JwtTestSupport.signServiceJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-ops", "authorization.manage"));
+        RestResponse role = client.postJson("/api/authorization/roles", """
+                {"code": "knowledge-reader-http", "name": "Knowledge Reader HTTP",
+                 "permissions": ["knowledge.read"]}
+                """);
+        assertThat(role.status().value()).isEqualTo(201);
+        String roleId = (String) role.jsonPath("$.data.id");
+        RestResponse binding = client.postJson("/api/authorization/bindings", """
+                {"issuer": "%s", "subjectType": "USER", "subjectId": "platform-user-1",
+                 "roleId": "%s", "scopeKind": "WORKSPACE", "workspaceId": "%s"}
+                """.formatted(ISSUER, roleId, WORKSPACE_ID));
+        assertThat(binding.status().value()).isEqualTo(201);
+
+        authenticate(JwtTestSupport.signUserJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-user-1", "knowledge.read"));
+        RestResponse allowed = client.get("/api/authz-knowledge-probe");
+        assertThat(allowed.status().value()).isEqualTo(200);
+    }
+
+    @Test
     void requestWithoutTokenIsUnauthorized() {
         restTemplate.getRestTemplate().setInterceptors(List.of());
         ResponseEntity<String> response = restTemplate.getForEntity(
@@ -424,7 +451,8 @@ class AinerServerAuthorizationLivePathTest {
             ConfigReadProbeController.class,
             NotificationSubmitProbeController.class,
             DictionaryReadProbeController.class,
-            TaskSubmitProbeController.class
+            TaskSubmitProbeController.class,
+            KnowledgeReadProbeController.class
     })
     static class TestApplication {
 
@@ -526,6 +554,19 @@ class AinerServerAuthorizationLivePathTest {
         @GetMapping
         @AinerAuthorize(permission = "task.submit")
         public ResponseEntity<Void> peekTaskSubmit() {
+            return ResponseEntity.ok().build();
+        }
+    }
+
+    @RestController
+    @RequestMapping("/api/authz-knowledge-probe")
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+            name = "ainer.server.test-authz-live", havingValue = "true")
+    static class KnowledgeReadProbeController {
+
+        @GetMapping
+        @AinerAuthorize(permission = "knowledge.read")
+        public ResponseEntity<Void> peekKnowledge() {
             return ResponseEntity.ok().build();
         }
     }
