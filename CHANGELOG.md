@@ -9,6 +9,13 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - **M5' 参考装配接线**：Workspace 读写/审计与 AI 网关/Agent 管理端点消费 `@AinerAuthorize`；
   网关仅在请求带 `actingAgentId` 时 fail-closed 调用 `ActingGrant.check`。这是参考装配粗门禁，
   **不是** 1.x 资源级授权合同。
+- **最小观测 Starter（`ainer-starter-observability`，ADR-0029 T1#6）**：默认桥接 Boot
+  `ObservationRegistry`，把 `requestId` 写入 `traceId` MDC；`ainer.observability.otlp.enabled`
+  默认关闭，开启只装配导出标记，不强制全链路 OTel，也不改写域 Micrometer counters。参考装配
+  `ainer-server` 与 `ainer-offstate-app` 按需依赖。发布清单 28 个 project / 132 个主制品。
+- **M2 延迟自提权 Alert（ADR-0050）**：入岗命中「任职主体曾创建且仍 ACTIVE 的岗位集合绑定」
+  时写 `DELAYED_SELF_ELEVATION` 审计并递增 `ainer.organization.delayed_self_elevation`；不自动
+  撤销、不阻断入岗。UNAVAILABLE 创建拒绝保持不变。
 - **通知 WEBHOOK 真实投递（默认关闭）**：启用 `ainer.notification.webhook.enabled` 后，WEBHOOK
   渠道用 `RestClient` POST JSON `{title,body}`；host 白名单 + HTTPS（loopback HTTP 需显式允许）
   + 拒绝私网/链路本地/ULA 解析 + 不跟随重定向。日志与错误消息不含 URL/正文。未启用时仍是
@@ -23,6 +30,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Changed
 
+- Maven 4 同 reactor BOM import 告警已用
+  [ADR-0049](docs/decisions/0049-maven4-reactor-bom-import-warning.md)
+  定性：**暂不消除，等待 Maven 4 GA**。不改 parentless BOM 消费合同。
 - **ai-agent 分页拉齐 file 基准**：非法 `page`/`size` 返回 422 `AINER.AI_AGENT.INVALID_PAGE`，
   信封字段为 `items`/`page`/`size`/`total`，不再静默钳制。
 - **ArchUnit 扩覆盖**：P3（file/dictionary/config/notification）、Incubating

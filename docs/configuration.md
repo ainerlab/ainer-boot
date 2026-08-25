@@ -260,6 +260,15 @@ Prometheus registry 已随两个可执行发行物引入，但仓库没有部署
 
 优雅停机已启用，shutdown phase 超时为 20 秒。修改超时必须结合请求、SSE 和数据库事务实测。
 
+`ainer-starter-observability`（ADR-0029 T1#6）默认启用 Observation 与 requestId/traceId
+MDC 关联；不改写域 Micrometer counters，也不把 Prometheus 鉴权搬进本模块。
+
+| 键 | 默认 | 说明 |
+|---|---|---|
+| `ainer.observability.enabled` | `true` | 关闭后不装配 ObservationRegistry 桥与关联过滤器 |
+| `ainer.observability.otlp.enabled` | `false` | 开启只装配导出标记；真实 OTel exporter 由产品自备 |
+| `ainer.observability.otlp.endpoint` | 空 | 预留端点字段；本 Starter 不强制发起 OTLP 导出 |
+
 ## 7. 通用授权模块（ADR-0037；ADR-0030 已被取代）
 
 `ainer.authorization.enabled`（默认 `true`）控制 `ainer-module-authorization` 的模块装配。
