@@ -1,5 +1,6 @@
 package dev.ainer.module.organization.orgdir.application;
 
+import dev.ainer.authorization.policy.DelayedSelfElevationDetector;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.core.uuid.Uuidv7;
@@ -14,6 +15,8 @@ import dev.ainer.module.organization.orgdir.domain.PositionAssignment;
 import dev.ainer.module.organization.orgdir.domain.UnitAssignment;
 import dev.ainer.module.organization.orgdir.domain.WorkforceEngagement;
 import dev.ainer.security.token.AuthenticatedPrincipal;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +26,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -42,18 +46,24 @@ public class WorkforceApplicationService {
     private final OrgChangeAuditRepository auditRepository;
     private final OrganizationProperties properties;
     private final Clock clock;
+    private final ObjectProvider<DelayedSelfElevationDetector> delayedSelfElevation;
+    private final ObjectProvider<MeterRegistry> meterRegistry;
 
     public WorkforceApplicationService(
             WorkforceRepository repository,
             DirectoryRepository directoryRepository,
             OrgChangeAuditRepository auditRepository,
             OrganizationProperties properties,
-            Clock clock) {
+            Clock clock,
+            ObjectProvider<DelayedSelfElevationDetector> delayedSelfElevation,
+            ObjectProvider<MeterRegistry> meterRegistry) {
         this.repository = repository;
         this.directoryRepository = directoryRepository;
         this.auditRepository = auditRepository;
         this.properties = properties;
         this.clock = clock;
+        this.delayedSelfElevation = delayedSelfElevation;
+        this.meterRegistry = meterRegistry;
     }
 
     @Transactional
@@ -319,7 +329,45 @@ public class WorkforceApplicationService {
                 validFrom, validUntil, OrgStatus.ENABLED, now, now);
         repository.insertPositionAssignment(assignment);
         audit(principal, requestId, "POSITION_ASSIGNMENT", assignment.id(), "ASSIGNED", now);
+        alertDelayedSelfElevation(engagement, position, assignment, principal, requestId, now);
         return assignment;
+    }
+
+    private void alertDelayedSelfElevation(
+            WorkforceEngagement engagement,
+            OrgPosition position,
+            PositionAssignment assignment,
+            AuthenticatedPrincipal principal,
+            String requestId,
+            Instant now) {
+        DelayedSelfElevationDetector detector = delayedSelfElevation.getIfAvailable();
+        if (detector == null) {
+            return;
+        }
+        Optional<UUID> hit;
+        try {
+            hit = detector.findSelfCreatedPositionAssigneeBinding(
+                    engagement.subjectIssuer(),
+                    engagement.subjectId(),
+                    engagement.workspaceId(),
+                    position.id());
+        } catch (RuntimeException ignored) {
+            // 探测失败不得阻断入岗。
+            return;
+        }
+        if (hit.isEmpty()) {
+            return;
+        }
+        audit(principal, requestId, "POSITION_ASSIGNMENT", assignment.id(),
+                "DELAYED_SELF_ELEVATION", now);
+        try {
+            MeterRegistry meters = meterRegistry.getIfAvailable();
+            if (meters != null) {
+                meters.counter("ainer.organization.delayed_self_elevation").increment();
+            }
+        } catch (RuntimeException ignored) {
+            // 指标失败不得阻断入岗或回滚已写入的审计。
+        }
     }
 
     /** Unit 成员投影：决策时实时解析父链（Engagement + UnitAssignment 同时覆盖评估时间）。 */

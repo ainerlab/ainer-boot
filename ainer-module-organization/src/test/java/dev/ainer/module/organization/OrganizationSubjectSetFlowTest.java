@@ -49,6 +49,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import dev.ainer.core.uuid.Uuidv7;
+
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
@@ -280,6 +282,89 @@ class OrganizationSubjectSetFlowTest {
                         "workforce.position", position.id(), "assignee", WORKSPACE_ID, null),
                 Instant.now());
         org.assertj.core.api.Assertions.assertThat(sameWorkspace.isMember()).isTrue();
+    }
+
+    @org.junit.jupiter.api.Order(3)
+    @Test
+    void assignPositionAlertsWhenAssigneeCreatedTheSetBinding() {
+        String directoryId = jsonPost("/api/organization/directories", """
+                {"workspaceId": "%s", "code": "alert", "displayName": "告警目录"}
+                """.formatted(WORKSPACE_ID));
+        String rootUnitId = (String) client
+                .get("/api/organization/directories/" + directoryId + "/units")
+                .jsonPath("$.data[0].id");
+        String unitId = jsonPost("/api/organization/directories/" + directoryId + "/units", """
+                {"parentUnitId": "%s", "code": "sec", "displayName": "安全"}
+                """.formatted(rootUnitId));
+        Instant past = Instant.now().minusSeconds(3600);
+        String engagementId = jsonPost("/api/organization/directories/" + directoryId
+                + "/engagements", """
+                {"subjectIssuer": "%s", "subjectId": "%s", "engagementType": "EMPLOYEE",
+                 "validFrom": "%s"}
+                """.formatted(ISSUER, WORKER_SUBJECT, past));
+        String assignmentId = jsonPost("/api/organization/directories/" + directoryId
+                + "/unit-assignments", """
+                {"engagementId": "%s", "orgUnitId": "%s", "kind": "PRIMARY", "validFrom": "%s"}
+                """.formatted(engagementId, unitId, past));
+        String selfPositionId = jsonPost("/api/organization/directories/" + directoryId
+                + "/positions", """
+                {"orgUnitId": "%s", "code": "self-created", "displayName": "自建岗"}
+                """.formatted(unitId));
+        String otherPositionId = jsonPost("/api/organization/directories/" + directoryId
+                + "/positions", """
+                {"orgUnitId": "%s", "code": "other-created", "displayName": "他人岗"}
+                """.formatted(unitId));
+
+        RestResponse roleCreated = client.postJson("/api/authorization/roles", """
+                {"code": "orgflow-alert", "name": "Orgflow Alert",
+                 "permissions": ["orgflow.resource.write"]}
+                """);
+        assertThat(roleCreated.status().value()).isEqualTo(201);
+        String roleId = (String) roleCreated.jsonPath("$.data.id");
+
+        UUID selfBindingId = Uuidv7.generate();
+        jdbcTemplate.update("""
+                INSERT INTO ainer_authorization_subject_set_binding
+                    (id, set_object_type, set_object_id, set_relation, set_workspace_id,
+                     set_directory_id, role_id, scope_kind, workspace_id, valid_from, status,
+                     version, created_at, updated_at)
+                VALUES (?, 'workforce.position', ?, 'assignee', ?, ?, ?, 'WORKSPACE', ?, now(),
+                        'ACTIVE', 1, now(), now())
+                """, selfBindingId, UUID.fromString(selfPositionId), WORKSPACE_ID,
+                UUID.fromString(directoryId), UUID.fromString(roleId), WORKSPACE_ID);
+        jdbcTemplate.update("""
+                INSERT INTO ainer_authorization_change_audit
+                    (actor_issuer, actor_type, actor_id, target_type, target_id, action,
+                     after_version, occurred_at)
+                VALUES (?, 'USER', ?, 'SET_BINDING', ?, 'CREATE', 1, now())
+                """, ISSUER, WORKER_SUBJECT, selfBindingId);
+
+        RestResponse otherBinding = client.postJson("/api/authorization/set-bindings", """
+                {"setObjectType": "workforce.position", "setObjectId": "%s",
+                 "setRelation": "assignee", "setWorkspaceId": "%s", "setDirectoryId": "%s",
+                 "roleId": "%s", "scopeKind": "WORKSPACE", "workspaceId": "%s"}
+                """.formatted(otherPositionId, WORKSPACE_ID, directoryId, roleId, WORKSPACE_ID));
+        assertThat(otherBinding.status().value()).isEqualTo(201);
+
+        jsonPost("/api/organization/directories/" + directoryId + "/position-assignments", """
+                {"positionId": "%s", "engagementId": "%s", "unitAssignmentId": "%s",
+                 "kind": "PRIMARY", "validFrom": "%s"}
+                """.formatted(selfPositionId, engagementId, assignmentId, past));
+        jsonPost("/api/organization/directories/" + directoryId + "/position-assignments", """
+                {"positionId": "%s", "engagementId": "%s", "unitAssignmentId": "%s",
+                 "kind": "SECONDARY", "validFrom": "%s"}
+                """.formatted(otherPositionId, engagementId, assignmentId, past));
+
+        Integer alerts = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_org_change_audit "
+                        + "WHERE operation = 'DELAYED_SELF_ELEVATION'",
+                Integer.class);
+        Integer assigned = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ainer_org_change_audit "
+                        + "WHERE entity_type = 'POSITION_ASSIGNMENT' AND operation = 'ASSIGNED'",
+                Integer.class);
+        assertThat(assigned).isEqualTo(2);
+        assertThat(alerts).isEqualTo(1);
     }
 
     @org.springframework.beans.factory.annotation.Autowired

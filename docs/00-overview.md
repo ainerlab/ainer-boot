@@ -170,6 +170,7 @@ Foundation Roadmap 仍是 Proposed；其 mdpress-first 是有条件的路线建�
    与 ADR-0030 通用授权的内部切片 S0–S3 是**两套不同的 S 编号**；ADR-0030 已被
    [ADR-0037](decisions/0037-post-greenfield-authorization-baseline.md) 取代，13 项差距全闭合）
 4. [`decisions/README.md`](decisions/README.md) 中相关安全 ADR
+   （含 [ADR-0050](decisions/0050-delayed-self-elevation-alert.md) 延迟自提权 Alert）
 5. 集成官方参考管理应用时阅读
    [`ainer-admin-integration.md`](ainer-admin-integration.md) 与
    [ADR-0022](decisions/0022-ainer-admin-browser-integration-baseline.md)
