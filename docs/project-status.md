@@ -310,6 +310,10 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-25 Maven 4 reactor BOM import 告警 ADR
+- **B**：`./mvnw -e validate` 固化根 POM 第 73 行 reactor BOM import WARNING；[ADR-0049](decisions/0049-maven4-reactor-bom-import-warning.md)
+  结论为方案 A——暂不消除，等待 Maven 4 GA。未改 parentless BOM 消费合同。
+
 2026-08-25 M2 延迟自提权 Alert
 - **E**：[ADR-0050](decisions/0050-delayed-self-elevation-alert.md) 选 Alert；入岗命中自建
   岗位集合绑定写 `DELAYED_SELF_ELEVATION` 与计数器，不自动撤销。PostgreSQL 集成对照：

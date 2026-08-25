@@ -23,6 +23,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Changed
 
+- Maven 4 同 reactor BOM import 告警已用
+  [ADR-0049](docs/decisions/0049-maven4-reactor-bom-import-warning.md)
+  定性：**暂不消除，等待 Maven 4 GA**。不改 parentless BOM 消费合同。
 - **ai-agent 分页拉齐 file 基准**：非法 `page`/`size` 返回 422 `AINER.AI_AGENT.INVALID_PAGE`，
   信封字段为 `items`/`page`/`size`/`total`，不再静默钳制。
 - **ArchUnit 扩覆盖**：P3（file/dictionary/config/notification）、Incubating
