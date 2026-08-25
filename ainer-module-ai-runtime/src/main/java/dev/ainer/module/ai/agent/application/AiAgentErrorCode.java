@@ -11,7 +11,9 @@ public enum AiAgentErrorCode implements ErrorCode {
 
     ALREADY_RETIRED("AINER.AI_AGENT.ALREADY_RETIRED", "Agent 已退役", 409),
 
-    INVALID_DEFINITION("AINER.AI_AGENT.INVALID_DEFINITION", "Agent 定义参数不合法", 422);
+    INVALID_DEFINITION("AINER.AI_AGENT.INVALID_DEFINITION", "Agent 定义参数不合法", 422),
+
+    INVALID_PAGE("AINER.AI_AGENT.INVALID_PAGE", "分页参数不合法", 422);
 
     private final String code;
     private final String defaultMessage;

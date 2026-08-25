@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -21,8 +20,6 @@ import java.util.UUID;
  */
 @Service
 public class AiAgentApplicationService implements AgentDefinitionStatusResolver {
-
-    public static final String SCOPE_MANAGE = "ai.agents.manage";
 
     private final AiAgentRepository repository;
     private final Clock clock;
@@ -80,21 +77,17 @@ public class AiAgentApplicationService implements AgentDefinitionStatusResolver 
     }
 
     @Transactional(readOnly = true)
-    public List<AiAgentDefinition> page(AuthenticatedPrincipal principal, long page, long size) {
+    public AiAgentPage page(AuthenticatedPrincipal principal, int page, int size) {
         requireManage(principal);
-        long safePage = Math.max(page, 1);
-        int safeSize = (int) Math.min(Math.max(size, 1), 100);
-        return repository.page((safePage - 1) * safeSize, safeSize);
-    }
-
-    @Transactional(readOnly = true)
-    public long count(AuthenticatedPrincipal principal) {
-        requireManage(principal);
-        return repository.count();
+        if (page < 1 || size < 1 || size > 100) {
+            throw new BusinessException(AiAgentErrorCode.INVALID_PAGE);
+        }
+        long offset = (long) (page - 1) * size;
+        return new AiAgentPage(repository.page(offset, size), page, size, repository.count());
     }
 
     private static void requireManage(AuthenticatedPrincipal principal) {
-        if (!principal.hasScope(SCOPE_MANAGE)) {
+        if (!principal.hasScope(AiAgentAuthorities.MANAGE)) {
             throw new BusinessException(StandardErrorCode.FORBIDDEN);
         }
     }
