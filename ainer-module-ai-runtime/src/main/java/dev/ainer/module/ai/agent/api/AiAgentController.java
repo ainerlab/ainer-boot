@@ -1,13 +1,12 @@
 package dev.ainer.module.ai.agent.api;
 
+import dev.ainer.authorization.spring.AinerAuthorize;
 import dev.ainer.core.web.ApiResponse;
 import dev.ainer.module.ai.agent.application.AiAgentApplicationService;
-import dev.ainer.module.ai.agent.domain.AiAgentDefinition;
 import dev.ainer.security.token.AuthenticatedPrincipal;
 import dev.ainer.security.token.AuthenticatedPrincipalResolver;
 import dev.ainer.web.request.RequestIds;
 import jakarta.servlet.http.HttpServletRequest;
-import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
 /** Agent 定义管理 API（ADR-0043 A1）：注册/退役/查询；scope 在应用服务内强制。 */
@@ -35,22 +33,10 @@ public class AiAgentController {
         this.service = service;
     }
 
-    public record RegisterRequest(String code, String version, String purpose,
-            @Nullable String runtimeRef, @Nullable UUID workspaceId) {
-    }
-
-    public record AgentResponse(UUID id, String code, String version, String status,
-            String purpose, @Nullable String runtimeRef, @Nullable UUID workspaceId) {
-
-        public static AgentResponse from(AiAgentDefinition agent) {
-            return new AgentResponse(agent.id(), agent.code(), agent.version(), agent.status(),
-                    agent.purpose(), agent.runtimeRef(), agent.workspaceId());
-        }
-    }
-
     @PostMapping
+    @AinerAuthorize(permission = "ai.agents.manage")
     public ResponseEntity<ApiResponse<AgentResponse>> register(
-            @RequestBody RegisterRequest body, HttpServletRequest request) {
+            @RequestBody RegisterAgentRequest body, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
         AgentResponse response = AgentResponse.from(service.register(principal, body.code(),
                 body.version(), body.purpose(), body.runtimeRef(), body.workspaceId()));
@@ -59,6 +45,7 @@ public class AiAgentController {
     }
 
     @PostMapping("/{agentId}/retirements")
+    @AinerAuthorize(permission = "ai.agents.manage")
     public ApiResponse<AgentResponse> retire(
             @PathVariable("agentId") UUID agentId, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -67,6 +54,7 @@ public class AiAgentController {
     }
 
     @GetMapping("/{agentId}")
+    @AinerAuthorize(permission = "ai.agents.manage")
     public ApiResponse<AgentResponse> get(
             @PathVariable("agentId") UUID agentId, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -74,22 +62,15 @@ public class AiAgentController {
                 RequestIds.currentOrCreate(request));
     }
 
-    /** 分页信封：与其他模块一致（records + total + page + size）。 */
-    public record AgentPageResponse(
-            List<AgentResponse> records, long total, long page, long size) {
-    }
-
     @GetMapping
+    @AinerAuthorize(permission = "ai.agents.manage")
     public ApiResponse<AgentPageResponse> page(
-            @RequestParam(name = "page", defaultValue = "1") long page,
-            @RequestParam(name = "size", defaultValue = "20") long size,
+            @RequestParam(name = "page", defaultValue = "1") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size,
             HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
-        List<AgentResponse> agents = service.page(principal, page, size).stream()
-                .map(AgentResponse::from).toList();
-        long total = service.count(principal);
         return ApiResponse.success(
-                new AgentPageResponse(agents, total, Math.max(page, 1), Math.min(Math.max(size, 1), 100)),
+                AgentPageResponse.from(service.page(principal, page, size)),
                 RequestIds.currentOrCreate(request));
     }
 }

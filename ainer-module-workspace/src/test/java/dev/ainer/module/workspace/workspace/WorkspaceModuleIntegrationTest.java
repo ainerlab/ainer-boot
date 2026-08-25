@@ -84,7 +84,12 @@ class WorkspaceModuleIntegrationTest {
 
     @Test
     void migrationAndTablesAreStandalone() {
-        assertThat(flyway.info().applied()).hasSize(1);
+        // Controller 编译依赖授权注解后，classpath 上会带上授权模块的 Flyway 脚本。
+        // 工作区自己的独立迁移仍必须恰好一条；外模块脚本不计入本不变量。
+        assertThat(flyway.info().applied())
+                .extracting(info -> info.getScript())
+                .filteredOn(script -> script.contains("workspace"))
+                .hasSize(1);
         assertThat(jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)

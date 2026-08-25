@@ -34,7 +34,12 @@ public sealed interface Scope permits Scope.Global, Scope.Workspace, Scope.Resou
 
         @Override
         public boolean covers(ResourceRef resource) {
-            return resource.workspaceId() != null && resource.workspaceId().equals(workspaceId);
+            if (resource.workspaceId() != null) {
+                return resource.workspaceId().equals(workspaceId);
+            }
+            // HTTP 粗门禁：拦截器合成的 request 资源常无 workspaceId。
+            // 任一 WORKSPACE Binding 即可满足「持有该权限」闸门，不是资源级合同。
+            return "request".equals(resource.resourceType().value());
         }
     }
 

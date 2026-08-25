@@ -70,7 +70,7 @@ export SPRING_DATASOURCE_PASSWORD=local-only-password
 **OpenAPI 文档**：业务 Server 启动后 `/v3/api-docs` 与 `/swagger-ui.html` 可用
 （需真 JWT 认证，springdoc 3.1.0）。
 
-## 4. 模块清单（27 个）
+## 4. 模块清单（28 个）
 
 ```text
 ── 基础设施 ──
@@ -82,6 +82,7 @@ ainer-framework/ainer-starter-web Web 自动配置（统一响应/全局异常/�
 ainer-framework/ainer-starter-persistence  MyBatis-Plus + Flyway + UUID TypeHandler
 ainer-framework/ainer-starter-security    Resource Server 安全链（JWT 验签/401/403/503）
 ainer-framework/ainer-starter-cache       Spring Cache 抽象（Caffeine 默认/Redis 可选）
+ainer-framework/ainer-starter-observability Observation + requestId/trace MDC；OTLP 默认关
 ainer-framework/ainer-test-support        测试基座（JwtTestSupport/RestTestClient/PG 容器）
 
 ── 业务模块 ──

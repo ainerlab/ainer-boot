@@ -30,6 +30,7 @@ Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 A
 | `ainer-module-ai-runtime` | ✅ | OpenAI-compatible 网关、SSE、策略、预算与用量/费用审计 |
 | `ainer-module-authorization` | ✅ 工程基线 | ADR-0037 Workspace 语义的 RBAC+ReBAC+ABAC 决策器、PostgreSQL Binding/审计、管理 API、类型化集合查询，以及真实 JWT 下由 MVC 拦截器执行的 `@AinerAuthorize` 端点粗粒度门禁；资源 target resolver、obligation executor 与方法级 AOP 仍属后续 |
 | `ainer-starter-cache` | ✅ | Spring Cache 抽象（Caffeine 默认 / Redis 可选）与分布式锁（ADR-0039） |
+| `ainer-starter-observability` | ✅ 最小集 | ObservationRegistry、requestId/traceId MDC；OTLP 默认关闭（ADR-0029 T1#6） |
 | `ainer-module-dictionary` / `ainer-module-config` / `ainer-module-notification` / `ainer-module-file` | ✅ | P3 企业基座四件套：管理 API、稳定错误码、scope、同事务审计（通知默认为日志发送器；WEBHOOK/EMAIL 可选用脚手架 HTTP/SMTP 投递，SMS/Push 仍经 `ChannelSender` SPI 由产品实现） |
 | `ainer-module-organization` | ✅ Incubating | 组织目录：Unit/任职/分配/岗位 + `workforce.position#assignee` 成员解析（撤岗即失权，ADR-0042） |
 | `ainer-module-knowledge` | ✅ Incubating | Knowledge Foundation：不可变 Revision + SUPERSEDES 血缘 + 人工发布门禁（ADR-0044） |

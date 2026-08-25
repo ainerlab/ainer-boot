@@ -24,8 +24,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.jspecify.annotations.Nullable;
 import org.mybatis.spring.annotation.MapperScan;
 import org.mybatis.spring.annotation.MapperScans;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -161,41 +161,50 @@ public class AuthorizationModuleConfiguration {
     }
 
     /**
-     * Servlet 端点适配器，与应用层检查共用同一个决策服务。只有当宿主存在已验证主体
-     * 解析器时才贡献此 bean；纯决策引擎消费者因此保持独立于 Spring Security 运行时装配。
+     * Servlet 端点适配器，与应用层检查共用同一个决策服务。解析器通常来自
+     * {@code ainer-starter-security} 自动装配，晚于本用户 {@code @Configuration}
+     * 的条件评估；不能用 {@code @ConditionalOnBean(AuthenticatedPrincipalResolver)}
+     * 守门，否则参考服务器上 {@code @AinerAuthorize} 会变成空操作。bean 方法调用时
+     * 再用 {@link ObjectProvider} 解析；宿主未提供解析器时不贡献适配器。
      */
     @Bean
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
-    @ConditionalOnBean(AuthenticatedPrincipalResolver.class)
     @ConditionalOnMissingBean
     AinerRequestAuthorizationManager ainerRequestAuthorizationManager(
             AuthorizationService authorizationService,
-            AuthenticatedPrincipalResolver principalResolver,
-            org.springframework.beans.factory.ObjectProvider<
+            ObjectProvider<AuthenticatedPrincipalResolver> principalResolver,
+            ObjectProvider<
                     dev.ainer.authorization.application.AuthorizationDecisionAuditService> decisionAudit,
-            org.springframework.beans.factory.ObjectProvider<
+            ObjectProvider<
                     dev.ainer.authorization.spring.AuthorizationTargetResolver> targetResolvers) {
+        AuthenticatedPrincipalResolver resolver = principalResolver.getIfAvailable();
+        if (resolver == null) {
+            return null;
+        }
         return new AinerRequestAuthorizationManager(
-                authorizationService, principalResolver, decisionAudit, targetResolvers);
+                authorizationService, resolver, decisionAudit, targetResolvers);
     }
 
     @Bean
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
-    @ConditionalOnBean(AinerRequestAuthorizationManager.class)
     @ConditionalOnMissingBean
     AinerAuthorizeInterceptor ainerAuthorizeInterceptor(
-            AinerRequestAuthorizationManager authorizationManager) {
-        return new AinerAuthorizeInterceptor(authorizationManager);
+            ObjectProvider<AinerRequestAuthorizationManager> authorizationManager) {
+        AinerRequestAuthorizationManager manager = authorizationManager.getIfAvailable();
+        return manager == null ? null : new AinerAuthorizeInterceptor(manager);
     }
 
     @Bean("ainerAuthorizationWebMvcConfigurer")
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
-    @ConditionalOnBean(AinerAuthorizeInterceptor.class)
-    WebMvcConfigurer ainerAuthorizationWebMvcConfigurer(AinerAuthorizeInterceptor interceptor) {
+    WebMvcConfigurer ainerAuthorizationWebMvcConfigurer(
+            ObjectProvider<AinerAuthorizeInterceptor> interceptor) {
         return new WebMvcConfigurer() {
             @Override
             public void addInterceptors(InterceptorRegistry registry) {
-                registry.addInterceptor(interceptor);
+                AinerAuthorizeInterceptor resolved = interceptor.getIfAvailable();
+                if (resolved != null) {
+                    registry.addInterceptor(resolved);
+                }
             }
         };
     }

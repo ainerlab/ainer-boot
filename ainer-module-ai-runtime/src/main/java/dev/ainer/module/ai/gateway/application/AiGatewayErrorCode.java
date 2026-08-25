@@ -9,6 +9,8 @@ import dev.ainer.core.error.ErrorCode;
 public enum AiGatewayErrorCode implements ErrorCode {
     INVALID_REQUEST("AINER.AI.INVALID_REQUEST", "AI 调用请求不合法", 400),
     INVALID_CONTEXT("AINER.AI.INVALID_CONTEXT", "调用上下文不合法", 400),
+    INVALID_ACTING_CONTEXT("AINER.AI.INVALID_ACTING_CONTEXT",
+            "代行调用必须同时提供 actingAgentId 与 workspaceId", 422),
     MODEL_NOT_ALLOWED("AINER.AI.MODEL_NOT_ALLOWED", "模型不在允许列表中", 422),
     PROMPT_TOO_LARGE("AINER.AI.PROMPT_TOO_LARGE", "提示内容超过允许大小", 413),
     SENSITIVE_DATA_REJECTED("AINER.AI.SENSITIVE_DATA_REJECTED", "请求包含禁止发送的敏感信息", 422),
