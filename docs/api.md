@@ -270,6 +270,9 @@ subject 使用。
 
 ### Dictionary（`dictionary.read` / `dictionary.manage`）
 
+参考装配另有 `@AinerAuthorize` 粗门禁，需对应 Binding；模块切片未装配拦截器时注解不生效。
+仍不是按类型/项 ID 的对象级授权合同。
+
 | Method | Path | Scope | 说明 |
 |---|---|---|---|
 | POST/GET | `/api/dictionaries/types` | manage / read | 创建类型（409 重复编码）；`?status=&page=&size=` 分页 |

@@ -1,8 +1,10 @@
 package dev.ainer.module.dictionary.dictionary.api;
 
+import dev.ainer.authorization.spring.AinerAuthorize;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.core.web.ApiResponse;
 import dev.ainer.module.dictionary.dictionary.application.DictionaryApplicationService;
+import dev.ainer.module.dictionary.dictionary.application.DictionaryAuthorities;
 import dev.ainer.module.dictionary.dictionary.application.DictionaryErrorCode;
 import dev.ainer.module.dictionary.dictionary.domain.DictionaryStatus;
 import dev.ainer.module.dictionary.dictionary.domain.DictionaryType;
@@ -26,7 +28,8 @@ import java.util.UUID;
 
 /**
  * 字典管理 API（ADR-0040）。scope（{@code dictionary.read} / {@code dictionary.manage}）
- * 由应用服务针对已验证主体强制检查；每次变更都写入同事务审计行。
+ * 由应用服务针对已验证主体强制检查；每次变更都写入同事务审计行。参考装配另有
+ * {@code @AinerAuthorize} 粗门禁（需 Binding）；模块切片未装配拦截器时注解不生效。
  */
 @RestController
 @RequestMapping("/api/dictionaries")
@@ -45,6 +48,7 @@ public class DictionaryManagementController {
     // ---- 类型 ----
 
     @PostMapping("/types")
+    @AinerAuthorize(permission = DictionaryAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<DictionaryApiDtos.DictionaryTypeResponse>> createType(
             @RequestBody DictionaryApiDtos.CreateTypeRequest body,
             HttpServletRequest request) {
@@ -59,6 +63,7 @@ public class DictionaryManagementController {
     }
 
     @GetMapping("/types")
+    @AinerAuthorize(permission = DictionaryAuthorities.READ)
     public ApiResponse<DictionaryApiDtos.DictionaryTypePageResponse> pageTypes(
             @RequestParam(value = "status", required = false) @Nullable String status,
             @RequestParam(value = "page", defaultValue = "1") int page,
@@ -72,6 +77,7 @@ public class DictionaryManagementController {
     }
 
     @GetMapping("/types/{id}")
+    @AinerAuthorize(permission = DictionaryAuthorities.READ)
     public ApiResponse<DictionaryApiDtos.DictionaryTypeResponse> getType(
             @PathVariable UUID id, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -83,6 +89,7 @@ public class DictionaryManagementController {
     }
 
     @PutMapping("/types/{id}")
+    @AinerAuthorize(permission = DictionaryAuthorities.MANAGE)
     public ApiResponse<DictionaryApiDtos.DictionaryTypeResponse> updateType(
             @PathVariable UUID id,
             @RequestBody DictionaryApiDtos.UpdateTypeRequest body,
@@ -97,6 +104,7 @@ public class DictionaryManagementController {
     }
 
     @PostMapping("/types/{id}/status-changes")
+    @AinerAuthorize(permission = DictionaryAuthorities.MANAGE)
     public ApiResponse<DictionaryApiDtos.DictionaryTypeResponse> changeTypeStatus(
             @PathVariable UUID id,
             @RequestBody DictionaryApiDtos.StatusChangeRequest body,
@@ -113,6 +121,7 @@ public class DictionaryManagementController {
     // ---- 字典项 ----
 
     @PostMapping("/types/{typeId}/items")
+    @AinerAuthorize(permission = DictionaryAuthorities.MANAGE)
     public ResponseEntity<ApiResponse<DictionaryApiDtos.DictionaryItemResponse>> createItem(
             @PathVariable UUID typeId,
             @RequestBody DictionaryApiDtos.CreateItemRequest body,
@@ -129,6 +138,7 @@ public class DictionaryManagementController {
     }
 
     @GetMapping("/types/{typeId}/items")
+    @AinerAuthorize(permission = DictionaryAuthorities.READ)
     public ApiResponse<DictionaryApiDtos.DictionaryItemPageResponse> pageItems(
             @PathVariable UUID typeId,
             @RequestParam(value = "page", defaultValue = "1") int page,
@@ -142,6 +152,7 @@ public class DictionaryManagementController {
     }
 
     @PutMapping("/items/{id}")
+    @AinerAuthorize(permission = DictionaryAuthorities.MANAGE)
     public ApiResponse<DictionaryApiDtos.DictionaryItemResponse> updateItem(
             @PathVariable UUID id,
             @RequestBody DictionaryApiDtos.UpdateItemRequest body,
@@ -156,6 +167,7 @@ public class DictionaryManagementController {
     }
 
     @PostMapping("/items/{id}/status-changes")
+    @AinerAuthorize(permission = DictionaryAuthorities.MANAGE)
     public ApiResponse<DictionaryApiDtos.DictionaryItemResponse> changeItemStatus(
             @PathVariable UUID id,
             @RequestBody DictionaryApiDtos.StatusChangeRequest body,
