@@ -6,6 +6,10 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **最小观测 Starter（`ainer-starter-observability`，ADR-0029 T1#6）**：默认桥接 Boot
+  `ObservationRegistry`，把 `requestId` 写入 `traceId` MDC；`ainer.observability.otlp.enabled`
+  默认关闭，开启只装配导出标记，不强制全链路 OTel，也不改写域 Micrometer counters。参考装配
+  `ainer-server` 与 `ainer-offstate-app` 按需依赖。发布清单 28 个 project / 132 个主制品。
 - **M2 延迟自提权 Alert（ADR-0050）**：入岗命中「任职主体曾创建且仍 ACTIVE 的岗位集合绑定」
   时写 `DELAYED_SELF_ELEVATION` 审计并递增 `ainer.organization.delayed_self_elevation`；不自动
   撤销、不阻断入岗。UNAVAILABLE 创建拒绝保持不变。

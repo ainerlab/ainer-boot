@@ -25,6 +25,10 @@
         </dependency>
         <dependency>
             <groupId>dev.ainer</groupId>
+            <artifactId>ainer-starter-observability</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>dev.ainer</groupId>
             <artifactId>ainer-module-workspace</artifactId>
         </dependency>
         <dependency>
