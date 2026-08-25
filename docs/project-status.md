@@ -328,6 +328,13 @@ Ainer 项目签名 provenance 已通过。
 - **A**：P3 / organization / knowledge / task / ai.agent / identity 补 ArchUnit；ai-agent
   非法分页改为 422 `AINER.AI_AGENT.INVALID_PAGE`，信封与 file 对齐（`items/page/size/total`）。
 
+2026-08-25 M5' 参考装配接线
+- **D**：参考装配 Workspace/AI 端点消费 `@AinerAuthorize`；网关 `actingAgentId` 走
+  `ActingGrant.check`。拦截器改为 bean 创建时解析 security 自动装配的
+  `AuthenticatedPrincipalResolver`，避免用户配置阶段 `@ConditionalOnBean` 空操作。
+  活路径：LivePath HTTP probe 无 Binding→403 / 有 Binding→200（解析器走自动装配，
+  与参考服务器同路径）；Agent 流代行 probe 允许后退役 403。**不是** 1.x 资源级授权合同。
+
 2026-08-25 通知 WEBHOOK 首个真实渠道（默认关闭）
 - **交付**：`HttpWebhookChannelSender` 可选用 `RestClient` POST JSON；host 白名单、HTTPS
   （loopback HTTP 需显式允许）、解析地址拒绝私网/链路本地/ULA、不跟随重定向；提交期对
@@ -340,7 +347,8 @@ Ainer 项目签名 provenance 已通过。
   模块图补上 P3 / 组织 / Knowledge / 任务调度；§4/§5 不再把「进入 G3」写成当前阶段。
 - **H5'**：不改默认值。`operations.md` / `configuration.md` / `security.md` 把在线校验与
   step-up 标为对外生产签发前必选项。M1/M3/L 系/M5 此前已关闭；M2 延迟自提权已落地 Alert
-  切片（ADR-0050）。仍开放 M5' 产品装配（见评审快照后续关闭表）。
+  切片（ADR-0050）；M5' 参考装配已接线（不是 1.x 资源级授权合同）。仍开放 Recheck /
+  其余 P3 Controller（见评审快照后续关闭表）。
 - **未做**：重跑 `v1.1.0` 远端发布、双消费者冷仓升级矩阵（仍等 9/1 或 Spending limit >$0）。
 
 2026-08-24 v1.1.0 发布存储配额事故：根因、处置与当前边界（发布未完成）
@@ -475,8 +483,9 @@ Ainer 项目签名 provenance 已通过。
 - **验证**：全量 reactor 411/0/0/0（+1 跨工作区提权回归）。
 - **遗留 follow-up**（当时记录）：workspace ALLOWED 审计顺序（M3）、自提权创建后防护（M2）、
   合成锚点保留类型拒绝（M1）、生产装配 policy 注册（M5）、客户可读性拉齐（L 系）。
-  **后续**：M1/M3/L 系/M5 已于 2026-08-20 关闭，H5' 文档于 2026-08-25 关闭；M2 Alert 于
-  2026-08-25 关闭切片。仍开放 M5' 产品装配——详见评审快照后续关闭表。
+  **后续**：M1/M3/L 系/M5 已于 2026-08-20 关闭，H5' 文档于 2026-08-25 关闭；M2 Alert 与
+  M5' 参考接线于 2026-08-25 关闭切片。仍开放 Recheck / 其余 P3 Controller——详见评审快照
+  后续关闭表。
 
 
 2026-08-19 OpenAPI 运行时文档 spike 关闭（springdoc 3.1.0 × Boot 4.1 兼容性验证通过）

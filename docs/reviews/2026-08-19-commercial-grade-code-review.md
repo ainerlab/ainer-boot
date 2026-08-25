@@ -60,14 +60,16 @@
 | M1 | 已关闭（2026-08-20） | `ScopeRequests.buildScope` 拒绝保留 resourceType（`workspace.anchor` / `request`），`ScopeRequestsTest` 覆盖 |
 | M2 | Alert 切片关闭（2026-08-25） | UNAVAILABLE 创建拒绝保持；入岗命中自建 `workforce.position#assignee` 绑定写 `DELAYED_SELF_ELEVATION` 审计与计数器（ADR-0050）。不自动撤销、不阻断入岗 |
 | M3 | 已关闭（2026-08-20） | 7 个写方法的 `auditAllowed` 移到业务写成功之后 |
-| M5 | 已关闭（2026-08-20） | 见上表原文；M5' 仍留给产品 |
+| M5 | 已关闭（2026-08-20） | 见上表原文 |
+| M5' | 参考接线关闭（2026-08-25） | Workspace/AI 端点消费 `@AinerAuthorize`；网关代行调用 `ActingGrant.check`。不是 1.x 资源级授权合同 |
 | L 系 | 已关闭（2026-08-19/20） | 注释统一中文；DTO/`@Nullable`/分页信封已拉齐 |
 | H5' | 已关闭（文档，2026-08-25） | 默认值仍为 `false`。`operations.md` / `configuration.md` / `security.md` 已把在线校验与 step-up 标为生产签发前必选项 |
 
 **仍开放（需产品或设计决策，本轮不改代码）**
 
 - **M2 Recheck / 禁止 bind-before-assignment**：ADR-0050 未选项，等真实 HR 流程消费者
-- **M5'**：`@AinerAuthorize` 端点消费与 `ActingGrant.check` 网关接线属产品装配责任
+- **M5' 后续**：通用 `AuthorizationTargetResolver` 框架、方法级 AOP、obligation executor、
+  其余 P3 Controller 一次喷完；当前只是参考装配粗门禁，不是 1.x 资源级授权合同
 
 ## 评审确认无问题的关键控制点
 

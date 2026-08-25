@@ -1,5 +1,6 @@
 package dev.ainer.module.ai.agent.api;
 
+import dev.ainer.authorization.spring.AinerAuthorize;
 import dev.ainer.core.web.ApiResponse;
 import dev.ainer.module.ai.agent.application.AiAgentApplicationService;
 import dev.ainer.security.token.AuthenticatedPrincipal;
@@ -33,6 +34,7 @@ public class AiAgentController {
     }
 
     @PostMapping
+    @AinerAuthorize(permission = "ai.agents.manage")
     public ResponseEntity<ApiResponse<AgentResponse>> register(
             @RequestBody RegisterAgentRequest body, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -43,6 +45,7 @@ public class AiAgentController {
     }
 
     @PostMapping("/{agentId}/retirements")
+    @AinerAuthorize(permission = "ai.agents.manage")
     public ApiResponse<AgentResponse> retire(
             @PathVariable("agentId") UUID agentId, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -51,6 +54,7 @@ public class AiAgentController {
     }
 
     @GetMapping("/{agentId}")
+    @AinerAuthorize(permission = "ai.agents.manage")
     public ApiResponse<AgentResponse> get(
             @PathVariable("agentId") UUID agentId, HttpServletRequest request) {
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
@@ -59,6 +63,7 @@ public class AiAgentController {
     }
 
     @GetMapping
+    @AinerAuthorize(permission = "ai.agents.manage")
     public ApiResponse<AgentPageResponse> page(
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "size", defaultValue = "20") int size,

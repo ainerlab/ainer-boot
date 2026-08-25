@@ -126,6 +126,7 @@ Authorization: Bearer <access-token-with-ai.invoke-scope>
 | 错误码 | HTTP | 含义 |
 |---|---:|---|
 | `AINER.AI.INVALID_REQUEST` / `INVALID_CONTEXT` | 400 | 请求或调用上下文不合法 |
+| `AINER.AI.INVALID_ACTING_CONTEXT` | 422 | 代行调用缺少 `actingAgentId` 或 `workspaceId` |
 | `AINER.AI.PROMPT_TOO_LARGE` | 413 | 提示字符总量超限 |
 | `AINER.AI.MODEL_NOT_ALLOWED` | 422 | 模型不在白名单 |
 | `AINER.AI.SENSITIVE_DATA_REJECTED` | 422 | 命中禁止出网的敏感模式 |

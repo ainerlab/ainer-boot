@@ -6,6 +6,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **M5' 参考装配接线**：Workspace 读写/审计与 AI 网关/Agent 管理端点消费 `@AinerAuthorize`；
+  网关仅在请求带 `actingAgentId` 时 fail-closed 调用 `ActingGrant.check`。这是参考装配粗门禁，
+  **不是** 1.x 资源级授权合同。
 - **最小观测 Starter（`ainer-starter-observability`，ADR-0029 T1#6）**：默认桥接 Boot
   `ObservationRegistry`，把 `requestId` 写入 `traceId` MDC；`ainer.observability.otlp.enabled`
   默认关闭，开启只装配导出标记，不强制全链路 OTel，也不改写域 Micrometer counters。参考装配
@@ -35,6 +38,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - **ArchUnit 扩覆盖**：P3（file/dictionary/config/notification）、Incubating
   （organization/knowledge/task）、`ai.agent` 与 identity foundation（无 Web）按 workspace
   模板守住分层与无环。
+- **`@AinerAuthorize` 拦截器装配**：适配器在 bean 创建时解析
+  `AuthenticatedPrincipalResolver`（通常来自 security starter 自动装配），不再被用户
+  `@Configuration` 阶段的 `@ConditionalOnBean` 误判为空操作。
 
 ## [1.1.0] - 2026-08-24
 
