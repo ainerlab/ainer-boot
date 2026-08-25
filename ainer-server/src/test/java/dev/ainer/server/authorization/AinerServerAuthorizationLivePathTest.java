@@ -31,6 +31,10 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import dev.ainer.authorization.spring.AinerAuthorize;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -54,11 +58,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
+        classes = AinerServerAuthorizationLivePathTest.TestApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
                 "mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml",
                 "spring.main.banner-mode=off",
                 "ainer.authorization.trusted-managers=https://auth.ainer.test|platform-ops",
+                "ainer.security.resource-server.enabled=true",
                 "ainer.server.test-authz-live=true"
         })
 @AutoConfigureTestRestTemplate
@@ -211,6 +217,33 @@ class AinerServerAuthorizationLivePathTest {
     }
 
     @Test
+    void annotatedProbeDeniesWithoutBindingAndAllowsWithBinding() {
+        authenticate(JwtTestSupport.signUserJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-user-1", "workspace.read"));
+        RestResponse denied = client.get("/api/authz-live-probe");
+        assertThat(denied.status().value()).isEqualTo(403);
+
+        authenticate(JwtTestSupport.signServiceJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-ops", "authorization.manage"));
+        RestResponse role = client.postJson("/api/authorization/roles", """
+                {"code": "workspace-reader-http", "name": "Workspace Reader HTTP",
+                 "permissions": ["workspace.read"]}
+                """);
+        assertThat(role.status().value()).isEqualTo(201);
+        String roleId = (String) role.jsonPath("$.data.id");
+        RestResponse binding = client.postJson("/api/authorization/bindings", """
+                {"issuer": "%s", "subjectType": "USER", "subjectId": "platform-user-1",
+                 "roleId": "%s", "scopeKind": "WORKSPACE", "workspaceId": "%s"}
+                """.formatted(ISSUER, roleId, WORKSPACE_ID));
+        assertThat(binding.status().value()).isEqualTo(201);
+
+        authenticate(JwtTestSupport.signUserJwt(
+                RSA_JWK, ISSUER, AUDIENCE, "platform-user-1", "workspace.read"));
+        RestResponse allowed = client.get("/api/authz-live-probe");
+        assertThat(allowed.status().value()).isEqualTo(200);
+    }
+
+    @Test
     void requestWithoutTokenIsUnauthorized() {
         restTemplate.getRestTemplate().setInterceptors(List.of());
         ResponseEntity<String> response = restTemplate.getForEntity(
@@ -220,9 +253,10 @@ class AinerServerAuthorizationLivePathTest {
 
     @SpringBootConfiguration
     @EnableAutoConfiguration
-    @org.springframework.context.annotation.Import({
+    @Import({
             AinerServerAuthorizationPolicyConfiguration.class,
-            dev.ainer.authorization.AuthorizationModuleConfiguration.class
+            dev.ainer.authorization.AuthorizationModuleConfiguration.class,
+            WorkspaceReadProbeController.class
     })
     static class TestApplication {
 
@@ -234,6 +268,19 @@ class AinerServerAuthorizationLivePathTest {
         @Primary
         JwtDecoder authzLiveJwtDecoder() {
             return JwtTestSupport.jwtDecoder(RSA_JWK, ISSUER, AUDIENCE);
+        }
+    }
+
+    @RestController
+    @RequestMapping("/api/authz-live-probe")
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+            name = "ainer.server.test-authz-live", havingValue = "true")
+    static class WorkspaceReadProbeController {
+
+        @GetMapping
+        @AinerAuthorize(permission = "workspace.read")
+        public ResponseEntity<Void> peek() {
+            return ResponseEntity.ok().build();
         }
     }
 }

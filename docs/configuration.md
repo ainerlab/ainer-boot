@@ -267,8 +267,9 @@ Prometheus registry 已随两个可执行发行物引入，但仓库没有部署
 时可用。
 
 启用 Servlet Web 且宿主存在 `AuthenticatedPrincipalResolver` 时，同一配置还注册
-`AinerRequestAuthorizationManager`、`AinerAuthorizeInterceptor` 和 MVC interceptor wiring；不增加
-新的 YAML 开关。`@AinerAuthorize` 采用显式 opt-in，未注解 endpoint 继续服从宿主原有
+`AinerRequestAuthorizationManager`、`AinerAuthorizeInterceptor` 和 MVC interceptor wiring；解析器
+通常来自 security starter 自动装配，在 bean 方法调用时解析，不依赖用户配置阶段的
+`@ConditionalOnBean`。不增加新的 YAML 开关。`@AinerAuthorize` 采用显式 opt-in，未注解 endpoint 继续服从宿主原有
 `SecurityFilterChain` 与应用服务授权。注解的 `PUBLIC_PROJECTION` 不会隐式修改
 `ainer.security.resource-server.public-paths`；0.1 尚未交付 projection obligation executor，故即使
 宿主开放路径也会失败关闭。

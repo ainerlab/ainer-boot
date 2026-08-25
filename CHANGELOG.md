@@ -6,6 +6,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Added
 
+- **M5' 参考装配接线**：Workspace 读写/审计与 AI 网关/Agent 管理端点消费 `@AinerAuthorize`；
+  网关仅在请求带 `actingAgentId` 时 fail-closed 调用 `ActingGrant.check`。这是参考装配粗门禁，
+  **不是** 1.x 资源级授权合同。
 - **通知 WEBHOOK 真实投递（默认关闭）**：启用 `ainer.notification.webhook.enabled` 后，WEBHOOK
   渠道用 `RestClient` POST JSON `{title,body}`；host 白名单 + HTTPS（loopback HTTP 需显式允许）
   + 拒绝私网/链路本地/ULA 解析 + 不跟随重定向。日志与错误消息不含 URL/正文。未启用时仍是
@@ -25,6 +28,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 - **ArchUnit 扩覆盖**：P3（file/dictionary/config/notification）、Incubating
   （organization/knowledge/task）、`ai.agent` 与 identity foundation（无 Web）按 workspace
   模板守住分层与无环。
+- **`@AinerAuthorize` 拦截器装配**：适配器在 bean 创建时解析
+  `AuthenticatedPrincipalResolver`（通常来自 security starter 自动装配），不再被用户
+  `@Configuration` 阶段的 `@ConditionalOnBean` 误判为空操作。
 
 ## [1.1.0] - 2026-08-24
 

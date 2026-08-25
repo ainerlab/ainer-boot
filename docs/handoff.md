@@ -60,7 +60,8 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
 ### 已知边界（记录在案，非缺陷）
 
 - M2 延迟自提权（先签集合绑定、再安排岗位——`check()` 实时复查部分兜底）
-- M5'（`@AinerAuthorize` 端点消费与 `ActingGrant.check` 网关接线属产品装配责任）
+- M5' 参考装配已接线 Workspace/AI `@AinerAuthorize` 与网关 `ActingGrant.check`；**不是**
+  1.x 资源级授权合同，其余 P3 Controller / TargetResolver 框架 / obligation executor 仍待做
 - 生产签发前必须启用在线校验与 step-up（脚手架默认关闭；见 `operations.md` 2.3 / §6）
 - GitHub Packages 私有仓库存储配额（免费版 500MB 含 Actions 制品，多次发布后可能耗尽）
 - 分支保护未启用（private + GitHub 免费版限制；升级 Pro 或转 public 可解锁）

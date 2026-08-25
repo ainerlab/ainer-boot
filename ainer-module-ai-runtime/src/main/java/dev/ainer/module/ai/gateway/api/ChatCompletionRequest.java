@@ -10,12 +10,15 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 public record ChatCompletionRequest(
         @Size(max = 128) String model,
         @NotEmpty @Size(max = 100) List<@Valid ChatMessageRequest> messages,
         @Min(1) @Max(32_768) Integer maxOutputTokens,
-        @DecimalMin("0") @DecimalMax("2") BigDecimal temperature) {
+        @DecimalMin("0") @DecimalMax("2") BigDecimal temperature,
+        UUID actingAgentId,
+        UUID workspaceId) {
 
     int effectiveMaxOutputTokens() {
         return maxOutputTokens == null ? 1_024 : maxOutputTokens;

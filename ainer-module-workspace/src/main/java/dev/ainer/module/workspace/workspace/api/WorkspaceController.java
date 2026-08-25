@@ -1,5 +1,6 @@
 package dev.ainer.module.workspace.workspace.api;
 
+import dev.ainer.authorization.spring.AinerAuthorize;
 import dev.ainer.core.web.ApiResponse;
 import dev.ainer.module.workspace.workspace.application.AddWorkspaceMemberCommand;
 import dev.ainer.module.workspace.workspace.application.CreateWorkspaceCommand;
@@ -52,6 +53,7 @@ public class WorkspaceController {
     }
 
     @PostMapping
+    @AinerAuthorize(permission = "workspace.write")
     public ResponseEntity<ApiResponse<WorkspaceResponse>> create(
             @Valid @RequestBody CreateWorkspaceRequest request,
             HttpServletRequest servletRequest) {
@@ -63,6 +65,7 @@ public class WorkspaceController {
     }
 
     @GetMapping("/{id}")
+    @AinerAuthorize(permission = "workspace.read")
     public ApiResponse<WorkspaceResponse> get(@PathVariable UUID id, HttpServletRequest servletRequest) {
         return ApiResponse.success(
                 WorkspaceResponse.from(service.get(principalResolver.requireCurrent(), id)),
@@ -70,6 +73,7 @@ public class WorkspaceController {
     }
 
     @GetMapping
+    @AinerAuthorize(permission = "workspace.read")
     public ApiResponse<WorkspacePageResponse> page(
             @RequestParam(defaultValue = "1") @Min(1) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
@@ -80,6 +84,7 @@ public class WorkspaceController {
     }
 
     @GetMapping("/{id}/authorization-audits")
+    @AinerAuthorize(permission = "workspace.audit.read")
     public ApiResponse<WorkspaceAuthorizationAuditPageResponse> authorizationAudits(
             @PathVariable UUID id,
             @RequestParam(defaultValue = "1") @Min(1) int page,
@@ -92,6 +97,7 @@ public class WorkspaceController {
     }
 
     @PatchMapping("/{id}")
+    @AinerAuthorize(permission = "workspace.write")
     public ApiResponse<WorkspaceResponse> rename(
             @PathVariable UUID id,
             @Valid @RequestBody RenameWorkspaceRequest request,
@@ -102,6 +108,7 @@ public class WorkspaceController {
     }
 
     @PostMapping("/{id}/members")
+    @AinerAuthorize(permission = "workspace.write")
     public ResponseEntity<ApiResponse<WorkspaceMemberResponse>> addMember(
             @PathVariable UUID id,
             @Valid @RequestBody AddWorkspaceMemberRequest request,
@@ -115,6 +122,7 @@ public class WorkspaceController {
     }
 
     @PostMapping("/{id}/membership-acceptances")
+    @AinerAuthorize(permission = "workspace.write")
     public ApiResponse<WorkspaceMemberResponse> acceptMembership(
             @PathVariable UUID id,
             HttpServletRequest servletRequest) {
@@ -125,6 +133,7 @@ public class WorkspaceController {
     }
 
     @PostMapping("/{id}/member-role-changes")
+    @AinerAuthorize(permission = "workspace.write")
     public ApiResponse<WorkspaceMemberResponse> changeMemberRole(
             @PathVariable UUID id,
             @Valid @RequestBody ChangeWorkspaceMemberRoleRequest request,
@@ -138,6 +147,7 @@ public class WorkspaceController {
     }
 
     @PostMapping("/{id}/member-removals")
+    @AinerAuthorize(permission = "workspace.write")
     public ApiResponse<Void> removeMember(
             @PathVariable UUID id,
             @Valid @RequestBody RemoveWorkspaceMemberRequest request,
@@ -150,6 +160,7 @@ public class WorkspaceController {
     }
 
     @PostMapping("/{id}/ownership-transfers")
+    @AinerAuthorize(permission = "workspace.write")
     public ApiResponse<WorkspaceMemberResponse> transferOwnership(
             @PathVariable UUID id,
             @Valid @RequestBody TransferWorkspaceOwnershipRequest request,

@@ -93,7 +93,10 @@ OpenAPI 使用相对 `/` 表达同源入口；由于生成器会为该合法相�
 
 ## 6. AI API
 
-AI runtime 默认关闭；启用后所有端点要求 `ai.invoke` scope。
+AI runtime 默认关闭；启用后所有端点要求 `ai.invoke` scope。参考装配还要求对应
+`@AinerAuthorize` Binding（粗门禁，不是资源级合同）。请求可选 `actingAgentId` +
+`workspaceId`：出现代行上下文时网关 fail-closed 调用 `ActingGrant.check`；人员直调不带
+`actingAgentId` 则跳过。缺 `workspaceId` 的代行请求返回 422 `AINER.AI.INVALID_ACTING_CONTEXT`。
 
 | Method | Path | 响应 | 说明 |
 |---|---|---|---|

@@ -1,8 +1,10 @@
 package dev.ainer.module.ai.gateway.api;
 
+import dev.ainer.authorization.spring.AinerAuthorize;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.core.web.ApiResponse;
 import dev.ainer.module.ai.AiRuntimeProperties;
+import dev.ainer.module.ai.gateway.application.AiGatewayActingGrantGuard;
 import dev.ainer.module.ai.gateway.application.AiGatewayApplicationService;
 import dev.ainer.module.ai.gateway.application.AiGatewayErrorCode;
 import dev.ainer.module.ai.gateway.application.AiStreamListener;
@@ -47,34 +49,43 @@ public class AiGatewayController {
     private final AiGatewayApplicationService service;
     private final AiRuntimeProperties properties;
     private final AuthenticatedPrincipalResolver principalResolver;
+    private final AiGatewayActingGrantGuard actingGrantGuard;
 
     public AiGatewayController(
             AiGatewayApplicationService service,
             AiRuntimeProperties properties,
-            AuthenticatedPrincipalResolver principalResolver) {
+            AuthenticatedPrincipalResolver principalResolver,
+            AiGatewayActingGrantGuard actingGrantGuard) {
         this.service = service;
         this.properties = properties;
         this.principalResolver = principalResolver;
+        this.actingGrantGuard = actingGrantGuard;
     }
 
     @PostMapping("/chat/completions")
+    @AinerAuthorize(permission = "ai.invoke")
     public ApiResponse<ChatCompletionResponse> complete(
             @Valid @RequestBody ChatCompletionRequest request,
             HttpServletRequest servletRequest) {
         String requestId = RequestIds.currentOrCreate(servletRequest);
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
         requireScope(principal);
+        actingGrantGuard.requireIfPresent(
+                principal, request.actingAgentId(), request.workspaceId(), servletRequest.getRequestURI());
         CompletionResult result = service.complete(command(principal, requestId, request));
         return ApiResponse.success(ChatCompletionResponse.from(result), requestId);
     }
 
     @PostMapping(value = "/chat/completions/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @AinerAuthorize(permission = "ai.invoke")
     public SseEmitter stream(
             @Valid @RequestBody ChatCompletionRequest request,
             HttpServletRequest servletRequest) {
         String requestId = RequestIds.currentOrCreate(servletRequest);
         AuthenticatedPrincipal principal = principalResolver.requireCurrent();
         requireScope(principal);
+        actingGrantGuard.requireIfPresent(
+                principal, request.actingAgentId(), request.workspaceId(), servletRequest.getRequestURI());
         SseEmitter emitter = new SseEmitter(properties.getProvider().getRequestTimeout().plusSeconds(5).toMillis());
         AtomicReference<Future<?>> task = new AtomicReference<>();
         AtomicBoolean completed = new AtomicBoolean();
@@ -114,6 +125,7 @@ public class AiGatewayController {
     }
 
     @GetMapping("/invocations/{id}")
+    @AinerAuthorize(permission = "ai.invoke")
     public ApiResponse<AiInvocationResponse> invocation(
             @PathVariable UUID id,
         HttpServletRequest servletRequest) {
