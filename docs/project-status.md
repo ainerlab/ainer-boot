@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-26 · 工程版本：`1.0.0`（已发布）；主线 `1.2.0` 发布准备；`1.1.0` withdrawn；运行基线 Spring Boot 4.1.1
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-26 · 工程版本：`1.2.0`（已发布）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -310,12 +310,22 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-26 `v1.2.0` 已发布（仓库公开后首个合格次版本）
+- **版本选择**：`v1.1.0` tag 在册但四次 Release 在 Packages 402 失败（最后 run
+  `32725167463`），无 GitHub Release、无 registry 制品。按 ADR-0041 版本已消耗，标
+  withdrawn / non-qualifying，禁止复用。开 **1.2.0**。
+- **发布**：准备 PR #60 合入 `d3d4b7b` → annotated tag `v1.2.0`（peel 等于当时
+  `origin/dev` 头）→ release run `32932265978` 全绿（约 24 分钟）。读回：28 projects /
+  **132/132** 主制品与签名、远端空仓 Maven 3/4 消费者、远端 Initializer 三通道、
+  SBOM/provenance、16 个签名证据资产。GitHub Release `immutable=true`、非 draft、
+  非 prerelease，精确绑定 `d3d4b7b`。BOM `dev.ainer.ainer-dependencies:1.2.0` 已在
+  Packages。28 个 Maven 包均为 public（新增 `ainer-module-task` 与
+  `ainer-starter-observability`）。
+- **未做**：双参考消费者 `1.0.0 → 1.2.0` 升级矩阵（发布后独立执行，不绑本记录）。
+
 2026-08-26 `1.2.0` 发布准备
-- **版本选择**：`v1.1.0` tag 在册，Release workflow 四次失败（最后 run `32725167463`），
-  无 GitHub Release、BOM 无 `1.1.0`。按 ADR-0041 deploy 已开始即版本已消耗，禁止重打
-  同号 tag。当前 `dev` 含 Boot 4.1.1 / MIT / 授权粗门禁 / 观测 Starter，开 **1.2.0**。
 - **门禁**：`scripts/check-release-contracts.sh` 通过（28 projects / 132 主制品）。
-  本机 `./mvnw clean verify` 已在 4.1.1 切片全绿。合格发布记录等 tag workflow 完成后补写。
+  本机 `./mvnw clean verify` 已在 4.1.1 切片全绿。
 
 2026-08-26 Spring Boot 4.1.1 对齐（This Week in Spring 2026-08-25）
 - **阅读**：https://spring.io/blog/2026/08/25/this-week-in-spring-august-25 及子页面
@@ -1668,8 +1678,8 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 - 没有生产备份恢复、容量测试、正式错误预算/告警路由和灾难恢复演练；
 - 1.x 兼容与 LTS 已由 ADR-0045/0046 成文；源码许可已定为 MIT、仓库公开（ADR-0051）。
   商标检索/注册与 Community/Pro/Enterprise 分层定价仍开放；付费产品交付系统未建立；
-- 既有 26 个 Maven 包已是 public（`0.1.0` / `0.2.0` / `1.0.0`）。`v1.1.0` 按 ADR-0041
-  withdrawn（四次 deploy 402，无 Release/制品），禁止复用；下一发布是 `1.2.0`；
+- 28 个 Maven 包已是 public（`0.1.0` / `0.2.0` / `1.0.0` / `1.2.0`）。`v1.1.0` 按
+  ADR-0041 withdrawn（四次 deploy 402，无 Release/制品），禁止复用；
 - Testcontainers 仍使用 `disabledWithoutDocker`；quality gate 已是 `dev` 必需检查，
   其中包含 `scripts/check-surefire-results.sh` 的零跳过门禁。
 
@@ -1688,10 +1698,10 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 定义的全局产品化阶段，**G0–G4 已关闭，`v1.0.0` 已发布**：P3 企业基座、组织目录 O1/O2、
 Agent 代行 A1、Knowledge K1/K2 均已交付（后三者为 Incubating）。`xq-platform-next` 完成
 `rc.2 → rc.3 → 0.1.0 → 0.2.0 → 1.0.0` 连续升级链（含回滚）；`python-learning-service`
-完成 `0.1.0 → 1.0.0` 冷仓接入。`v1.1.0` withdrawn；主线准备 `v1.2.0`（Boot 4.1.1 /
-MIT / 授权粗门禁 / 观测 Starter）。仓库与既有 26 个 Maven 包现为 public。`dev` 分支
-保护与 GitHub secret scanning 已启用。剩余能力只由真实消费者拉动（见 §5），不再把
-「进入 G3」写成当前阶段。
+完成 `0.1.0 → 1.0.0` 冷仓接入。`v1.2.0` 已合格发布（Boot 4.1.1 / MIT / 授权粗门禁 /
+观测 Starter）；`v1.1.0` withdrawn。28 个 Maven 包均为 public。`dev` 分支保护与
+GitHub secret scanning 已启用。剩余能力只由真实消费者拉动（见 §5），不再把
+「进入 G3」写成当前阶段。`1.0.0 → 1.2.0` 消费者矩阵尚未执行。
 
 ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -Denforcer.skip=true` 验证；正式
 `./mvnw clean verify`、零跳过门禁与 Testcontainers 集成仍待 Maven 4 RC6 官方发行包恢复后执行）：
