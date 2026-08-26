@@ -52,8 +52,8 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
 
 | 仓库 | 位置 | 验证内容 |
 |---|---|---|
-| `xq-platform-next` | 独立工程验证仓库 | Initializer 生成 + 完整升级链 `rc.2→1.0.0` 含回滚 + JWT/授权/SDK 纵向切片 |
-| `python-learning-service` | 独立工程验证仓库 | Initializer 生成 + 冷仓接入 `0.1.0→1.0.0` + Evidence 存档切片 |
+| `xq-platform-next` | 独立工程验证仓库 | Initializer 生成 + 完整升级链 `rc.2→1.2.0` 含回滚 + JWT/授权/SDK 纵向切片 |
+| `python-learning-service` | 独立工程验证仓库 | Initializer 生成 + 冷仓接入 `0.1.0→1.2.0` + Evidence 存档切片 |
 
 **重要**：两个消费者目前都是工程验证仓库，**没有部署运行，没有真实终端用户**。升级矩阵
 和兼容验证是工程证据（证明脚手架「可以被消费」），不是「正在被消费」。
@@ -173,12 +173,11 @@ ainer-core ← ainer-spring ← starter-* ← module-* ← server
 
 | 优先级 | 事项 | 状态 |
 |---|---|---|
-| 高 | 双消费者 `1.0.0 → 1.2.0` 升级矩阵 | `v1.2.0` 已合格发布，待在两仓库执行 |
 | 中 | 第二位 CODEOWNER | 到位后可取消日常 `gh pr merge --admin` |
 | 低 | Incubating → Stable 晋升评估 | 等第二个消费者兼容验证积累 |
 | 低 | AI Runtime A2-A4 / Knowledge Phase 2-4 | 按真实产品需求拉动 |
 
-已完成：P4 任务调度模块（ADR-0047）并入 1.2.0（原拟随 withdrawn 的 1.1.0 发布）；授权端点门禁类型化目标解析 +
+已完成：双消费者 `1.0.0 → 1.2.0` 矩阵（xq 含一级回滚后固定 1.2.0；pil 冷仓）；P4 任务调度模块（ADR-0047）并入 1.2.0（原拟随 withdrawn 的 1.1.0 发布）；授权端点门禁类型化目标解析 +
 RFC 9470 挑战头 + ArchUnit 守护（ADR-0037 后续切片首批，PR #35）；CI 存储纪律
 （housekeeping 工作流 + 发布构建去缓存，PR #36）。
 

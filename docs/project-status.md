@@ -310,6 +310,19 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-26 双消费者 `1.0.0 → 1.2.0` 升级矩阵（ADR-0045 相邻合格 minor）
+- **路径**：跳过 withdrawn 的 `v1.1.0`，从合格发布 `v1.0.0` 升到 `v1.2.0`。两仓均用隔离
+  本地 Maven 仓库 + `.mvn/github-packages-settings.xml` 从远端 Packages 解析，不含
+  Ainer 源码、不复用 `~/.m2`。
+- **`xq-platform-next`**：`1.0.0 → 1.2.0`（14/0/0/0，冷仓）+ 回滚 `1.2.0 → 1.0.0`
+  （14/0/0/0，冷仓）后固定 `1.2.0`（14/0/0/0）。覆盖 JWT 链、授权 Binding、migration
+  重放与 HTTP 错误。累计链 `rc.2 → rc.3 → 0.1.0 → 0.2.0 → 1.0.0 → 1.2.0`，每级回滚
+  终点均有 git 提交。
+- **`python-learning-service`**：`1.0.0 → 1.2.0`（8/0/0/0，冷仓），累计
+  `0.1.0 → 0.2.0 → 1.0.0 → 1.2.0`。Evidence 学员归属隔离切片。
+- **边界**：两仓仍是工程验证仓库，无部署、无真实用户。消费者工程自身版本号未改，只升
+  `ainer-dependencies` BOM。
+
 2026-08-26 `v1.2.0` 已发布（仓库公开后首个合格次版本）
 - **版本选择**：`v1.1.0` tag 在册但四次 Release 在 Packages 402 失败（最后 run
   `32725167463`），无 GitHub Release、无 registry 制品。按 ADR-0041 版本已消耗，标
@@ -321,7 +334,7 @@ Ainer 项目签名 provenance 已通过。
   非 prerelease，精确绑定 `d3d4b7b`。BOM `dev.ainer.ainer-dependencies:1.2.0` 已在
   Packages。28 个 Maven 包均为 public（新增 `ainer-module-task` 与
   `ainer-starter-observability`）。
-- **未做**：双参考消费者 `1.0.0 → 1.2.0` 升级矩阵（发布后独立执行，不绑本记录）。
+- **随后完成**：双参考消费者 `1.0.0 → 1.2.0` 矩阵见上条记录。
 
 2026-08-26 `1.2.0` 发布准备
 - **门禁**：`scripts/check-release-contracts.sh` 通过（28 projects / 132 主制品）。
@@ -1697,11 +1710,11 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 [`Ainer Boot 产品定位、竞品能力矩阵与路线图`](design/ainer-scaffold-design.md)
 定义的全局产品化阶段，**G0–G4 已关闭，`v1.0.0` 已发布**：P3 企业基座、组织目录 O1/O2、
 Agent 代行 A1、Knowledge K1/K2 均已交付（后三者为 Incubating）。`xq-platform-next` 完成
-`rc.2 → rc.3 → 0.1.0 → 0.2.0 → 1.0.0` 连续升级链（含回滚）；`python-learning-service`
-完成 `0.1.0 → 1.0.0` 冷仓接入。`v1.2.0` 已合格发布（Boot 4.1.1 / MIT / 授权粗门禁 /
-观测 Starter）；`v1.1.0` withdrawn。28 个 Maven 包均为 public。`dev` 分支保护与
-GitHub secret scanning 已启用。剩余能力只由真实消费者拉动（见 §5），不再把
-「进入 G3」写成当前阶段。`1.0.0 → 1.2.0` 消费者矩阵尚未执行。
+`rc.2 → rc.3 → 0.1.0 → 0.2.0 → 1.0.0 → 1.2.0` 连续升级链（含回滚）；
+`python-learning-service` 完成 `0.1.0 → 1.2.0` 冷仓接入。`v1.2.0` 已合格发布
+（Boot 4.1.1 / MIT / 授权粗门禁 / 观测 Starter）；`v1.1.0` withdrawn。28 个 Maven
+包均为 public。`dev` 分支保护与 GitHub secret scanning 已启用。剩余能力只由真实
+消费者拉动（见 §5），不再把「进入 G3」写成当前阶段。
 
 ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -Denforcer.skip=true` 验证；正式
 `./mvnw clean verify`、零跳过门禁与 Testcontainers 集成仍待 Maven 4 RC6 官方发行包恢复后执行）：
