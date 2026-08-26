@@ -42,7 +42,7 @@ class InitializerCliTest {
                   groupId: dev.ainer.consumer
                   artifactId: cli-sample
                   version: 1.0.0
-                spring-boot: 4.1.0
+                spring-boot: 4.1.1
                 ainner: 0.1.0
                 java: 25
                 """);

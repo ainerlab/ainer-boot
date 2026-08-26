@@ -1,6 +1,6 @@
 # Ainer 架构总览
 
-> 权威状态：`v1.0.0` 已发布（G0–G4 关闭）；`v1.1.0` 已打 tag；既有 Packages 已 public，`1.1.0` 尚未 deploy · 核对 2026-08-26
+> 权威状态：`v1.0.0` 已发布（G0–G4 关闭）；运行基线 Spring Boot 4.1.1；`v1.1.0` 已打 tag；既有 Packages 已 public，`1.1.0` 尚未 deploy · 核对 2026-08-26
 
 ## 1. 系统定位
 

@@ -66,7 +66,7 @@ project:
   artifactId: vt-matrix
   version: 1.0.0
   description: platform vs virtual thread pressure matrix target
-spring-boot: 4.1.0
+spring-boot: 4.1.1
 ainner: $ainner_version
 java: 25
 package: dev.ainer.vt

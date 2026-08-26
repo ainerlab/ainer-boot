@@ -27,12 +27,13 @@ class ManifestReaderTest {
                   groupId: dev.ainer.consumer
                   artifactId: sample-project
                   version: 1.0.0
-                spring-boot: 4.1.0
+                spring-boot: 4.1.1
                 ainner: 0.1.0
                 java: 25
                 """));
 
         assertThat(manifest.project().name()).isEqualTo("Ainer Consumer Sample");
+        assertThat(manifest.springBootVersion()).isEqualTo("4.1.1");
         assertThat(manifest.project().artifactId()).isEqualTo("sample-project");
         assertThat(manifest.resolvedPackageName()).isEqualTo("dev.ainer.consumer");
         assertThat(manifest.database()).isEqualTo(ManifestV1.Database.NONE);
@@ -136,6 +137,40 @@ class ManifestReaderTest {
                 java: 25
                 owner:
                   email: not-an-email
+                """);
+    }
+
+    @Test
+    @DisplayName("仍接受已发布的 4.1.0 manifest")
+    void stillAcceptsPreviousPatch() throws IOException {
+        ManifestV1 manifest = reader.read(string(
+                """
+                schemaVersion: v1
+                project:
+                  name: legacy-patch
+                  groupId: dev.ainer.consumer
+                  artifactId: legacy-patch
+                  version: 1.0.0
+                spring-boot: 4.1.0
+                ainner: 0.1.0
+                java: 25
+                """));
+        assertThat(manifest.springBootVersion()).isEqualTo("4.1.0");
+    }
+
+    @Test
+    @DisplayName("拒绝尚未纳入生产基线的 Boot milestone")
+    void rejectsUnsupportedMilestone() {
+        assertInvalid("""
+                schemaVersion: v1
+                project:
+                  name: x
+                  groupId: dev.ainer
+                  artifactId: x
+                  version: 1.0.0
+                spring-boot: 4.2.0-M1
+                ainner: 0.1.0
+                java: 25
                 """);
     }
 

@@ -1,6 +1,6 @@
 # Ainer 第三方依赖与许可证台账
 
-> 状态：M4.8A + 公共制品策略 · 2026-08-13
+> 状态：M4.8A + 公共制品策略 · 2026-08-26（Boot 4.1.1）
 
 本台账记录 Ainer 主动选择的构建与运行基线，服务于 clean-room、商业发行和后续 SBOM 审计。版本来自当前 Maven Reactor 的有效依赖；许可证以 Maven Central 发布 POM、上游仓库许可证文件为依据。
 
@@ -9,18 +9,18 @@ Ainer 自己撰写的源码与制品按 **MIT** 许可（见根目录 `LICENSE` 
 
 | 组件 | 当前版本 | 用途 | 许可证 | 来源坐标 |
 |---|---:|---|---|---|
-| Spring Boot | 4.1.0 | 平台 BOM、Web、JDBC、Actuator、测试 | Apache-2.0 | `org.springframework.boot:*` |
-| Spring Security / Authorization Server / OAuth2 Client | 7.1.0 | Resource Server、OAuth 2.1/OIDC、JWT、Client Credentials 与 JDBC 协议仓库 | Apache-2.0 | `org.springframework.security:*` |
+| Spring Boot | 4.1.1 | 平台 BOM、Web、JDBC、Actuator、测试 | Apache-2.0 | `org.springframework.boot:*` |
+| Spring Security / Authorization Server / OAuth2 Client | 7.1.1 | Resource Server、OAuth 2.1/OIDC、JWT、Client Credentials 与 JDBC 协议仓库 | Apache-2.0 | `org.springframework.security:*` |
 | MyBatis-Plus Spring Boot 4 Starter | 3.5.17 | MyBatis、Boot 4 自动装配与基础设施 CRUD 增强 | Apache-2.0 | `com.baomidou:mybatis-plus-spring-boot4-starter` |
 | MyBatis-Plus JSqlParser Module | 3.5.17 | PostgreSQL 分页插件的显式运行时模块 | Apache-2.0 | `com.baomidou:mybatis-plus-jsqlparser` |
 | JSqlParser | 5.2 | MyBatis-Plus 分页所需 SQL 解析器（传递依赖） | LGPL-2.1 与 Apache-2.0 双许可证 | `com.github.jsqlparser:jsqlparser` |
 | Flyway Core / PostgreSQL | 12.4.0 | 数据库 migration | Apache-2.0 | `org.flywaydb:flyway-core`、`flyway-database-postgresql` |
-| PostgreSQL JDBC | 42.7.11 | PostgreSQL 驱动 | BSD-2-Clause | `org.postgresql:postgresql` |
+| PostgreSQL JDBC | 42.7.13 | PostgreSQL 驱动 | BSD-2-Clause | `org.postgresql:postgresql` |
 | Testcontainers | 2.0.5 | PostgreSQL 集成测试 | MIT | `org.testcontainers:*` |
-| springdoc-openapi | 3.1.0 | OpenAPI 运行时文档（`/v3/api-docs` + Swagger UI；官方支持 Boot 4.x，3.1.0 以 Boot 4.1.0 为基线；仅装配于 ainer-server，端点受资源服务器安全链保护，业务模块不强制依赖） | Apache-2.0 | `org.springdoc:springdoc-openapi-starter-webmvc-ui` |
+| springdoc-openapi | 3.1.0 | OpenAPI 运行时文档（`/v3/api-docs` + Swagger UI；官方支持 Boot 4.x；仅装配于 ainer-server，端点受资源服务器安全链保护，业务模块不强制依赖） | Apache-2.0 | `org.springdoc:springdoc-openapi-starter-webmvc-ui` |
 | ArchUnit | 1.4.2 | 包和分层边界测试 | Apache-2.0；其发布 POM 同时声明传递 ASM 的 BSD 许可证 | `com.tngtech.archunit:archunit` |
-| Micrometer Core | 1.17.0 | 在线校验、撤销传播与安全运营指标 API | Apache-2.0 | `io.micrometer:micrometer-core` |
-| Micrometer Prometheus Registry | 1.17.0 | 两个可执行发行物的 Prometheus 文本格式导出 | Apache-2.0 | `io.micrometer:micrometer-registry-prometheus` |
+| Micrometer Core | 1.17.1 | 在线校验、撤销传播与安全运营指标 API | Apache-2.0 | `io.micrometer:micrometer-core` |
+| Micrometer Prometheus Registry | 1.17.1 | 两个可执行发行物的 Prometheus 文本格式导出 | Apache-2.0 | `io.micrometer:micrometer-registry-prometheus` |
 | Apache Maven | 4.0.0-rc-6 / 3.9.16 | Ainer 生产者 preview 基线 / Initializer 生成项目稳定 consumer 基线 | Apache-2.0 | `org.apache.maven:apache-maven` |
 | Maven Wrapper | 3.3.4 | 分别固定生产者与生成项目的 Maven 发行版、下载地址和校验值 | Apache-2.0 | `org.apache.maven.wrapper:maven-wrapper` |
 | Maven Clean Plugin | 3.5.0 | 清理构建输出 | Apache-2.0 | `org.apache.maven.plugins:maven-clean-plugin` |

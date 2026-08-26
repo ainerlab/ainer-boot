@@ -4,7 +4,7 @@ project:
   groupId: dev.ainer.consumer
   artifactId: crud-sample
   version: 1.0.0
-spring-boot: 4.1.0
+spring-boot: 4.1.1
 ainner: 0.1.0
 java: 25
 package: dev.ainer.consumer.crud

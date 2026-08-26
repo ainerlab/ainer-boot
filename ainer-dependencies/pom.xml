@@ -22,11 +22,11 @@
     <!-- The BOM is deliberately parentless so the root project can import it without a model cycle. -->
     <properties>
         <revision>0.1.0-SNAPSHOT</revision>
-        <spring.boot.version>4.1.0</spring.boot.version>
+        <spring.boot.version>4.1.1</spring.boot.version>
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <archunit.version>1.4.2</archunit.version>
-        <webauthn4j.version>0.31.6.RELEASE</webauthn4j.version>
+        <webauthn4j.version>0.31.9.RELEASE</webauthn4j.version>
         <springdoc.version>3.1.0</springdoc.version>
         <maven.clean.plugin.version>3.5.0</maven.clean.plugin.version>
         <maven.install.plugin.version>3.1.4</maven.install.plugin.version>

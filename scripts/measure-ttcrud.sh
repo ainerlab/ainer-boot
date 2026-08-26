@@ -73,7 +73,7 @@ project:
   artifactId: ttcrud-gate
   version: 1.0.0
   description: measured by the Ainer TTCRUD gate
-spring-boot: 4.1.0
+spring-boot: 4.1.1
 ainner: $ainner_version
 java: 25
 package: dev.ainer.consumer.gate

@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-25 · 工程版本：`1.0.0`（已发布）；主线 `1.1.0` 发布中
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-26 · 工程版本：`1.0.0`（已发布）；主线 `1.1.0` 发布中；运行基线 Spring Boot 4.1.1
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -21,7 +21,7 @@ Authorization Server 承载并于 2026-07-29 部署 dev (release `e6cb0b44bb9e-2
 下文 M4.x 里程碑记录中涉及 tenant、access-event、relay、Directory 与平台预配的历史描述反映
 当时代码，已被 Greenfield S8 删除取代，不作为当前部署依据。真实外部通知网关/供应商联调、供应商
 回执映射、最终送达验证、生产限速/告警尚未完成，0-skipped 仍需在正式发布候选环境重复执行。
-当前工程是可编译、可运行、可用真实 PostgreSQL 验证的 Spring Boot 4.1 多模块基线，但尚未达到
+当前工程是可编译、可运行、可用真实 PostgreSQL 验证的 Spring Boot 4.1.1 多模块基线，但尚未达到
 生产或商业发行就绪。
 
 P2 Create & Generate 的原始能力批次已收口（2026-08-09）：`ainer-initializer`（Manifest v1
@@ -118,7 +118,7 @@ Ainer 项目签名 provenance 已通过。
 当时里程碑，已被 ADR-0033 S8 删除，不是 `0.1` 当前支持面。当前结论优先以上述阶段说明、ADR-0037
 和 §4/§5 为准。
 
-- JDK 25、Maven Reactor、独立 BOM 与 Spring Boot 4.1.0 基线；
+- JDK 25、Maven Reactor、独立 BOM 与 Spring Boot 4.1.1 基线（由 4.1.0 补丁升级）；
 - 无 Spring 依赖的核心错误和身份参与者契约；
 - Web、Persistence、Security Starter 及自动装配测试；
 - ADR-0029 T0 第 1 项的 Web Starter 实现范围：`ainer-starter-web` 已从废弃兼容坐标
@@ -309,6 +309,34 @@ Ainer 项目签名 provenance 已通过。
   `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 
 ## 3. 最近验证记录
+
+2026-08-26 Spring Boot 4.1.1 对齐（This Week in Spring 2026-08-25）
+- **阅读**：https://spring.io/blog/2026/08/25/this-week-in-spring-august-25 及子页面
+  [Boot 4.1.1](https://spring.io/blog/2026/08/20/spring-boot-4-1-1-available-now)、
+  [Boot 4.2.0-M1](https://spring.io/blog/2026/08/20/spring-boot-4-2-0-M1-available-now)、
+  [Spring AI 2.0.1](https://spring.io/blog/2026/08/21/spring-ai-2-0-1-available-now)、
+  GitHub `v4.1.1` / Framework `7.0.9` / Security `7.1.1` 发行说明。
+- **采用**：生产 BOM `4.1.0 → 4.1.1`（98 项修复 + 依赖升级）。随 BOM 得到 Framework 7.0.9、
+  Security 7.1.1、Jackson 3.1.5、Tomcat 11.0.24、PostgreSQL JDBC 42.7.13、Micrometer 1.17.1。
+  `webauthn4j-test` 钉到 `0.31.9.RELEASE` 与 Security 7.1.1 对齐。Initializer 默认 `4.1.1`，
+  仍接受已发布消费者的 `4.1.0`；拒绝 `4.2.0-M1`。
+- **对本仓有关的 4.1.1 修复**：空 `issuer-uri` / `jwk-set-uri` 处理一致（#50849，我们用
+  `${AINER_SECURITY_ISSUER_URI:}`）；OAuth2 Resource Server 在 Reactor 在类路径但无 WebFlux
+  时的 `ClassNotFoundException`（#50764）；Micrometer registry 钉死 ApplicationContext
+  （#51135）；record 上 getter 级 `@NestedConfigurationProperty`（#51098）。
+- **明确不采用**：
+  - **Boot 4.2.0-M1**：里程碑，主特性是 AMQP 1.0 / RabbitMQ 与 Buildpacks 镜像缓存。
+    消息中间件是 ADR-0040 非目标；脚手架生产 BOM 不跟 milestone。
+  - **Spring AI 2.0.1**：ADR-0003 自建网关，不引入厂商/Spring AI SDK。2.0.1 修了多枚 CVE，
+    若将来独立 PoC 必须从该版本起，不得回退 2.0.0。HyDE / ReACT 文章不改变网关边界。
+  - **Spring Cloud 2025.1.3 / Integration 7.2.0-M1 / AMQP 4.2.0-M1 / Batch 6.0.5**：
+    不在当前装配图。Spring Data 2026.0.1 随 Boot 4.1.1 BOM 传递，业务仍走 MyBatis-Plus。
+- **Framework 7.0.9 后续（未改代码）**：`ForwardedHeaderFilter` 建议显式选择 Forwarded vs
+  X-Forwarded；`SimpleEvaluationContext` 默认不再编译表达式。有生产 ingress / 非受信 SpEL
+  时再单独接线，本切片不改代理语义。
+- **验证**：本机 `./mvnw clean verify` BUILD SUCCESS（3m50s，0 skipped）。解析树确认为
+  `spring-boot:4.1.1`、`spring-core:7.0.9`、`spring-security-core:7.1.1`、
+  `postgresql:42.7.13`、`micrometer-core:1.17.1`。
 
 2026-08-26 公开仓库治理落地
 - **Packages**：`orgs/ainerlab` 下 26 个 Maven 包均为 `visibility=public`。BOM

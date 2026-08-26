@@ -14,10 +14,12 @@
 - 官方要求至少 Java 17，兼容至 Java 26。
 - 官方 Maven 最低版本为 3.6.3；Ainer 为保证现代插件能力，项目门禁提高到 Maven 3.9+。
 - Boot 4.1 使用 Spring Framework 7.0.8+、Tomcat 11 / Servlet 6.1 和 Jackson 3。
+  当前生产 BOM 为 **4.1.1**（2026-08-20，Framework 7.0.9 / Security 7.1.1）。
 
 官方资料：
 
 - [Spring Boot 4.1.0 release](https://spring.io/blog/2026/06/10/spring-boot-4/)
+- [Spring Boot 4.1.1](https://spring.io/blog/2026/08/20/spring-boot-4-1-1-available-now)
 - [Spring Boot system requirements](https://docs.spring.io/spring-boot/system-requirements.html)
 
 ## 2. Ainer 已验证环境
@@ -231,3 +233,16 @@ MyBatis-Plus Boot 4 Starter 已从本清单移除，其已验证范围以第 6.1
 □ ./mvnw clean verify 通过
 □ 若连接外部组件，Testcontainers 或合约测试通过
 ```
+
+## 11. 2026-08-26：对齐 This Week in Spring（4.1.1）
+
+[This Week in Spring — August 25, 2026](https://spring.io/blog/2026/08/25/this-week-in-spring-august-25)
+当周发布了 Boot 4.1.1 / 4.2.0-M1 / 4.0.8、Spring AI 2.0.1、Spring Data 2026.0.1、
+Spring Cloud 2025.1.3 等。Ainer **只把生产基线升到 Boot 4.1.1**：
+
+- 4.2.0-M1 的 AMQP 1.0 与 Buildpacks 镜像缓存不是当前产品目标，milestone 不进脚手架 BOM；
+- Spring AI 仍按 ADR-0003 排除；2.0.1 的 CVE 修复只作为将来独立 PoC 的地板版本；
+- Spring Cloud / Integration / AMQP / Batch 不引入。
+
+空 `issuer-uri` 处理（Boot #50849）对本仓 Resource Server 的
+`${AINER_SECURITY_ISSUER_URI:}` 默认值有直接意义，随 BOM 升级自动获得。
