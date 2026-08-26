@@ -310,6 +310,17 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-08-26 公开仓库治理落地
+- **Packages**：`orgs/ainerlab` 下 26 个 Maven 包均为 `visibility=public`。BOM
+  `dev.ainer.ainer-dependencies` 仅有 `1.0.0` / `0.2.0` / `0.1.0`；`1.1.0` 从未 deploy。
+- **分支保护**（`dev`）：必须 PR；CODEOWNERS 审查 1 票；必需检查 `Commit discipline`、
+  `JDK 25 / Maven 4 quality gate`、`Secret scan (gitleaks)`；`strict` 要求分支与 base
+  同步；禁止 force-push / 删除。`enforce_admins=false`：当前唯一 CODEOWNER 合入自己的
+  PR 使用 `gh pr merge --admin`。
+- **密钥扫描**：GitHub secret scanning 与 push protection 已启用（公开仓库免费能力）。
+- **Actions**：公开后重跑 run `32843417869`，不再 5 秒配额秒红；`Commit discipline` 与
+  gitleaks 已绿，quality gate 进入实际执行。
+
 2026-08-25 MIT 许可与仓库公开（ADR-0051）
 - **决策**：Ainer 自有源码/文档/制品采用 MIT；`ainerlab/ainer-boot` 改为 public。
   不授予商标权。ADR-0041 的签名、SBOM、provenance 与不可变 Release 仍有效。
@@ -1601,14 +1612,13 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
   （326/0/0/0，见 §3 2026-08-04 记录）；`scripts/verify-maven-consumers.sh` 也已通过（consumer POM、
   配置元数据、可重复性、M3.9+/M4 consumer）。ADR-0026 §验收方式 已本地满足；CI 已首次跑绿（见 §3
   2026-08-04(续)）、PR #2 合入 dev。当时许可证为暂不开源；后续见 ADR-0051（MIT + 公开仓库）。
-  P0 分支保护在私有免费版无法启用，公开后免费版已可配置，当前仍未打开远端强制执行；
-  秘密扫描仍建议作为公开后持续门禁；
+  P0 分支保护当时无法启用；2026-08-26 已在公开仓库打开 `dev` 保护与 GitHub secret scanning；
 - 已增加只读权限的候选 GitHub Actions 质量门禁，编排 JDK 25、Maven 4、Docker、
   PostgreSQL/Testcontainers `skipped=0`、Maven 3/4 consumer 与短期 CycloneDX SBOM；RC6 已上 Central、
   wrapper 已修、本地 `./mvnw clean verify` 已达成 `0 skipped`、consumer 门禁已通过（2026-08-04），工作流已
   首次跑绿（run 30904716377，ubuntu 原生 Docker）；当时 private + GitHub 免费版无法启用
-  分支保护/必需检查。ADR-0051 公开后免费版已可配置，硬性 gate 仍未打开，目前靠「绿了再合」
-  软约束，故尚未称为正式 CI；
+  分支保护/必需检查。2026-08-26 已打开 `dev` 保护，quality gate / gitleaks / commit
+  discipline 为必需检查，公开后 CI 已重新实际执行；
   `0.1.0-rc.1` 已完成一次正式 key 的签名 deploy，但因源码/tag 不一致、无 GitHub Release、无完整
   远端消费与 provenance 证据而撤回。当前 workflow 进一步要求 annotated tag/source、目标版本不存在、
   passphrase-protected key、远端空仓 consumers、107/107 读回验签、签名 SBOM/checksum/provenance 和
@@ -1618,15 +1628,15 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
   `BOM imports from within reactor should be avoided` 告警。ADR-0026 已明确批准当前 parentless BOM
   结构并把 POM 4.1/model 重构留给后续独立原型；`rc.2` 以 Maven 4 preview 风险、Maven 3/4 空仓
   consumer 和可重复构建门禁将其作为已知例外保留，不把告警宣称为已解决；
-- 已有 `.github/CODEOWNERS`；仓库按 ADR-0051 公开后免费版可启用受保护分支，当前仍未打开远端强制执行；
+- 已有 `.github/CODEOWNERS`；`dev` 已启用远端分支保护（PR + CODEOWNERS 1 票 + 三项
+  必需检查）。当前唯一 CODEOWNER 合入自己的 PR 仍需管理员绕过；
 - 没有生产备份恢复、容量测试、正式错误预算/告警路由和灾难恢复演练；
 - 1.x 兼容与 LTS 已由 ADR-0045/0046 成文；源码许可已定为 MIT、仓库公开（ADR-0051）。
   商标检索/注册与 Community/Pro/Enterprise 分层定价仍开放；付费产品交付系统未建立；
-- GitHub Packages 私有存储配额曾锁定 `v1.1.0` 远端发布（ADR-0048）。公开后公开 Actions /
-  公开 Packages 不再占用该配额；既有私有 package 可见性仍需在 registry 侧核对；
-- Testcontainers 仍使用 `disabledWithoutDocker`；本机 Colima 与候选 CI 均已完整执行，候选 CI 已用
-  `scripts/check-surefire-results.sh` 明确拒绝任何 skipped 测试，但该门禁尚未纳入受保护分支的
-  必需检查。
+- 既有 26 个 Maven 包已是 public（`0.1.0` / `0.2.0` / `1.0.0`）。`v1.1.0` tag 在册但
+  Packages 无此版本，不是可见性残留，是当时私有配额打断 deploy（ADR-0048）；
+- Testcontainers 仍使用 `disabledWithoutDocker`；quality gate 已是 `dev` 必需检查，
+  其中包含 `scripts/check-surefire-results.sh` 的零跳过门禁。
 
 ### 脚手架产品化评估
 
@@ -1643,11 +1653,10 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 定义的全局产品化阶段，**G0–G4 已关闭，`v1.0.0` 已发布**：P3 企业基座、组织目录 O1/O2、
 Agent 代行 A1、Knowledge K1/K2 均已交付（后三者为 Incubating）。`xq-platform-next` 完成
 `rc.2 → rc.3 → 0.1.0 → 0.2.0 → 1.0.0` 连续升级链（含回滚）；`python-learning-service`
-完成 `0.1.0 → 1.0.0` 冷仓接入。`v1.1.0` 已打 annotated tag，远端 Packages 发布受本月
-GB·小时配额锁定；仓库按 ADR-0051 公开后，公开 Actions / 公开 Packages 不再占用免费版
-私有存储配额，既有私有 package 可见性仍需在 registry 侧核对。分支保护仍缺远端强制
-执行，公开后免费版已可配置。剩余能力只由真实消费者拉动（见 §5），不再把「进入 G3」
-写成当前阶段。
+完成 `0.1.0 → 1.0.0` 冷仓接入。`v1.1.0` 已打 annotated tag，当时远端 deploy 被私有
+配额打断；仓库与既有 26 个 Maven 包现为 public，`1.1.0` 仍待按 ADR-0041 重跑或新开
+发布。`dev` 分支保护与 GitHub secret scanning 已启用。剩余能力只由真实消费者拉动
+（见 §5），不再把「进入 G3」写成当前阶段。
 
 ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -Denforcer.skip=true` 验证；正式
 `./mvnw clean verify`、零跳过门禁与 Testcontainers 集成仍待 Maven 4 RC6 官方发行包恢复后执行）：
@@ -1679,8 +1688,8 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 CHANGELOG：rc.2/rc.3 → 0.1.0 → 0.2.0（G3 四切片）→ 1.0.0（合同定稿），双消费者矩阵见 §3）。
 
 1. **1.0.x 补丁线**（ADR-0045/0046）：OpenAPI 运行时文档兼容性验证（Boot 4.1 springdoc，
-  当前最大诚实缺口——消费者在手写 OpenAPI）；消费者使用中暴露的缺陷按 patch 规则修复；
-  分支保护治理小决策（仓库已按 ADR-0051 公开，可在 GitHub 免费版启用）。
+  当前最大诚实缺口——消费者在手写 OpenAPI）；消费者使用中暴露的缺陷按 patch 规则修复。
+  分支保护已启用。
 2. **消费者拉动的能力演进**（构成 1.1.0 内容，不预建）：pil 的 Tutor → AI Runtime 凭据
   托管/A2 最小 Context 授权；xq 的 VS1 业务切片 → 组织目录 O2 真实消费 + XA Access Model；
   RAG 真实需求出现时再启 Knowledge Phase 2；A4 Token Exchange 只在真实跨服务边界出现后。

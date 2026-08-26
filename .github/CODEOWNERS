@@ -1,8 +1,9 @@
 # CODEOWNERS for ainer-boot.
 #
-# 每个领域默认由 @codefitx 审查。仓库当前为 private + GitHub 免费版，分支保护受计费限制
-# （HTTP 403）；此文件为 PR review 默认 reviewer 与未来多协作者领域归属服务。
-# 仓库可见性或计费变更后，在 GitHub 设置中启用 required review 即可生效。
+# 每个领域默认由 @codefitx 审查。`dev` 已启用分支保护：必须走 PR、CODEOWNERS 审查
+# 1 票、必需检查（Commit discipline / JDK 25 Maven 4 quality gate / Secret scan）。
+# 当前唯一 CODEOWNER 无法批准自己的 PR，合入需管理员绕过（`gh pr merge --admin`）；
+# 第二位审查人到位后即可取消日常绕过。enforce_admins=false，禁止 force-push / 删分支。
 
 # 默认（所有未匹配路径）
 *                        @codefitx
