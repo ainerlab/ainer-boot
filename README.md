@@ -50,8 +50,8 @@ Spring Boot 4.1.1、MIT 公开仓库、参考装配 `@AinerAuthorize` 粗门禁�
 `v1.1.0` tag **withdrawn / non-qualifying**（无 Release、无 Packages），禁止消费。
 [`v1.0.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.0.0) 保持不可变，作为
 `1.2.0` 的升级起点与 `1.0.x` LTS 线的基线。
-双参考消费者并存：`xq-platform-next`（`rc.2 → … → 1.0.0` 完整升级链含回滚）与
-`python-learning-service`（`0.1.0 → 1.0.0` 冷仓接入）；`1.0.0 → 1.2.0` 矩阵待执行。
+双参考消费者并存：`xq-platform-next`（`rc.2 → … → 1.2.0` 完整升级链含回滚）与
+`python-learning-service`（`0.1.0 → 1.2.0` 冷仓接入）。
 
 完整产品说明（能力域、合同、质量模型与快速开始）见
 [`docs/ainer-boot-1.0-product.md`](docs/ainer-boot-1.0-product.md)；动态门禁只以

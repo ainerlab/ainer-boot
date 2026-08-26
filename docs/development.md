@@ -192,8 +192,8 @@ ainer-initializer-cli              P2 CLI（preview / init / diff）
 
 | 仓库 | 位置 | 用途 |
 |---|---|---|
-| `xq-platform-next` | `~/01-code/xq/xq-platform-next` | 完整升级链验证（rc.2→1.0.0 含回滚）；JWT/授权/SDK 纵向切片 |
-| `python-learning-service` | `/Users/xq/01-code/self/python-learning-service` | 冷仓接入验证（0.1.0→1.0.0）；Evidence 存档切片 |
+| `xq-platform-next` | `~/01-code/xq/xq-platform-next` | 完整升级链验证（rc.2→1.2.0 含回滚）；JWT/授权/SDK 纵向切片 |
+| `python-learning-service` | `/Users/xq/01-code/self/python-learning-service` | 冷仓接入验证（0.1.0→1.2.0）；Evidence 存档切片 |
 
 两者均通过版本化 BOM/Starter 消费远端制品，不含 Ainer 源码副本。
 
