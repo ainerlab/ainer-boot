@@ -4,6 +4,14 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-26
+
+仓库公开后的首个合格发布目标：Spring Boot 4.1.1、MIT、参考装配授权粗门禁、观测 Starter
+与通知 EMAIL/WEBHOOK。`v1.1.0` tag 因 Packages 配额四次 deploy 失败，无 GitHub Release、
+无 registry 制品，按 ADR-0041 视为 **withdrawn / non-qualifying**，禁止消费或复用版本号。
+升级起点是合格发布 `v1.0.0`。全部为加性变更与依赖补丁，无 schema 破坏。28 modules /
+132 主制品。
+
 ### Changed
 
 - **Spring Boot 4.1.1 生产基线**：跟进 [This Week in Spring (2026-08-25)](https://spring.io/blog/2026/08/25/this-week-in-spring-august-25)
@@ -12,7 +20,7 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   manifest。**不**把 4.2.0-M1、Spring AI、Spring Cloud、AMQP/Integration/Batch 纳入生产 BOM。
 - **公开仓库治理落地**：`dev` 启用 PR + CODEOWNERS 必需审查 + CI 必需检查；GitHub
   secret scanning / push protection 已打开。既有 26 个 Maven 包均为 public（`0.1.0` /
-  `0.2.0` / `1.0.0`）；`1.1.0` 仍未 deploy。
+  `0.2.0` / `1.0.0`）。
 - **采用 MIT 并公开仓库（ADR-0051）**：根目录 `LICENSE` / `NOTICE`，根 POM 声明 MIT。
   不授予 Ainer 商标权（ADR-0004）。供应链签名/SBOM/不可变 Release 门禁不变。
 
@@ -81,7 +89,11 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   `AuthenticatedPrincipalResolver`（通常来自 security starter 自动装配），不再被用户
   `@Configuration` 阶段的 `@ConditionalOnBean` 误判为空操作。
 
-## [1.1.0] - 2026-08-24
+## [1.1.0] - 2026-08-24 — withdrawn / non-qualifying
+
+**本版本未形成合格发布**：annotated tag 存在，但四次 Release workflow 在 GitHub Packages
+deploy 处因私有配额 HTTP 402 失败；无 GitHub Release、无 registry 制品。按 ADR-0041
+禁止消费、覆盖或移动 tag。合格后继版本是 `1.2.0`。
 
 商业级代码评审首次制品发布（PR #24–#27），并纳入评审遗留收口：P4 任务调度引擎
 （ADR-0047）、授权管理面硬化与 `trusted-managers` issuer 绑定匹配（PR #30/#31）。
@@ -600,6 +612,11 @@ migration 只追加），是对 1.x 兼容承诺的首次真实验证。
 - 稳定版仍要求 `xq-platform-next` 从远端 RC 完成真实纵向切片、migration replay、升级与回滚；
   本仓库测试和 RC 发布不能替代产品证据。
 
-[Unreleased]: https://github.com/ainerlab/ainer-boot/compare/v0.1.0-rc.3...HEAD
+[Unreleased]: https://github.com/ainerlab/ainer-boot/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.2.0
+[1.1.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.1.0
+[1.0.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.0.0
+[0.2.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v0.2.0
+[0.1.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v0.1.0
 [0.1.0-rc.3]: https://github.com/ainerlab/ainer-boot/releases/tag/v0.1.0-rc.3
 [0.1.0-rc.2]: https://github.com/ainerlab/ainer-boot/releases/tag/v0.1.0-rc.2
