@@ -1,6 +1,6 @@
 # Ainer Boot 项目交接文档
 
-> 文档类型：交接快照 · 状态：生效 · 核对时间：2026-08-26 · 工程版本：`1.1.0`（发布中，见 §10）
+> 文档类型：交接快照 · 状态：生效 · 核对时间：2026-08-26 · 工程版本：`1.2.0`（发布准备，见 §10）
 >
 > 本文面向接手项目的开发者或 AI 代理。读完本文应能：理解项目定位与当前状态、完成首次
 > 构建、知道去哪找细节、避免踩过的坑。
@@ -40,7 +40,8 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
 
 | 版本 | 日期 | 要点 |
 |---|---|---|
-| `v1.1.0` | 2026-08-24（发布中） | 商业级评审修复 + P4 任务调度引擎（ADR-0047）+ 授权管理面收口；原 08-21 tag 因 Packages 配额未部署，重打 tag 后重新发布 |
+| `v1.2.0` | 2026-08-26（发布准备） | Boot 4.1.1 + MIT + 授权粗门禁 + 观测 Starter；接替 withdrawn 的 `v1.1.0` |
+| `v1.1.0` | 2026-08-24 | **withdrawn / non-qualifying**：四次 Release 在 Packages 402 失败，无 Release/制品 |
 | `v1.0.0` | 2026-08-18 | 1.0 产品合同定稿（零代码差异合同冻结） |
 | `v0.2.0` | 2026-08-18 | G3 四切片（组织/Agent/Knowledge） |
 | `v0.1.0` | 2026-08-14 | 第一个稳定 0.1 基线 |
@@ -51,8 +52,8 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
 
 | 仓库 | 位置 | 验证内容 |
 |---|---|---|
-| `xq-platform-next` | 独立工程验证仓库 | Initializer 生成 + 完整升级链 `rc.2→1.1.0` 含回滚 + JWT/授权/SDK 纵向切片 |
-| `python-learning-service` | 独立工程验证仓库 | Initializer 生成 + 冷仓接入 `0.1.0→1.1.0` + Evidence 存档切片 |
+| `xq-platform-next` | 独立工程验证仓库 | Initializer 生成 + 完整升级链 `rc.2→1.0.0` 含回滚 + JWT/授权/SDK 纵向切片 |
+| `python-learning-service` | 独立工程验证仓库 | Initializer 生成 + 冷仓接入 `0.1.0→1.0.0` + Evidence 存档切片 |
 
 **重要**：两个消费者目前都是工程验证仓库，**没有部署运行，没有真实终端用户**。升级矩阵
 和兼容验证是工程证据（证明脚手架「可以被消费」），不是「正在被消费」。
@@ -66,8 +67,8 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
   路径 workspaceId）；**不是** 1.x 资源级授权合同，类型化 resourceType、obligation executor
   仍待做
 - 生产签发前必须启用在线校验与 step-up（脚手架默认关闭；见 `operations.md` 2.3 / §6）
-- 仓库与 26 个已发布 Maven 包均为 public（`0.1.0` / `0.2.0` / `1.0.0`）。`1.1.0` 从未
-  进入 GitHub Packages（当时被私有配额打断，不是可见性问题）
+- 仓库与 26 个已发布 Maven 包均为 public（`0.1.0` / `0.2.0` / `1.0.0`）。`v1.1.0`
+  withdrawn（无 Release、无 Packages），禁止消费；下一发布是 `1.2.0`
 - `dev` 已启用分支保护：必须 PR、CODEOWNERS 1 票、必需检查（Commit discipline /
   quality gate / gitleaks）；禁止 force-push 与删分支。当前唯一 CODEOWNER 合入自己的
   PR 需 `gh pr merge --admin`
@@ -172,13 +173,13 @@ ainer-core ← ainer-spring ← starter-* ← module-* ← server
 
 | 优先级 | 事项 | 状态 |
 |---|---|---|
-| 高 | **1.1.0 发布收尾** | 仓库与既有包已 public，私有配额不再阻塞。`v1.1.0` tag 在册但 Packages 无此版本；按 ADR-0041 评估后重跑或新开发布，禁止覆盖已有版本 |
-| 中 | 双消费者 `1.0.0 → 1.1.0` 升级矩阵 | 等 1.1.0 发布后执行（两仓库均在本机） |
+| 高 | **1.2.0 发布** | 准备 PR 合入后打 `v1.2.0`；`v1.1.0` 已 withdrawn，禁止复用 |
+| 中 | 双消费者 `1.0.0 → 1.2.0` 升级矩阵 | 等 1.2.0 合格发布后执行 |
 | 中 | 第二位 CODEOWNER | 到位后可取消日常 `gh pr merge --admin` |
 | 低 | Incubating → Stable 晋升评估 | 等第二个消费者兼容验证积累 |
 | 低 | AI Runtime A2-A4 / Knowledge Phase 2-4 | 按真实产品需求拉动 |
 
-已完成：P4 任务调度模块（ADR-0047）并入 1.1.0；授权端点门禁类型化目标解析 +
+已完成：P4 任务调度模块（ADR-0047）并入 1.2.0（原拟随 withdrawn 的 1.1.0 发布）；授权端点门禁类型化目标解析 +
 RFC 9470 挑战头 + ArchUnit 守护（ADR-0037 后续切片首批，PR #35）；CI 存储纪律
 （housekeeping 工作流 + 发布构建去缓存，PR #36）。
 
