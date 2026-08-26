@@ -6,6 +6,9 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Changed
 
+- **公开仓库治理落地**：`dev` 启用 PR + CODEOWNERS 必需审查 + CI 必需检查；GitHub
+  secret scanning / push protection 已打开。既有 26 个 Maven 包均为 public（`0.1.0` /
+  `0.2.0` / `1.0.0`）；`1.1.0` 仍未 deploy。
 - **采用 MIT 并公开仓库（ADR-0051）**：根目录 `LICENSE` / `NOTICE`，根 POM 声明 MIT。
   不授予 Ainer 商标权（ADR-0004）。供应链签名/SBOM/不可变 Release 门禁不变。
 

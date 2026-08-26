@@ -1,6 +1,6 @@
 # Ainer Boot 项目交接文档
 
-> 文档类型：交接快照 · 状态：生效 · 核对时间：2026-08-25 · 工程版本：`1.1.0`（发布中，见 §10）
+> 文档类型：交接快照 · 状态：生效 · 核对时间：2026-08-26 · 工程版本：`1.1.0`（发布中，见 §10）
 >
 > 本文面向接手项目的开发者或 AI 代理。读完本文应能：理解项目定位与当前状态、完成首次
 > 构建、知道去哪找细节、避免踩过的坑。
@@ -66,9 +66,11 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
   路径 workspaceId）；**不是** 1.x 资源级授权合同，类型化 resourceType、obligation executor
   仍待做
 - 生产签发前必须启用在线校验与 step-up（脚手架默认关闭；见 `operations.md` 2.3 / §6）
-- 公开仓库后，Actions / 公开 Packages 不再占用免费版私有存储配额；既有私有 package
-  版本的可见性仍要在 GitHub Packages 侧核对（ADR-0051 / ADR-0048）
-- 分支保护仍未启用；仓库公开后免费版已可配置，需维护者在 GitHub 上打开
+- 仓库与 26 个已发布 Maven 包均为 public（`0.1.0` / `0.2.0` / `1.0.0`）。`1.1.0` 从未
+  进入 GitHub Packages（当时被私有配额打断，不是可见性问题）
+- `dev` 已启用分支保护：必须 PR、CODEOWNERS 1 票、必需检查（Commit discipline /
+  quality gate / gitleaks）；禁止 force-push 与删分支。当前唯一 CODEOWNER 合入自己的
+  PR 需 `gh pr merge --admin`
 
 ## 3. 快速上手
 
@@ -129,14 +131,15 @@ ainer-core ← ainer-spring ← starter-* ← module-* ← server
 | `SCOPE_` 前缀不一致 | JWT 有 scope 但 403 | JWT scope claim 用裸值（无前缀）；常量也不带前缀 |
 | timestamptz 精度漂移 | CI 422（本地通过） | 服务层时间入口统一 `truncatedTo(ChronoUnit.MICROS)` |
 | 模块 `@MapperScan` 退避 | 自定义 mapper 不注册 | 授权模块的显式 `@MapperScan` 会让 MyBatis 自动扫描退避；宿主需自己声明 |
-| GitHub Packages 配额 | deploy HTTP 402 / 包内容 404 锁定 | 免费版 500MB 共享存储，包体已 ~377MB；发布前清空缓存（housekeeping 工作流每周兜底），发布构建已去缓存；根治需付费额度或删历史版本（见 project-status 2026-08-24 记录） |
+| GitHub Packages 配额 | deploy HTTP 402 / 包内容 404 锁定 | **历史坑**（私有仓库时代）。仓库与既有包已 public，公开 Actions/Packages 不再占该配额；发布前仍清空缓存（housekeeping） |
 | jsonPath 数字断言 | `expected: 2L but was: 2` | jsonPath 返回 Integer 不是 Long |
 
 ## 7. 测试与质量
 
 - **全量**：`./mvnw clean verify` → 415 tests / 0 failure / 0 error / **0 skipped**
 - **真 JWT 链**：全部业务模块的 HTTP 测试用 `JwtTestSupport`（RSA 3072 验签，无 stub）
-- **CI 三门禁**：Maven 4 质量门禁 + gitleaks + 虚拟线程矩阵（非阻塞）
+- **CI 三门禁**：Maven 4 质量门禁 + gitleaks + 虚拟线程矩阵（非阻塞）。前两项已是
+  `dev` 必需检查；另加 Commit discipline
 - **商业级评审**：已完成三路语义评审（安全/正确性/契约一致性），审计快照见
   [`reviews/2026-08-19-commercial-grade-code-review.md`](reviews/2026-08-19-commercial-grade-code-review.md)
 
@@ -162,15 +165,16 @@ ainer-core ← ainer-spring ← starter-* ← module-* ← server
    SBOM/provenance → immutable Release）；发布构建已去 Maven 缓存，不会自我毒化
 5. 双消费者升级矩阵验证
 
-**发布前检查**：Packages 配额充足（包体基线 ~377MB + 本版 ~65MB < 500MB）；目标版本远端不存在（404）。
+**发布前检查**：目标版本远端不存在（404）。公开 Packages 不再占用免费版私有存储配额；
+仍不要在发布窗口并发跑会写缓存的 CI（见 housekeeping）。
 
 ## 10. 当前待办
 
 | 优先级 | 事项 | 状态 |
 |---|---|---|
-| 高 | **1.1.0 发布收尾** | ADR-0048 已执行（69 个 rc 版本条目退役，包体 377→~188MB）；剩余阻塞为本月存储 GB·小时配额耗尽（写入 402 + 内容读取锁），二选一：Spending limit 调 >$0 立即解锁，或等 9/1 计费月重置；之后 `gh run rerun 32725167463` 即可 |
+| 高 | **1.1.0 发布收尾** | 仓库与既有包已 public，私有配额不再阻塞。`v1.1.0` tag 在册但 Packages 无此版本；按 ADR-0041 评估后重跑或新开发布，禁止覆盖已有版本 |
 | 中 | 双消费者 `1.0.0 → 1.1.0` 升级矩阵 | 等 1.1.0 发布后执行（两仓库均在本机） |
-| 中 | 分支保护治理（GitHub Pro 或转 public） | 需负责人决策 |
+| 中 | 第二位 CODEOWNER | 到位后可取消日常 `gh pr merge --admin` |
 | 低 | Incubating → Stable 晋升评估 | 等第二个消费者兼容验证积累 |
 | 低 | AI Runtime A2-A4 / Knowledge Phase 2-4 | 按真实产品需求拉动 |
 

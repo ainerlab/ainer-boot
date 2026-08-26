@@ -1,6 +1,6 @@
 # Ainer 版本与发布规范
 
-> 文档类型：长期维护规范 · 状态：生效 · 最近核对：2026-08-13 · 适用版本：`0.1.x`
+> 文档类型：长期维护规范 · 状态：生效 · 最近核对：2026-08-26 · 适用版本：`0.1.x`
 
 ## 1. 版本与资格语义
 
@@ -84,9 +84,9 @@ AINER_VERSION="$AINER_VERSION" ./scripts/verify-initializer-consumer.sh
 ## 5. GitHub Packages 发布流程
 
 发布坐标为 `https://maven.pkg.github.com/ainerlab/ainer-boot`，repository id 为
-`github-packages`。仓库按 ADR-0051 公开后，后续 deploy 的 package 可见性需在 GitHub
-Packages 侧单独核对，不得假设改仓库 visibility 会自动改已有私有版本。
-`.github/workflows/release.yml` 只由 `v*` tag 触发，顺序固定为：
+`github-packages`。2026-08-26 核对：既有 26 个 Maven 包均为 public（`0.1.0` /
+`0.2.0` / `1.0.0`）。新包在首次 deploy 后仍应核对其 `visibility`，不得假设继承仓库
+公开状态。`.github/workflows/release.yml` 只由 `v*` tag 触发，顺序固定为：
 
 1. checkout 完整历史，验证 tag 是 annotated SemVer tag，且 peel 后 commit 同时等于 workflow 源码与
    当前默认分支头；
@@ -123,8 +123,7 @@ Attestations 时启用。未启用时，项目签名 provenance 仍是强制门�
 失败必须阻断，不允许 `continue-on-error`。
 
 本地手动发布需要在 Maven settings 为 `github-packages` 配置 `write:packages` 凭据，但常规发布只走
-tag workflow。公开 package 可匿名拉取；仍为 private 的既有版本需要 `read:packages`。
-不得把 PAT 写入 POM、仓库或日志。
+tag workflow。既有 26 个包已是 public，可匿名拉取。不得把 PAT 写入 POM、仓库或日志。
 
 ## 6. 签名、制品清单与 provenance
 
