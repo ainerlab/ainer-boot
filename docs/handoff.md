@@ -8,7 +8,7 @@
 ## 1. 项目是什么
 
 **Ainer Boot**（AI-Native Extensible Runtime Boot）是一个 **AI 原生但不局限于 AI** 的
-通用企业 Java 脚手架：JDK 25 + Spring Boot 4.1 + PostgreSQL 18 的模块化单体，自带可信的
+通用企业 Java 脚手架：JDK 25 + Spring Boot 4.1.1 + PostgreSQL 18 的模块化单体，自带可信的
 身份、授权、工作区治理、AI 模型网关与企业基座。
 
 **商业定位**：付费客户与社区都将阅读源码——代码质量标准是「优秀的商业级脚手架」，不是
@@ -23,7 +23,7 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
 
 | 能力域 | 状态 | 关键 ADR |
 |---|---|---|
-| 现代运行基座（JDK25/Boot4.1/PG18/虚拟线程/Maven4） | Stable | ADR-0026/0027/0029 |
+| 现代运行基座（JDK25/Boot4.1.1/PG18/虚拟线程/Maven4） | Stable | ADR-0026/0027/0029 |
 | OAuth 2.1/OIDC + Passkey + typed token | Stable | ADR-0033 |
 | Workspace membership 治理 + OWNER 转移 + 审计 | Stable | — |
 | ADR-0037 混合授权 + SubjectSet + ActingGrant | Stable + Incubating 扩展 | ADR-0037/0042/0043 |

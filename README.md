@@ -1,6 +1,6 @@
 # Ainer Boot
 
-> 正式品牌：Ainer · 脚手架产品：Ainer Boot · JDK 25 + Spring Boot 4.1.0
+> 正式品牌：Ainer · 脚手架产品：Ainer Boot · JDK 25 + Spring Boot 4.1.1
 > · Maven 4.0.0-rc-6 preview
 
 Ainer Boot（**AI-Native Extensible Runtime**，中文读音“艾纳”）是 AI-native、但不局限于 AI

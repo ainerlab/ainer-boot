@@ -6,6 +6,10 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ### Changed
 
+- **Spring Boot 4.1.1 生产基线**：跟进 [This Week in Spring (2026-08-25)](https://spring.io/blog/2026/08/25/this-week-in-spring-august-25)
+  的稳定补丁线。BOM 升至 Boot 4.1.1（Framework 7.0.9、Security 7.1.1、PostgreSQL JDBC
+  42.7.13、Micrometer 1.17.1）。Initializer 默认生成 4.1.1，仍接受已发布的 4.1.0
+  manifest。**不**把 4.2.0-M1、Spring AI、Spring Cloud、AMQP/Integration/Batch 纳入生产 BOM。
 - **公开仓库治理落地**：`dev` 启用 PR + CODEOWNERS 必需审查 + CI 必需检查；GitHub
   secret scanning / push protection 已打开。既有 26 个 Maven 包均为 public（`0.1.0` /
   `0.2.0` / `1.0.0`）；`1.1.0` 仍未 deploy。

@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 public final class ManifestReader {
 
     /** Boot versions the embedded generator templates are verified against. */
-    public static final Set<String> SUPPORTED_SPRING_BOOT_VERSIONS = Set.of("4.1.0");
+    public static final Set<String> SUPPORTED_SPRING_BOOT_VERSIONS = Set.of("4.1.0", "4.1.1");
 
     private static final Pattern GROUP_ID_SEGMENT = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
     private static final Pattern ARTIFACT_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]+$");

@@ -27,7 +27,7 @@ Ainer Boot 面向 AI 应用、企业管理系统和商业化交付提供以下�
 - AI 产品可以统一接入模型、Agent、RAG、工具、费用与安全策略；
 - 在满足明确扩容、隔离、组织和工程准备条件后，可以把清晰边界演进为独立服务。
 
-技术基线为 JDK 25、Spring Boot 4.1.0、Spring Framework 7、Jakarta EE 11 和 PostgreSQL。
+技术基线为 JDK 25、Spring Boot 4.1.1、Spring Framework 7、Jakarta EE 11 和 PostgreSQL。
 正式架构名称和 DDD、端口适配器、模块化单体与服务化的关系见
 [ADR-0024：演进式模块化平台架构](../decisions/0024-evolutionary-modular-platform-architecture.md)。
 
@@ -133,7 +133,7 @@ Ainer 的综合目标是：
 ### 4.1 构建
 
 - 根 Reactor、独立 BOM、JDK/Maven Enforcer。
-- Boot 4.1.0 依赖管理和可执行 JAR 插件。
+- Boot 4.1.1 依赖管理和可执行 JAR 插件。
 - `./mvnw clean verify` 覆盖全部模块。
 
 ### 4.2 核心依赖方向

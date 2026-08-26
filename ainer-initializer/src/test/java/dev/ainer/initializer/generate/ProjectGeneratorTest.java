@@ -257,7 +257,7 @@ class ProjectGeneratorTest {
                   groupId: dev.ainer.consumer
                   artifactId: dup
                   version: 1.0.0
-                spring-boot: 4.1.0
+                spring-boot: 4.1.1
                 ainner: 0.1.0
                 java: 25
                 database: postgresql
@@ -487,7 +487,7 @@ class ProjectGeneratorTest {
                   groupId: dev.ainer.consumer
                   artifactId: sizesample
                   version: 1.0.0
-                spring-boot: 4.1.0
+                spring-boot: 4.1.1
                 ainner: 0.1.0
                 java: 25
                 database: postgresql
@@ -520,7 +520,7 @@ class ProjectGeneratorTest {
                       groupId: dev.ainer.consumer
                       artifactId: bad
                       version: 1.0.0
-                    spring-boot: 4.1.0
+                    spring-boot: 4.1.1
                     ainner: 0.1.0
                     java: 25
                     database: none

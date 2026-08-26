@@ -19,7 +19,7 @@
 
 ## 2. 项目心智模型
 
-Ainer（AI-Native Extensible Runtime）是基于 JDK 25、Spring Boot 4.1 和 PostgreSQL 18 的
+Ainer（AI-Native Extensible Runtime）是基于 JDK 25、Spring Boot 4.1.1 和 PostgreSQL 18 的
 AI-native、但不局限于 AI 的通用企业应用脚手架与平台底座。它同时面向三个层次：
 
 - 可独立发布的 Java BOM、framework、starter、test support 与 build tools；
