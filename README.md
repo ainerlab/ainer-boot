@@ -42,16 +42,16 @@ MIT **不授予** Ainer 商标权。产品命名、域名状态与标识规则�
 
 当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
 
-`v1.2.0` 是当前发布目标（本准备 PR 合入并打 tag 后由 Release workflow 形成合格发布）：
+[`v1.2.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.2.0) 是当前稳定版本：
 Spring Boot 4.1.1、MIT 公开仓库、参考装配 `@AinerAuthorize` 粗门禁、
-`ainer-starter-observability`、通知 EMAIL/WEBHOOK，以及 1.1.0 线已合入但未成功发布的
-任务调度 / 授权管理面收口。全部为加性变更与依赖补丁，无 schema 破坏；`1.0.x` 作为
-LTS 补丁线继续受支持（ADR-0045/0046）。
+`ainer-starter-observability`、通知 EMAIL/WEBHOOK，以及任务调度 / 授权管理面收口。
+全部为加性变更与依赖补丁，无 schema 破坏；`1.0.x` 作为 LTS 补丁线继续受支持
+（ADR-0045/0046）。
 `v1.1.0` tag **withdrawn / non-qualifying**（无 Release、无 Packages），禁止消费。
 [`v1.0.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.0.0) 保持不可变，作为
 `1.2.0` 的升级起点与 `1.0.x` LTS 线的基线。
 双参考消费者并存：`xq-platform-next`（`rc.2 → … → 1.0.0` 完整升级链含回滚）与
-`python-learning-service`（`0.1.0 → 1.0.0` 冷仓接入）。
+`python-learning-service`（`0.1.0 → 1.0.0` 冷仓接入）；`1.0.0 → 1.2.0` 矩阵待执行。
 
 完整产品说明（能力域、合同、质量模型与快速开始）见
 [`docs/ainer-boot-1.0-product.md`](docs/ainer-boot-1.0-product.md)；动态门禁只以

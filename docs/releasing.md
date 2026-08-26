@@ -84,9 +84,10 @@ AINER_VERSION="$AINER_VERSION" ./scripts/verify-initializer-consumer.sh
 ## 5. GitHub Packages 发布流程
 
 发布坐标为 `https://maven.pkg.github.com/ainerlab/ainer-boot`，repository id 为
-`github-packages`。2026-08-26 核对：既有 26 个 Maven 包均为 public（`0.1.0` /
-`0.2.0` / `1.0.0`）。新包在首次 deploy 后仍应核对其 `visibility`，不得假设继承仓库
-公开状态。`.github/workflows/release.yml` 只由 `v*` tag 触发，顺序固定为：
+`github-packages`。2026-08-26 `v1.2.0` 核对：28 个 Maven 包均为 public（`0.1.0` /
+`0.2.0` / `1.0.0` / `1.2.0`；本版首次发布 `ainer-module-task` 与
+`ainer-starter-observability`）。新包在首次 deploy 后仍应核对其 `visibility`，不得
+假设继承仓库公开状态。`.github/workflows/release.yml` 只由 `v*` tag 触发，顺序固定为：
 
 1. checkout 完整历史，验证 tag 是 annotated SemVer tag，且 peel 后 commit 同时等于 workflow 源码与
    当前默认分支头；

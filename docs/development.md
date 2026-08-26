@@ -207,6 +207,6 @@ ainer-initializer-cli              P2 CLI（preview / init / diff）
    SBOM/provenance、immutable Release
 4. 双消费者升级矩阵验证
 
-**注意**：仓库与既有 26 个 Maven 包均为 public。公开 Actions / 公开 Packages 不再计入
-免费版私有存储配额。`v1.1.0` withdrawn，下一发布是 `1.2.0`。发布前确认目标版本不存在；rc 退役仍按
+**注意**：仓库与 28 个 Maven 包均为 public。公开 Actions / 公开 Packages 不再计入
+免费版私有存储配额。`v1.2.0` 已合格发布；`v1.1.0` withdrawn。发布前确认目标版本不存在；rc 退役仍按
 ADR-0048。
