@@ -37,14 +37,14 @@ MIT **不授予** Ainer 商标权。产品命名、域名状态与标识规则�
 | `ainer-module-organization` | ✅ Incubating | 组织目录：Unit/任职/分配/岗位 + `workforce.position#assignee` 成员解析（撤岗即失权，ADR-0042） |
 | `ainer-module-knowledge` | ✅ Incubating | Knowledge Foundation：不可变 Revision + SUPERSEDES 血缘 + 人工发布门禁（ADR-0044） |
 | `ainer-module-task` | ✅ Incubating | 任务调度：类型注册、延迟/周期执行、SKIP LOCKED 领取、指数退避、超时看门狗与管理 API（ADR-0047） |
-| `ainer-initializer` / `ainer-initializer-cli` | ✅ 发布候选 | Manifest v1 兼容生成；v2 `simple-service + workspace` 安全纵向切片（显式分层、Workspace SQL、JWT/授权审计、OpenAPI 与真实 PostgreSQL 负向门禁，ADR-0052；目标版本 `1.3.0`） |
+| `ainer-initializer` / `ainer-initializer-cli` | ✅ Stable | Manifest v1 兼容生成；v2 `simple-service + workspace` 安全纵向切片（显式分层、Workspace SQL、JWT/授权审计、OpenAPI 与真实 PostgreSQL 负向门禁，ADR-0052；随 `v1.3.0` 发布） |
 | `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、Workspace、AI Runtime、Authorization、P3 与 Incubating 模块装配 |
 | `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、typed token profile、RFC 7662/7009 与受审计 JDBC 协议仓库 |
 
 当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
 
-`v1.3.0` 是当前发布目标（本准备 PR 合入并打 tag 后由 Release workflow 形成合格发布）：
-在 [`v1.2.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.2.0) 基础上发布 Initializer v2
+[`v1.3.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.3.0) 是当前稳定版本：
+它在 [`v1.2.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.2.0) 基础上发布 Initializer v2
 `simple-service + workspace` 安全纵向切片。Manifest v1 与既有读取、生成合同保持不变，Ainer
 framework 无数据库 migration 变化；`1.0.x` 作为 LTS 补丁线继续受支持（ADR-0045/0046）。
 `v1.1.0` tag **withdrawn / non-qualifying**（无 Release、无 Packages），禁止消费。
@@ -91,8 +91,8 @@ preview，不表示 Maven 4 已进入稳定版。请使用 JDK 25，并从仓库
 `./mvnw`，它固定 Maven 3.9.16 与发行包摘要。
 安全纵向切片 manifest 显式选择 `schemaVersion: v2`、
 `preset: simple-service`、`accessControl: workspace` 与自有 `errorNamespace`；完整合同和样例见
-[ADR-0052](docs/decisions/0052-initializer-v2-secure-vertical-slice.md)。该能力以 `v1.3.0` 为
-发布目标；Release workflow 完成前不能把本仓库 SNAPSHOT 或准备分支当作稳定发行物。
+[ADR-0052](docs/decisions/0052-initializer-v2-secure-vertical-slice.md)。该能力已随 `v1.3.0`
+发布；消费者应使用正式 Release，不得把本仓库 SNAPSHOT 或开发分支当作稳定发行物。
 若 Apache 刚发布新的 rc、持久下载端点尚在同步，新环境首次启动 Wrapper 可能暂时返回 404；
 不要把仓库 URL 改到会被删除的临时候选目录，当前同步状态见
 [`docs/project-status.md`](docs/project-status.md)。
@@ -199,56 +199,6 @@ ainer-boot/
 
 ## 下一里程碑
 
-M4.3 已为高风险 API 建立选择性在线撤销基线：本地 JWT 认证后按路径/方法执行 RFC 7662，无 active 正向缓存；inactive 返回 401，Authorization Server 依赖失败返回 503；人员 Token 同时受 Identity 当前状态与 revocation epoch 约束，普通业务 client 不能调用 introspection。
-
-生产指标代码基线现已开始落地：两个发行物提供受 JWT 保护的 Prometheus exporter，抓取凭据使用独立无 tenant metrics client。tenant-bound Client Credentials 也已具备默认关闭、服务端生成一次性 secret、scope/operator 双白名单、蓝绿轮换、显式退役和同事务审计的内部控制面；browser/OIDC 与平台 client 尚未纳管。
-
-Authorization Code + PKCE 已建立真实 PostgreSQL 与浏览器 HTTP 会话门禁，覆盖 S256、登录、
-授权码单次交换和回调地址拒绝；该验证使用测试专用 public client，不代表生产 browser client
-控制面或登录体验已经交付。
-
-M4.6 已完成默认关闭的 Passkey 代码主线：真实签名 ceremony、条件 MFA、恢复码、管理员双人恢复、
-受控首次 enrollment、登录限速和 Resource Server step-up 均有自动化验证。本轮又修复恢复/enrollment
-跨租户目标绑定、限速 HTTP 契约以及 step-up 匿名/服务身份/未来时间语义。主流真实设备矩阵、恢复
-通知、共享限流和多节点会话仍未完成，详见 ADR-0014 至 ADR-0017。
-
-M4.7 首个管理面切片已经落地：Identity 所属的 `ainer-authorization-server` 提供租户成员列表、
-加入、角色变更和软移除 API，
-同时要求 USER actor、`tenant.members.read|write`、可信 tenant claim 与数据库 ACTIVE
-OWNER/ADMIN 关系；所有写入同事务审计，通用接口不能操作 OWNER。首个平台 tenant/OWNER 可用默认
-关闭的严格幂等 bootstrap 创建，部分占用或状态漂移会失败关闭，详见
-[ADR-0018](docs/decisions/0018-management-authorization-and-tenant-member-management.md)。
-
-Ainer Admin 后端融合基线已经收口：`dev` profile 提供固定 `ainer-admin-dev` public client 与
-安全开发身份 fixture；成员 API 逐请求校验官方 authorization active 状态；当前 access token
-可自助撤销；`ainer-admin-v1.yaml` 可严格校验并生成 TypeScript SDK。同一 browser client 的真实
-PostgreSQL 端到端测试已覆盖 PKCE → 成员列表/添加/双向改角色/软移除 → revoke → OIDC logout。
-第一版采用 `/ainer-admin/` 同源反代、不启用 Refresh Token 或全局 CORS，完整契约见
-[Ainer Admin 集成手册](docs/ainer-admin-integration.md)。
-
-M4.8 的已接受设计见
-[ADR-0019](docs/decisions/0019-identity-provisioning-tenant-context-and-ownership-governance.md)：
-按“平台 tenant/user 幂等供应与一次性激活 → 人员多租户上下文选择 → OWNER 双方强认证转移”
-推进。该顺序避免把 `is_default` 当作跨设备租户切换状态，也避免在目标管理员无法取得目标 tenant
-Token 时提前实现不可本人确认的 OWNER 转移。租户角色与未来 Community / Pro / Enterprise
-entitlement 保持独立。
-
-M4.8A 已形成“预配、激活与控制面”代码基线：平台申请仍只预留标识，同时为新用户创建短时、限次、
-只存 SHA-256 摘要的一次性 grant，并把唯一明文连同联系目标写入 AES-256-GCM 保护的 notification
-outbox；已有 ACTIVE 用户不产生认证材料，只生成按 Identity subject 路由的接受通知。新用户凭
-grant 设置首个长期密码，已有用户则必须以本人 USER Token 和 `identity.provisioning.accept`
-接受；两条路径都在单一事务中创建 ACTIVE tenant 与唯一 OWNER membership，失败不留下核心孤儿
-记录。平台响应和数据库可查询列均不暴露激活明文。Authorization Server 已提供默认关闭的
-OAuth2 Client Credentials + HTTPS 通知网关 relay，以稳定 notification ID 做下游幂等键，并在
-网关持久接收或请求取消后销毁可解密 payload；具体邮件/短信/站内信供应商和模板仍属于外部通知域。
-平台还形成了默认关闭的终态回执接收基线：外部网关使用另一组 tenantless SERVICE credential、
-精确白名单和 `identity.provisioning-notifications.receipts.write` scope，把供应商结果归一化为
-`DELIVERED` 或 `FAILED`；Identity 只保存 UUIDv7 notification 关联、受限事件/失败码和时间，不接收
-正文、联系地址或供应商原始 body。`DELIVERED` 仍只表示供应商确认交付，不表示自然人已阅读。
-平台现在还提供 tenant/user 的受限安全分页，以及对未完成申请的显式幂等取消；取消会在同一事务
-收口 request、一次性 grant、未发布通知 payload 和阶段审计。外部通知网关联调、最终送达验证、
-生产边缘限速/告警和 0-skipped 发布门禁仍未完成，因此当前还不能宣称可达的生产开户已经闭环。
-
-生产并行工作仍需部署真实 Prometheus、dashboard/告警，并完成 Authorization Server 多实例容量、
-故障切换和平台旧凭据退役验证；随后继续 IAM 职责分离、外部不可变审计副本、多节点 SLO、
-恢复通知与真实设备兼容矩阵、browser/OIDC client 控制面和签名密钥轮换。
+`v1.3.0` 发布后，最高优先级是让首个真实产品消费者用远端制品验证 Manifest v2、安全纵向
+切片、migration replay、升级与回滚。动态完成项、缺口和后续顺序只在
+[`docs/project-status.md`](docs/project-status.md) 维护，README 不复制时间敏感任务清单。

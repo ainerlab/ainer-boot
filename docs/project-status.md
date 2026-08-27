@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-27 · 工程版本：`1.2.0`（当前稳定）；主线 `1.3.0` 发布准备；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-27 · 工程版本：`1.3.0`（当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -20,7 +20,8 @@ Authorization Server 承载并于 2026-07-29 部署 dev (release `e6cb0b44bb9e-2
 
 下文 M4.x 里程碑记录中涉及 tenant、access-event、relay、Directory 与平台预配的历史描述反映
 当时代码，已被 Greenfield S8 删除取代，不作为当前部署依据。真实外部通知网关/供应商联调、供应商
-回执映射、最终送达验证、生产限速/告警尚未完成，0-skipped 仍需在正式发布候选环境重复执行。
+回执映射、最终送达验证、生产限速/告警尚未完成；`v1.3.0` 正式发布已通过 0-skipped 门禁，但它
+不替代这些外部运行验证。
 当前工程是可编译、可运行、可用真实 PostgreSQL 验证的 Spring Boot 4.1.1 多模块基线，但尚未达到
 生产或商业发行就绪。
 
@@ -34,8 +35,8 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 组织/行业模板与策略包是 ADR-0035 决策 7 明示的 v1 非目标，属 Studio/Enterprise 扩展
 （设计文档能力矩阵第 94 行），移交 P3+ 扩展清单，不再作为 P2 阻塞项。
 
-2026-08-27 Initializer v2 安全纵向切片已形成 `v1.3.0` 发布候选（ADR-0052；当前稳定
-`v1.2.0` 不包含该能力）：新增显式 `schemaVersion: v2` 的 `simple-service + workspace` 窄预设，生成结果按
+2026-08-27 Initializer v2 安全纵向切片已随 `v1.3.0` 发布（ADR-0052）：新增显式
+`schemaVersion: v2` 的 `simple-service + workspace` 窄预设，生成结果按
 API / application / infrastructure 分层，并同时落地可信 JWT、HUMAN 主体限制、资源 scope、
 Workspace ACTIVE membership、所有资源 SQL 的 `workspace_id` 绑定、Workspace 级唯一约束、
 UUIDv7、乐观锁、独立授权决策审计、稳定消费者错误码、受保护 OpenAPI 和真实 PostgreSQL 负向
@@ -43,8 +44,8 @@ UUIDv7、乐观锁、独立授权决策审计、稳定消费者错误码、受�
 `verify-initializer-consumer.sh` 已扩展为普通、PostgreSQL、CRUD、secure-v2 四个独立生成项目，
 两轮确定性生成和共 12 项外部消费者测试全部通过，0 failure / 0 error / 0 skipped，其中 v2 使用
 PostgreSQL 18.3 与 RSA 真签名 JWT。`./mvnw clean verify` 在 JDK 25 / Maven 4.0.0-rc-6 下完成
-28 模块、541 tests / 0 failure / 0 error / 0 skipped；远端制品与真实产品消费者验证仍需在后续
-发布 workflow 与真实产品消费者上执行。
+28 模块、541 tests / 0 failure / 0 error / 0 skipped；远端制品发布门禁已由 run
+`33043332907` 关闭，真实产品消费者验证仍未执行。
 
 2026-08-13 首个产品消费者 `xq-platform-next` 复核发现 `v0.1.0-rc.2` 的 Initializer 存在一个
 真实合同缺口：README 与 ADR-0035 决策 6 要求 `./mvnw`，生成树却没有 Wrapper；此前门禁借用了
@@ -321,6 +322,24 @@ Ainer 项目签名 provenance 已通过。
   `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 
 ## 3. 最近验证记录
+
+2026-08-27 `v1.3.0` 已发布（Initializer v2 安全纵向切片）
+- **发布身份**：发布准备 PR #65 合入默认分支 `a5347bf`；annotated tag `v1.3.0` peel 精确等于
+  `a5347bf71ca051d4c2f6e1f944eb5200e4675cc2`。Release workflow run
+  [`33043332907`](https://github.com/ainerlab/ainer-boot/actions/runs/33043332907) 用时 24m16s 全绿。
+- **远端制品**：28 个 Maven 包已包含 `1.3.0`；132 个主制品及 132 个 detached OpenPGP
+  signature 全部从 GitHub Packages 读回并按正式 fingerprint 验签。Maven 3.9.16 / Maven 4
+  分别从空仓消费成功；远端 CLI 生成普通、PostgreSQL、CRUD、secure-v2 四通道项目并使用各自
+  Maven 3.9.16 Wrapper 全绿，secure-v2 实际启动 PostgreSQL 18.3、重放 5 条 migration 并执行
+  真签名 JWT 负向测试。
+- **发布证据**：GitHub Release
+  [`v1.3.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.3.0) 为非 draft、非 prerelease、
+  `immutable=true`，精确绑定 `a5347bf`；包含 16 个签名证据资产（CycloneDX SBOM、SHA-256/
+  SHA-512 清单、签名 provenance、公钥/fingerprint 与证据签名）。GitHub Attestations 未启用，
+  不把项目签名 provenance 宣称为 GitHub Attestation 或 SLSA 等级。
+- **证据边界**：以上关闭的是正式制品与远端参考消费者门禁；`xq-platform-next` 和
+  `python-learning-service` 尚固定 `1.2.0`，真实产品 Manifest v2、安全纵向切片、`1.2.0 → 1.3.0`
+  升级/migration replay/回滚仍是后续工作。
 
 2026-08-27 `1.3.0` 发布准备
 - **版本选择**：Initializer Manifest v2 是保持 v1 合同不变的加性能力，按语义化版本开
@@ -1718,7 +1737,7 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 - 没有生产备份恢复、容量测试、正式错误预算/告警路由和灾难恢复演练；
 - 1.x 兼容与 LTS 已由 ADR-0045/0046 成文；源码许可已定为 MIT、仓库公开（ADR-0051）。
   商标检索/注册与 Community/Pro/Enterprise 分层定价仍开放；付费产品交付系统未建立；
-- 28 个 Maven 包已是 public（`0.1.0` / `0.2.0` / `1.0.0` / `1.2.0`）。`v1.1.0` 按
+- 28 个 Maven 包已是 public（`0.1.0` / `0.2.0` / `1.0.0` / `1.2.0` / `1.3.0`）。`v1.1.0` 按
   ADR-0041 withdrawn（四次 deploy 402，无 Release/制品），禁止复用；
 - Testcontainers 仍使用 `disabledWithoutDocker`；quality gate 已是 `dev` 必需检查，
   其中包含 `scripts/check-surefire-results.sh` 的零跳过门禁。
@@ -1736,10 +1755,10 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 按
 [`Ainer Boot 产品定位、竞品能力矩阵与路线图`](design/ainer-scaffold-design.md)
 定义的全局产品化阶段，**G0–G4 已关闭，`v1.0.0` 已发布**：P3 企业基座、组织目录 O1/O2、
-Agent 代行 A1、Knowledge K1/K2 均已交付（后三者为 Incubating）。`xq-platform-next` 完成
+Agent 代行 A1、Knowledge K1/K2 均已交付（后三者为 Incubating）。`v1.3.0` 已合格发布并从远端
+验证 Initializer v2 四通道；`xq-platform-next` 完成
 `rc.2 → rc.3 → 0.1.0 → 0.2.0 → 1.0.0 → 1.2.0` 连续升级链（含回滚）；
-`python-learning-service` 完成 `0.1.0 → 1.2.0` 冷仓接入。`v1.2.0` 已合格发布
-（Boot 4.1.1 / MIT / 授权粗门禁 / 观测 Starter）；`v1.1.0` withdrawn。28 个 Maven
+`python-learning-service` 完成 `0.1.0 → 1.2.0` 冷仓接入。`v1.1.0` withdrawn。28 个 Maven
 包均为 public。`dev` 分支保护与 GitHub secret scanning 已启用。剩余能力只由真实
 消费者拉动（见 §5），不再把「进入 G3」写成当前阶段。
 
@@ -1772,11 +1791,11 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 **1.0 后路线：消费驱动**（G0–G4 已关闭；`0.1` 主线历史序列已全部完成并存档于 §3 与
 CHANGELOG：rc.2/rc.3 → 0.1.0 → 0.2.0（G3 四切片）→ 1.0.0（合同定稿），双消费者矩阵见 §3）。
 
-1. **Initializer v2 发布与真实消费**（ADR-0052）：在发布候选上重跑远端四通道门禁，并由首个
-  真实产品消费者验证 manifest、升级和安全纵向切片；模块化单体、多实体关系、生成 SDK 与本地
-  Compose 只在消费需求出现后扩展，不提前承诺。
+1. **Initializer v2 真实产品消费**（ADR-0052）：`v1.3.0` 远端四通道已通过；由首个真实产品
+  消费者验证 manifest、安全纵向切片、`1.2.0 → 1.3.0` 升级、migration replay 和一级回滚。
+  模块化单体、多实体关系、生成 SDK 与本地 Compose 只在消费需求出现后扩展，不提前承诺。
 2. **1.0.x 补丁线**（ADR-0045/0046）：消费者使用中暴露的缺陷按 patch 规则修复；分支保护已启用。
-3. **消费者拉动的能力演进**（1.2.0 之后，不预建）：pil 的 Tutor → AI Runtime 凭据
+3. **消费者拉动的能力演进**（1.3.0 之后，不预建）：pil 的 Tutor → AI Runtime 凭据
   托管/A2 最小 Context 授权；xq 的 VS1 业务切片 → 组织目录 O2 真实消费 + XA Access Model；
   RAG 真实需求出现时再启 Knowledge Phase 2；A4 Token Exchange 只在真实跨服务边界出现后。
 4. **Incubating → Stable 晋升**：组织目录/Agent 代行经第二个消费者兼容验证后评估（各自

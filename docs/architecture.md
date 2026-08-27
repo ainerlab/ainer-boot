@@ -1,6 +1,6 @@
 # Ainer 架构总览
 
-> 权威状态：`v1.2.0` 是当前稳定版本，主线准备 `v1.3.0` Initializer v2；`v1.0.0` 为升级起点与 `1.0.x` LTS；运行基线 Spring Boot 4.1.1；`v1.1.0` withdrawn · 核对 2026-08-27
+> 权威状态：`v1.3.0` 是当前稳定版本，包含 Initializer v2；`v1.0.0` 为升级起点与 `1.0.x` LTS；运行基线 Spring Boot 4.1.1；`v1.1.0` withdrawn · 核对 2026-08-27
 
 ## 1. 系统定位
 
@@ -54,7 +54,7 @@ ainer-starter-observability -> ObservationRegistry + requestId/trace MDC（OTLP 
 ainer-dependencies                   独立 BOM，统一依赖版本
 ```
 
-`ainer-initializer` 是构建期工具而非运行时模块。Manifest v1 保持已发布兼容合同；开发线新增的
+`ainer-initializer` 是构建期工具而非运行时模块。Manifest v1 保持已发布兼容合同；`v1.3.0` 新增的
 Manifest v2 仅在显式选择 `simple-service + workspace` 时生成带安全边界的独立消费者项目，
 并由该项目自己的 Wrapper、真实 JWT 与 PostgreSQL 验证。它不会把生成项目并入 Ainer reactor，
 也不会复制 Ainer 源码；完整决策见
