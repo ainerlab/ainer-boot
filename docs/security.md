@@ -144,6 +144,15 @@ Bearer Token 仍由 Resource Server 在更早阶段返回 401。
 注册 `PublicAccessPolicy`，当前 public ALLOW 仍携带 projection obligation，而 0.1 adapter 尚未执行
 该 obligation，因此会失败关闭为 403；在 `DecisionObligationExecutor` 交付前不得宣称支持匿名投影。
 
+### 3.3 Initializer v2 生成项目
+
+Manifest v2 的 `simple-service + workspace` 预设复用同一可信主体与 Workspace 双层授权原则，但不把
+`@AinerAuthorize` 当作对象级授权替代品。每个生成应用用例显式校验 HUMAN 主体、实体 read/write
+scope 与目标 Workspace 的 ACTIVE membership；随后执行带 `workspace_id` 的资源 SQL。每次资源
+授权决定写入独立事务审计，审计失败阻断请求。生成项目只公开健康检查，业务 API 与 OpenAPI 都
+需要有效 Bearer JWT；真签名 JWT、跨 Workspace、缺 scope 与 DENY 审计进入独立消费者门禁。
+完整合同见 [ADR-0052](decisions/0052-initializer-v2-secure-vertical-slice.md)。
+
 ## 4. Authorization Server
 
 Authorization Server 使用独立 PostgreSQL 数据库或独立 schema 所属权。启动前配置 datasource、HTTPS issuer 与 RSA 签名密钥：

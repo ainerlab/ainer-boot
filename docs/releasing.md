@@ -32,7 +32,7 @@ Changelog 提供替代方案。Stable/Incubating/非目标边界以 ADR-0040 为
    `LICENSE`/`NOTICE` 与根 POM `<licenses>` 必须与之一致；商标仍按 ADR-0004，不因
    MIT 而宣称已取得商标；
 4. JDK 25 下 `./mvnw clean verify` 通过，PostgreSQL Testcontainers 为 `0 skipped`；
-5. 本地 non-SNAPSHOT Maven 3.9+/Maven 4 Golden Consumer 与 Initializer 三通道通过；
+5. 本地 non-SNAPSHOT Maven 3.9+/Maven 4 Golden Consumer 与 Initializer 四通道通过；
 6. Maven Artifact Plugin 的 build plan 与可重复构建比较通过；
 7. 两个可执行 JAR 在目标 JDK 启动；
 8. 空库 migration、升级 migration、关键约束、事务回滚和上一版应用兼容性通过；
@@ -68,8 +68,9 @@ git status --short --branch
 ```
 
 脚本默认使用 `AINER_ARTIFACT_SOURCE=local`，在隔离仓库安装 producer 后验证 28 个 consumer POM、
-公开配置元数据、sources/Javadoc、Maven 3/4 Golden Consumer 和 Initializer。Initializer 的普通、
-PostgreSQL 与 CRUD 三通道必须执行各自生成的 Maven 3.9.16 Wrapper。发布后的远端门禁使用：
+公开配置元数据、sources/Javadoc、Maven 3/4 Golden Consumer 和 Initializer。Initializer 的 v1
+普通/PostgreSQL/CRUD 与 v2 安全纵向切片四通道必须执行各自生成的 Maven 3.9.16 Wrapper。
+发布后的远端门禁使用：
 
 ```bash
 export AINER_ARTIFACT_SOURCE=remote
@@ -93,14 +94,14 @@ AINER_VERSION="$AINER_VERSION" ./scripts/verify-initializer-consumer.sh
    当前默认分支头；
 2. 检查 `AINER_IMMUTABLE_RELEASES=true` 声明，并在 GitHub Packages 查询 BOM POM；版本存在即停止；
 3. 运行 shell/release 契约、Docker、锁定 Maven 3.9.16、本地 non-SNAPSHOT consumers，以及使用
-   生成项目自身 Wrapper 的 Initializer 三通道；
+   生成项目自身 Wrapper 的 Initializer 四通道；
 4. 导入 passphrase-protected GPG key，执行一次临时签名与验签 probe；
 5. 使用 `-Prelease clean deploy` 完整测试、附加 sources/Javadoc、签名并部署；
 6. 强制 Surefire failure/error/skipped 全为零，生成 CycloneDX release SBOM；
 7. 下载 132 个 Maven 主制品及 132 个 `.asc`，带重试逐一校验精确 fingerprint，生成
    checksum/provenance；
 8. 确认远端制品完整可见后，从两个空仓运行 Maven 3/4 consumer，并从远端获取 CLI 生成带 Wrapper
-   的项目，再以生成 Wrapper 运行 Initializer 三通道；
+   的项目，再以生成 Wrapper 运行 Initializer 四通道；
 9. 上传签名发布证据；若启用 GitHub Attestations，attestation 也必须成功；
 10. 最后创建 GitHub Release，并从 release API 读回 `immutable=true`；否则本版本不合格。
 

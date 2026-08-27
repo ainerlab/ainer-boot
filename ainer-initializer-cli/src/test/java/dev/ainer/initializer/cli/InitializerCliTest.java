@@ -49,6 +49,31 @@ class InitializerCliTest {
         return manifest;
     }
 
+    private Path writeV2Manifest() throws IOException {
+        Path manifest = tempDir.resolve("manifest-v2.yaml");
+        Files.writeString(manifest, """
+                schemaVersion: v2
+                preset: simple-service
+                accessControl: workspace
+                errorNamespace: CLI_SAMPLE
+                project:
+                  name: Secure CLI Sample
+                  groupId: dev.ainer.consumer.secure
+                  artifactId: secure-cli-sample
+                  version: 1.0.0
+                spring-boot: 4.1.1
+                ainner: 1.0.0
+                java: 25
+                database: postgresql
+                entities:
+                  - name: note
+                    fields:
+                      - name: title
+                        type: string(120)
+                """);
+        return manifest;
+    }
+
     @Test
     @DisplayName("preview 只读输出文件清单")
     void previewShowsTree() throws IOException {
@@ -74,6 +99,22 @@ class InitializerCliTest {
         assertThat(target.resolve("pom.xml")).isRegularFile();
         assertThat(target.resolve("mvnw")).isRegularFile();
         assertThat(target.resolve("src/main/resources/application.yml")).isRegularFile();
+    }
+
+    @Test
+    @DisplayName("CLI 识别 v2 并生成 Workspace 安全纵向切片")
+    void initGeneratesSecureV2Project() throws IOException {
+        Path manifest = writeV2Manifest();
+        Path target = tempDir.resolve("generated-v2");
+
+        RunResult result = run("init", manifest.toString(), target.toString());
+
+        assertThat(result.exit()).isZero();
+        assertThat(target.resolve(
+                "src/main/java/dev/ainer/consumer/secure/note/application/NoteApplicationService.java"))
+                .isRegularFile();
+        assertThat(Files.readString(target.resolve("README.md")))
+                .contains("manifest v2", "workspace_id");
     }
 
     @Test

@@ -54,6 +54,12 @@ ainer-starter-observability -> ObservationRegistry + requestId/trace MDC（OTLP 
 ainer-dependencies                   独立 BOM，统一依赖版本
 ```
 
+`ainer-initializer` 是构建期工具而非运行时模块。Manifest v1 保持已发布兼容合同；开发线新增的
+Manifest v2 仅在显式选择 `simple-service + workspace` 时生成带安全边界的独立消费者项目，
+并由该项目自己的 Wrapper、真实 JWT 与 PostgreSQL 验证。它不会把生成项目并入 Ainer reactor，
+也不会复制 Ainer 源码；完整决策见
+[ADR-0052](decisions/0052-initializer-v2-secure-vertical-slice.md)。
+
 约束：
 
 - 箭头只允许向下游依赖上游。

@@ -4,8 +4,11 @@ import dev.ainer.core.error.BusinessException;
 import dev.ainer.initializer.generate.ProjectGenerator;
 import dev.ainer.initializer.generate.ProjectTree;
 import dev.ainer.initializer.generate.ProjectWriter;
+import dev.ainer.initializer.generate.SecureProjectGenerator;
+import dev.ainer.initializer.manifest.ManifestV2;
 import dev.ainer.initializer.manifest.ManifestReader;
 import dev.ainer.initializer.manifest.ManifestV1;
+import dev.ainer.initializer.manifest.ProjectManifest;
 import dev.ainer.initializer.preview.ProjectDiffer;
 import dev.ainer.initializer.preview.ProjectPreview;
 
@@ -80,8 +83,8 @@ public final class InitializerCli {
             usage();
             return 2;
         }
-        ManifestV1 manifest = readManifest(args[1]);
-        ProjectTree tree = new ProjectGenerator(manifest).generate();
+        ProjectManifest manifest = readManifest(args[1]);
+        ProjectTree tree = generate(manifest);
         out.print(ProjectPreview.of(tree).render());
         out.println("(preview 未写入任何文件)");
         return 0;
@@ -96,9 +99,9 @@ public final class InitializerCli {
             usage();
             return 2;
         }
-        ManifestV1 manifest = readManifest(rest[1]);
+        ProjectManifest manifest = readManifest(rest[1]);
         Path target = Path.of(rest[2]).toAbsolutePath();
-        ProjectTree tree = new ProjectGenerator(manifest).generate();
+        ProjectTree tree = generate(manifest);
         try {
             new ProjectWriter().write(tree, target, force);
         } catch (BusinessException e) {
@@ -115,19 +118,29 @@ public final class InitializerCli {
             usage();
             return 2;
         }
-        ManifestV1 manifest = readManifest(args[1]);
+        ProjectManifest manifest = readManifest(args[1]);
         Path target = Path.of(args[2]).toAbsolutePath();
-        ProjectTree tree = new ProjectGenerator(manifest).generate();
+        ProjectTree tree = generate(manifest);
         ProjectDiffer.DiffResult result = new ProjectDiffer().diff(tree, target);
         out.print(diffText(result));
         return result.hasChanges() ? 1 : 0;
     }
 
-    private ManifestV1 readManifest(String manifestPath) throws IOException {
+    private ProjectManifest readManifest(String manifestPath) throws IOException {
         try (var reader = new InputStreamReader(
                 Files.newInputStream(Path.of(manifestPath)), StandardCharsets.UTF_8)) {
-            return new ManifestReader().read(reader);
+            return new ManifestReader().readProject(reader);
         }
+    }
+
+    private ProjectTree generate(ProjectManifest manifest) {
+        if (manifest instanceof ManifestV1 v1) {
+            return new ProjectGenerator(v1).generate();
+        }
+        if (manifest instanceof ManifestV2 v2) {
+            return new SecureProjectGenerator(v2).generate();
+        }
+        throw new IllegalArgumentException("不支持的 manifest 实现: " + manifest.getClass().getName());
     }
 
     private static String diffText(ProjectDiffer.DiffResult result) {

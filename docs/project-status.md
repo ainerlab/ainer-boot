@@ -34,6 +34,18 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 组织/行业模板与策略包是 ADR-0035 决策 7 明示的 v1 非目标，属 Studio/Enterprise 扩展
 （设计文档能力矩阵第 94 行），移交 P3+ 扩展清单，不再作为 P2 阻塞项。
 
+2026-08-27 Initializer v2 安全纵向切片已在开发线上完成（ADR-0052，尚未进入已发布
+`v1.2.0`）：新增显式 `schemaVersion: v2` 的 `simple-service + workspace` 窄预设，生成结果按
+API / application / infrastructure 分层，并同时落地可信 JWT、HUMAN 主体限制、资源 scope、
+Workspace ACTIVE membership、所有资源 SQL 的 `workspace_id` 绑定、Workspace 级唯一约束、
+UUIDv7、乐观锁、独立授权决策审计、稳定消费者错误码、受保护 OpenAPI 和真实 PostgreSQL 负向
+测试。Manifest v1 的读取入口与生成器保持原样。Core/Initializer/CLI 定向测试 52 项全绿；
+`verify-initializer-consumer.sh` 已扩展为普通、PostgreSQL、CRUD、secure-v2 四个独立生成项目，
+两轮确定性生成和共 12 项外部消费者测试全部通过，0 failure / 0 error / 0 skipped，其中 v2 使用
+PostgreSQL 18.3 与 RSA 真签名 JWT。`./mvnw clean verify` 在 JDK 25 / Maven 4.0.0-rc-6 下完成
+28 模块、541 tests / 0 failure / 0 error / 0 skipped；远端制品与真实产品消费者验证仍需在后续
+发布候选上执行。
+
 2026-08-13 首个产品消费者 `xq-platform-next` 复核发现 `v0.1.0-rc.2` 的 Initializer 存在一个
 真实合同缺口：README 与 ADR-0035 决策 6 要求 `./mvnw`，生成树却没有 Wrapper；此前门禁借用了
 Ainer 生产者仓库的 Maven 4 Wrapper，因而“生成项目独立构建”的证据不完整。当前开发分支已补入
@@ -1745,15 +1757,16 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 **1.0 后路线：消费驱动**（G0–G4 已关闭；`0.1` 主线历史序列已全部完成并存档于 §3 与
 CHANGELOG：rc.2/rc.3 → 0.1.0 → 0.2.0（G3 四切片）→ 1.0.0（合同定稿），双消费者矩阵见 §3）。
 
-1. **1.0.x 补丁线**（ADR-0045/0046）：OpenAPI 运行时文档兼容性验证（Boot 4.1 springdoc，
-  当前最大诚实缺口——消费者在手写 OpenAPI）；消费者使用中暴露的缺陷按 patch 规则修复。
-  分支保护已启用。
-2. **消费者拉动的能力演进**（1.2.0 之后，不预建）：pil 的 Tutor → AI Runtime 凭据
+1. **Initializer v2 发布与真实消费**（ADR-0052）：在发布候选上重跑远端四通道门禁，并由首个
+  真实产品消费者验证 manifest、升级和安全纵向切片；模块化单体、多实体关系、生成 SDK 与本地
+  Compose 只在消费需求出现后扩展，不提前承诺。
+2. **1.0.x 补丁线**（ADR-0045/0046）：消费者使用中暴露的缺陷按 patch 规则修复；分支保护已启用。
+3. **消费者拉动的能力演进**（1.2.0 之后，不预建）：pil 的 Tutor → AI Runtime 凭据
   托管/A2 最小 Context 授权；xq 的 VS1 业务切片 → 组织目录 O2 真实消费 + XA Access Model；
   RAG 真实需求出现时再启 Knowledge Phase 2；A4 Token Exchange 只在真实跨服务边界出现后。
-3. **Incubating → Stable 晋升**：组织目录/Agent 代行经第二个消费者兼容验证后评估（各自
+4. **Incubating → Stable 晋升**：组织目录/Agent 代行经第二个消费者兼容验证后评估（各自
   ADR 声明的条件）；Knowledge 保持更久。
-4. **发行后续**：源码已 MIT、仓库已公开（ADR-0051）。仍开放：商标检索/注册（ADR-0004）、
+5. **发行后续**：源码已 MIT、仓库已公开（ADR-0051）。仍开放：商标检索/注册（ADR-0004）、
    Community/Pro/Enterprise 分层定稿、定价与 Studio 定位。
 
 ## 6. 更新规则

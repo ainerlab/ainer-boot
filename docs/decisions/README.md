@@ -1,6 +1,6 @@
 # Ainer 架构决策记录
 
-> 文档类型：决策索引 · 状态：生效 · 最近核对：2026-08-25
+> 文档类型：决策索引 · 状态：生效 · 最近核对：2026-08-27
 
 ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是实现日志，也不替代 API 或运行手册。
 
@@ -59,6 +59,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0049](0049-maven4-reactor-bom-import-warning.md) | Accepted | Maven 4 同 reactor BOM import 告警：暂不消除，等待 Maven 4 GA（修订 ADR-0026 开放项；不改 parentless BOM 消费合同） |
 | [0050](0050-delayed-self-elevation-alert.md) | Accepted | 岗位集合绑定延迟自提权采用 Alert：入岗命中自建绑定写审计/指标，不自动撤销、不阻断入岗 |
 | [0051](0051-mit-license-and-public-repository.md) | Accepted | Ainer Boot 源码采用 MIT，GitHub 仓库公开（修订 ADR-0041 私有分发假设；不授予商标权） |
+| [0052](0052-initializer-v2-secure-vertical-slice.md) | Accepted | Initializer v2 安全纵向切片：`simple-service + workspace`、显式分层、Workspace SQL、授权审计与第四消费者门禁 |
 
 ## 历史草案与审查记录
 

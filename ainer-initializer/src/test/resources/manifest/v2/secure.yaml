@@ -1,0 +1,23 @@
+schemaVersion: v2
+preset: simple-service
+accessControl: workspace
+errorNamespace: CATALOG
+project:
+  name: Secure Catalog
+  groupId: dev.example.catalog
+  artifactId: catalog-service
+  version: 1.0.0
+spring-boot: 4.1.1
+ainner: 0.1.0-SNAPSHOT
+allowSnapshot: true
+java: 25
+database: postgresql
+entities:
+  - name: product
+    fields:
+      - name: name
+        type: string(120)
+        comment: Product name
+      - name: price
+        type: decimal
+        nullable: true
