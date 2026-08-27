@@ -1,6 +1,6 @@
 # Ainer Boot 开发手册
 
-> 文档类型：开发操作 · 状态：生效 · 最近核对：2026-08-27 · 适用版本：`1.2.0`
+> 文档类型：开发操作 · 状态：生效 · 最近核对：2026-08-27 · 适用版本：`1.3.0`（发布准备）
 
 本文是 Ainer Boot 的日常开发操作手册。新开发者应先读 [`00-overview.md`](00-overview.md)
 了解文档地图，再按本文完成第一次构建与验证。架构决策背景见 [`architecture.md`](architecture.md)
@@ -210,7 +210,7 @@ ainer-initializer-cli              P2 CLI（preview / init / diff）
 5. 按第 12 节做双参考消费者升级矩阵
 
 **注意**：仓库与 28 个 Maven 包均为 public。GitHub Packages 仍需登录拉取（`read:packages`）。
-`v1.2.0` 已合格发布；`v1.1.0` withdrawn，禁止消费或复用。发布前确认目标版本不存在；
+`v1.2.0` 已合格发布；主线准备 `v1.3.0`，`v1.1.0` withdrawn，禁止消费或复用。发布前确认目标版本不存在；
 rc 退役仍按 ADR-0048。
 
 ## 12. 参考消费者升级矩阵

@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-27 · 工程版本：`1.2.0`（已发布）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-27 · 工程版本：`1.2.0`（当前稳定）；主线 `1.3.0` 发布准备；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -34,8 +34,8 @@ TTCRUD 实测 124s（门禁 1800s）、生成物通过 PostgreSQL 与 golden con
 组织/行业模板与策略包是 ADR-0035 决策 7 明示的 v1 非目标，属 Studio/Enterprise 扩展
 （设计文档能力矩阵第 94 行），移交 P3+ 扩展清单，不再作为 P2 阻塞项。
 
-2026-08-27 Initializer v2 安全纵向切片已在开发线上完成（ADR-0052，尚未进入已发布
-`v1.2.0`）：新增显式 `schemaVersion: v2` 的 `simple-service + workspace` 窄预设，生成结果按
+2026-08-27 Initializer v2 安全纵向切片已形成 `v1.3.0` 发布候选（ADR-0052；当前稳定
+`v1.2.0` 不包含该能力）：新增显式 `schemaVersion: v2` 的 `simple-service + workspace` 窄预设，生成结果按
 API / application / infrastructure 分层，并同时落地可信 JWT、HUMAN 主体限制、资源 scope、
 Workspace ACTIVE membership、所有资源 SQL 的 `workspace_id` 绑定、Workspace 级唯一约束、
 UUIDv7、乐观锁、独立授权决策审计、稳定消费者错误码、受保护 OpenAPI 和真实 PostgreSQL 负向
@@ -44,7 +44,7 @@ UUIDv7、乐观锁、独立授权决策审计、稳定消费者错误码、受�
 两轮确定性生成和共 12 项外部消费者测试全部通过，0 failure / 0 error / 0 skipped，其中 v2 使用
 PostgreSQL 18.3 与 RSA 真签名 JWT。`./mvnw clean verify` 在 JDK 25 / Maven 4.0.0-rc-6 下完成
 28 模块、541 tests / 0 failure / 0 error / 0 skipped；远端制品与真实产品消费者验证仍需在后续
-发布候选上执行。
+发布 workflow 与真实产品消费者上执行。
 
 2026-08-13 首个产品消费者 `xq-platform-next` 复核发现 `v0.1.0-rc.2` 的 Initializer 存在一个
 真实合同缺口：README 与 ADR-0035 决策 6 要求 `./mvnw`，生成树却没有 Wrapper；此前门禁借用了
@@ -321,6 +321,21 @@ Ainer 项目签名 provenance 已通过。
   `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 
 ## 3. 最近验证记录
+
+2026-08-27 `1.3.0` 发布准备
+- **版本选择**：Initializer Manifest v2 是保持 v1 合同不变的加性能力，按语义化版本开
+  **1.3.0**。Java/HTTP/错误码/JWT scope/配置/Starter 的既有合同不变；Ainer framework 无
+  数据库 migration 变化，新增合同只在显式 `schemaVersion: v2` 时生效。发布清单保持 28
+  modules / 132 主制品。
+- **本地目标版本门禁**：JDK 25 + Maven 4.0.0-rc-6 下，`artifact:check-buildplan` 通过；
+  `-Drevision=1.3.0` 隔离仓库两轮构建成功，`artifact:compare` 聚合 82/82 文件匹配；Maven
+  3.9+ / Maven 4 Golden Consumer 均通过；Initializer 普通、PostgreSQL、CRUD、secure-v2
+  四通道均通过各自 Maven 3.9.16 Wrapper，secure-v2 使用 PostgreSQL 18.3 与 RSA 真签名 JWT；
+  release contracts 与 `git diff --check` 通过。
+- **远端预检**：`v1.3.0` tag 与 GitHub Release 不存在；BOM Packages 版本列表仅有
+  `0.1.0` / `0.2.0` / `1.0.0` / `1.2.0`，目标版本尚未被 registry 消耗。远端 132/132
+  读回验签、空仓消费者、远端 Initializer、SBOM/provenance 与 immutable Release 必须等 tag
+  workflow 完成后才能记录为发布证据。
 
 2026-08-26 双消费者 `1.0.0 → 1.2.0` 升级矩阵（ADR-0045 相邻合格 minor）
 - **路径**：跳过 withdrawn 的 `v1.1.0`，从合格发布 `v1.0.0` 升到 `v1.2.0`。两仓均用隔离
