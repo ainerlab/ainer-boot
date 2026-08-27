@@ -1,6 +1,6 @@
 # Ainer Boot 项目交接文档
 
-> 文档类型：交接快照 · 状态：生效 · 核对时间：2026-08-27 · 工程版本：`1.3.0`（发布准备，见 §10）
+> 文档类型：交接快照 · 状态：生效 · 核对时间：2026-08-27 · 工程版本：`1.3.0`（当前稳定）
 >
 > 本文面向接手项目的开发者或 AI 代理。读完本文应能：理解项目定位与当前状态、完成首次
 > 构建、知道去哪找细节、避免踩过的坑。
@@ -40,7 +40,7 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
 
 | 版本 | 日期 | 要点 |
 |---|---|---|
-| `v1.3.0` | 2026-08-27（发布准备） | Initializer v2 `simple-service + workspace` 安全纵向切片；v1 合同保持兼容 |
+| `v1.3.0` | 2026-08-27 | Initializer v2 `simple-service + workspace` 安全纵向切片；v1 合同保持兼容 |
 | `v1.2.0` | 2026-08-26 | Boot 4.1.1 + MIT + 授权粗门禁 + 观测 Starter；接替 withdrawn 的 `v1.1.0` |
 | `v1.1.0` | 2026-08-24 | **withdrawn / non-qualifying**：四次 Release 在 Packages 402 失败，无 Release/制品 |
 | `v1.0.0` | 2026-08-18 | 1.0 产品合同定稿（零代码差异合同冻结） |
@@ -68,7 +68,7 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
   路径 workspaceId）；**不是** 1.x 资源级授权合同，类型化 resourceType、obligation executor
   仍待做
 - 生产签发前必须启用在线校验与 step-up（脚手架默认关闭；见 `operations.md` 2.3 / §6）
-- 28 个 Maven 包均为 public（`0.1.0` / `0.2.0` / `1.0.0` / `1.2.0`）。`v1.1.0`
+- 28 个 Maven 包均为 public（`0.1.0` / `0.2.0` / `1.0.0` / `1.2.0` / `1.3.0`）。`v1.1.0`
   withdrawn（无 Release、无 Packages），禁止消费
 - `dev` 已启用分支保护：必须 PR、CODEOWNERS 1 票、必需检查（Commit discipline /
   quality gate / gitleaks）；禁止 force-push 与删分支。当前唯一 CODEOWNER 合入自己的
@@ -175,13 +175,14 @@ ainer-core ← ainer-spring ← starter-* ← module-* ← server
 
 | 优先级 | 事项 | 状态 |
 |---|---|---|
-| 高 | **1.3.0 发布** | 准备 PR 合入后打 `v1.3.0`；远端四通道与 132/132 签名读回必须全绿 |
-| 高 | Initializer v2 真实产品消费 | 发布成功后由首个真实产品验证 manifest、升级与安全纵向切片 |
+| 高 | Initializer v2 真实产品消费 | `v1.3.0` 已发布；待首个真实产品验证 manifest、升级/migration replay/回滚与安全纵向切片 |
 | 中 | 第二位 CODEOWNER | 到位后可取消日常 `gh pr merge --admin` |
 | 低 | Incubating → Stable 晋升评估 | 等第二个消费者兼容验证积累 |
 | 低 | AI Runtime A2-A4 / Knowledge Phase 2-4 | 按真实产品需求拉动 |
 
-已完成：双消费者 `1.0.0 → 1.2.0` 矩阵（xq 含一级回滚后固定 1.2.0；pil 冷仓）；P4 任务调度模块（ADR-0047）并入 1.2.0（原拟随 withdrawn 的 1.1.0 发布）；授权端点门禁类型化目标解析 +
+已完成：`v1.3.0` 合格发布（run `33043332907`，132/132 远端验签、Maven 3/4 空仓消费者、
+Initializer 四通道、16 个签名证据资产、immutable Release）；双消费者 `1.0.0 → 1.2.0`
+矩阵（xq 含一级回滚后固定 1.2.0；pil 冷仓）；P4 任务调度模块（ADR-0047）并入 1.2.0（原拟随 withdrawn 的 1.1.0 发布）；授权端点门禁类型化目标解析 +
 RFC 9470 挑战头 + ArchUnit 守护（ADR-0037 后续切片首批，PR #35）；CI 存储纪律
 （housekeeping 工作流 + 发布构建去缓存，PR #36）。
 
