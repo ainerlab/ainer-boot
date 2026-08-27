@@ -214,6 +214,11 @@ failure/error/skipped。这些门禁是本地/自动化工程要求；消费本�
 `AINER_ARTIFACT_SOURCE=remote` 则要求 non-SNAPSHOT 版本和 `AINER_MAVEN_SETTINGS`，Maven 3、Maven 4
 分别从空本地仓库解析远端制品，禁止借用 reactor install 作为远端消费证据。
 
+Initializer 消费者门禁包含四个独立项目：Manifest v1 普通、PostgreSQL、CRUD，以及 Manifest v2
+`simple-service + workspace` 安全纵向切片。第四通道除确定性和无源码复制外，还必须用真实签名
+JWT 与 PostgreSQL 验证未认证 401、缺 scope 403、非成员/跨 Workspace 拒绝、乐观锁 409、授权
+DENY 审计和受保护 OpenAPI，全部测试 0 skipped。
+
 授权端点适配器的发布门禁不能只直接实例化 manager。至少要用真实 Servlet Web、真实签名 JWT 和
 真实 HTTP 验证：匹配 scope/policy 的 `@AinerAuthorize` handler 在 controller 前放行；缺 scope
 返回统一 403 且 controller effect 不发生；无 Bearer Token 返回 401；未注解 endpoint 不被该

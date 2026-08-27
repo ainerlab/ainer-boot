@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
- * Manifest v1 — the only input contract of the Ainer Project Initializer (ADR-0035).
+ * Manifest v1 — Ainer Project Initializer 的兼容输入合同（ADR-0035）。
  *
  * <p>Values are immutable and fully validated before generation starts. Unknown fields,
  * unknown starters and template look-alike values fail fast instead of being silently ignored.
@@ -23,7 +23,7 @@ public record ManifestV1(
         List<String> starters,
         Database database,
         List<EntityDeclaration> entities,
-        @Nullable Owner owner) {
+        @Nullable Owner owner) implements ProjectManifest {
 
     /** Schema marker required by the generator. */
     public static final String SCHEMA_VERSION = "v1";
@@ -37,6 +37,11 @@ public record ManifestV1(
     public enum Database {
         NONE,
         POSTGRESQL
+    }
+
+    @Override
+    public String schemaVersion() {
+        return SCHEMA_VERSION;
     }
 
     public ManifestV1 {

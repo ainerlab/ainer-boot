@@ -4,6 +4,14 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- **Project Initializer Manifest v2 安全纵向切片（ADR-0052）**：新增显式
+  `simple-service + workspace` 预设，生成 API/application/infrastructure 边界、Workspace 绑定 SQL、
+  乐观锁与受控分页、消费者自有稳定错误码、独立事务授权决策审计、受保护 OpenAPI，以及真实签名
+  JWT + PostgreSQL 负向集成测试。Manifest v1、`ManifestReader.read(Reader)` 与既有模板保持不变；
+  `verify-initializer-consumer.sh` 从三通道扩展为四通道。
+
 ## [1.2.0] - 2026-08-26
 
 仓库公开后的首个合格发布目标：Spring Boot 4.1.1、MIT、参考装配授权粗门禁、观测 Starter

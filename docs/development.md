@@ -102,7 +102,7 @@ ainer-module-task                  任务调度（Incubating：SKIP LOCKED 队�
 ainer-server                       业务 Resource Server（全模块装配）
 ainer-authorization-server         OAuth 2.1/OIDC Authorization Server
 ainer-offstate-app                 P1 最小可消费应用（无外部服务冒烟）
-ainer-initializer                  P2 确定性生成内核（Manifest v1）
+ainer-initializer                  P2 确定性生成内核（Manifest v1 + v2 安全预设）
 ainer-initializer-cli              P2 CLI（preview / init / diff）
 ```
 
@@ -205,7 +205,7 @@ ainer-initializer-cli              P2 CLI（preview / init / diff）
 1. 发布准备 PR（CHANGELOG + README + project-status 版本行）
 2. 合入 → dev CI 全绿 → 发布窗口清空 Actions caches（`total_count=0`）
 3. annotated tag `v<version>` 必须 peel 到当时 `origin/dev` 头 → release workflow
-4. 完整门禁：签名 deploy、132 主制品远端读回验签、空仓消费者、Initializer 三通道、
+4. 完整门禁：签名 deploy、132 主制品远端读回验签、空仓消费者、Initializer 四通道、
    SBOM/provenance、immutable Release
 5. 按第 12 节做双参考消费者升级矩阵
 

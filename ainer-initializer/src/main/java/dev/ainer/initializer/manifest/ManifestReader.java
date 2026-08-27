@@ -10,6 +10,7 @@ import org.yaml.snakeyaml.error.YAMLException;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,6 +35,10 @@ public final class ManifestReader {
     private static final Set<String> KNOWN_TOP_LEVEL_KEYS = Set.of(
             "schemaVersion", "project", "java", "spring-boot", "ainner", "package", "starters",
             "database", "owner", "entities", "allowSnapshot");
+    private static final Set<String> KNOWN_V2_TOP_LEVEL_KEYS = Set.of(
+            "schemaVersion", "project", "java", "spring-boot", "ainner", "package", "starters",
+            "database", "owner", "entities", "allowSnapshot", "preset", "accessControl",
+            "errorNamespace");
     private static final Set<String> KNOWN_PROJECT_KEYS =
             Set.of("name", "groupId", "artifactId", "version", "description");
     private static final Set<String> KNOWN_OWNER_KEYS = Set.of("displayName", "email");
@@ -59,6 +64,24 @@ public final class ManifestReader {
     public ManifestV1 read(Reader reader) throws IOException {
         Objects.requireNonNull(reader, "reader");
         return parseAndValidate(nextDocument(reader));
+    }
+
+    /**
+     * 读取 Initializer 支持的任意 schema 版本。旧 {@link #read(Reader)} 仍只读取 v1，保证既有
+     * 库消费者保留源码级返回类型。
+     */
+    public ProjectManifest readProject(Reader reader) throws IOException {
+        Objects.requireNonNull(reader, "reader");
+        Map<?, ?> root = nextDocument(reader);
+        String schema = stringOrNull(root, "schemaVersion");
+        if (ManifestV1.SCHEMA_VERSION.equals(schema)) {
+            return parseAndValidate(root);
+        }
+        if (ManifestV2.SCHEMA_VERSION.equals(schema)) {
+            return parseV2(root);
+        }
+        fail("schemaVersion 必须是 v1 或 v2，收到: " + schema);
+        throw new AssertionError("unreachable");
     }
 
     private Map<?, ?> nextDocument(Reader reader) throws IOException {
@@ -155,13 +178,57 @@ public final class ManifestReader {
                 owner);
     }
 
+    private ManifestV2 parseV2(Map<?, ?> root) {
+        rejectUnknownKeys(root, KNOWN_V2_TOP_LEVEL_KEYS, "", "v2");
+        String presetText = requiredString(root, "preset", "preset");
+        if (!"simple-service".equals(presetText)) {
+            fail("preset 必须是 simple-service，收到: " + presetText);
+        }
+        String accessControlText = requiredString(root, "accessControl", "accessControl");
+        if (!"workspace".equals(accessControlText)) {
+            fail("accessControl 必须是 workspace，收到: " + accessControlText);
+        }
+        String errorNamespace = requiredString(root, "errorNamespace", "errorNamespace");
+        String databaseText = stringOrNull(root, "database");
+        if (!"postgresql".equals(databaseText)) {
+            fail("Manifest v2 simple-service 必须使用 database: postgresql");
+        }
+
+        Map<Object, Object> v1Shape = new LinkedHashMap<>();
+        root.forEach(v1Shape::put);
+        v1Shape.put("schemaVersion", ManifestV1.SCHEMA_VERSION);
+        v1Shape.remove("preset");
+        v1Shape.remove("accessControl");
+        v1Shape.remove("errorNamespace");
+        ManifestV1 common = parseAndValidate(v1Shape);
+
+        return new ManifestV2(
+                common.project(),
+                common.javaRelease(),
+                common.springBootVersion(),
+                common.ainerVersion(),
+                common.packageName(),
+                common.starters(),
+                common.database(),
+                common.entities(),
+                common.owner(),
+                ManifestV2.Preset.SIMPLE_SERVICE,
+                ManifestV2.AccessControl.WORKSPACE,
+                errorNamespace);
+    }
+
     private void rejectUnknownKeys(Map<?, ?> map, Set<String> allowed, String prefix) {
+        rejectUnknownKeys(map, allowed, prefix, "v1");
+    }
+
+    private void rejectUnknownKeys(Map<?, ?> map, Set<String> allowed, String prefix, String version) {
         Set<String> unknown = map.keySet().stream()
                 .map(String::valueOf)
                 .filter(key -> !allowed.contains(key))
                 .collect(Collectors.toSet());
         if (!unknown.isEmpty()) {
-            fail("未知字段 " + prefix + (prefix.isEmpty() ? "" : ".") + unknown + "，v1 不允许未知字段");
+            fail("未知字段 " + prefix + (prefix.isEmpty() ? "" : ".") + unknown
+                    + "，" + version + " 不允许未知字段");
         }
     }
 

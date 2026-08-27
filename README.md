@@ -37,6 +37,7 @@ MIT **不授予** Ainer 商标权。产品命名、域名状态与标识规则�
 | `ainer-module-organization` | ✅ Incubating | 组织目录：Unit/任职/分配/岗位 + `workforce.position#assignee` 成员解析（撤岗即失权，ADR-0042） |
 | `ainer-module-knowledge` | ✅ Incubating | Knowledge Foundation：不可变 Revision + SUPERSEDES 血缘 + 人工发布门禁（ADR-0044） |
 | `ainer-module-task` | ✅ Incubating | 任务调度：类型注册、延迟/周期执行、SKIP LOCKED 领取、指数退避、超时看门狗与管理 API（ADR-0047） |
+| `ainer-initializer` / `ainer-initializer-cli` | ✅ 开发线 | Manifest v1 兼容生成；新增 v2 `simple-service + workspace` 安全纵向切片（显式分层、Workspace SQL、JWT/授权审计、OpenAPI 与真实 PostgreSQL 负向门禁，ADR-0052；尚未随 `v1.2.0` 发布） |
 | `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、Workspace、AI Runtime、Authorization、P3 与 Incubating 模块装配 |
 | `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、typed token profile、RFC 7662/7009 与受审计 JDBC 协议仓库 |
 
@@ -89,6 +90,10 @@ preview，不表示 Maven 4 已进入稳定版。请使用 JDK 25，并从仓库
 系统 Maven 3.9+ 只用于 `scripts/verify-maven-consumers.sh` 的下游兼容门禁，不能替代 Wrapper
 构建、安装或发布 Ainer reactor。Initializer 生成的独立项目例外：必须使用生成目录自己的
 `./mvnw`，它固定 Maven 3.9.16 与发行包摘要。
+开发线需要安全纵向切片时，manifest 显式选择 `schemaVersion: v2`、
+`preset: simple-service`、`accessControl: workspace` 与自有 `errorNamespace`；完整合同和样例见
+[ADR-0052](docs/decisions/0052-initializer-v2-secure-vertical-slice.md)。已发布 `v1.2.0` 仍只提供
+既有 Manifest v1 合同，不能把本仓库 SNAPSHOT 当作稳定发行物。
 若 Apache 刚发布新的 rc、持久下载端点尚在同步，新环境首次启动 Wrapper 可能暂时返回 404；
 不要把仓库 URL 改到会被删除的临时候选目录，当前同步状态见
 [`docs/project-status.md`](docs/project-status.md)。
