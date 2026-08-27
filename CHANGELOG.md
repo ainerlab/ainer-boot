@@ -4,6 +4,12 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-27
+
+面向脚手架首次安全纵向生成的兼容性次版本：Project Initializer 在保持 Manifest v1 与既有读取、
+生成合同不变的前提下，新增显式 Manifest v2 `simple-service + workspace` 预设。无 Ainer framework
+数据库 migration 变化；发布清单保持 28 modules / 132 主制品。
+
 ### Added
 
 - **Project Initializer Manifest v2 安全纵向切片（ADR-0052）**：新增显式
@@ -620,7 +626,8 @@ migration 只追加），是对 1.x 兼容承诺的首次真实验证。
 - 稳定版仍要求 `xq-platform-next` 从远端 RC 完成真实纵向切片、migration replay、升级与回滚；
   本仓库测试和 RC 发布不能替代产品证据。
 
-[Unreleased]: https://github.com/ainerlab/ainer-boot/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/ainerlab/ainer-boot/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.3.0
 [1.2.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.2.0
 [1.1.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.1.0
 [1.0.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.0.0

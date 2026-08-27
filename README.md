@@ -37,17 +37,16 @@ MIT **不授予** Ainer 商标权。产品命名、域名状态与标识规则�
 | `ainer-module-organization` | ✅ Incubating | 组织目录：Unit/任职/分配/岗位 + `workforce.position#assignee` 成员解析（撤岗即失权，ADR-0042） |
 | `ainer-module-knowledge` | ✅ Incubating | Knowledge Foundation：不可变 Revision + SUPERSEDES 血缘 + 人工发布门禁（ADR-0044） |
 | `ainer-module-task` | ✅ Incubating | 任务调度：类型注册、延迟/周期执行、SKIP LOCKED 领取、指数退避、超时看门狗与管理 API（ADR-0047） |
-| `ainer-initializer` / `ainer-initializer-cli` | ✅ 开发线 | Manifest v1 兼容生成；新增 v2 `simple-service + workspace` 安全纵向切片（显式分层、Workspace SQL、JWT/授权审计、OpenAPI 与真实 PostgreSQL 负向门禁，ADR-0052；尚未随 `v1.2.0` 发布） |
+| `ainer-initializer` / `ainer-initializer-cli` | ✅ 发布候选 | Manifest v1 兼容生成；v2 `simple-service + workspace` 安全纵向切片（显式分层、Workspace SQL、JWT/授权审计、OpenAPI 与真实 PostgreSQL 负向门禁，ADR-0052；目标版本 `1.3.0`） |
 | `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、Workspace、AI Runtime、Authorization、P3 与 Incubating 模块装配 |
 | `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、typed token profile、RFC 7662/7009 与受审计 JDBC 协议仓库 |
 
 当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
 
-[`v1.2.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.2.0) 是当前稳定版本：
-Spring Boot 4.1.1、MIT 公开仓库、参考装配 `@AinerAuthorize` 粗门禁、
-`ainer-starter-observability`、通知 EMAIL/WEBHOOK，以及任务调度 / 授权管理面收口。
-全部为加性变更与依赖补丁，无 schema 破坏；`1.0.x` 作为 LTS 补丁线继续受支持
-（ADR-0045/0046）。
+`v1.3.0` 是当前发布目标（本准备 PR 合入并打 tag 后由 Release workflow 形成合格发布）：
+在 [`v1.2.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.2.0) 基础上发布 Initializer v2
+`simple-service + workspace` 安全纵向切片。Manifest v1 与既有读取、生成合同保持不变，Ainer
+framework 无数据库 migration 变化；`1.0.x` 作为 LTS 补丁线继续受支持（ADR-0045/0046）。
 `v1.1.0` tag **withdrawn / non-qualifying**（无 Release、无 Packages），禁止消费。
 [`v1.0.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.0.0) 保持不可变，作为
 `1.2.0` 的升级起点与 `1.0.x` LTS 线的基线。
@@ -90,10 +89,10 @@ preview，不表示 Maven 4 已进入稳定版。请使用 JDK 25，并从仓库
 系统 Maven 3.9+ 只用于 `scripts/verify-maven-consumers.sh` 的下游兼容门禁，不能替代 Wrapper
 构建、安装或发布 Ainer reactor。Initializer 生成的独立项目例外：必须使用生成目录自己的
 `./mvnw`，它固定 Maven 3.9.16 与发行包摘要。
-开发线需要安全纵向切片时，manifest 显式选择 `schemaVersion: v2`、
+安全纵向切片 manifest 显式选择 `schemaVersion: v2`、
 `preset: simple-service`、`accessControl: workspace` 与自有 `errorNamespace`；完整合同和样例见
-[ADR-0052](docs/decisions/0052-initializer-v2-secure-vertical-slice.md)。已发布 `v1.2.0` 仍只提供
-既有 Manifest v1 合同，不能把本仓库 SNAPSHOT 当作稳定发行物。
+[ADR-0052](docs/decisions/0052-initializer-v2-secure-vertical-slice.md)。该能力以 `v1.3.0` 为
+发布目标；Release workflow 完成前不能把本仓库 SNAPSHOT 或准备分支当作稳定发行物。
 若 Apache 刚发布新的 rc、持久下载端点尚在同步，新环境首次启动 Wrapper 可能暂时返回 404；
 不要把仓库 URL 改到会被删除的临时候选目录，当前同步状态见
 [`docs/project-status.md`](docs/project-status.md)。
