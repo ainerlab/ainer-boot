@@ -1,6 +1,6 @@
 # Ainer 版本与发布规范
 
-> 文档类型：长期维护规范 · 状态：生效 · 最近核对：2026-08-26 · 适用版本：`0.1.x`
+> 文档类型：长期维护规范 · 状态：生效 · 最近核对：2026-08-27 · 适用版本：`1.2.x`
 
 ## 1. 版本与资格语义
 
@@ -41,7 +41,7 @@ Changelog 提供替代方案。Stable/Incubating/非目标边界以 ADR-0040 为
 11. 备份恢复与应用回滚在非生产环境演练；
 12. annotated tag 精确指向默认分支头，目标源码 SHA、版本不存在性与 GitHub Immutable Releases
     声明通过预检；
-13. deploy 后远端 Maven 3/4 空仓消费、远端 Initializer、107 个主制品与 107 个 `.asc` 读回通过；
+13. deploy 后远端 Maven 3/4 空仓消费、远端 Initializer、132 个主制品与 132 个 `.asc` 读回通过；
 14. CycloneDX SBOM、SHA-256/SHA-512、项目签名 provenance、公钥与证据签名已成为 GitHub Release assets。
 
 其中第 13、14 项必须针对 registry 中的实际字节执行，本地 reactor/install 结果不能替代。
@@ -97,7 +97,7 @@ AINER_VERSION="$AINER_VERSION" ./scripts/verify-initializer-consumer.sh
 4. 导入 passphrase-protected GPG key，执行一次临时签名与验签 probe；
 5. 使用 `-Prelease clean deploy` 完整测试、附加 sources/Javadoc、签名并部署；
 6. 强制 Surefire failure/error/skipped 全为零，生成 CycloneDX release SBOM；
-7. 下载 107 个 Maven 主制品及 107 个 `.asc`，带重试逐一校验精确 fingerprint，生成
+7. 下载 132 个 Maven 主制品及 132 个 `.asc`，带重试逐一校验精确 fingerprint，生成
    checksum/provenance；
 8. 确认远端制品完整可见后，从两个空仓运行 Maven 3/4 consumer，并从远端获取 CLI 生成带 Wrapper
    的项目，再以生成 Wrapper 运行 Initializer 三通道；
@@ -124,7 +124,8 @@ Attestations 时启用。未启用时，项目签名 provenance 仍是强制门�
 失败必须阻断，不允许 `continue-on-error`。
 
 本地手动发布需要在 Maven settings 为 `github-packages` 配置 `write:packages` 凭据，但常规发布只走
-tag workflow。既有 26 个包已是 public，可匿名拉取。不得把 PAT 写入 POM、仓库或日志。
+tag workflow。28 个包已是 public，但仍须登录 GitHub Packages 拉取。不得把 PAT 写入
+POM、仓库或日志。
 
 ## 6. 签名、制品清单与 provenance
 
@@ -175,6 +176,8 @@ migration/回滚、132 个主制品 checksum、签名 fingerprint、SBOM、prove
 - 从 GitHub Release 而不是孤立 package version 选择消费版本；
 - 验证 health、Token 签发、JWT 校验和关键业务 smoke；
 - 观察错误率、延迟、数据库连接/锁、归档积压和 AI provider 失败；
+- 按 [`development.md`](development.md) §12 跑双参考消费者相邻合格 minor 矩阵，结论写入
+  [`project-status.md`](project-status.md)；withdrawn 版本跳过；
 - 将实际 migration replay、产品消费、升级与回滚结果写入发布记录；
 - 清空 Changelog 的 `Unreleased` 时立即建立新的空区段；
 - 发现设计偏差时新增 ADR 或修复文档，不让口头结论成为长期规则。

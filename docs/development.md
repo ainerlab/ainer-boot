@@ -1,6 +1,6 @@
 # Ainer Boot 开发手册
 
-> 文档类型：开发操作 · 状态：生效 · 最近核对：2026-08-21 · 适用版本：`1.1.x`
+> 文档类型：开发操作 · 状态：生效 · 最近核对：2026-08-27 · 适用版本：`1.2.0`
 
 本文是 Ainer Boot 的日常开发操作手册。新开发者应先读 [`00-overview.md`](00-overview.md)
 了解文档地图，再按本文完成第一次构建与验证。架构决策背景见 [`architecture.md`](architecture.md)
@@ -195,18 +195,46 @@ ainer-initializer-cli              P2 CLI（preview / init / diff）
 | `xq-platform-next` | `~/01-code/xq/xq-platform-next` | 完整升级链验证（rc.2→1.2.0 含回滚）；JWT/授权/SDK 纵向切片 |
 | `python-learning-service` | `/Users/xq/01-code/self/python-learning-service` | 冷仓接入验证（0.1.0→1.2.0）；Evidence 存档切片 |
 
-两者均通过版本化 BOM/Starter 消费远端制品，不含 Ainer 源码副本。
+两者均通过版本化 BOM/Starter 消费远端制品，不含 Ainer 源码副本。当前固定
+`dev.ainer:ainer-dependencies:1.2.0`。两仓是本地工程验证仓库，没有 remote、没有部署。
 
 ## 11. 发布流程
 
 详见 [`releasing.md`](releasing.md)。摘要：
 
 1. 发布准备 PR（CHANGELOG + README + project-status 版本行）
-2. 合入 → dev CI 全绿 → annotated tag `v<version>` → release workflow
-3. 完整门禁：签名 deploy、全量制品远端读回验签、空仓消费者、Initializer 三通道、
+2. 合入 → dev CI 全绿 → 发布窗口清空 Actions caches（`total_count=0`）
+3. annotated tag `v<version>` 必须 peel 到当时 `origin/dev` 头 → release workflow
+4. 完整门禁：签名 deploy、132 主制品远端读回验签、空仓消费者、Initializer 三通道、
    SBOM/provenance、immutable Release
-4. 双消费者升级矩阵验证
+5. 按第 12 节做双参考消费者升级矩阵
 
-**注意**：仓库与 28 个 Maven 包均为 public。公开 Actions / 公开 Packages 不再计入
-免费版私有存储配额。`v1.2.0` 已合格发布；`v1.1.0` withdrawn。发布前确认目标版本不存在；rc 退役仍按
-ADR-0048。
+**注意**：仓库与 28 个 Maven 包均为 public。GitHub Packages 仍需登录拉取（`read:packages`）。
+`v1.2.0` 已合格发布；`v1.1.0` withdrawn，禁止消费或复用。发布前确认目标版本不存在；
+rc 退役仍按 ADR-0048。
+
+## 12. 参考消费者升级矩阵
+
+合格发布后按 [ADR-0045](decisions/0045-versioning-lts-and-patch-baseline.md) 做**相邻合格
+minor** 升级，并至少让一个消费者完成一级回滚。withdrawn / non-qualifying 版本跳过：
+`1.0.0 → 1.2.0` 因 `v1.1.0` 无 Release、无制品，算相邻合格次版本。
+
+```bash
+export DOCKER_HOST=unix:///Users/$(whoami)/.colima/default/docker.sock
+export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
+export GITHUB_PACKAGES_USER=<GitHub 用户名>
+export GITHUB_PACKAGES_TOKEN=$(gh auth token)   # 需 read:packages 或 write:packages
+
+# 只改 BOM import 版本，不改消费者工程自身 <version>
+# 隔离本地仓库，证明解析的是远端 Packages，不是 ~/.m2 或生产者 reactor
+REPO="$(mktemp -d)"
+./mvnw -s .mvn/github-packages-settings.xml \
+  -Dmaven.repo.local="$REPO" clean verify
+```
+
+记录 Surefire `tests/failures/errors/skipped`。`xq-platform-next` 再把 BOM 改回上一合格
+版本冷仓验证回滚，然后固定回新版本。`python-learning-service` 只做冷仓升级。
+
+结论写入 [`project-status.md`](project-status.md)，提交留在各消费者本机 git。
+2026-08-26 已完成：xq `1.0.0 → 1.2.0`（14/0/0/0）+ 回滚后固定；pil `1.0.0 → 1.2.0`
+（8/0/0/0）。

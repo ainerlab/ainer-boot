@@ -1,6 +1,6 @@
 # Ainer Boot 项目交接文档
 
-> 文档类型：交接快照 · 状态：生效 · 核对时间：2026-08-26 · 工程版本：`1.2.0`（已发布，见 §10）
+> 文档类型：交接快照 · 状态：生效 · 核对时间：2026-08-27 · 工程版本：`1.2.0`（已发布，见 §10）
 >
 > 本文面向接手项目的开发者或 AI 代理。读完本文应能：理解项目定位与当前状态、完成首次
 > 构建、知道去哪找细节、避免踩过的坑。
@@ -164,7 +164,8 @@ ainer-core ← ainer-spring ← starter-* ← module-* ← server
 3. `git tag -a v<version> <merge-commit> -m "..."` → `git push origin v<version>`
 4. Release workflow 自动执行完整门禁（签名 deploy → 远端读回验签 → 空仓消费者 →
    SBOM/provenance → immutable Release）；发布构建已去 Maven 缓存，不会自我毒化
-5. 双消费者升级矩阵验证
+5. 双消费者升级矩阵：见 [`development.md`](development.md) §12。只改 BOM 版本，隔离本地
+   仓库拉远端制品；xq 做升级 + 一级回滚后固定，pil 只做冷仓升级。跳过 withdrawn 版本。
 
 **发布前检查**：目标版本远端不存在（404）。公开 Packages 不再占用免费版私有存储配额；
 仍不要在发布窗口并发跑会写缓存的 CI（见 housekeeping）。
