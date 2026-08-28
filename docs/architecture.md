@@ -1,6 +1,6 @@
 # Ainer 架构总览
 
-> 权威状态：`v1.3.0` 是当前稳定版本，包含 Initializer v2；`v1.0.0` 为升级起点与 `1.0.x` LTS；运行基线 Spring Boot 4.1.1；`v1.1.0` withdrawn · 核对 2026-08-28
+> 权威状态：`v1.4.0` 正在发布准备；`v1.3.0` 是当前稳定版本；`v1.0.0` 为升级起点与 `1.0.x` LTS；运行基线 Spring Boot 4.1.1；`v1.1.0` withdrawn · 核对 2026-08-28
 
 ## 1. 系统定位
 
@@ -59,7 +59,7 @@ Manifest v2 仅在显式选择 `simple-service + workspace` 时生成带安全�
 并由该项目自己的 Wrapper、真实 JWT 与 PostgreSQL 验证。它不会把生成项目并入 Ainer reactor，
 也不会复制 Ainer 源码；完整决策见
 [ADR-0052](decisions/0052-initializer-v2-secure-vertical-slice.md)。
-开发分支进一步为已有单模块 Maven/Spring Boot 项目提供 `plan-add` / `add`：调用者显式给出
+`v1.4.0` 发布候选进一步为已有单模块 Maven/Spring Boot 项目提供 `plan-add` / `add`：调用者显式给出
 Flyway 起始版本，工具只新增切片文件、有限合并顶层 POM，并通过 manifest package 下的配置类
 导入 Workspace；不修改宿主 Application、配置、README 或 Wrapper。多模块、Gradle、plugin/profile
 策略和自动 migration 编号不在首版范围，见

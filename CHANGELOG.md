@@ -4,6 +4,12 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-28
+
+面向已有项目安全增量接入的兼容性次版本：Initializer 在保持 Manifest v1/v2 新项目合同不变的
+前提下，新增现有单模块 Maven/Spring Boot 项目的只读规划与幂等接入，并开放模块授权策略组合
+SPI。无 Ainer framework 数据库 migration 变化；发布清单保持 28 modules / 132 主制品。
+
 ### Added
 
 - **已有项目增量接入（ADR-0053）**：Initializer CLI 新增只读 `plan-add` 与幂等 `add`，首版支持
@@ -17,6 +23,8 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 - Manifest v2 新项目显式同时装配 Authorization 与 Workspace；Initializer 外部门禁增加
   existing-project V3/幂等通道，并在真实 PostgreSQL 18.3 上执行新旧两个安全切片。
+- Resource Server Starter 显式携带运行时 JOSE/JWT 实现；`ainer-server` 不再依赖测试作用域偶然
+  补齐 `JwtDecoder`，可执行 JAR 在独立 PostgreSQL 数据库和真实 Authorization Server JWK 端点下启动。
 
 ## [1.3.0] - 2026-08-27
 
@@ -640,7 +648,8 @@ migration 只追加），是对 1.x 兼容承诺的首次真实验证。
 - 稳定版仍要求 `xq-platform-next` 从远端 RC 完成真实纵向切片、migration replay、升级与回滚；
   本仓库测试和 RC 发布不能替代产品证据。
 
-[Unreleased]: https://github.com/ainerlab/ainer-boot/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/ainerlab/ainer-boot/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.4.0
 [1.3.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.3.0
 [1.2.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.2.0
 [1.1.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.1.0

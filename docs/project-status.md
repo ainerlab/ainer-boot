@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-28 · 工程版本：`1.3.0`（当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-28 · 工程版本：`1.4.0` 发布准备（`1.3.0` 当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -47,7 +47,7 @@ PostgreSQL 18.3 与 RSA 真签名 JWT。`./mvnw clean verify` 在 JDK 25 / Maven
 28 模块、541 tests / 0 failure / 0 error / 0 skipped；远端制品发布门禁已由 run
 `33043332907` 关闭，真实产品消费者验证仍未执行。
 
-2026-08-28 开发分支完成 Initializer 已有项目增量接入与 Workspace/Authorization 组合基线
+2026-08-28 `v1.4.0` 发布候选完成 Initializer 已有项目增量接入与 Workspace/Authorization 组合基线
 （ADR-0053）：CLI 新增只读 `plan-add` 和幂等 `add`，要求显式 Flyway 起始版本，只新增生成文件并
 有限合并顶层 POM；宿主完整授权策略保持优先，Workspace 通过模块贡献补齐自身权限元数据、同名
 scope 与粗粒度 domain 策略，应用服务仍校验 ACTIVE membership、角色和对象归属。定向验证共
@@ -337,6 +337,22 @@ Ainer 项目签名 provenance 已通过。
   `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 
 ## 3. 最近验证记录
+
+2026-08-28 `1.4.0` 发布准备
+- **版本选择**：已有项目 `plan-add` / `add` 与 `AuthorizationPolicyContributor` 是向后兼容的公开
+  CLI/SPI 增量，按 ADR-0045/0053 选择 **1.4.0**。既有 HTTP、错误码、JWT、配置与数据库合同不变，
+  Ainer framework 无新增 migration；发布清单保持 28 modules / 132 主制品。
+- **本地目标版本门禁**：JDK 25 + Maven 4.0.0-rc-6 下，`artifact:check-buildplan` 通过；
+  `-Drevision=1.4.0` 隔离仓库 install/verify 成功，`artifact:compare` 聚合 82/82 文件匹配，完整
+  Reactor 为 549 tests / 0 failure / 0 error / 0 skipped。Maven 3.9.16 / Maven 4 Golden Consumer
+  均通过；Initializer 普通、PostgreSQL、CRUD、secure-v2 与 existing-project 五通道通过各自
+  Maven 3.9.16 Wrapper。两个 1.4.0 可执行 JAR 已用独立 PostgreSQL 18.3 数据库、临时 RSA key
+  与真实 JWK 端点启动；该门禁暴露并修复了 Resource Server Starter 缺少运行时 JOSE 的问题，
+  同时移除 `ainer-server` 会掩盖缺陷的 test-scope 依赖。
+- **远端预检**：`v1.4.0` tag、GitHub Release 与 BOM package version 均不存在；目标 `dev`
+  基线 CI run [`33143002514`](https://github.com/ainerlab/ainer-boot/actions/runs/33143002514) 全绿。
+  远端 132/132 读回验签、空仓消费者、五通道 Initializer、SBOM/provenance 与 immutable Release
+  必须等 tag workflow 完成后才能记录为发布证据。
 
 2026-08-27 `v1.3.0` 已发布（Initializer v2 安全纵向切片）
 - **发布身份**：发布准备 PR #65 合入默认分支 `a5347bf`；annotated tag `v1.3.0` peel 精确等于
@@ -1806,7 +1822,7 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 **1.0 后路线：消费驱动**（G0–G4 已关闭；`0.1` 主线历史序列已全部完成并存档于 §3 与
 CHANGELOG：rc.2/rc.3 → 0.1.0 → 0.2.0（G3 四切片）→ 1.0.0（合同定稿），双消费者矩阵见 §3）。
 
-1. **发布并真实消费 Initializer 增量接入**（ADR-0053）：开发分支已在
+1. **发布并真实消费 Initializer 增量接入**（ADR-0053）：`v1.4.0` 发布候选已在
   `xq-platform-next@f08d71a` 本地历史基线完成零手工 Application/授权策略的 plan/add 与 15 项测试；
   因新增公开 CLI/SPI，按 ADR-0045 目标版本必须是 minor `v1.4.0`。下一步完成完整发布门禁，再由
   真实消费者从远端制品重放 `1.3.0 → 1.4.0`、migration replay 与一级回滚。多模块、Gradle、
