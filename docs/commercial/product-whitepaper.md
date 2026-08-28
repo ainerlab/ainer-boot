@@ -72,7 +72,7 @@ Project Initializer 支持 Manifest v1 兼容生成、Manifest v2 `simple-servic
 | 承诺 | 当前证据 | 不能外推的结论 |
 |---|---|---|
 | 源码基线可构建、数据路径可执行 | JDK 25/Maven 4 Reactor、真实 PostgreSQL 集成测试、真实签名 JWT HTTP 测试 | 生产容量、HA、灾备 |
-| 公共制品可消费 | `v1.4.0` 远端 Maven 3.9.16/Maven 4 空仓消费与 Initializer 五通道通过 | 某个客户产品已升级成功 |
+| 公共制品可消费 | `v1.4.1` 远端 Maven 3.9.16/Maven 4 空仓消费与 Initializer 五通道通过 | 某个客户产品已升级成功 |
 | 制品来源可复核 | annotated tag/source、逐制品签名读回、SBOM、checksum、provenance、immutable Release | GitHub Attestation 或 SLSA 等级认证 |
 | 历史升级规则已被产品验证 | 参考消费者已留档至 `1.2.0` 的升级/回滚链 | `1.3.0 → 1.4.0` 已完成真实产品验收 |
 
@@ -81,8 +81,8 @@ Project Initializer 支持 Manifest v1 兼容生成、Manifest v2 `simple-servic
 
 ## 5. 版本与支持
 
-- `v1.4.1` 是兼容性补丁发布目标；完成不可变 Release 前，当前合格稳定仍为 `v1.4.0`。
-  `v1.1.0` withdrawn；`v1.0.0` 是升级起点；`1.0.x` 是首个 LTS 工程补丁线。
+- `v1.4.1` 是当前合格稳定版本；`v1.1.0` withdrawn；`v1.0.0` 是升级起点；`1.0.x` 是首个
+  LTS 工程补丁线。
 - `v1.3.0` 交付 Manifest v2 安全纵向切片；`v1.4.0` 交付已有项目 `plan-add` / `add` 与模块
   授权策略组合 SPI。
 - 版本政策支持相邻合格 minor 升级与一级应用回滚；生产采用者必须在自己的数据副本、业务切片
@@ -104,7 +104,7 @@ Project Initializer 支持 Manifest v1 兼容生成、Manifest v2 `simple-servic
 
 | 问题 | 当前结论 |
 |---|---|
-| 能否用于工程研发和技术试点 | 可以，使用固定 `v1.4.0` 制品并执行自身验收 |
+| 能否用于工程研发和技术试点 | 可以，使用固定 `v1.4.1` 制品并执行自身验收 |
 | 能否用于受控生产 | 有条件；必须关闭真实消费者升级、双节点/容量、监控告警、备份/PITR、密钥轮换与安全评审 |
 | 是否是开箱即用的企业生产平台 | 不是 |
 | 是否已有可采购的 Pro / Enterprise SKU | 没有，分层、价格、entitlement、交付系统与 SLA 均未定稿 |

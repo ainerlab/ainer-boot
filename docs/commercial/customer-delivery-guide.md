@@ -64,9 +64,9 @@ Application、application.yml、README、Wrapper 或既有 migration；多模块
 
 ## 6. 升级与回滚
 
-- 合格版本链为 `v1.0.0 → v1.2.0 → v1.3.0 → v1.4.0`；`v1.1.0` withdrawn，不得消费。
+- 合格版本链为 `v1.0.0 → v1.2.0 → v1.3.0 → v1.4.0 → v1.4.1`；`v1.1.0` withdrawn，不得消费。
 - 版本政策支持相邻合格 minor 升级与一级应用回滚；跨多个版本时逐级重放。
-- `v1.4.0` 的远端制品、Maven 3/4、Initializer 五通道与不可变 Release 已通过发布门禁；真实产品
+- `v1.4.1` 的远端制品、Maven 3/4、Initializer 五通道与不可变 Release 已通过发布门禁；真实产品
   消费者的 `1.3.0 → 1.4.0`、migration replay 与一级回滚仍未完成，不能把流水线参考消费者当成
   客户生产升级证明。
 - 数据库 migration 只向前追加；回滚 JAR 不自动回退 schema。升级前必须在可恢复的数据副本上
