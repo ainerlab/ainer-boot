@@ -37,7 +37,7 @@ MIT **不授予** Ainer 商标权。产品命名、域名状态与标识规则�
 | `ainer-module-organization` | ✅ Incubating | 组织目录：Unit/任职/分配/岗位 + `workforce.position#assignee` 成员解析（撤岗即失权，ADR-0042） |
 | `ainer-module-knowledge` | ✅ Incubating | Knowledge Foundation：不可变 Revision + SUPERSEDES 血缘 + 人工发布门禁（ADR-0044） |
 | `ainer-module-task` | ✅ Incubating | 任务调度：类型注册、延迟/周期执行、SKIP LOCKED 领取、指数退避、超时看门狗与管理 API（ADR-0047） |
-| `ainer-initializer` / `ainer-initializer-cli` | ✅ Stable | Manifest v1 兼容生成；v2 `simple-service + workspace` 安全纵向切片（随 `v1.3.0` 发布）；开发分支另提供已有单模块 Maven 项目的只读 `plan-add` 与幂等 `add`（显式 Flyway 版本、有限 POM 合并，ADR-0053） |
+| `ainer-initializer` / `ainer-initializer-cli` | ✅ Stable | Manifest v1 兼容生成；v2 `simple-service + workspace` 安全纵向切片（随 `v1.3.0` 发布）；`v1.4.0` 发布候选提供已有单模块 Maven 项目的只读 `plan-add` 与幂等 `add`（显式 Flyway 版本、有限 POM 合并，ADR-0053） |
 | `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、Workspace、AI Runtime、Authorization、P3 与 Incubating 模块装配 |
 | `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、typed token profile、RFC 7662/7009 与受审计 JDBC 协议仓库 |
 
@@ -52,6 +52,8 @@ framework 无数据库 migration 变化；`1.0.x` 作为 LTS 补丁线继续受�
 `1.2.0` 的升级起点与 `1.0.x` LTS 线的基线。
 双参考消费者并存：`xq-platform-next`（`rc.2 → … → 1.2.0` 完整升级链含回滚）与
 `python-learning-service`（`0.1.0 → 1.2.0` 冷仓接入）。
+当前源码正准备 `v1.4.0` 兼容性次版本；在远端 Release 与 Packages 门禁全部完成前，
+消费者仍应使用 `v1.3.0`。
 
 完整产品说明（能力域、合同、质量模型与快速开始）见
 [`docs/ainer-boot-1.0-product.md`](docs/ainer-boot-1.0-product.md)；动态门禁只以
@@ -93,7 +95,8 @@ preview，不表示 Maven 4 已进入稳定版。请使用 JDK 25，并从仓库
 `preset: simple-service`、`accessControl: workspace` 与自有 `errorNamespace`；完整合同和样例见
 [ADR-0052](docs/decisions/0052-initializer-v2-secure-vertical-slice.md)。该能力已随 `v1.3.0`
 发布；消费者应使用正式 Release，不得把本仓库 SNAPSHOT 或开发分支当作稳定发行物。
-已有项目增量接入在开发分支使用同一份 Manifest v2，并要求调用者明确指定第一个 Flyway 版本：
+已有项目增量接入已进入 `v1.4.0` 发布候选，使用同一份 Manifest v2，并要求调用者
+明确指定第一个 Flyway 版本：
 
 ```bash
 java -jar ainer-initializer-cli-<version>-cli.jar \
@@ -211,6 +214,6 @@ ainer-boot/
 
 ## 下一里程碑
 
-`v1.3.0` 发布后的最高优先级是把已有项目增量接入与 Workspace/Authorization 组合合同形成下一个
-正式版本，并让首个真实产品消费者从远端制品重放该升级与回滚。动态完成项、缺口和后续顺序只在
+`v1.4.0` 发布候选的最高优先级是完成本地 non-SNAPSHOT、远端签名制品与不可变 Release 门禁，
+然后让首个真实产品消费者从远端制品重放 `1.3.0 → 1.4.0` 升级与回滚。动态完成项、缺口和后续顺序只在
 [`docs/project-status.md`](docs/project-status.md) 维护，README 不复制时间敏感任务清单。

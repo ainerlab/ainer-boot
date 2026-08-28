@@ -1,6 +1,6 @@
 # Ainer Boot 项目交接文档
 
-> 文档类型：交接快照 · 状态：生效 · 核对时间：2026-08-27 · 工程版本：`1.3.0`（当前稳定）
+> 文档类型：交接快照 · 状态：生效 · 核对时间：2026-08-28 · 工程版本：`1.4.0` 发布准备（`1.3.0` 当前稳定）
 >
 > 本文面向接手项目的开发者或 AI 代理。读完本文应能：理解项目定位与当前状态、完成首次
 > 构建、知道去哪找细节、避免踩过的坑。
@@ -40,6 +40,7 @@ Initializer 实现声明式生成新项目（manifest v1，确定性输出）。
 
 | 版本 | 日期 | 要点 |
 |---|---|---|
+| `v1.4.0` | 2026-08-28 | 发布准备：已有项目 `plan-add` / `add` + Workspace/Authorization 策略组合 |
 | `v1.3.0` | 2026-08-27 | Initializer v2 `simple-service + workspace` 安全纵向切片；v1 合同保持兼容 |
 | `v1.2.0` | 2026-08-26 | Boot 4.1.1 + MIT + 授权粗门禁 + 观测 Starter；接替 withdrawn 的 `v1.1.0` |
 | `v1.1.0` | 2026-08-24 | **withdrawn / non-qualifying**：四次 Release 在 Packages 402 失败，无 Release/制品 |
@@ -175,7 +176,7 @@ ainer-core ← ainer-spring ← starter-* ← module-* ← server
 
 | 优先级 | 事项 | 状态 |
 |---|---|---|
-| 高 | 发布并消费 Initializer 增量接入 | `v1.4.0` 开发分支已完成本地历史基线复验；待正式发布后由真实产品从远端重放升级/migration/回滚 |
+| 高 | 发布并消费 Initializer 增量接入 | `v1.4.0` 发布候选已完成本地历史基线复验；待正式发布后由真实产品从远端重放升级/migration/回滚 |
 | 中 | 第二位 CODEOWNER | 到位后可取消日常 `gh pr merge --admin` |
 | 低 | Incubating → Stable 晋升评估 | 等第二个消费者兼容验证积累 |
 | 低 | AI Runtime A2-A4 / Knowledge Phase 2-4 | 按真实产品需求拉动 |
