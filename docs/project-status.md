@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-28 · 工程版本：`1.4.0`（当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-28 · 工程版本：`1.4.1` 发布准备（`1.4.0` 当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -337,6 +337,29 @@ Ainer 项目签名 provenance 已通过。
   `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 
 ## 3. 最近验证记录
+
+2026-08-28 `1.4.1` 发布准备（商业事实基线与测试确定性）
+- **版本选择**：仅修复商业文档/发布治理与测试夹具确定性，不改变运行时 Java/HTTP/错误码/JWT/
+  配置/数据库/事件/Initializer 合同，也不改变 28 modules / 132 主制品清单，按 ADR-0045 选择
+  **PATCH `1.4.1`**。
+- **本地验证**：JDK 25 + Maven 4.0.0-rc-6 + Colima/PostgreSQL 18.3 下，完整
+  `./mvnw clean verify` 为 549 tests / 0 failure / 0 error / 0 skipped；商业文档正向门禁对
+  `v1.4.1` 通过，伪造 `v1.5.0` 目标版本会失败关闭。远端 CI、目标版本制品、tag、Release 与
+  132/132 远端读回仍待本次发布流程完成，不能提前记为发布证据。
+
+2026-08-28 商业文档发布一致性缺陷关闭
+- **缺陷**：`v1.3.0`、`v1.4.0` 已合格发布，但 `docs/commercial/` 六份材料仍停留在
+  `v1.2.0` / “草案 v0.1”，并包含“两个自有产品已业务上线”“没有 EMAIL/WEBHOOK”“当前可售”
+  等超出或落后于工程事实的口径。根因是发布门禁没有校验商业材料的目标版本与事实边界。
+- **修正**：六份材料统一到 `v1.4.0`，分别声明技术事实已生效、商务方案仍待决策；补入
+  Manifest v2、已有项目 `plan-add` / `add`、远端五通道证据，并明确真实产品升级、生产资格、
+  Pro/Enterprise SKU、价格、entitlement 与 SLA 均未闭环。
+- **防复发门禁**：新增 `scripts/check-commercial-docs.sh`，从 Release 目标版本或 CHANGELOG
+  解析商业事实基线，要求六份 Markdown 全部一致并校验关键当前版本口径；CI 经
+  `check-release-contracts.sh` 执行，tag workflow 显式传入 `AINER_COMMERCIAL_VERSION` 后失败关闭。
+- **验证中关闭的确定性缺陷**：全量门禁在本机 Colima 暴露 Agent 委托夹具使用 PostgreSQL
+  `now()`、授权判定使用 JVM 时钟导致的毫秒级生效时间漂移；改为 JVM 显式提供已生效时间后，
+  `AgentDelegationFlowTest` 6/6 与 28 模块 `./mvnw clean verify` 均通过。
 
 2026-08-28 `v1.4.0` 已发布（已有项目增量接入与授权策略组合）
 - **发布身份**：发布准备 PR [#68](https://github.com/ainerlab/ainer-boot/pull/68) 合入默认分支
@@ -1786,7 +1809,7 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 - 没有生产备份恢复、容量测试、正式错误预算/告警路由和灾难恢复演练；
 - 1.x 兼容与 LTS 已由 ADR-0045/0046 成文；源码许可已定为 MIT、仓库公开（ADR-0051）。
   商标检索/注册与 Community/Pro/Enterprise 分层定价仍开放；付费产品交付系统未建立；
-- 28 个 Maven 包已是 public（`0.1.0` / `0.2.0` / `1.0.0` / `1.2.0` / `1.3.0`）。`v1.1.0` 按
+- 28 个 Maven 包已是 public（`0.1.0` / `0.2.0` / `1.0.0` / `1.2.0` / `1.3.0` / `1.4.0`）。`v1.1.0` 按
   ADR-0041 withdrawn（四次 deploy 402，无 Release/制品），禁止复用；
 - Testcontainers 仍使用 `disabledWithoutDocker`；quality gate 已是 `dev` 必需检查，
   其中包含 `scripts/check-surefire-results.sh` 的零跳过门禁。
@@ -1850,8 +1873,9 @@ CHANGELOG：rc.2/rc.3 → 0.1.0 → 0.2.0（G3 四切片）→ 1.0.0（合同定
   RAG 真实需求出现时再启 Knowledge Phase 2；A4 Token Exchange 只在真实跨服务边界出现后。
 4. **Incubating → Stable 晋升**：组织目录/Agent 代行经第二个消费者兼容验证后评估（各自
   ADR 声明的条件）；Knowledge 保持更久。
-5. **发行后续**：源码已 MIT、仓库已公开（ADR-0051）。仍开放：商标检索/注册（ADR-0004）、
-   Community/Pro/Enterprise 分层定稿、定价与 Studio 定位。
+5. **发行与商业后续**：商业材料已同步 `v1.4.0` 并纳入发布失败关闭门禁；源码已 MIT、仓库已
+   公开（ADR-0051）。仍开放：商标检索/注册（ADR-0004）、Community/Pro/Enterprise 分层定稿、
+   定价、entitlement、SLA、外部客户案例与 Studio 定位。
 
 ## 6. 更新规则
 

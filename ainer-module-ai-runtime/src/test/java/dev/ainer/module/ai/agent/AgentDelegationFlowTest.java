@@ -56,6 +56,8 @@ import org.testcontainers.utility.DockerImageName;
 
 import dev.ainer.core.uuid.Uuidv7;
 
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 
@@ -161,12 +163,14 @@ class AgentDelegationFlowTest {
                 """.formatted(permission, permission));
         assertThat(role.status().value()).isEqualTo(201);
         String roleId = (String) role.jsonPath("$.data.id");
+        // 绑定生效时间由授权判定使用的 JVM 时钟提供，避免容器时钟轻微领先造成假性 NO_BINDING。
         jdbcTemplate.update("""
                 INSERT INTO ainer_authorization_subject_binding
                     (id, issuer, subject_type, subject_id, role_id, scope_kind, workspace_id,
                      valid_from, status, version, created_at, updated_at)
-                VALUES (?, ?, 'SERVICE', 'xq-ops', ?, 'WORKSPACE', ?, now(), 'ACTIVE', 1, now(), now())
-                """, Uuidv7.generate(), ISSUER, UUID.fromString(roleId), WORKSPACE_ID);
+                VALUES (?, ?, 'SERVICE', 'xq-ops', ?, 'WORKSPACE', ?, ?, 'ACTIVE', 1, now(), now())
+                """, Uuidv7.generate(), ISSUER, UUID.fromString(roleId), WORKSPACE_ID,
+                Timestamp.from(Instant.now().minusSeconds(1)));
     }
 
     private void authenticate(String jwt) {

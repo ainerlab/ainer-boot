@@ -57,7 +57,7 @@ jobs:
       - name: Verify locked Maven 4 distribution
         run: ./mvnw --version
 
-      - name: Verify shell and release workflow contracts
+      - name: Verify shell, commercial docs and release workflow contracts
         run: ./scripts/check-release-contracts.sh
 
       - name: Verify Docker runtime

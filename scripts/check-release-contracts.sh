@@ -113,6 +113,7 @@ required_release_markers=(
   'AINER_RELEASE_GPG_FINGERPRINT'
   'AINER_ARTIFACT_SOURCE: remote'
   'verify-remote-release-artifacts.sh'
+  'AINER_COMMERCIAL_VERSION'
   'Generate CycloneDX release SBOM'
   'Create immutable GitHub Release'
   'release_immutable'
@@ -122,4 +123,6 @@ for marker in "${required_release_markers[@]}"; do
     || fail "release workflow is missing required marker: $marker"
 done
 
-echo "[ainer-release-contracts] shell and release workflow contracts passed"
+"$boot_root/scripts/check-commercial-docs.sh"
+
+echo "[ainer-release-contracts] shell, commercial documentation and release workflow contracts passed"

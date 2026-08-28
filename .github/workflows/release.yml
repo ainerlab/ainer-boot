@@ -46,8 +46,8 @@ jobs:
           AINER_RELEASE_BASE_REF: origin/${{ github.event.repository.default_branch }}
         run: ./scripts/verify-release-ref.sh >> "$GITHUB_ENV"
 
-      - name: Verify release workflow contracts
-        run: ./scripts/check-release-contracts.sh
+      - name: Verify release workflow and commercial documentation contracts
+        run: AINER_COMMERCIAL_VERSION="$release_version" ./scripts/check-release-contracts.sh
 
       - name: Verify immutable release policy declaration
         env:
