@@ -64,7 +64,32 @@ public final class SecureProjectGenerator {
                 testRoot() + "/support/SecureTestConfiguration.java"));
         files.add(commonRender(".gitignore.tpl", ".gitignore"));
         files.add(render("README.md", "README.md"));
-        files.addAll(entityFiles());
+        files.addAll(entityFiles(1));
+        return new ProjectTree(files);
+    }
+
+    /**
+     * 生成可叠加到已有 Ainer Maven 项目的安全纵向切片。项目级 POM、主应用、README、
+     * application.yml 与 Wrapper 不进入结果；调用方负责先完成已有项目预检和 POM 依赖合并。
+     *
+     * @param migrationVersion 第一个实体使用的显式 Flyway 数字版本
+     */
+    public ProjectTree generateAdditive(long migrationVersion) {
+        if (migrationVersion < 1) {
+            throw new BusinessException(InitializerErrorCode.INVALID_MANIFEST,
+                    "migration version 必须是正整数，收到: " + migrationVersion);
+        }
+        long additionalVersions = manifest.entities().size() - 1L;
+        if (migrationVersion > Long.MAX_VALUE - additionalVersions) {
+            throw new BusinessException(InitializerErrorCode.INVALID_MANIFEST,
+                    "migration version 无法容纳全部实体，起始版本: " + migrationVersion);
+        }
+        List<GeneratedFile> files = new ArrayList<>();
+        files.add(render("ExistingProjectConfiguration.java",
+                sourceRoot() + "/initializer/AinerInitializerWorkspaceConfiguration.java"));
+        files.add(render("SecureTestConfiguration.java",
+                testRoot() + "/support/SecureTestConfiguration.java"));
+        files.addAll(entityFiles(migrationVersion));
         return new ProjectTree(files);
     }
 
@@ -76,10 +101,11 @@ public final class SecureProjectGenerator {
         return applicationClassName;
     }
 
-    private List<GeneratedFile> entityFiles() {
+    private List<GeneratedFile> entityFiles(long firstMigrationVersion) {
         List<GeneratedFile> files = new ArrayList<>();
-        int migrationVersion = 1;
-        for (EntityDeclaration entity : manifest.entities()) {
+        long migrationVersion = firstMigrationVersion;
+        for (int entityIndex = 0; entityIndex < manifest.entities().size(); entityIndex++) {
+            EntityDeclaration entity = manifest.entities().get(entityIndex);
             String feature = featurePackage(entity);
             String main = sourceRoot() + "/" + feature;
             String test = testRoot() + "/" + feature;
@@ -108,7 +134,9 @@ public final class SecureProjectGenerator {
                     + entity.className() + "Mapper.java", entity));
             files.add(renderEntity("entity/SecureCrudIntegrationTest.java", test + "/"
                     + entity.className() + "SecureCrudIntegrationTest.java", entity));
-            migrationVersion++;
+            if (entityIndex + 1 < manifest.entities().size()) {
+                migrationVersion++;
+            }
         }
         return files;
     }

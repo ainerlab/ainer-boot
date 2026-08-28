@@ -1,6 +1,6 @@
 # Ainer 架构总览
 
-> 权威状态：`v1.3.0` 是当前稳定版本，包含 Initializer v2；`v1.0.0` 为升级起点与 `1.0.x` LTS；运行基线 Spring Boot 4.1.1；`v1.1.0` withdrawn · 核对 2026-08-27
+> 权威状态：`v1.3.0` 是当前稳定版本，包含 Initializer v2；`v1.0.0` 为升级起点与 `1.0.x` LTS；运行基线 Spring Boot 4.1.1；`v1.1.0` withdrawn · 核对 2026-08-28
 
 ## 1. 系统定位
 
@@ -59,6 +59,11 @@ Manifest v2 仅在显式选择 `simple-service + workspace` 时生成带安全�
 并由该项目自己的 Wrapper、真实 JWT 与 PostgreSQL 验证。它不会把生成项目并入 Ainer reactor，
 也不会复制 Ainer 源码；完整决策见
 [ADR-0052](decisions/0052-initializer-v2-secure-vertical-slice.md)。
+开发分支进一步为已有单模块 Maven/Spring Boot 项目提供 `plan-add` / `add`：调用者显式给出
+Flyway 起始版本，工具只新增切片文件、有限合并顶层 POM，并通过 manifest package 下的配置类
+导入 Workspace；不修改宿主 Application、配置、README 或 Wrapper。多模块、Gradle、plugin/profile
+策略和自动 migration 编号不在首版范围，见
+[ADR-0053](decisions/0053-initializer-existing-project-and-authorization-composition.md)。
 
 约束：
 
@@ -126,6 +131,10 @@ Spring 适配只位于 `dev.ainer.authorization.spring`。Servlet 安全过滤�
 
 当前支持面与边界：
 
+- 宿主完整 `DomainAuthorizationPolicy` 对已认领 permission 保持绝对优先；模块可通过
+  `AuthorizationPolicyContributor` 为宿主未认领的 permission 同时贡献权限元数据、scope 天花板与
+  domain 策略。多模块认领同一 permission 失败关闭。Workspace 用该合同贡献自身三个粗门禁，
+  ACTIVE membership、OWNER/ADMIN 与对象归属仍由 Workspace 应用服务重新校验（ADR-0053）。
 - 未注册目标解析器时，门禁是 `resourceType=request` 的合成资源粗闸门；产品可注册
   `AuthorizationTargetResolver` bean（第一个非空结果胜出）从请求解析类型化 `ResourceRef`，
   其类型必须与 permission 注册的 resourceType 一致，否则 fail-closed 拒绝。参考装配已注册

@@ -4,6 +4,20 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- **已有项目增量接入（ADR-0053）**：Initializer CLI 新增只读 `plan-add` 与幂等 `add`，首版支持
+  已导入同版本 Ainer BOM 的单模块 Maven/Spring Boot 项目；Flyway 起始版本必须显式给出，POM 只
+  有限补齐依赖与 compiler parameter，既有源码、配置、migration、README 和 Wrapper 不覆盖、不删除。
+- **模块授权策略组合（ADR-0053）**：新增 `AuthorizationPolicyContributor`，宿主完整策略对已认领
+  permission 保持优先，模块只填补未认领权限，重复认领失败关闭。Workspace 贡献自身权限元数据与
+  同名 scope 粗门禁，ACTIVE membership、OWNER/ADMIN 和对象归属继续由应用服务校验。
+
+### Changed
+
+- Manifest v2 新项目显式同时装配 Authorization 与 Workspace；Initializer 外部门禁增加
+  existing-project V3/幂等通道，并在真实 PostgreSQL 18.3 上执行新旧两个安全切片。
+
 ## [1.3.0] - 2026-08-27
 
 面向脚手架首次安全纵向生成的兼容性次版本：Project Initializer 在保持 Manifest v1 与既有读取、

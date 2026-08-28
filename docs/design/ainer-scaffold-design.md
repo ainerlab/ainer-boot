@@ -91,7 +91,7 @@ Ainer 的综合目标是：
 | 能力域 | Community 最低目标 | Studio / Enterprise / AI 扩展 | 独立验收 | 阶段 |
 |---|---|---|---|---|
 | 制品与 Starter | 可消费 BOM、core、web、security、persistence、observability、test support | 企业适配器、受支持版本矩阵与 LTS | Maven 3.9+/4 外部消费者只从制品仓库构建和启动 | P1 |
-| Project Initializer | manifest 创建独立项目，安全 preview/diff，不复制 Ainer 源码；v1 兼容基线 + v2 安全预设 | 组织模板、行业模板与受控策略包 | 同版本、同 manifest 生成无差异；默认不覆盖、不改菜单、不写数据库 | P2 |
+| Project Initializer | manifest 创建独立项目，安全 preview/diff，不复制 Ainer 源码；v1 兼容基线 + v2 安全预设；已有单模块 Maven 项目显式 migration 的 plan/add | 组织模板、行业模板与受控策略包 | 同版本、同 manifest、同目标状态与显式 migration 生成无差异；默认不覆盖、不改菜单、不写数据库 | P2 |
 | CRUD 与模块生成 | 单表，以及按真实需求扩展的树表/主子表 migration、API、应用层、持久化、测试和 OpenAPI | Studio 管理页面、批量重构与升级辅助 | 生成结果通过 PostgreSQL、Workspace 负向授权和 golden consumer 门禁 | P2–P4 |
 | Identity 与管理面 | 用户、Workspace、组织/成员、角色、资源权限、数据范围、菜单、字典与配置 | SSO、SCIM、审批、职责分离和高级策略 | 浏览器 E2E、跨 Workspace 负向矩阵、操作审计与协议测试 | P3–P5 |
 | 通用企业能力 | 文件、通知、任务、缓存、幂等、outbox、审计、SSE/WS 的按需模块 | 商业连接器、合规留存、运营控制台 | 每个模块可关闭，且不修改 core 即可安装或移除 | P3–P5 |
@@ -399,7 +399,7 @@ Industry Products
 |---|---|---|
 | **P0 Baseline Integrity** | 让代码、文档、测试、数据与许可证事实可信 | PostgreSQL 18 正式门禁 0 skipped；未验收能力保持 Proposed 或默认关闭；秘密扫描与依赖许可证无未处置问题；权威文档与 ADR 无冲突 |
 | **P1 Scaffold Ready** | 把平台内核变成可发布、可独立消费的制品 | 非 SNAPSHOT BOM/Starter 发布；Maven 3.9+ 与 Maven 4 独立消费者通过；最小应用关闭全部可选模块仍能启动；source/Javadoc、LICENSE/NOTICE、SBOM、checksum/signature/provenance 和兼容政策齐全 |
-| **P2 Create & Generate** | 安全、确定性地创建项目和纵向 CRUD | manifest v1 兼容基线与 v2 安全预设、preview/diff、默认不覆盖/不改菜单/不写数据库；同版本同 manifest 生成无差异；TTFR 与 TTCRUD 目标通过；生成物通过 PostgreSQL 与 golden consumer 门禁 |
+| **P2 Create & Generate** | 安全、确定性地创建项目和纵向 CRUD | manifest v1 兼容基线与 v2 安全预设、preview/diff、已有单模块 Maven 项目的 plan/add、默认不覆盖/不改菜单/不写数据库；同版本同 manifest 与显式输入生成无差异；TTFR 与 TTCRUD 目标通过；生成物通过 PostgreSQL 与 golden consumer 门禁 |
 | **P3 Enterprise Base & First Consumer** | 用商业级 Stable 企业基座和真实产品证明脚手架边界 | Identity/Workspace/Authorization/AI Runtime 与**文件元数据**、**字典**、**配置**、**通知**、**缓存**的服务端管理 API、审计和安全门禁闭环；Initializer 生成的 `xq-platform-next` 不含 Ainer 源码副本或 SNAPSHOT；至少一个真实纵向切片和一次 Ainer minor 升级/回滚通过。组织目录、菜单和前端管理面不阻塞本阶段（ADR-0040） |
 | **P4 Incubating Product Core** | 验证 AI-native 产品核心并收敛 Incubating 契约 | Agent/Tool/Context/Evaluation 具备身份、权限、预算、数据治理、人工反馈和回归门禁；Knowledge 完成两个语义切片；组织目录与任务调度达到可用但可演进的 Incubating 水平；AI/Incubating 模块关闭时 Stable 企业应用不受影响（ADR-0040） |
 | **P5 Ecosystem & Commercial Delivery** | 建立生态、升级、LTS 和商业交付闭环 | 至少两个独立消费者；模块安装/移除不改 core；连续两个 minor 完成升级验证；兼容清单、升级助手、entitlement、LTS/补丁与行业模块交付流程落地 |

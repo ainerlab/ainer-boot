@@ -175,7 +175,7 @@ ainer-core ← ainer-spring ← starter-* ← module-* ← server
 
 | 优先级 | 事项 | 状态 |
 |---|---|---|
-| 高 | Initializer v2 真实产品消费 | `v1.3.0` 已发布；待首个真实产品验证 manifest、升级/migration replay/回滚与安全纵向切片 |
+| 高 | 发布并消费 Initializer 增量接入 | `v1.4.0` 开发分支已完成本地历史基线复验；待正式发布后由真实产品从远端重放升级/migration/回滚 |
 | 中 | 第二位 CODEOWNER | 到位后可取消日常 `gh pr merge --admin` |
 | 低 | Incubating → Stable 晋升评估 | 等第二个消费者兼容验证积累 |
 | 低 | AI Runtime A2-A4 / Knowledge Phase 2-4 | 按真实产品需求拉动 |

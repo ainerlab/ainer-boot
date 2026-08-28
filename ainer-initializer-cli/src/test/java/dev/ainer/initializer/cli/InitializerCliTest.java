@@ -153,4 +153,123 @@ class InitializerCliTest {
         assertThat(result.exit()).isEqualTo(2);
         assertThat(result.stderr()).contains("未知子命令");
     }
+
+    @Test
+    @DisplayName("plan-add 对已有项目只读规划 POM 与 V3 切片")
+    void planAddIsReadOnly() throws IOException {
+        Path manifest = writeV2Manifest();
+        Path target = writeExistingProject("planned");
+        String originalPom = Files.readString(target.resolve("pom.xml"));
+
+        RunResult result = run(
+                "plan-add", manifest.toString(), target.toString(), "--migration-version", "3");
+
+        assertThat(result.exit()).isZero();
+        assertThat(result.stdout()).contains(
+                "Flyway 起始版本 V3", "POM 新增依赖", "未写入任何文件");
+        assertThat(target.resolve(
+                "src/main/resources/db/migration/V3__secure_secure_cli_sample_note.sql"))
+                .doesNotExist();
+        assertThat(Files.readString(target.resolve("pom.xml"))).isEqualTo(originalPom);
+    }
+
+    @Test
+    @DisplayName("add 安全合并 POM 并幂等写入已有项目")
+    void addIntegratesExistingProjectIdempotently() throws IOException {
+        Path manifest = writeV2Manifest();
+        Path target = writeExistingProject("integrated");
+
+        RunResult first = run(
+                "add", manifest.toString(), target.toString(), "--migration-version", "3");
+
+        assertThat(first.exit()).isZero();
+        assertThat(target.resolve(
+                "src/main/resources/db/migration/V3__secure_secure_cli_sample_note.sql"))
+                .isRegularFile();
+        assertThat(target.resolve(
+                "src/main/java/dev/ainer/consumer/secure/initializer/"
+                        + "AinerInitializerWorkspaceConfiguration.java"))
+                .isRegularFile();
+        assertThat(Files.readString(target.resolve("pom.xml")))
+                .contains(
+                        "<maven.compiler.parameters>true</maven.compiler.parameters>",
+                        "<artifactId>ainer-module-workspace</artifactId>",
+                        "<artifactId>ainer-module-authorization</artifactId>",
+                        "<artifactId>ainer-test-support</artifactId>")
+                .containsOnlyOnce("<artifactId>ainer-starter-web</artifactId>");
+        assertThat(Files.readString(target.resolve("keep.txt"))).isEqualTo("preserve");
+
+        RunResult second = run(
+                "add", manifest.toString(), target.toString(), "--migration-version", "3");
+
+        assertThat(second.exit()).isZero();
+        assertThat(second.stdout()).contains("新增文件 0", "POM 新增依赖 0");
+    }
+
+    @Test
+    @DisplayName("add 在 Flyway 版本已占用时失败且不修改 POM")
+    void addRefusesOccupiedMigrationVersion() throws IOException {
+        Path manifest = writeV2Manifest();
+        Path target = writeExistingProject("collision");
+        Files.writeString(target.resolve(
+                "src/main/resources/db/migration/V3__existing.sql"), "SELECT 1;\n");
+        String originalPom = Files.readString(target.resolve("pom.xml"));
+
+        RunResult result = run(
+                "add", manifest.toString(), target.toString(), "--migration-version", "3");
+
+        assertThat(result.exit()).isEqualTo(3);
+        assertThat(result.stderr()).contains("migration 版本 V3 已被占用");
+        assertThat(Files.readString(target.resolve("pom.xml"))).isEqualTo(originalPom);
+        assertThat(target.resolve(
+                "src/main/java/dev/ainer/consumer/secure/note/application/NoteApplicationService.java"))
+                .doesNotExist();
+    }
+
+    private Path writeExistingProject(String name) throws IOException {
+        Path target = tempDir.resolve(name);
+        Path source = target.resolve("src/main/java/dev/ainer/consumer/secure");
+        Path migrations = target.resolve("src/main/resources/db/migration");
+        Files.createDirectories(source);
+        Files.createDirectories(migrations);
+        Files.writeString(source.resolve("ExistingApplication.java"), """
+                package dev.ainer.consumer.secure;
+
+                import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+                @SpringBootApplication
+                public class ExistingApplication {
+                }
+                """);
+        Files.writeString(migrations.resolve("V1__base.sql"), "SELECT 1;\n");
+        Files.writeString(migrations.resolve("V2__existing.sql"), "SELECT 2;\n");
+        Files.writeString(target.resolve("keep.txt"), "preserve");
+        Files.writeString(target.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>dev.ainer.consumer.secure</groupId>
+                    <artifactId>existing-consumer</artifactId>
+                    <version>1.0.0</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>dev.ainer</groupId>
+                                <artifactId>ainer-dependencies</artifactId>
+                                <version>1.0.0</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>dev.ainer</groupId>
+                            <artifactId>ainer-starter-web</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        return target;
+    }
 }

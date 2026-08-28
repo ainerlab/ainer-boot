@@ -13,6 +13,8 @@ import dev.ainer.authorization.domain.Requester;
 import dev.ainer.authorization.domain.ResourceRef;
 import dev.ainer.authorization.domain.RiskTier;
 import dev.ainer.authorization.policy.BindingResolver;
+import dev.ainer.authorization.policy.AuthorizationPolicyComposition;
+import dev.ainer.authorization.policy.AuthorizationPolicyContributor;
 import dev.ainer.authorization.policy.DomainAuthorizationPolicy;
 import dev.ainer.authorization.policy.PublicAccessPolicy;
 import dev.ainer.authorization.policy.ScopePermissionCeiling;
@@ -36,7 +38,9 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.time.Clock;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -74,10 +78,30 @@ public class AuthorizationModuleConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    PermissionRegistry permissionRegistry(List<PermissionContributor> contributors) {
+    PermissionRegistry permissionRegistry(
+            List<PermissionContributor> contributors,
+            List<AuthorizationPolicyContributor> policyContributors) {
         PermissionRegistry registry = new PermissionRegistry();
         for (PermissionContributor contributor : contributors) {
             registry.register(contributor);
+        }
+        Map<PermissionCode, AuthorizationPolicyContributor> moduleClaims = new HashMap<>();
+        for (AuthorizationPolicyContributor contributor : policyContributors) {
+            for (Permission permission : contributor.permissions()) {
+                if (contributor.pathFor(permission.code()) == null) {
+                    throw new IllegalStateException(
+                            "AuthorizationPolicyContributor registered permission without domain policy: "
+                                    + permission.code().value());
+                }
+                AuthorizationPolicyContributor existing = moduleClaims.putIfAbsent(
+                        permission.code(), contributor);
+                if (existing != null) {
+                    throw new IllegalStateException(
+                            "Multiple AuthorizationPolicyContributor beans claim permission: "
+                                    + permission.code().value());
+                }
+                registry.register(permission);
+            }
         }
         return registry;
     }
@@ -91,7 +115,7 @@ public class AuthorizationModuleConfiguration {
     @Bean
     @ConditionalOnMissingBean
     ScopePermissionCeiling denyAllScopePermissionCeiling() {
-        return (scope, permission) -> false;
+        return new DenyAllScopePermissionCeiling();
     }
 
     /**
@@ -115,26 +139,7 @@ public class AuthorizationModuleConfiguration {
     @Bean
     @ConditionalOnMissingBean
     DomainAuthorizationPolicy denyAllDomainAuthorizationPolicy() {
-        return new DomainAuthorizationPolicy() {
-            @Override
-            public @Nullable GrantPath pathFor(PermissionCode permission) {
-                return null;
-            }
-
-            @Override
-            public boolean relationGrants(
-                    Requester.Authenticated subject, PermissionCode permission,
-                    ResourceRef resource, AuthorizationContext context) {
-                return false;
-            }
-
-            @Override
-            public boolean resourceStateSatisfies(
-                    Requester.Authenticated subject, PermissionCode permission,
-                    ResourceRef resource, AuthorizationContext context) {
-                return false;
-            }
-        };
+        return new DenyAllDomainAuthorizationPolicy();
     }
 
     /**
@@ -149,15 +154,83 @@ public class AuthorizationModuleConfiguration {
     @ConditionalOnMissingBean
     AuthorizationService authorizationService(
             PermissionRegistry permissionRegistry,
-            ScopePermissionCeiling scopeCeiling,
+            ObjectProvider<ScopePermissionCeiling> scopeCeilings,
             PublicAccessPolicy publicAccessPolicy,
-            DomainAuthorizationPolicy domainPolicy,
+            ObjectProvider<DomainAuthorizationPolicy> domainPolicies,
+            List<AuthorizationPolicyContributor> policyContributors,
             BindingResolver bindingResolver,
             dev.ainer.authorization.policy.SubjectSetMembershipRegistry setMembershipRegistry,
             @Value("${ainer.authorization.policy-version:ainer-authorization-default}") String policyVersion) {
+        ScopePermissionCeiling scopeCeiling = resolveHostScopeCeiling(scopeCeilings);
+        DomainAuthorizationPolicy domainPolicy = resolveHostDomainPolicy(domainPolicies);
+        ScopePermissionCeiling composedCeiling = AuthorizationPolicyComposition.scopeCeiling(
+                scopeCeiling, domainPolicy, policyContributors);
+        DomainAuthorizationPolicy composedDomain = AuthorizationPolicyComposition.domainPolicy(
+                domainPolicy, policyContributors);
         return new AuthorizationService(
-                permissionRegistry, scopeCeiling, publicAccessPolicy,
-                domainPolicy, bindingResolver, setMembershipRegistry, policyVersion);
+                permissionRegistry, composedCeiling, publicAccessPolicy,
+                composedDomain, bindingResolver, setMembershipRegistry, policyVersion);
+    }
+
+    private ScopePermissionCeiling resolveHostScopeCeiling(
+            ObjectProvider<ScopePermissionCeiling> provider) {
+        List<ScopePermissionCeiling> candidates = provider.orderedStream()
+                .filter(candidate -> !(candidate instanceof DenyAllScopePermissionCeiling))
+                .toList();
+        if (candidates.size() > 1) {
+            ScopePermissionCeiling primary = provider.getIfUnique();
+            if (primary != null && candidates.contains(primary)) {
+                return primary;
+            }
+            throw new IllegalStateException(
+                    "Multiple host ScopePermissionCeiling beans are not supported: " + candidates.size());
+        }
+        return candidates.isEmpty() ? new DenyAllScopePermissionCeiling() : candidates.getFirst();
+    }
+
+    private DomainAuthorizationPolicy resolveHostDomainPolicy(
+            ObjectProvider<DomainAuthorizationPolicy> provider) {
+        List<DomainAuthorizationPolicy> candidates = provider.orderedStream()
+                .filter(candidate -> !(candidate instanceof DenyAllDomainAuthorizationPolicy))
+                .filter(candidate -> !(candidate instanceof AuthorizationPolicyContributor))
+                .toList();
+        if (candidates.size() > 1) {
+            DomainAuthorizationPolicy primary = provider.getIfUnique();
+            if (primary != null && candidates.contains(primary)) {
+                return primary;
+            }
+            throw new IllegalStateException(
+                    "Multiple host DomainAuthorizationPolicy beans are not supported: " + candidates.size());
+        }
+        return candidates.isEmpty() ? new DenyAllDomainAuthorizationPolicy() : candidates.getFirst();
+    }
+
+    private static final class DenyAllScopePermissionCeiling implements ScopePermissionCeiling {
+        @Override
+        public boolean permits(String scope, PermissionCode permission) {
+            return false;
+        }
+    }
+
+    private static final class DenyAllDomainAuthorizationPolicy implements DomainAuthorizationPolicy {
+        @Override
+        public @Nullable GrantPath pathFor(PermissionCode permission) {
+            return null;
+        }
+
+        @Override
+        public boolean relationGrants(
+                Requester.Authenticated subject, PermissionCode permission,
+                ResourceRef resource, AuthorizationContext context) {
+            return false;
+        }
+
+        @Override
+        public boolean resourceStateSatisfies(
+                Requester.Authenticated subject, PermissionCode permission,
+                ResourceRef resource, AuthorizationContext context) {
+            return false;
+        }
     }
 
     /**

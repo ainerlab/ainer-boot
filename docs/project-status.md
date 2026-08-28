@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-27 · 工程版本：`1.3.0`（当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-28 · 工程版本：`1.3.0`（当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -46,6 +46,21 @@ UUIDv7、乐观锁、独立授权决策审计、稳定消费者错误码、受�
 PostgreSQL 18.3 与 RSA 真签名 JWT。`./mvnw clean verify` 在 JDK 25 / Maven 4.0.0-rc-6 下完成
 28 模块、541 tests / 0 failure / 0 error / 0 skipped；远端制品发布门禁已由 run
 `33043332907` 关闭，真实产品消费者验证仍未执行。
+
+2026-08-28 开发分支完成 Initializer 已有项目增量接入与 Workspace/Authorization 组合基线
+（ADR-0053）：CLI 新增只读 `plan-add` 和幂等 `add`，要求显式 Flyway 起始版本，只新增生成文件并
+有限合并顶层 POM；宿主完整授权策略保持优先，Workspace 通过模块贡献补齐自身权限元数据、同名
+scope 与粗粒度 domain 策略，应用服务仍校验 ACTIVE membership、角色和对象归属。定向验证共
+22 tests / 0 failure / 0 error / 0 skipped；本地 Initializer 外部门禁增加 existing-project 通道，
+五个消费者项目共 17 tests 全绿，PostgreSQL 18.3、真实签名 JWT 与 V1/V2/V3 空库重放均实际执行。
+最终完整 reactor 在 JDK 25 / Maven 4.0.0-rc-6 下为 28 模块、549 tests / 0 failure / 0 error /
+0 skipped；`1.4.0-SNAPSHOT` 隔离仓库的 Maven 3.9.16 / Maven 4 Golden Consumer、公开配置元数据、
+sources/Javadoc 与可重复构建比较均通过。
+另从 `xq-platform-next@f08d71a`（手工接入安全切片前的历史提交）临时克隆复验：只修改 BOM 为本地
+`1.4.0-SNAPSHOT` 后，`plan-add` 报告 14 个新文件、4 个缺失依赖和 compiler parameter；首次 add
+成功、第二次为 0 新增，宿主 Application 与 `XqAccessConfiguration` 零改动，`clean verify` 为
+15 tests / 0 failure / 0 error / 0 skipped。该证据仍是本地工程验证，不是正式版本或真实产品仓库
+发布；下一退出条件是形成 non-SNAPSHOT Release，再由真实消费者从远端制品重放升级与回滚。
 
 2026-08-13 首个产品消费者 `xq-platform-next` 复核发现 `v0.1.0-rc.2` 的 Initializer 存在一个
 真实合同缺口：README 与 ADR-0035 决策 6 要求 `./mvnw`，生成树却没有 Wrapper；此前门禁借用了
@@ -1791,9 +1806,11 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 **1.0 后路线：消费驱动**（G0–G4 已关闭；`0.1` 主线历史序列已全部完成并存档于 §3 与
 CHANGELOG：rc.2/rc.3 → 0.1.0 → 0.2.0（G3 四切片）→ 1.0.0（合同定稿），双消费者矩阵见 §3）。
 
-1. **Initializer v2 真实产品消费**（ADR-0052）：`v1.3.0` 远端四通道已通过；由首个真实产品
-  消费者验证 manifest、安全纵向切片、`1.2.0 → 1.3.0` 升级、migration replay 和一级回滚。
-  模块化单体、多实体关系、生成 SDK 与本地 Compose 只在消费需求出现后扩展，不提前承诺。
+1. **发布并真实消费 Initializer 增量接入**（ADR-0053）：开发分支已在
+  `xq-platform-next@f08d71a` 本地历史基线完成零手工 Application/授权策略的 plan/add 与 15 项测试；
+  因新增公开 CLI/SPI，按 ADR-0045 目标版本必须是 minor `v1.4.0`。下一步完成完整发布门禁，再由
+  真实消费者从远端制品重放 `1.3.0 → 1.4.0`、migration replay 与一级回滚。多模块、Gradle、
+  多实体关系、生成 SDK 与本地 Compose 只在消费需求出现后扩展，不提前承诺。
 2. **1.0.x 补丁线**（ADR-0045/0046）：消费者使用中暴露的缺陷按 patch 规则修复；分支保护已启用。
 3. **消费者拉动的能力演进**（1.3.0 之后，不预建）：pil 的 Tutor → AI Runtime 凭据
   托管/A2 最小 Context 授权；xq 的 VS1 业务切片 → 组织目录 O2 真实消费 + XA Access Model；

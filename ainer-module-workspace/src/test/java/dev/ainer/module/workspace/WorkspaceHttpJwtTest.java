@@ -1,6 +1,19 @@
 package dev.ainer.module.workspace;
 
 import com.jayway.jsonpath.JsonPath;
+import dev.ainer.authorization.AuthorizationModuleConfiguration;
+import dev.ainer.authorization.catalog.PermissionContributor;
+import dev.ainer.authorization.domain.AuditLevel;
+import dev.ainer.authorization.domain.AuthorizationContext;
+import dev.ainer.authorization.domain.GrantPath;
+import dev.ainer.authorization.domain.Permission;
+import dev.ainer.authorization.domain.PermissionCode;
+import dev.ainer.authorization.domain.Requester;
+import dev.ainer.authorization.domain.ResourceRef;
+import dev.ainer.authorization.domain.ResourceType;
+import dev.ainer.authorization.domain.RiskTier;
+import dev.ainer.authorization.policy.DomainAuthorizationPolicy;
+import dev.ainer.authorization.policy.ScopePermissionCeiling;
 import dev.ainer.module.workspace.WorkspaceModuleConfiguration;
 import dev.ainer.testsupport.jwt.JwtTestSupport;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +24,7 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -34,8 +48,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Workspace `/api/workspaces` 的真实 JWT HTTP 门禁测试：真 RSA 签名 USER_NEUTRAL_V1 +
- * NimbusJwtDecoder 验签完整安全链（补齐此前仅有服务层集成测试的缺口）。覆盖 401/403/
- * 201/本人读取/非成员 404 不泄露存在性。
+ * NimbusJwtDecoder 验签完整安全链，并同时装配通用 Authorization 模块与一个只认领产品权限的
+ * 宿主策略。Workspace 自有贡献必须补齐粗门禁，不能因宿主策略未知 workspace 权限而 403。
+ * 覆盖 401/403/201/本人读取/非成员 404 不泄露存在性。
  */
 @Testcontainers
 @SpringBootTest(
@@ -156,7 +171,11 @@ class WorkspaceHttpJwtTest {
 
     @SpringBootConfiguration
     @EnableAutoConfiguration
-    @Import(WorkspaceModuleConfiguration.class)
+    @Import({
+            AuthorizationModuleConfiguration.class,
+            WorkspaceModuleConfiguration.class,
+            HostProductAuthorizationConfiguration.class
+    })
     static class TestApplication {
 
         @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
@@ -167,5 +186,53 @@ class WorkspaceHttpJwtTest {
             return JwtTestSupport.jwtDecoder(RSA_JWK, ISSUER, AUDIENCE);
         }
 
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class HostProductAuthorizationConfiguration {
+
+        private static final PermissionCode PRODUCT_READ = new PermissionCode("consumer.product.read");
+        private static final ResourceType REQUEST = new ResourceType("request");
+
+        @Bean
+        PermissionContributor hostProductPermissionContributor() {
+            return () -> java.util.Set.of(new Permission(
+                    PRODUCT_READ, "read", REQUEST, RiskTier.LOW,
+                    AuditLevel.ON_DECISION, false, false));
+        }
+
+        @Bean
+        ScopePermissionCeiling hostProductScopeCeiling() {
+            return (scope, permission) -> "consumer.product.read".equals(scope)
+                    && PRODUCT_READ.equals(permission);
+        }
+
+        @Bean
+        DomainAuthorizationPolicy hostProductDomainPolicy() {
+            return new DomainAuthorizationPolicy() {
+                @Override
+                public GrantPath pathFor(PermissionCode permission) {
+                    return PRODUCT_READ.equals(permission) ? GrantPath.BINDING_REQUIRED : null;
+                }
+
+                @Override
+                public boolean relationGrants(
+                        Requester.Authenticated subject,
+                        PermissionCode permission,
+                        ResourceRef resource,
+                        AuthorizationContext context) {
+                    return false;
+                }
+
+                @Override
+                public boolean resourceStateSatisfies(
+                        Requester.Authenticated subject,
+                        PermissionCode permission,
+                        ResourceRef resource,
+                        AuthorizationContext context) {
+                    return PRODUCT_READ.equals(permission);
+                }
+            };
+        }
     }
 }

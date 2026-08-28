@@ -20,6 +20,10 @@ Resource endpoints live below `/api/workspaces/{workspaceId}/...`. Every applica
 3. binds `workspace_id` in every resource SQL statement;
 4. records the authorization decision in a separate transaction and fails closed if audit fails.
 
+The generated application explicitly composes Ainer Authorization and Workspace. Authorization
+provides the HTTP scope gate; Workspace contributes its own coarse policy, while the application
+service remains authoritative for ACTIVE membership and object ownership.
+
 The application intentionally fails startup without a configured JWT decoder. Configure an issuer
 or JWK set through Spring Security's standard Resource Server properties. Never use the generated
 test key outside tests.

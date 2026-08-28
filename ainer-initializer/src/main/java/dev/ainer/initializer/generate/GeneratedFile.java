@@ -5,6 +5,7 @@ import dev.ainer.initializer.error.InitializerErrorCode;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
@@ -67,6 +68,19 @@ public record GeneratedFile(String relativePath, byte[] content, boolean executa
         } catch (java.io.IOException e) {
             throw new BusinessException(InitializerErrorCode.ILLEGAL_STATE,
                     "写入 " + relativePath + " 失败");
+        }
+    }
+
+    /** Writes a new path only; never replaces a file created after an additive plan. */
+    public void writeNewTo(Path targetDir) {
+        try {
+            Path resolved = targetDir.resolve(relativePath);
+            Files.createDirectories(resolved.getParent());
+            Files.write(resolved, content, StandardOpenOption.CREATE_NEW);
+            applyPermissions(resolved);
+        } catch (java.io.IOException e) {
+            throw new BusinessException(InitializerErrorCode.ILLEGAL_STATE,
+                    "只新增写入 " + relativePath + " 失败");
         }
     }
 
