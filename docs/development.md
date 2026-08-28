@@ -1,6 +1,6 @@
 # Ainer Boot 开发手册
 
-> 文档类型：开发操作 · 状态：生效 · 最近核对：2026-08-27 · 适用版本：`1.3.0`（当前稳定）
+> 文档类型：开发操作 · 状态：生效 · 最近核对：2026-08-28 · 适用版本：`1.3.0`（当前稳定）
 
 本文是 Ainer Boot 的日常开发操作手册。新开发者应先读 [`00-overview.md`](00-overview.md)
 了解文档地图，再按本文完成第一次构建与验证。架构决策背景见 [`architecture.md`](architecture.md)
@@ -103,7 +103,7 @@ ainer-server                       业务 Resource Server（全模块装配）
 ainer-authorization-server         OAuth 2.1/OIDC Authorization Server
 ainer-offstate-app                 P1 最小可消费应用（无外部服务冒烟）
 ainer-initializer                  P2 确定性生成内核（Manifest v1 + v2 安全预设）
-ainer-initializer-cli              P2 CLI（preview / init / diff）
+ainer-initializer-cli              P2 CLI（preview / init / diff / plan-add / add）
 ```
 
 模块内部分层：`api → application → domain`，`infrastructure` 实现端口。framework 不依赖
@@ -196,7 +196,7 @@ ainer-initializer-cli              P2 CLI（preview / init / diff）
 | `python-learning-service` | `/Users/xq/01-code/self/python-learning-service` | 冷仓接入验证（0.1.0→1.2.0）；Evidence 存档切片 |
 
 两者均通过版本化 BOM/Starter 消费远端制品，不含 Ainer 源码副本。当前固定
-`dev.ainer:ainer-dependencies:1.2.0`。两仓是本地工程验证仓库，没有 remote、没有部署。
+`dev.ainer:ainer-dependencies:1.3.0`。两仓是本地工程验证仓库，没有 remote、没有部署。
 
 ## 11. 发布流程
 
@@ -205,7 +205,7 @@ ainer-initializer-cli              P2 CLI（preview / init / diff）
 1. 发布准备 PR（CHANGELOG + README + project-status 版本行）
 2. 合入 → dev CI 全绿 → 发布窗口清空 Actions caches（`total_count=0`）
 3. annotated tag `v<version>` 必须 peel 到当时 `origin/dev` 头 → release workflow
-4. 完整门禁：签名 deploy、132 主制品远端读回验签、空仓消费者、Initializer 四通道、
+4. 完整门禁：签名 deploy、132 主制品远端读回验签、空仓消费者、Initializer 五项目门禁、
    SBOM/provenance、immutable Release
 5. 按第 12 节做双参考消费者升级矩阵
 

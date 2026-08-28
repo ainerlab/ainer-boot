@@ -1,6 +1,6 @@
 # Ainer 文档总览：从这里开始
 
-> 文档类型：统一入口 · 状态：生效 · 最近核对：2026-08-27 · 适用版本：`1.3.0`（当前稳定；`v1.1.0` withdrawn；Packages `0.1.0`/`0.2.0`/`1.0.0`/`1.2.0`/`1.3.0` 已 public）
+> 文档类型：统一入口 · 状态：生效 · 最近核对：2026-08-28 · 适用版本：`1.3.0`（当前稳定；`v1.1.0` withdrawn；Packages `0.1.0`/`0.2.0`/`1.0.0`/`1.2.0`/`1.3.0` 已 public）
 
 本文是 Ainer Boot 文档的唯一权威入口。它帮助开发者、架构师和 AI agent 先建立同一份项目心智
 模型，再进入具体规范。它不复制各专题文档的细节，也不替代当前状态、架构规范或 ADR。
@@ -76,8 +76,8 @@ ainer-authorization-server            OAuth 2.1/OIDC、Passkey 与 Identity 管�
 
 ainer-offstate-app                    P1 最小可消费应用（无外部服务冒烟）
 
-ainer-initializer                     P2 离线确定性生成内核（Manifest v1 + v2 安全预设，ADR-0035/0052）
-ainer-initializer-cli                 P2 离线 CLI：preview / init / diff
+ainer-initializer                     P2 离线确定性生成内核（Manifest v1 + v2 安全预设，ADR-0035/0052/0053）
+ainer-initializer-cli                 P2 离线 CLI：preview / init / diff / plan-add / add
 ```
 
 必须先理解的四条边界：
@@ -135,7 +135,9 @@ ainer-initializer-cli                 P2 离线 CLI：preview / init / diff
 6. [`decisions/README.md`](decisions/README.md)
 7. 生成安全纵向切片时读
    [ADR-0052](decisions/0052-initializer-v2-secure-vertical-slice.md)
-8. 先新增或取代 ADR，再实现重大决策
+8. 向已有项目增量接入切片时继续读
+   [ADR-0053](decisions/0053-initializer-existing-project-and-authorization-composition.md)
+9. 先新增或取代 ADR，再实现重大决策
 
 Foundation Roadmap 仍是 Proposed；其 mdpress-first 是有条件的路线建议，不会自动取代当前
 `xq-platform-next` first-consumer 决策。消费者顺序改变必须先有独立 ADR。
@@ -266,6 +268,7 @@ Maven 4 对根工程 import 同 reactor BOM 的模型 WARNING 以 ADR-0049 为�
 | [`decisions/README.md`](decisions/README.md) | ADR 状态、索引和模板 |
 | [`decisions/0051-mit-license-and-public-repository.md`](decisions/0051-mit-license-and-public-repository.md) | ADR-0051：MIT 许可与仓库公开（不授予商标权） |
 | [`decisions/0052-initializer-v2-secure-vertical-slice.md`](decisions/0052-initializer-v2-secure-vertical-slice.md) | ADR-0052：Manifest v2 `simple-service + workspace` 安全纵向切片与第四消费者门禁 |
+| [`decisions/0053-initializer-existing-project-and-authorization-composition.md`](decisions/0053-initializer-existing-project-and-authorization-composition.md) | ADR-0053：已有项目显式 migration 增量接入与 Workspace/Authorization 策略组合 |
 
 ### 工程规范
 

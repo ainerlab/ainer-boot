@@ -420,4 +420,99 @@ secure_skipped=$(find "$secure_report" -name '*.txt' -exec grep -h 'Tests run:' 
 [[ "$secure_skipped" == "0" ]] \
   || fail "secure v2 consumer integration tests must run with 0 skipped (got $secure_skipped)"
 
-echo "[ainer-initializer-consumer] $artifact_source initializer generation + consumer compile + postgres/CRUD/secure-v2 Testcontainers gate passed"
+# 7. Existing-project additive integration: start from an already runnable secure-v2
+#    consumer, preserve every existing byte, reserve V2 as an unrelated migration, then
+#    plan/add a second entity at explicit V3. Repeating add must be idempotent. Because the
+#    base project imports Authorization + Workspace, the generated JWT lifecycle also proves
+#    the Workspace module policy contribution composes without hand-written workspace policy.
+existing_manifest="$temporary_dir/manifest-existing-v2.yaml"
+existing_dir="$temporary_dir/generated-existing-v2"
+existing_reference="$temporary_dir/reference-existing-v2"
+cp -R "$secure_dir" "$existing_dir"
+rm -rf -- "$existing_dir/target"
+printf 'SELECT 1;\n' >"$existing_dir/src/main/resources/db/migration/V2__existing_marker.sql"
+cp -R "$existing_dir" "$existing_reference"
+
+{
+  cat <<EOF
+schemaVersion: v2
+preset: simple-service
+accessControl: workspace
+errorNamespace: CATALOG
+project:
+  name: Initializer Secure V2 Gate
+  groupId: dev.ainer.consumer
+  artifactId: initializer-gate-secure
+  version: 1.0.0
+spring-boot: 4.1.1
+ainner: $ainner_version
+java: 25
+package: dev.ainer.consumer.gate.secure
+database: postgresql
+entities:
+  - name: catalogEntry
+    fields:
+      - name: title
+        type: string(120)
+        comment: 增量目录条目标题
+      - name: active
+        type: boolean
+EOF
+  if [[ "$ainner_version" == *-SNAPSHOT ]]; then
+    printf 'allowSnapshot: true\n'
+  fi
+} >"$existing_manifest"
+
+run_cli plan-add "$existing_manifest" "$existing_dir" --migration-version 3 \
+  | grep -q 'Flyway 起始版本 V3' \
+  || fail "existing-project plan-add must report explicit V3"
+[[ ! -e "$existing_dir/src/main/resources/db/migration/V3__secure_initializer_gate_secure_catalog_entry.sql" ]] \
+  || fail "plan-add must remain read-only"
+
+run_cli add "$existing_manifest" "$existing_dir" --migration-version 3 >/dev/null \
+  || fail "existing-project additive integration failed"
+second_add_output="$(run_cli add "$existing_manifest" "$existing_dir" --migration-version 3)" \
+  || fail "existing-project repeated add failed"
+grep -q '新增文件 0' <<<"$second_add_output" \
+  || fail "existing-project repeated add must be idempotent"
+
+while IFS= read -r -d '' reference_file; do
+  relative="${reference_file#"$existing_reference"/}"
+  cmp -s "$reference_file" "$existing_dir/$relative" \
+    || fail "existing-project add modified an existing file: $relative"
+done < <(find "$existing_reference" -type f -print0)
+
+existing_migration="$existing_dir/src/main/resources/db/migration/V3__secure_initializer_gate_secure_catalog_entry.sql"
+[[ -f "$existing_migration" ]] \
+  || fail "existing-project add must generate the explicit V3 migration"
+grep -q 'workspace_id uuid NOT NULL' "$existing_migration" \
+  || fail "existing-project V3 migration must preserve workspace isolation"
+grep -q 'AuthorizationModuleConfiguration.class' \
+  "$existing_dir/src/main/java/dev/ainer/consumer/gate/secure/InitializerGateSecureApplication.java" \
+  || fail "secure v2 base project must explicitly compose Authorization"
+reject_ainer_source_copies "$existing_dir" "existing-project v2"
+
+cd "$existing_dir"
+existing_wrapper="$existing_dir/mvnw"
+[[ -x "$existing_wrapper" ]] \
+  || fail "existing-project Maven Wrapper is missing or not executable"
+"$existing_wrapper" --batch-mode --no-transfer-progress \
+  "${maven_settings_args[@]}" \
+  -Dmaven.repo.local="$local_repository" \
+  -DskipTests \
+  clean compile \
+  || fail "existing-project additive consumer failed to compile"
+
+"$existing_wrapper" --batch-mode --no-transfer-progress \
+  "${maven_settings_args[@]}" \
+  -Dmaven.repo.local="$local_repository" \
+  test \
+  || fail "existing-project additive consumer integration tests failed"
+
+existing_report="$existing_dir/target/surefire-reports"
+existing_skipped=$(find "$existing_report" -name '*.txt' -exec grep -h 'Tests run:' {} \; \
+  | awk -F, '{for (i=1; i<=NF; i++) if ($i ~ /Skipped/) {gsub(/[^0-9]/, "", $i); s += $i}} END {print s+0}')
+[[ "$existing_skipped" == "0" ]] \
+  || fail "existing-project consumer integration tests must run with 0 skipped (got $existing_skipped)"
+
+echo "[ainer-initializer-consumer] $artifact_source initializer generation + consumer compile + postgres/CRUD/secure-v2/existing-project Testcontainers gate passed"

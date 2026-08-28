@@ -5,6 +5,7 @@ import dev.ainer.initializer.generate.ProjectGenerator;
 import dev.ainer.initializer.generate.ProjectTree;
 import dev.ainer.initializer.generate.ProjectWriter;
 import dev.ainer.initializer.generate.SecureProjectGenerator;
+import dev.ainer.initializer.integrate.ExistingProjectIntegrator;
 import dev.ainer.initializer.manifest.ManifestV2;
 import dev.ainer.initializer.manifest.ManifestReader;
 import dev.ainer.initializer.manifest.ManifestV1;
@@ -29,6 +30,10 @@ import java.util.Objects;
  *   <li>{@code init <manifest.yaml> <target-dir>} — generate into an empty target
  *       (refuses non-empty targets unless {@code --force});</li>
  *   <li>{@code diff <manifest.yaml> <target-dir>} — read-only comparison.</li>
+ *   <li>{@code plan-add <manifest.yaml> <target-dir> --migration-version N} — read-only
+ *       existing-project integration plan.</li>
+ *   <li>{@code add <manifest.yaml> <target-dir> --migration-version N} — safely add a v2
+ *       slice to an existing Maven project.</li>
  * </ul>
  *
  * <p>Exit codes: 0 success, 2 usage/manifest error, 3 write refused.
@@ -59,6 +64,8 @@ public final class InitializerCli {
                 case "preview" -> preview(args);
                 case "init" -> init(args);
                 case "diff" -> diff(args);
+                case "plan-add" -> planAdd(args);
+                case "add" -> add(args);
                 case "help", "--help", "-h" -> {
                     usage(out);
                     yield 0;
@@ -126,11 +133,58 @@ public final class InitializerCli {
         return result.hasChanges() ? 1 : 0;
     }
 
+    private int planAdd(String[] args) throws IOException {
+        AddArguments parsed = parseAddArguments(args);
+        if (parsed == null) {
+            return 2;
+        }
+        ManifestV2 manifest = readV2Manifest(parsed.manifestPath());
+        try {
+            ExistingProjectIntegrator.Plan plan = new ExistingProjectIntegrator(manifest)
+                    .plan(parsed.target(), parsed.migrationVersion());
+            out.print(addPlanText(plan));
+            out.println("(plan-add 未写入任何文件)");
+            return 0;
+        } catch (BusinessException exception) {
+            err.println("错误: " + exception.getMessage());
+            return 3;
+        }
+    }
+
+    private int add(String[] args) throws IOException {
+        AddArguments parsed = parseAddArguments(args);
+        if (parsed == null) {
+            return 2;
+        }
+        ManifestV2 manifest = readV2Manifest(parsed.manifestPath());
+        try {
+            ExistingProjectIntegrator.Result result = new ExistingProjectIntegrator(manifest)
+                    .apply(parsed.target(), parsed.migrationVersion());
+            out.print(addPlanText(result.plan()));
+            out.println("已增量接入 " + result.files().newFiles().size()
+                    + " 个新文件到 " + result.plan().target());
+            return 0;
+        } catch (BusinessException exception) {
+            err.println("错误: " + exception.getMessage());
+            return 3;
+        }
+    }
+
     private ProjectManifest readManifest(String manifestPath) throws IOException {
         try (var reader = new InputStreamReader(
                 Files.newInputStream(Path.of(manifestPath)), StandardCharsets.UTF_8)) {
             return new ManifestReader().readProject(reader);
         }
+    }
+
+    private ManifestV2 readV2Manifest(String manifestPath) throws IOException {
+        ProjectManifest manifest = readManifest(manifestPath);
+        if (manifest instanceof ManifestV2 v2) {
+            return v2;
+        }
+        throw new BusinessException(
+                dev.ainer.initializer.error.InitializerErrorCode.INVALID_MANIFEST,
+                "已有项目增量接入只支持 schemaVersion: v2");
     }
 
     private ProjectTree generate(ProjectManifest manifest) {
@@ -163,6 +217,46 @@ public final class InitializerCli {
         return builder.toString();
     }
 
+    private static String addPlanText(ExistingProjectIntegrator.Plan plan) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("Flyway 起始版本 V").append(plan.migrationVersion()).append('\n');
+        builder.append("新增文件 ").append(plan.files().newFiles().size());
+        if (!plan.files().newFiles().isEmpty()) {
+            builder.append(": ").append(String.join(", ", plan.files().newFiles()));
+        }
+        builder.append('\n');
+        builder.append("不变文件 ").append(plan.files().unchangedFiles().size()).append('\n');
+        builder.append("POM 新增依赖 ").append(plan.pom().addedDependencies().size());
+        if (!plan.pom().addedDependencies().isEmpty()) {
+            builder.append(": ").append(String.join(", ", plan.pom().addedDependencies()));
+        }
+        builder.append('\n');
+        builder.append("POM compiler parameters ")
+                .append(plan.pom().compilerParametersAdded() ? "新增" : "已存在")
+                .append('\n');
+        return builder.toString();
+    }
+
+    private AddArguments parseAddArguments(String[] args) {
+        if (args.length != 5 || !"--migration-version".equals(args[3])) {
+            usage();
+            return null;
+        }
+        long migrationVersion;
+        try {
+            migrationVersion = Long.parseLong(args[4]);
+        } catch (NumberFormatException exception) {
+            err.println("--migration-version 必须是正整数: " + args[4]);
+            return null;
+        }
+        if (migrationVersion < 1) {
+            err.println("--migration-version 必须是正整数: " + args[4]);
+            return null;
+        }
+        return new AddArguments(
+                args[1], Path.of(args[2]).toAbsolutePath(), migrationVersion);
+    }
+
     private static String messageOf(Throwable e) {
         return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
     }
@@ -179,7 +273,14 @@ public final class InitializerCli {
                   preview <manifest.yaml>                校验并预览（只读，不落盘）
                   init <manifest.yaml> <target-dir>      在空目录生成项目（非空需 --force）
                   diff <manifest.yaml> <target-dir>      只读对比现有目录
+                  plan-add <manifest.yaml> <target-dir> --migration-version N
+                                                        只读规划 v2 增量接入
+                  add <manifest.yaml> <target-dir> --migration-version N
+                                                        安全增量接入已有 Maven 项目
                   help                                    显示本帮助
                 """);
+    }
+
+    private record AddArguments(String manifestPath, Path target, long migrationVersion) {
     }
 }

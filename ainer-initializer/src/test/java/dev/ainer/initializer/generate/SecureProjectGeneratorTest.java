@@ -73,8 +73,14 @@ class SecureProjectGeneratorTest {
         String pom = file(tree, "pom.xml");
         assertThat(pom).contains(
                 "ainer-module-workspace",
+                "ainer-module-authorization",
                 "ainer-starter-security",
                 "springdoc-openapi-starter-webmvc-ui");
+
+        String application = file(tree, "Application.java");
+        assertThat(application).contains(
+                "AuthorizationModuleConfiguration.class",
+                "WorkspaceModuleConfiguration.class");
 
         String test = file(tree, "ProductSecureCrudIntegrationTest.java");
         assertThat(test).contains(
@@ -96,6 +102,31 @@ class SecureProjectGeneratorTest {
         assertThat(test)
                 .contains("00000000-0000-0000-0000-000000000001")
                 .contains("00000000-0000-0000-0000-000000000002");
+    }
+
+    @Test
+    void additiveGenerationStartsAtExplicitMigrationAndOmitsProjectScaffold() throws Exception {
+        ProjectTree tree = new SecureProjectGenerator(manifest()).generateAdditive(7);
+
+        assertThat(tree.files().stream().map(GeneratedFile::path))
+                .contains(
+                        "src/main/resources/db/migration/V7__secure_catalog_service_product.sql",
+                        "src/main/java/dev/example/catalog/initializer/"
+                                + "AinerInitializerWorkspaceConfiguration.java",
+                        "src/test/java/dev/example/catalog/support/SecureTestConfiguration.java")
+                .doesNotContain("pom.xml", "mvnw", "README.md", "src/main/resources/application.yml");
+        assertThat(file(tree, "AinerInitializerWorkspaceConfiguration.java"))
+                .contains("@Import(WorkspaceModuleConfiguration.class)")
+                .doesNotContain("@MapperScan");
+    }
+
+    @Test
+    void additiveGenerationAcceptsMaximumMigrationVersionForOneEntity() throws Exception {
+        ProjectTree tree = new SecureProjectGenerator(manifest()).generateAdditive(Long.MAX_VALUE);
+
+        assertThat(tree.files().stream().map(GeneratedFile::path))
+                .contains("src/main/resources/db/migration/V9223372036854775807"
+                        + "__secure_catalog_service_product.sql");
     }
 
     @Test

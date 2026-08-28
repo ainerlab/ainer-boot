@@ -37,7 +37,7 @@ MIT **不授予** Ainer 商标权。产品命名、域名状态与标识规则�
 | `ainer-module-organization` | ✅ Incubating | 组织目录：Unit/任职/分配/岗位 + `workforce.position#assignee` 成员解析（撤岗即失权，ADR-0042） |
 | `ainer-module-knowledge` | ✅ Incubating | Knowledge Foundation：不可变 Revision + SUPERSEDES 血缘 + 人工发布门禁（ADR-0044） |
 | `ainer-module-task` | ✅ Incubating | 任务调度：类型注册、延迟/周期执行、SKIP LOCKED 领取、指数退避、超时看门狗与管理 API（ADR-0047） |
-| `ainer-initializer` / `ainer-initializer-cli` | ✅ Stable | Manifest v1 兼容生成；v2 `simple-service + workspace` 安全纵向切片（显式分层、Workspace SQL、JWT/授权审计、OpenAPI 与真实 PostgreSQL 负向门禁，ADR-0052；随 `v1.3.0` 发布） |
+| `ainer-initializer` / `ainer-initializer-cli` | ✅ Stable | Manifest v1 兼容生成；v2 `simple-service + workspace` 安全纵向切片（随 `v1.3.0` 发布）；开发分支另提供已有单模块 Maven 项目的只读 `plan-add` 与幂等 `add`（显式 Flyway 版本、有限 POM 合并，ADR-0053） |
 | `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、Workspace、AI Runtime、Authorization、P3 与 Incubating 模块装配 |
 | `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、typed token profile、RFC 7662/7009 与受审计 JDBC 协议仓库 |
 
@@ -93,6 +93,18 @@ preview，不表示 Maven 4 已进入稳定版。请使用 JDK 25，并从仓库
 `preset: simple-service`、`accessControl: workspace` 与自有 `errorNamespace`；完整合同和样例见
 [ADR-0052](docs/decisions/0052-initializer-v2-secure-vertical-slice.md)。该能力已随 `v1.3.0`
 发布；消费者应使用正式 Release，不得把本仓库 SNAPSHOT 或开发分支当作稳定发行物。
+已有项目增量接入在开发分支使用同一份 Manifest v2，并要求调用者明确指定第一个 Flyway 版本：
+
+```bash
+java -jar ainer-initializer-cli-<version>-cli.jar \
+  plan-add manifest-v2.yaml /path/to/existing-project --migration-version 3
+java -jar ainer-initializer-cli-<version>-cli.jar \
+  add manifest-v2.yaml /path/to/existing-project --migration-version 3
+```
+
+`plan-add` 不写盘；`add` 只新增生成文件、幂等保留同字节文件，并有限合并顶层 POM。它不会猜测
+migration、修改宿主 Application/application.yml/README/Wrapper，也不支持多模块或 Gradle；完整合同见
+[ADR-0053](docs/decisions/0053-initializer-existing-project-and-authorization-composition.md)。
 若 Apache 刚发布新的 rc、持久下载端点尚在同步，新环境首次启动 Wrapper 可能暂时返回 404；
 不要把仓库 URL 改到会被删除的临时候选目录，当前同步状态见
 [`docs/project-status.md`](docs/project-status.md)。
@@ -199,6 +211,6 @@ ainer-boot/
 
 ## 下一里程碑
 
-`v1.3.0` 发布后，最高优先级是让首个真实产品消费者用远端制品验证 Manifest v2、安全纵向
-切片、migration replay、升级与回滚。动态完成项、缺口和后续顺序只在
+`v1.3.0` 发布后的最高优先级是把已有项目增量接入与 Workspace/Authorization 组合合同形成下一个
+正式版本，并让首个真实产品消费者从远端制品重放该升级与回滚。动态完成项、缺口和后续顺序只在
 [`docs/project-status.md`](docs/project-status.md) 维护，README 不复制时间敏感任务清单。
