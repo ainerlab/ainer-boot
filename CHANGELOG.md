@@ -4,6 +4,14 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- **商业文档发布一致性**：六份商业材料同步到 `v1.4.0`，纠正旧 `v1.2.0`、已完成生产上线、
+  通知通道缺失与“当前可售”错误口径；新增 `check-commercial-docs.sh`，CI 与 Release 按目标版本
+  校验每份材料的商业事实基线，阻止后续发布再次携带过期商业文档。
+- **Agent 委托集成测试确定性**：测试 Binding 改由 JVM 显式提供已生效时间，避免 PostgreSQL
+  容器时钟轻微领先时把刚创建的授权误判为 `NO_BINDING`。
+
 ## [1.4.0] - 2026-08-28
 
 面向已有项目安全增量接入的兼容性次版本：Initializer 在保持 Manifest v1/v2 新项目合同不变的

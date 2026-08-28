@@ -300,12 +300,12 @@ Maven 4 对根工程 import 同 reactor BOM 的模型 WARNING 以 ADR-0049 为�
 
 | 文档 | 作用 |
 |---|---|
-| [`commercial/README.md`](commercial/README.md) | 对外商业文档套件索引：阅读顺序、买家画像、待定商业决策清单 |
+| [`commercial/README.md`](commercial/README.md) | 对外商业文档套件索引：当前发布事实、阅读顺序、买家画像与待定商业决策 |
 | [`commercial/product-whitepaper.md`](commercial/product-whitepaper.md) | 产品白皮书（对外）：定位、问题论证、能力域价值、信任证据链、交付形态 |
-| [`commercial/edition-tiers.md`](commercial/edition-tiers.md) | 版本分层框架草案（Community/Pro/Enterprise 边界，基于能力矩阵推导） |
-| [`commercial/customer-delivery-guide.md`](commercial/customer-delivery-guide.md) | 客户交付指南：接入路径、验收基线、升级回滚、责任分界 |
-| [`commercial/sales-one-pager.md`](commercial/sales-one-pager.md) | 销售物料一页纸 |
-| [`commercial/gap-analysis-and-next-steps.md`](commercial/gap-analysis-and-next-steps.md) | 可售性差距分析与发展路线建议（非权威，供排期讨论） |
+| [`commercial/edition-tiers.md`](commercial/edition-tiers.md) | 商业分层提案：当前 Community 实体与未交付 Pro/Enterprise 边界 |
+| [`commercial/customer-delivery-guide.md`](commercial/customer-delivery-guide.md) | 评估与交付指南：新建/增量接入、验收、升级回滚和责任分界 |
+| [`commercial/sales-one-pager.md`](commercial/sales-one-pager.md) | 售前技术评估一页纸（非报价单或 SLA） |
+| [`commercial/gap-analysis-and-next-steps.md`](commercial/gap-analysis-and-next-steps.md) | 可售性与生产资格差距（非权威，供排期讨论） |
 
 ### 运行、发布与迁移
 
@@ -363,6 +363,7 @@ Maven 4 对根工程 import 同 reactor BOM 的模型 WARNING 以 ADR-0049 为�
 | 启停、诊断、备份、恢复 | `operations.md` |
 | 开发环境容器化、本地启动 | `docker-compose.yml` + `.env.example`（见 [`development.md`](development.md) §3） |
 | 版本、制品、发布或回滚 | `releasing.md` + `CHANGELOG.md` |
+| 合格发布事实或商业承诺 | `commercial/` + `scripts/check-commercial-docs.sh` |
 | 新依赖、版本或许可证 | `dependencies.md` |
 | 文档新增、改名、取代 | 本文与所有入链 |
 | 基线能力利用审计快照 | `reviews/`（只读结论）；实施进度仍只写 `project-status.md` |
@@ -376,6 +377,7 @@ Maven 4 对根工程 import 同 reactor BOM 的模型 WARNING 以 ADR-0049 为�
 - 没有把计划能力写成已经实现；
 - 当前状态与长期规范没有混在同一权威位置反复维护；
 - 新文档已经接入本文，不重复已有文档职责；
+- `scripts/check-commercial-docs.sh` 通过，商业事实基线与当前合格版本一致；
 - `git diff --check` 通过。
 
 影响代码的变更仍必须执行 [`testing.md`](testing.md) 规定的测试，不能用文档审查代替运行验证。

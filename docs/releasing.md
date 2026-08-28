@@ -26,7 +26,8 @@ Changelog 提供替代方案。Stable/Incubating/非目标边界以 ADR-0040 为
 
 ## 3. 发布候选门禁
 
-1. `project-status.md` 已更新实际范围、未完成项和证据边界；
+1. `project-status.md` 已更新实际范围、未完成项和证据边界；`docs/commercial/` 六份材料的
+   “商业事实基线”已同步到目标版本，并通过 `scripts/check-commercial-docs.sh`；
 2. `CHANGELOG.md` 的 `Unreleased` 已整理到目标版本；
 3. 相关 ADR 已接受，许可证台账已更新；Ainer 源码许可为 MIT（ADR-0051），根目录
    `LICENSE`/`NOTICE` 与根 POM `<licenses>` 必须与之一致；商标仍按 ADR-0004，不因
@@ -63,6 +64,7 @@ AINER_REPRO_REPOSITORY="$(mktemp -d)"
 AINER_VERSION="$AINER_VERSION" ./scripts/verify-maven-consumers.sh
 AINER_VERSION="$AINER_VERSION" ./scripts/verify-initializer-consumer.sh
 ./scripts/check-release-contracts.sh
+./scripts/check-commercial-docs.sh
 git diff --check
 git status --short --branch
 ```
@@ -86,15 +88,15 @@ AINER_VERSION="$AINER_VERSION" ./scripts/verify-initializer-consumer.sh
 ## 5. GitHub Packages 发布流程
 
 发布坐标为 `https://maven.pkg.github.com/ainerlab/ainer-boot`，repository id 为
-`github-packages`。2026-08-27 `v1.3.0` 核对：28 个 Maven 包均为 public（`0.1.0` /
-`0.2.0` / `1.0.0` / `1.2.0` / `1.3.0`）。新包在首次 deploy 后仍应核对其 `visibility`，不得
+`github-packages`。2026-08-28 `v1.4.0` 核对：28 个 Maven 包均为 public（`0.1.0` /
+`0.2.0` / `1.0.0` / `1.2.0` / `1.3.0` / `1.4.0`）。新包在首次 deploy 后仍应核对其 `visibility`，不得
 假设继承仓库公开状态。`.github/workflows/release.yml` 只由 `v*` tag 触发，顺序固定为：
 
 1. checkout 完整历史，验证 tag 是 annotated SemVer tag，且 peel 后 commit 同时等于 workflow 源码与
    当前默认分支头；
 2. 检查 `AINER_IMMUTABLE_RELEASES=true` 声明，并在 GitHub Packages 查询 BOM POM；版本存在即停止；
-3. 运行 shell/release 契约、Docker、锁定 Maven 3.9.16、本地 non-SNAPSHOT consumers，以及使用
-   生成项目自身 Wrapper 的 Initializer 五项目门禁；
+3. 运行 shell/release 契约与目标版本商业文档同步检查、Docker、锁定 Maven 3.9.16、本地
+   non-SNAPSHOT consumers，以及使用生成项目自身 Wrapper 的 Initializer 五项目门禁；
 4. 导入 passphrase-protected GPG key，执行一次临时签名与验签 probe；
 5. 使用 `-Prelease clean deploy` 完整测试、附加 sources/Javadoc、签名并部署；
 6. 强制 Surefire failure/error/skipped 全为零，生成 CycloneDX release SBOM；
@@ -180,5 +182,7 @@ migration/回滚、132 个主制品 checksum、签名 fingerprint、SBOM、prove
 - 按 [`development.md`](development.md) §12 跑双参考消费者相邻合格 minor 矩阵，结论写入
   [`project-status.md`](project-status.md)；withdrawn 版本跳过；
 - 将实际 migration replay、产品消费、升级与回滚结果写入发布记录；
+- 确认商业材料仍区分“发布制品证据、真实产品验收、受控生产资格与商业合同”，不因发布成功
+  自动升级生产或 SLA 口径；
 - 清空 Changelog 的 `Unreleased` 时立即建立新的空区段；
 - 发现设计偏差时新增 ADR 或修复文档，不让口头结论成为长期规则。
