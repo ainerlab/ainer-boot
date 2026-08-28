@@ -4,6 +4,12 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-08-28
+
+兼容性补丁版本：关闭商业文档相对稳定发行漂移的缺陷，并把目标版本一致性加入 CI/Release
+失败关闭门禁；同时消除 Agent 委托集成测试对 PostgreSQL 容器与 JVM 毫秒级时钟一致性的依赖。
+运行时 API、HTTP、错误码、JWT、配置、数据库 migration、Initializer 与制品清单均不变。
+
 ### Fixed
 
 - **商业文档发布一致性**：六份商业材料同步到 `v1.4.0`，纠正旧 `v1.2.0`、已完成生产上线、
@@ -656,7 +662,8 @@ migration 只追加），是对 1.x 兼容承诺的首次真实验证。
 - 稳定版仍要求 `xq-platform-next` 从远端 RC 完成真实纵向切片、migration replay、升级与回滚；
   本仓库测试和 RC 发布不能替代产品证据。
 
-[Unreleased]: https://github.com/ainerlab/ainer-boot/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/ainerlab/ainer-boot/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.4.1
 [1.4.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.4.0
 [1.3.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.3.0
 [1.2.0]: https://github.com/ainerlab/ainer-boot/releases/tag/v1.2.0

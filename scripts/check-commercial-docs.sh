@@ -46,11 +46,11 @@ assert_contains() {
     || fail "$relative_file is missing current release claim: $expected_text"
 }
 
-assert_contains 'README.md' "当前合格稳定版本是 \`v$expected_version\`"
-assert_contains 'product-whitepaper.md' "当前合格稳定：\`v$expected_version\`"
+assert_contains 'README.md' "本套材料对应工程版本：\`v$expected_version\`"
+assert_contains 'product-whitepaper.md' "本文对应工程版本：\`v$expected_version\`"
 assert_contains 'customer-delivery-guide.md' "对应版本：\`v$expected_version\`"
 assert_contains 'edition-tiers.md' "当前事实对照（截至 \`v$expected_version\`）"
-assert_contains 'sales-one-pager.md' "当前合格稳定 \`v$expected_version\`"
+assert_contains 'sales-one-pager.md' "本文对应工程版本：\`v$expected_version\`"
 assert_contains 'gap-analysis-and-next-steps.md' '是否已是开箱即用的生产平台'
 
 echo "[ainer-commercial-docs] commercial facts align to v$expected_version"

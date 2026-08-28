@@ -1,7 +1,7 @@
 # Ainer Boot 评估与客户交付指南
 
 > 面向：技术评估、试点项目、接入工程师与运维负责人 · 商务合同状态：未定稿
-> 商业事实基线：`v1.4.0` · 对应版本：`v1.4.0` · 最近核对：2026-08-28
+> 商业事实基线：`v1.4.1` · 对应版本：`v1.4.1` · 最近核对：2026-08-28
 > 本指南是工程手册的采用者视角重组；专题细节以文末工程手册为准。
 
 ## 1. 当前可获得的交付物
@@ -27,8 +27,8 @@
 ## 3. 路径 A：生成新项目
 
 ```bash
-java -jar ainer-initializer-cli-1.4.0-cli.jar preview manifest.yaml
-java -jar ainer-initializer-cli-1.4.0-cli.jar init manifest.yaml my-product/
+java -jar ainer-initializer-cli-<version>-cli.jar preview manifest.yaml
+java -jar ainer-initializer-cli-<version>-cli.jar init manifest.yaml my-product/
 cd my-product
 ./mvnw verify
 ```
@@ -43,9 +43,9 @@ Manifest v1 保持兼容；Manifest v2 必须显式选择 `schemaVersion: v2`、
 审核文件与 POM 变化后再执行幂等写入：
 
 ```bash
-java -jar ainer-initializer-cli-1.4.0-cli.jar \
+java -jar ainer-initializer-cli-<version>-cli.jar \
   plan-add manifest-v2.yaml /path/to/existing-project --migration-version 3
-java -jar ainer-initializer-cli-1.4.0-cli.jar \
+java -jar ainer-initializer-cli-<version>-cli.jar \
   add manifest-v2.yaml /path/to/existing-project --migration-version 3
 ```
 

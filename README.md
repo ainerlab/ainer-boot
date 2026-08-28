@@ -55,6 +55,8 @@ MIT **不授予** Ainer 商标权。产品命名、域名状态与标识规则�
 `python-learning-service`（`0.1.0 → 1.2.0` 冷仓接入）。
 远端 Packages 已提供 `1.4.0`，Release 为 immutable；真实产品消费者的 `1.3.0 → 1.4.0`
 升级、migration replay 与一级回滚仍需单独完成，不能由发布流水线内的参考消费者替代。
+`v1.4.1` 是商业文档发布一致性与测试确定性的兼容性补丁发布目标；在不可变 Release 门禁完成前，
+不得把它写成当前稳定版本或已发布制品。
 
 完整产品说明（能力域、合同、质量模型与快速开始）见
 [`docs/ainer-boot-1.0-product.md`](docs/ainer-boot-1.0-product.md)；动态门禁只以

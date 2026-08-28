@@ -1,7 +1,7 @@
 # Ainer Boot 商业文档套件
 
 > 文档类型：对外商业文档 · 技术事实状态：生效 · 商务方案状态：待决策 · 维护人：产品
-> 商业事实基线：`v1.4.0` · 最近核对：2026-08-28
+> 商业事实基线：`v1.4.1` · 本套材料对应工程版本：`v1.4.1` · 最近核对：2026-08-28
 > 对应工程合同快照：[`ainer-boot-1.0-product.md`](../ainer-boot-1.0-product.md)；
 > 能力现状唯一权威：[`project-status.md`](../project-status.md)
 
@@ -25,7 +25,8 @@
 
 ## 当前对外口径
 
-- 当前合格稳定版本是 `v1.4.0`；`v1.1.0` withdrawn / non-qualifying，禁止消费。
+- `v1.4.1` 是兼容性补丁发布目标；完成不可变 Release 前，当前合格稳定版本仍是 `v1.4.0`。
+  `v1.1.0` withdrawn / non-qualifying，禁止消费。
 - Ainer Boot 已是可远端消费、带签名供应链与升级规则的企业 Java 工程脚手架。
 - `v1.4.0` 的远端 Maven 3/4、Initializer 五通道与不可变 Release 门禁已通过；真实产品消费者的
   `1.3.0 → 1.4.0`、migration replay 与一级回滚仍待完成。

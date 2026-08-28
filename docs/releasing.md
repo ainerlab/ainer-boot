@@ -27,7 +27,8 @@ Changelog 提供替代方案。Stable/Incubating/非目标边界以 ADR-0040 为
 ## 3. 发布候选门禁
 
 1. `project-status.md` 已更新实际范围、未完成项和证据边界；`docs/commercial/` 六份材料的
-   “商业事实基线”已同步到目标版本，并通过 `scripts/check-commercial-docs.sh`；
+   “商业事实基线”已同步到目标版本，并通过 `scripts/check-commercial-docs.sh`；发布准备期间必须
+   把“目标版本”与“当前合格稳定版本”分开，只有不可变 Release 完成后才能更新后者；
 2. `CHANGELOG.md` 的 `Unreleased` 已整理到目标版本；
 3. 相关 ADR 已接受，许可证台账已更新；Ainer 源码许可为 MIT（ADR-0051），根目录
    `LICENSE`/`NOTICE` 与根 POM `<licenses>` 必须与之一致；商标仍按 ADR-0004，不因
