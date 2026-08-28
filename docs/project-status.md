@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-28 · 工程版本：`1.4.1` 发布准备（`1.4.0` 当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-28 · 工程版本：`1.4.1`（当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -22,8 +22,9 @@ Authorization Server 承载并于 2026-07-29 部署 dev (release `e6cb0b44bb9e-2
 当时代码，已被 Greenfield S8 删除取代，不作为当前部署依据。真实外部通知网关/供应商联调、供应商
 回执映射、最终送达验证、生产限速/告警尚未完成；`v1.3.0` 正式发布已通过 0-skipped 门禁，但它
 不替代这些外部运行验证。
-当前工程是可编译、可运行、可用真实 PostgreSQL 验证的 Spring Boot 4.1.1 多模块基线，但尚未达到
-生产或商业发行就绪。
+当前工程已达到可远端消费、带签名供应链与发布治理的商业级工程脚手架基线，并可作为受控生产
+候选；但它还不是开箱即用的生产平台，也没有形成可采购的 Pro / Enterprise SKU、合同 SLA，
+生产采用仍需由目标产品关闭真实升级、容量/双节点、监控告警、备份恢复、密钥轮换与安全评审。
 
 P2 Create & Generate 的原始能力批次已收口（2026-08-09）：`ainer-initializer`（Manifest v1
 解析/校验 + 确定性生成内核）与 `ainer-initializer-cli`（preview/init/diff 离线命令）已交付并通过
@@ -337,6 +338,26 @@ Ainer 项目签名 provenance 已通过。
   `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 
 ## 3. 最近验证记录
+
+2026-08-28 `v1.4.1` 已发布（商业事实基线与测试确定性补丁）
+- **发布身份**：发布准备 PR [#70](https://github.com/ainerlab/ainer-boot/pull/70) 合入默认分支
+  `377a0795d8890b0ca48d314e1c162a54369d7fc4`；annotated tag `v1.4.1` peel 精确等于该提交。
+  Release workflow run
+  [`33156993839`](https://github.com/ainerlab/ainer-boot/actions/runs/33156993839) 用时 22m35s 全绿。
+- **分支门禁**：发布前 `dev` 与 `main` 精确同步到 `377a0795`；`dev` push run
+  [`33155340597`](https://github.com/ainerlab/ainer-boot/actions/runs/33155340597) 与 `main` push run
+  [`33156101242`](https://github.com/ainerlab/ainer-boot/actions/runs/33156101242) 均全绿后才创建 tag。
+- **远端制品**：28 个 Maven 包已包含 `1.4.1`；132 个主制品及 detached OpenPGP signature
+  全部从 GitHub Packages 读回并按正式 fingerprint 验签。Maven 3.9.16 / Maven 4 分别从空仓
+  消费成功；远端 Initializer 普通、PostgreSQL、CRUD、secure-v2、existing-project 五通道全绿。
+- **发布证据**：GitHub Release
+  [`v1.4.1`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.4.1) 为非 draft、非 prerelease、
+  `immutable=true`，包含 16 个签名证据资产（CycloneDX SBOM、SHA-256/SHA-512 清单、签名
+  provenance、公钥/fingerprint 与证据签名）。GitHub Attestations 未启用，不把项目签名
+  provenance 宣称为 GitHub Attestation 或 SLSA 等级。
+- **范围与边界**：本补丁不改变运行时 Java/HTTP/错误码/JWT/配置/数据库/事件/Initializer 合同，
+  也不改变 28 modules / 132 主制品清单。真实产品消费者的 `1.3.0 → 1.4.0`、migration replay
+  与一级回滚仍待完成，不能由发布流水线参考消费者替代。
 
 2026-08-28 `1.4.1` 发布准备（商业事实基线与测试确定性）
 - **版本选择**：仅修复商业文档/发布治理与测试夹具确定性，不改变运行时 Java/HTTP/错误码/JWT/
@@ -1809,7 +1830,8 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
 - 没有生产备份恢复、容量测试、正式错误预算/告警路由和灾难恢复演练；
 - 1.x 兼容与 LTS 已由 ADR-0045/0046 成文；源码许可已定为 MIT、仓库公开（ADR-0051）。
   商标检索/注册与 Community/Pro/Enterprise 分层定价仍开放；付费产品交付系统未建立；
-- 28 个 Maven 包已是 public（`0.1.0` / `0.2.0` / `1.0.0` / `1.2.0` / `1.3.0` / `1.4.0`）。`v1.1.0` 按
+- 28 个 Maven 包已是 public（`0.1.0` / `0.2.0` / `1.0.0` / `1.2.0` / `1.3.0` / `1.4.0` /
+  `1.4.1`）。`v1.1.0` 按
   ADR-0041 withdrawn（四次 deploy 402，无 Release/制品），禁止复用；
 - Testcontainers 仍使用 `disabledWithoutDocker`；quality gate 已是 `dev` 必需检查，
   其中包含 `scripts/check-surefire-results.sh` 的零跳过门禁。
@@ -1873,7 +1895,7 @@ CHANGELOG：rc.2/rc.3 → 0.1.0 → 0.2.0（G3 四切片）→ 1.0.0（合同定
   RAG 真实需求出现时再启 Knowledge Phase 2；A4 Token Exchange 只在真实跨服务边界出现后。
 4. **Incubating → Stable 晋升**：组织目录/Agent 代行经第二个消费者兼容验证后评估（各自
   ADR 声明的条件）；Knowledge 保持更久。
-5. **发行与商业后续**：商业材料已同步 `v1.4.0` 并纳入发布失败关闭门禁；源码已 MIT、仓库已
+5. **发行与商业后续**：商业材料已同步 `v1.4.1` 并纳入发布失败关闭门禁；源码已 MIT、仓库已
    公开（ADR-0051）。仍开放：商标检索/注册（ADR-0004）、Community/Pro/Enterprise 分层定稿、
    定价、entitlement、SLA、外部客户案例与 Studio 定位。
 

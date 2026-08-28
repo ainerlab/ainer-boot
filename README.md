@@ -43,20 +43,20 @@ MIT **不授予** Ainer 商标权。产品命名、域名状态与标识规则�
 
 当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
 
-[`v1.4.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.4.0) 是当前稳定版本：
-它在 [`v1.3.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.3.0) 的 Initializer v2 安全
-纵向切片基础上，增加已有项目 `plan-add` / `add` 与模块授权策略组合 SPI。Manifest v1/v2 与既有
-读取、生成合同保持兼容，Ainer framework 无数据库 migration 变化；`1.0.x` 作为 LTS 补丁线继续
-受支持（ADR-0045/0046/0053）。
+[`v1.4.1`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.4.1) 是当前稳定版本：
+它包含 [`v1.4.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.4.0) 在 Initializer v2 安全
+纵向切片基础上增加的已有项目 `plan-add` / `add` 与模块授权策略组合 SPI，并补齐商业文档发布
+一致性与测试确定性。Manifest v1/v2 与既有读取、生成合同保持兼容，Ainer framework 无数据库
+migration 变化；`1.0.x` 作为 LTS 补丁线继续受支持（ADR-0045/0046/0053）。
 `v1.1.0` tag **withdrawn / non-qualifying**（无 Release、无 Packages），禁止消费。
 [`v1.0.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.0.0) 保持不可变，作为
 `1.2.0` 的升级起点与 `1.0.x` LTS 线的基线。
 双参考消费者并存：`xq-platform-next`（`rc.2 → … → 1.2.0` 完整升级链含回滚）与
 `python-learning-service`（`0.1.0 → 1.2.0` 冷仓接入）。
-远端 Packages 已提供 `1.4.0`，Release 为 immutable；真实产品消费者的 `1.3.0 → 1.4.0`
+远端 Packages 已提供 `1.4.1`，Release 为 immutable；真实产品消费者的 `1.3.0 → 1.4.0`
 升级、migration replay 与一级回滚仍需单独完成，不能由发布流水线内的参考消费者替代。
-`v1.4.1` 是商业文档发布一致性与测试确定性的兼容性补丁发布目标；在不可变 Release 门禁完成前，
-不得把它写成当前稳定版本或已发布制品。
+`v1.4.1` 是商业文档发布一致性与测试确定性的兼容性补丁；运行时合同和 28 modules / 132 主制品
+清单相对 `v1.4.0` 不变。
 
 完整产品说明（能力域、合同、质量模型与快速开始）见
 [`docs/ainer-boot-1.0-product.md`](docs/ainer-boot-1.0-product.md)；动态门禁只以

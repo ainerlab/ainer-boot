@@ -25,10 +25,9 @@
 
 ## 当前对外口径
 
-- `v1.4.1` 是兼容性补丁发布目标；完成不可变 Release 前，当前合格稳定版本仍是 `v1.4.0`。
-  `v1.1.0` withdrawn / non-qualifying，禁止消费。
+- `v1.4.1` 是当前合格稳定版本；`v1.1.0` withdrawn / non-qualifying，禁止消费。
 - Ainer Boot 已是可远端消费、带签名供应链与升级规则的企业 Java 工程脚手架。
-- `v1.4.0` 的远端 Maven 3/4、Initializer 五通道与不可变 Release 门禁已通过；真实产品消费者的
+- `v1.4.1` 的远端 Maven 3/4、Initializer 五通道与不可变 Release 门禁已通过；真实产品消费者的
   `1.3.0 → 1.4.0`、migration replay 与一级回滚仍待完成。
 - 当前只可表述为**商业级工程基线**和**受控生产候选**，不能表述为开箱即用的企业生产平台、
   已验证 HA、托管服务或已有合同 SLA。
