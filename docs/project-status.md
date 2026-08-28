@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-28 · 工程版本：`1.4.0` 发布准备（`1.3.0` 当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-08-28 · 工程版本：`1.4.0`（当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -47,7 +47,7 @@ PostgreSQL 18.3 与 RSA 真签名 JWT。`./mvnw clean verify` 在 JDK 25 / Maven
 28 模块、541 tests / 0 failure / 0 error / 0 skipped；远端制品发布门禁已由 run
 `33043332907` 关闭，真实产品消费者验证仍未执行。
 
-2026-08-28 `v1.4.0` 发布候选完成 Initializer 已有项目增量接入与 Workspace/Authorization 组合基线
+2026-08-28 `v1.4.0` 已发布，完成 Initializer 已有项目增量接入与 Workspace/Authorization 组合基线
 （ADR-0053）：CLI 新增只读 `plan-add` 和幂等 `add`，要求显式 Flyway 起始版本，只新增生成文件并
 有限合并顶层 POM；宿主完整授权策略保持优先，Workspace 通过模块贡献补齐自身权限元数据、同名
 scope 与粗粒度 domain 策略，应用服务仍校验 ACTIVE membership、角色和对象归属。定向验证共
@@ -59,8 +59,8 @@ sources/Javadoc 与可重复构建比较均通过。
 另从 `xq-platform-next@f08d71a`（手工接入安全切片前的历史提交）临时克隆复验：只修改 BOM 为本地
 `1.4.0-SNAPSHOT` 后，`plan-add` 报告 14 个新文件、4 个缺失依赖和 compiler parameter；首次 add
 成功、第二次为 0 新增，宿主 Application 与 `XqAccessConfiguration` 零改动，`clean verify` 为
-15 tests / 0 failure / 0 error / 0 skipped。该证据仍是本地工程验证，不是正式版本或真实产品仓库
-发布；下一退出条件是形成 non-SNAPSHOT Release，再由真实消费者从远端制品重放升级与回滚。
+15 tests / 0 failure / 0 error / 0 skipped。该证据仍是本地历史基线验证，不是当前真实产品仓库
+消费；正式 non-SNAPSHOT Release 已关闭，下一退出条件是由真实消费者从远端制品重放升级与回滚。
 
 2026-08-13 首个产品消费者 `xq-platform-next` 复核发现 `v0.1.0-rc.2` 的 Initializer 存在一个
 真实合同缺口：README 与 ADR-0035 决策 6 要求 `./mvnw`，生成树却没有 Wrapper；此前门禁借用了
@@ -337,6 +337,24 @@ Ainer 项目签名 provenance 已通过。
   `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 
 ## 3. 最近验证记录
+
+2026-08-28 `v1.4.0` 已发布（已有项目增量接入与授权策略组合）
+- **发布身份**：发布准备 PR [#68](https://github.com/ainerlab/ainer-boot/pull/68) 合入默认分支
+  `e588abedb1a33b689afa5740e3bdd6037c4b787a`；annotated tag `v1.4.0` peel 精确等于该提交。
+  Release workflow run
+  [`33147391960`](https://github.com/ainerlab/ainer-boot/actions/runs/33147391960) 用时 22m32s 全绿。
+- **远端制品**：28 个 Maven 包已包含 `1.4.0`；132 个主制品及 132 个 detached OpenPGP
+  signature 全部从 GitHub Packages 读回并按正式 fingerprint 验签。Maven 3.9.16 / Maven 4
+  分别从空仓消费成功；远端 CLI 生成普通、PostgreSQL、CRUD、secure-v2、existing-project
+  五通道项目并使用各自 Maven 3.9.16 Wrapper 全绿。
+- **发布证据**：GitHub Release
+  [`v1.4.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.4.0) 为非 draft、非 prerelease、
+  `immutable=true`，精确绑定 `e588abed`；包含 16 个签名证据资产（CycloneDX SBOM、SHA-256/
+  SHA-512 清单、签名 provenance、公钥/fingerprint 与证据签名）。GitHub Attestations 未启用，
+  不把项目签名 provenance 宣称为 GitHub Attestation 或 SLSA 等级。
+- **证据边界**：以上关闭的是正式制品与远端参考消费者门禁；`xq-platform-next` 的本地历史
+  基线验证不能替代当前产品仓库的真实升级，`python-learning-service` 也尚未消费 `1.4.0`。
+  下一退出条件是从远端制品执行 `1.3.0 → 1.4.0`、migration replay 与一级回滚。
 
 2026-08-28 `1.4.0` 发布准备
 - **版本选择**：已有项目 `plan-add` / `add` 与 `AuthorizationPolicyContributor` 是向后兼容的公开
@@ -1822,10 +1840,9 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 **1.0 后路线：消费驱动**（G0–G4 已关闭；`0.1` 主线历史序列已全部完成并存档于 §3 与
 CHANGELOG：rc.2/rc.3 → 0.1.0 → 0.2.0（G3 四切片）→ 1.0.0（合同定稿），双消费者矩阵见 §3）。
 
-1. **发布并真实消费 Initializer 增量接入**（ADR-0053）：`v1.4.0` 发布候选已在
+1. **真实消费 Initializer 增量接入**（ADR-0053）：`v1.4.0` 已正式发布，并已在
   `xq-platform-next@f08d71a` 本地历史基线完成零手工 Application/授权策略的 plan/add 与 15 项测试；
-  因新增公开 CLI/SPI，按 ADR-0045 目标版本必须是 minor `v1.4.0`。下一步完成完整发布门禁，再由
-  真实消费者从远端制品重放 `1.3.0 → 1.4.0`、migration replay 与一级回滚。多模块、Gradle、
+  下一步由真实消费者从远端制品重放 `1.3.0 → 1.4.0`、migration replay 与一级回滚。多模块、Gradle、
   多实体关系、生成 SDK 与本地 Compose 只在消费需求出现后扩展，不提前承诺。
 2. **1.0.x 补丁线**（ADR-0045/0046）：消费者使用中暴露的缺陷按 patch 规则修复；分支保护已启用。
 3. **消费者拉动的能力演进**（1.3.0 之后，不预建）：pil 的 Tutor → AI Runtime 凭据

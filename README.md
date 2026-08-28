@@ -37,23 +37,24 @@ MIT **不授予** Ainer 商标权。产品命名、域名状态与标识规则�
 | `ainer-module-organization` | ✅ Incubating | 组织目录：Unit/任职/分配/岗位 + `workforce.position#assignee` 成员解析（撤岗即失权，ADR-0042） |
 | `ainer-module-knowledge` | ✅ Incubating | Knowledge Foundation：不可变 Revision + SUPERSEDES 血缘 + 人工发布门禁（ADR-0044） |
 | `ainer-module-task` | ✅ Incubating | 任务调度：类型注册、延迟/周期执行、SKIP LOCKED 领取、指数退避、超时看门狗与管理 API（ADR-0047） |
-| `ainer-initializer` / `ainer-initializer-cli` | ✅ Stable | Manifest v1 兼容生成；v2 `simple-service + workspace` 安全纵向切片（随 `v1.3.0` 发布）；`v1.4.0` 发布候选提供已有单模块 Maven 项目的只读 `plan-add` 与幂等 `add`（显式 Flyway 版本、有限 POM 合并，ADR-0053） |
+| `ainer-initializer` / `ainer-initializer-cli` | ✅ Stable | Manifest v1 兼容生成；v2 `simple-service + workspace` 安全纵向切片（随 `v1.3.0` 发布）；`v1.4.0` 提供已有单模块 Maven 项目的只读 `plan-add` 与幂等 `add`（显式 Flyway 版本、有限 POM 合并，ADR-0053） |
 | `ainer-server` | ✅ | JWT Resource Server、受保护 Prometheus exporter、Workspace、AI Runtime、Authorization、P3 与 Incubating 模块装配 |
 | `ainer-authorization-server` | ✅ foundation | OAuth 2.1/OIDC、PKCE、条件 Passkey、typed token profile、RFC 7662/7009 与受审计 JDBC 协议仓库 |
 
 当前版本已经在本机 Colima/Testcontainers 的真实 PostgreSQL 18.3 上通过完整 Reactor 测试，Identity、Workspace、AI runtime 与 Authorization Server 数据库用例均实际执行；M1/M2 还曾使用真实 PostgreSQL 18.4 与本地 OpenAI-compatible 合约服务完成验证。本轮另在本机 PostgreSQL 18.4 从空库启动 Authorization Server，完成专用/普通 introspection client 隔离、active、RFC 7009 撤销与 revocation epoch 查询计划验证。它是可运行的工程基线，不再是文档草案；生产高可用、容量与告警仍需单独完成。
 
-[`v1.3.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.3.0) 是当前稳定版本：
-它在 [`v1.2.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.2.0) 基础上发布 Initializer v2
-`simple-service + workspace` 安全纵向切片。Manifest v1 与既有读取、生成合同保持不变，Ainer
-framework 无数据库 migration 变化；`1.0.x` 作为 LTS 补丁线继续受支持（ADR-0045/0046）。
+[`v1.4.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.4.0) 是当前稳定版本：
+它在 [`v1.3.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.3.0) 的 Initializer v2 安全
+纵向切片基础上，增加已有项目 `plan-add` / `add` 与模块授权策略组合 SPI。Manifest v1/v2 与既有
+读取、生成合同保持兼容，Ainer framework 无数据库 migration 变化；`1.0.x` 作为 LTS 补丁线继续
+受支持（ADR-0045/0046/0053）。
 `v1.1.0` tag **withdrawn / non-qualifying**（无 Release、无 Packages），禁止消费。
 [`v1.0.0`](https://github.com/ainerlab/ainer-boot/releases/tag/v1.0.0) 保持不可变，作为
 `1.2.0` 的升级起点与 `1.0.x` LTS 线的基线。
 双参考消费者并存：`xq-platform-next`（`rc.2 → … → 1.2.0` 完整升级链含回滚）与
 `python-learning-service`（`0.1.0 → 1.2.0` 冷仓接入）。
-当前源码正准备 `v1.4.0` 兼容性次版本；在远端 Release 与 Packages 门禁全部完成前，
-消费者仍应使用 `v1.3.0`。
+远端 Packages 已提供 `1.4.0`，Release 为 immutable；真实产品消费者的 `1.3.0 → 1.4.0`
+升级、migration replay 与一级回滚仍需单独完成，不能由发布流水线内的参考消费者替代。
 
 完整产品说明（能力域、合同、质量模型与快速开始）见
 [`docs/ainer-boot-1.0-product.md`](docs/ainer-boot-1.0-product.md)；动态门禁只以
@@ -95,7 +96,7 @@ preview，不表示 Maven 4 已进入稳定版。请使用 JDK 25，并从仓库
 `preset: simple-service`、`accessControl: workspace` 与自有 `errorNamespace`；完整合同和样例见
 [ADR-0052](docs/decisions/0052-initializer-v2-secure-vertical-slice.md)。该能力已随 `v1.3.0`
 发布；消费者应使用正式 Release，不得把本仓库 SNAPSHOT 或开发分支当作稳定发行物。
-已有项目增量接入已进入 `v1.4.0` 发布候选，使用同一份 Manifest v2，并要求调用者
+已有项目增量接入已随 `v1.4.0` 发布，使用同一份 Manifest v2，并要求调用者
 明确指定第一个 Flyway 版本：
 
 ```bash
@@ -214,6 +215,6 @@ ainer-boot/
 
 ## 下一里程碑
 
-`v1.4.0` 发布候选的最高优先级是完成本地 non-SNAPSHOT、远端签名制品与不可变 Release 门禁，
-然后让首个真实产品消费者从远端制品重放 `1.3.0 → 1.4.0` 升级与回滚。动态完成项、缺口和后续顺序只在
+`v1.4.0` 发布后的最高优先级是让首个真实产品消费者从远端制品重放 `1.3.0 → 1.4.0`
+升级、migration replay 与一级回滚。动态完成项、缺口和后续顺序只在
 [`docs/project-status.md`](docs/project-status.md) 维护，README 不复制时间敏感任务清单。
