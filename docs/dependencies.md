@@ -220,7 +220,7 @@ final class ContextSnapshotJacksonAdapter {
 ## Ainer Admin 契约切片取舍
 
 - OpenAPI Generator 只在显式 `ainer-admin-sdk` Maven profile 中运行，不进入服务器运行时依赖。
-- 生成物写入模块 `target/`，Ainer Boot 不提交派生 TypeScript；唯一前端源码仍由 Ainer Studio
-  的 `templates/ainer-admin` 维护。
+- 生成物写入模块 `target/`，Ainer Boot 不提交派生 TypeScript；前端源码由消费者产品仓库维护
+  （原 Ainer Studio `templates/ainer-admin` 已随 ADR-0055 退役）。
 - SDK 只生成 Ainer JSON API。Authorization Code + PKCE、OIDC discovery 和 RP-Initiated
   Logout 继续交给标准前端协议库，避免生成并维护自制 OAuth 实现。

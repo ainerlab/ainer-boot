@@ -1,6 +1,10 @@
 # Ainer Admin 与 Ainer Boot 集成手册
 
 > 文档类型：前后端集成与运行契约 · 状态：MVP 基线 · 最近核对：2026-08-08 · 适用版本：`0.3.x`
+>
+> **ADR-0055 注**：Ainer Studio 产品线与 `templates/ainer-admin` 参考实现已退役
+> （唯一留存物为维护者冷备份）。本文的 PKCE、SDK、同源代理与退出契约继续有效，
+> 作为消费者自建管理面（如 `xq-platform-next` 的 `xq-admin`）的规范。
 
 本文定义 Ainer Admin 第一版如何通过同源入口接入 Ainer Boot。它是前端实现、反向代理配置、
 开发联调和端到端验收的共同契约，不替代
@@ -10,10 +14,9 @@
 产品边界固定为：
 
 - **Ainer Boot**：后端、认证、权限与 API；
-- **Ainer Studio**：Blocks、Templates、预览与 Registry；
-- **Ainer Admin**：Ainer Studio 交付的第一个完整 Admin Dashboard Template，也是连接
-  Ainer Boot 的官方参考管理应用；唯一前端源码位于
-  `ainer-studio/templates/ainer-admin`。
+- **Ainer Studio**：Blocks、Templates、预览与 Registry（已按 ADR-0055 退役）；
+- **Ainer Admin**：连接 Ainer Boot 的官方参考管理应用，原唯一前端源码位于
+  `ainer-studio/templates/ainer-admin`（已随 ADR-0055 退役，冷备份留存）。
 
 设计依据见
 [`ADR-0022`](decisions/0022-ainer-admin-browser-integration-baseline.md)。Ainer Admin

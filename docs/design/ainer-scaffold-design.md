@@ -36,7 +36,7 @@ Ainer Boot 面向 AI 应用、企业管理系统和商业化交付提供以下�
 | 产品或仓库 | 职责 | 不承担 |
 |---|---|---|
 | **Ainer Boot** | BOM、Framework、Starter、Test Support、Build Tools、Initializer、通用平台模块与参考装配 | `xq` 商品、采购、客户等产品语义 |
-| **Ainer Studio** | 管理端模板、Blocks、页面与模块生成、预览和视觉交付 | Java 平台内核、业务数据所有权 |
+| **Ainer Studio** | （已按 ADR-0055 退役）管理端模板、Blocks、页面与模块生成、预览和视觉交付 | Java 平台内核、业务数据所有权 |
 | **`xq-platform-next`** | 规划中的首个外部产品消费者，为两个 2.0 小程序承载产品业务 | Ainer 源码副本、Ainer 通用模块的长期 fork（受控单模块 vendored 例外见 ADR-0054） |
 | **现有 `xq-server`** | 在迁移期继续运行，并作为业务事实与迁移来源 | Ainer Boot 的架构母体或新项目模板 |
 
@@ -402,7 +402,7 @@ Industry Products
 | **P2 Create & Generate** | 安全、确定性地创建项目和纵向 CRUD | manifest v1 兼容基线与 v2 安全预设、preview/diff、已有单模块 Maven 项目的 plan/add、默认不覆盖/不改菜单/不写数据库；同版本同 manifest 与显式输入生成无差异；TTFR 与 TTCRUD 目标通过；生成物通过 PostgreSQL 与 golden consumer 门禁 |
 | **P3 Enterprise Base & First Consumer** | 用商业级 Stable 企业基座和真实产品证明脚手架边界 | Identity/Workspace/Authorization/AI Runtime 与**文件元数据**、**字典**、**配置**、**通知**、**缓存**的服务端管理 API、审计和安全门禁闭环；Initializer 生成的 `xq-platform-next` 不含 Ainer 源码副本或 SNAPSHOT；至少一个真实纵向切片和一次 Ainer minor 升级/回滚通过。组织目录、菜单和前端管理面不阻塞本阶段（ADR-0040） |
 | **P4 Incubating Product Core** | 验证 AI-native 产品核心并收敛 Incubating 契约 | Agent/Tool/Context/Evaluation 具备身份、权限、预算、数据治理、人工反馈和回归门禁；Knowledge 完成两个语义切片；组织目录与任务调度达到可用但可演进的 Incubating 水平；AI/Incubating 模块关闭时 Stable 企业应用不受影响（ADR-0040） |
-| **P5 Ecosystem & Commercial Delivery** | 建立生态、升级、LTS 和商业交付闭环 | 至少两个独立消费者；模块安装/移除不改 core；连续两个 minor 完成升级验证；兼容清单、升级助手、entitlement、LTS/补丁与行业模块交付流程落地；制品匿名可解析公开分发、受控 vendored 例外检测与升级 diff 报告、参考管理台或管理面生成切片（ADR-0054） |
+| **P5 Ecosystem & Commercial Delivery** | 建立生态、升级、LTS 和商业交付闭环 | 至少两个独立消费者；模块安装/移除不改 core；连续两个 minor 完成升级验证；兼容清单、升级助手、entitlement、LTS/补丁与行业模块交付流程落地；制品匿名可解析公开分发、受控 vendored 例外检测与升级 diff 报告；管理面交付（ADR-0055 改述）：Initializer 管理面纵向切片生成，或至少一个消费者自建管理面通过 OpenAPI SDK 契约门禁（ADR-0054） |
 
 P3 不等待 P4 或 P5。否则 Ainer 会继续成为只被自身使用的平台，而不是经过外部产品验证的
 脚手架。服务化也不是固定阶段：只有满足

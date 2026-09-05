@@ -39,8 +39,9 @@ https://ainer-dev.xiaoqu99.com
 /error             -> Ainer Authorization Server
 /connect/logout    -> Ainer Authorization Server
 /api/me/**         -> Ainer Authorization Server
-/ainer-studio/**   -> Ainer Studio（开发环境可选）
 ```
+
+（原 `/ainer-studio/** -> Ainer Studio` 开发环境可选路由已随 ADR-0055 退役并从 dev 服务器下线。）
 
 内部 `ainer-authorization-server` 可以继续监听 `127.0.0.1:9000` 或受控服务网络地址，不需要独立
 公开域名。代理必须覆盖而不是透传用户提交的 Forwarded headers，并保留 Cookie、`Location`、表单
@@ -55,10 +56,11 @@ body 和外部 HTTPS scheme。
 
 ```text
 https://ainer.com          品牌官网
-https://app.ainer.com      production Ainer Admin + Boot 登录/API
-https://studio.ainer.com   Ainer Studio 内容与源码分发站（可选）
+https://app.ainer.com      production 消费者管理面 + Boot 登录/API
 https://dev.ainer.com      非生产联合环境
 ```
+
+（原 `studio.ainer.com` Ainer Studio 分发站已随 ADR-0055 退役。）
 
 如果最终取得的是其他独立域名，用相同角色替换 `<brand-domain>`，不把示例名称写死进代码：
 
@@ -69,9 +71,9 @@ studio.<brand-domain>      Studio（可选）
 dev.<brand-domain>         非生产联合环境
 ```
 
-Ainer Studio 不参与 Admin 登录会话时可以使用独立 `studio.*` origin；Ainer Admin 与 Boot 登录/API
-仍必须共同使用 `app.*` origin。只有出现多个真实独立应用共享统一登录的需求，并完成 Cookie、CORS、
-issuer、客户端注册、会话和退出模型 ADR 后，才考虑独立 `auth.*` 域名。
+消费者自建管理面（原 Ainer Admin）若不参与 Admin 登录会话，可以使用独立 origin；管理面与
+Boot 登录/API 仍必须共同使用 `app.*` origin。只有出现多个真实独立应用共享统一登录的需求，
+并完成 Cookie、CORS、issuer、客户端注册、会话和退出模型 ADR 后，才考虑独立 `auth.*` 域名。
 
 ## 4. `ainer.com` 与 `ainer.cn` 的边界
 

@@ -2,7 +2,7 @@
 
 > 文档类型：接口基线 · 状态：生效 · 最近核对：2026-08-27 · 适用版本：`1.2.x`
 
-本文记录当前 HTTP 契约和兼容规则。Ainer Admin 的机器可读子集位于
+本文记录当前 HTTP 契约和兼容规则。消费者自建管理面（原 Ainer Admin）的机器可读子集位于
 `ainer-authorization-server/src/main/openapi/ainer-admin-v1.yaml`，由固定 Maven profile
 校验并生成 TypeScript SDK；本文件继续解释跨 API 的语义与边界。
 
@@ -84,7 +84,8 @@ Server 官方 JDBC authorization，不建立 Ainer 自定义 Token 表，也不�
 命令先严格校验 `ainer-admin-v1.yaml`，再用固定版本 OpenAPI Generator 的
 `typescript-fetch` 生成器输出到
 `ainer-authorization-server/target/generated-sources/ainer-admin-typescript/`。生成目录属于
-构建产物，不提交到 Ainer Boot；Ainer Studio 按已批准的前端目录与包管理策略消费该输出。
+构建产物，不提交到 Ainer Boot；消费者前端仓库按自己的目录与包管理策略消费该输出
+（原 Ainer Studio 消费方已随 ADR-0055 退役）。
 SDK 只覆盖当前 token 自助撤销，OAuth/OIDC 登录和 logout 继续使用标准协议客户端。
 OpenAPI 使用相对 `/` 表达同源入口；由于生成器会为该合法相对地址写入 `http://localhost`
 兜底值，Ainer Admin 必须在 SDK `Configuration` 中显式传入 `window.location.origin`，

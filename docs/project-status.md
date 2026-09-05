@@ -1886,8 +1886,19 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
   标记与"隐藏源码副本检测"CI 门禁均未实现；在实现前，扩展点缺口仍只能走跨仓需求流程；
 - 公开分发仍依赖 GitHub Packages token 解析；Maven Central 或同级匿名可解析渠道未接入，
   签名/SBOM/provenance 对新渠道的发布演练未做；
-- 管理面缺口未交付：参考管理台（消费 OpenAPI 合同的独立前端发行物）与 Initializer 管理面
-  纵向切片生成均未启动，P5 退出门禁依赖二者至少其一。
+- 管理面缺口未交付：按 ADR-0055 改述，交付形态为 Initializer 管理面纵向切片生成，或至少
+  一个消费者自建管理面通过 OpenAPI SDK 契约门禁（Astryx 选型证据见
+  `xq-platform-next` 的 `codex/astryx-admin-spike`）；两者均未启动，P5 退出门禁依赖其一。
+
+### Ainer Studio 退役（ADR-0055）
+
+- 2026-09-05 维护者决策退役 Studio 设计系统产品线（首个消费者管理面设计系统层选定
+  Astryx）；`templates/ainer-admin` 参考实现唯一留存物为维护者冷备份
+  `~/xq/archive/ainer-studio-final-20260905.tar.gz`（SHA256 前缀 `c67829b3…`）；
+- 执行序列：冷备份（已完成）→ 文档退役修订 → 远端仓 `ainerlab/ainer-studio` 删除 →
+  本地工作目录删除 → dev nginx `/ainer-studio/` 路由与 `/opt/ainer-studio` 部署物下线；
+- `ainer-admin-integration.md` 与 ADR-0022 契约继续有效；品牌 `/login`（Authorization
+  Server 承载）不受影响。
 
 ## 5. 下一里程碑
 
@@ -1909,8 +1920,8 @@ CHANGELOG：rc.2/rc.3 → 0.1.0 → 0.2.0（G3 四切片）→ 1.0.0（合同定
    定价、entitlement、SLA、外部客户案例与 Studio 定位。
 6. **消费者体验与分发修正**（ADR-0054，按消费需求排期，不提前实现）：扩展点缺口先以 SPI
    端口响应；vendored 单模块标记与隐藏副本检测 CI 在首个真实 vendoring 出现前落地；
-   Maven Central 匿名解析与参考管理台/管理面生成切片进入 P5 退出门禁，接入时机由
-   xq-platform-next 管理后台建设触发。
+   Maven Central 匿名解析进入 P5 退出门禁；管理面交付按 ADR-0055 改述（Initializer 管理面
+   切片或消费者自建管理面通过 SDK 契约门禁），接入时机由 xq-platform-next 管理后台建设触发。
 
 ## 6. 更新规则
 
