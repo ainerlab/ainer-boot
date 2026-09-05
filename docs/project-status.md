@@ -1895,8 +1895,11 @@ ADR-0029「JDK 25 / Boot 4 现代化基线」P0 进展（均经 `mvn 3.9.16 + -D
 - 2026-09-05 维护者决策退役 Studio 设计系统产品线（首个消费者管理面设计系统层选定
   Astryx）；`templates/ainer-admin` 参考实现唯一留存物为维护者冷备份
   `~/xq/archive/ainer-studio-final-20260905.tar.gz`（SHA256 前缀 `c67829b3…`）；
-- 执行序列：冷备份（已完成）→ 文档退役修订 → 远端仓 `ainerlab/ainer-studio` 删除 →
-  本地工作目录删除 → dev nginx `/ainer-studio/` 路由与 `/opt/ainer-studio` 部署物下线；
+- 执行序列已于 2026-09-05 当日全部完成：冷备份（`~/xq/archive/ainer-studio-final-20260905.tar.gz`，
+  SHA256 前缀 `c67829b3…`）→ 文档退役修订（本文件与 ADR-0055）→ 远端仓
+  `ainerlab/ainer-studio` 删除 → 本地工作目录删除 → dev nginx `/ainer-studio/` 路由移除、
+  显式 404 与 `/opt/ainer-studio` 部署物下线（验证：`/ainer-studio/**` 404，
+  `/login`、`/api/*`、admin SPA 不受影响）；
 - `ainer-admin-integration.md` 与 ADR-0022 契约继续有效；品牌 `/login`（Authorization
   Server 承载）不受影响。
 
