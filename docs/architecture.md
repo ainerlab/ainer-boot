@@ -220,10 +220,11 @@ domain 与 API 仍使用 Ainer 自己的端口和模型。`IService`、`ServiceI
 
 ### 5.1 官方参考管理应用
 
-Ainer Admin 不作为 Ainer Boot 的新 Java 模块或第三个后端发行物。它是 Ainer Studio 中
-`ainer-studio/templates/ainer-admin` 的前端模板，通过 `/ainer-admin/` 同源入口连接
+Ainer Admin 不作为 Ainer Boot 的新 Java 模块或第三个后端发行物。其参考实现原为 Ainer Studio 中
+`ainer-studio/templates/ainer-admin` 前端模板，已随 ADR-0055 退役（唯一留存物为维护者冷备份）。
+消费者自建管理前端通过 `/ainer-admin/` 同源入口连接
 `ainer-authorization-server` 的 OAuth/OIDC 与 Identity 成员 API。Boot 负责协议、client、身份、
-授权、OpenAPI 和 active gate；Studio 负责前端源码、Blocks、预览和交付。
+授权、OpenAPI 和 active gate；前端源码、Blocks 与交付由消费者产品仓库自担。
 
 第一版同源反代只改变边缘路由，不改变 Identity 数据所有权，也不把前端静态资源引入
 Authorization Server JAR。完整部署边界见

@@ -27,8 +27,9 @@ AI-native、但不局限于 AI 的通用企业应用脚手架与平台底座。�
 - 未来社区版、企业版和行业产品的工程与商业交付基线。
 
 `xq-platform-next` 是规划中的首个外部产品消费者，不是 Ainer 源码副本；`python-learning-service`
-已登记为第二个外部消费者（Version-based 升级接入，不绑定开发分支）。Ainer Studio 独立负责
-管理端模板、Blocks 与视觉交付。完整产品边界与消费者登记见
+已登记为第二个外部消费者（Version-based 升级接入，不绑定开发分支）。Ainer Studio 产品线已按
+ADR-0055 退役；管理面由消费者基于 Astryx 自建，集成契约见
+[`ainer-admin-integration.md`](ainer-admin-integration.md)。完整产品边界与消费者登记见
 [`design/ainer-scaffold-design.md`](design/ainer-scaffold-design.md)。
 
 当前优先做正确的模块化单体边界；服务化通过独立发行物、稳定契约、明确数据所有权和可靠事件
@@ -281,7 +282,7 @@ Maven 4 对根工程 import 同 reactor BOM 的模型 WARNING 以 ADR-0049 为�
 | [`testing.md`](testing.md) | 测试层次、PostgreSQL 门禁与完成标准 |
 | [`api.md`](api.md) | HTTP、响应、错误、分页和接口契约 |
 | [`configuration.md`](configuration.md) | 配置键、安全默认值和秘密注入 |
-| [`ainer-admin-integration.md`](ainer-admin-integration.md) | Ainer Admin 的 PKCE、成员 API、SDK、退出与同源代理契约 |
+| [`ainer-admin-integration.md`](ainer-admin-integration.md) | 消费者自建管理面的 PKCE、成员 API、SDK、退出与同源代理契约（参考实现随 ADR-0055 退役） |
 
 ### 数据与领域专题
 

@@ -5,6 +5,9 @@
 - 决策者：Ainer 项目维护者
 - 取代：无
 - 被取代：无
+- 修订：ADR-0055 退役 Ainer Studio 产品线；`templates/ainer-admin` 参考实现已随 Studio
+  仓退役（唯一留存物为维护者冷备份），但本文的 PKCE/SDK/同源代理契约继续有效，
+  作为消费者自建管理面的规范
 
 ## 背景
 

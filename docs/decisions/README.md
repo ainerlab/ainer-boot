@@ -62,6 +62,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0052](0052-initializer-v2-secure-vertical-slice.md) | Accepted | Initializer v2 安全纵向切片：`simple-service + workspace`、显式分层、Workspace SQL、授权审计与第四消费者门禁 |
 | [0053](0053-initializer-existing-project-and-authorization-composition.md) | Accepted | Initializer 已有项目增量接入：显式 migration、有限 POM 合并、幂等 add 与 Workspace/Authorization 策略组合 |
 | [0054](0054-controlled-escape-hatch-and-open-distribution.md) | Accepted | 受控逃逸舱与公开分发基线：SPI 端口优先、vendored 单模块例外、匿名可解析分发与管理面退出门禁（修订 ADR-0025） |
+| [0055](0055-ainer-studio-retirement-and-admin-surface-repath.md) | Accepted | Ainer Studio 产品线退役与管理面交付路线改道（修订 ADR-0022/0054；契约留在 ainer-admin-integration.md） |
 
 ## 历史草案与审查记录
 
