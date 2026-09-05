@@ -32,7 +32,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0022](0022-ainer-admin-browser-integration-baseline.md) | Accepted | Ainer Admin 浏览器集成基线 |
 | [0023](0023-governed-ai-task-execution-and-identity-weekly-report.md) | Proposed | 受治理 AI 任务执行模型与 Identity 周报验收场景 |
 | [0024](0024-evolutionary-modular-platform-architecture.md) | Accepted | 演进式模块化平台架构 |
-| [0025](0025-public-artifacts-utilities-and-repository-boundary.md) | Accepted | 公共制品、工具类与仓库边界 |
+| [0025](0025-public-artifacts-utilities-and-repository-boundary.md) | Accepted | 公共制品、工具类与仓库边界（"消费者不复制源码"立场由 ADR-0054 引入受控单模块 vendored 例外） |
 | [0026](0026-maven-4-build-and-consumer-pom-baseline.md) | Accepted | Maven 4 构建与 Consumer POM 基线 |
 | [0027](0027-keep-jdk-25-production-baseline.md) | Accepted | 保留 JDK 25 生产基线并跟踪 JDK 27 |
 | [0028](0028-mybatis-plus-infrastructure-baseline.md) | Accepted | MyBatis-Plus 基础设施增强基线 |
@@ -61,6 +61,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0051](0051-mit-license-and-public-repository.md) | Accepted | Ainer Boot 源码采用 MIT，GitHub 仓库公开（修订 ADR-0041 私有分发假设；不授予商标权） |
 | [0052](0052-initializer-v2-secure-vertical-slice.md) | Accepted | Initializer v2 安全纵向切片：`simple-service + workspace`、显式分层、Workspace SQL、授权审计与第四消费者门禁 |
 | [0053](0053-initializer-existing-project-and-authorization-composition.md) | Accepted | Initializer 已有项目增量接入：显式 migration、有限 POM 合并、幂等 add 与 Workspace/Authorization 策略组合 |
+| [0054](0054-controlled-escape-hatch-and-open-distribution.md) | Accepted | 受控逃逸舱与公开分发基线：SPI 端口优先、vendored 单模块例外、匿名可解析分发与管理面退出门禁（修订 ADR-0025） |
 
 ## 历史草案与审查记录
 
