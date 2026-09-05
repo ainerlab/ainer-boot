@@ -37,7 +37,7 @@ Ainer Boot 面向 AI 应用、企业管理系统和商业化交付提供以下�
 |---|---|---|
 | **Ainer Boot** | BOM、Framework、Starter、Test Support、Build Tools、Initializer、通用平台模块与参考装配 | `xq` 商品、采购、客户等产品语义 |
 | **Ainer Studio** | 管理端模板、Blocks、页面与模块生成、预览和视觉交付 | Java 平台内核、业务数据所有权 |
-| **`xq-platform-next`** | 规划中的首个外部产品消费者，为两个 2.0 小程序承载产品业务 | Ainer 源码副本、Ainer 通用模块的长期 fork |
+| **`xq-platform-next`** | 规划中的首个外部产品消费者，为两个 2.0 小程序承载产品业务 | Ainer 源码副本、Ainer 通用模块的长期 fork（受控单模块 vendored 例外见 ADR-0054） |
 | **现有 `xq-server`** | 在迁移期继续运行，并作为业务事实与迁移来源 | Ainer Boot 的架构母体或新项目模板 |
 
 ## 2. 不做什么
@@ -402,7 +402,7 @@ Industry Products
 | **P2 Create & Generate** | 安全、确定性地创建项目和纵向 CRUD | manifest v1 兼容基线与 v2 安全预设、preview/diff、已有单模块 Maven 项目的 plan/add、默认不覆盖/不改菜单/不写数据库；同版本同 manifest 与显式输入生成无差异；TTFR 与 TTCRUD 目标通过；生成物通过 PostgreSQL 与 golden consumer 门禁 |
 | **P3 Enterprise Base & First Consumer** | 用商业级 Stable 企业基座和真实产品证明脚手架边界 | Identity/Workspace/Authorization/AI Runtime 与**文件元数据**、**字典**、**配置**、**通知**、**缓存**的服务端管理 API、审计和安全门禁闭环；Initializer 生成的 `xq-platform-next` 不含 Ainer 源码副本或 SNAPSHOT；至少一个真实纵向切片和一次 Ainer minor 升级/回滚通过。组织目录、菜单和前端管理面不阻塞本阶段（ADR-0040） |
 | **P4 Incubating Product Core** | 验证 AI-native 产品核心并收敛 Incubating 契约 | Agent/Tool/Context/Evaluation 具备身份、权限、预算、数据治理、人工反馈和回归门禁；Knowledge 完成两个语义切片；组织目录与任务调度达到可用但可演进的 Incubating 水平；AI/Incubating 模块关闭时 Stable 企业应用不受影响（ADR-0040） |
-| **P5 Ecosystem & Commercial Delivery** | 建立生态、升级、LTS 和商业交付闭环 | 至少两个独立消费者；模块安装/移除不改 core；连续两个 minor 完成升级验证；兼容清单、升级助手、entitlement、LTS/补丁与行业模块交付流程落地 |
+| **P5 Ecosystem & Commercial Delivery** | 建立生态、升级、LTS 和商业交付闭环 | 至少两个独立消费者；模块安装/移除不改 core；连续两个 minor 完成升级验证；兼容清单、升级助手、entitlement、LTS/补丁与行业模块交付流程落地；制品匿名可解析公开分发、受控 vendored 例外检测与升级 diff 报告、参考管理台或管理面生成切片（ADR-0054） |
 
 P3 不等待 P4 或 P5。否则 Ainer 会继续成为只被自身使用的平台，而不是经过外部产品验证的
 脚手架。服务化也不是固定阶段：只有满足
@@ -417,15 +417,17 @@ P3 不等待 P4 或 P5。否则 Ainer 会继续成为只被自身使用的平台
 |---|---|
 | TTFR（Time to First Run） | 在官方参考环境、前置工具已安装且制品仓库可达时，从空目录到 `/actuator/health=UP` 不超过 10 分钟 |
 | TTCRUD | 从 manifest 到含 PostgreSQL migration、Workspace/资源授权、API、测试与 OpenAPI 的可运行纵向 CRUD 不超过 30 分钟 |
-| 独立消费 | 外部消费者中的 Ainer 源码副本为 0，进入 P3 后 SNAPSHOT Ainer 依赖为 0 |
+| 独立消费 | 外部消费者中的 Ainer 源码副本为 0，进入 P3 后 SNAPSHOT Ainer 依赖为 0；显式标记的受控 vendored 单模块（ADR-0054）是唯一合法例外，且必须出现在例外清单中 |
 | 生成确定性 | 同一 Ainer 版本、同一 manifest 和同一规范化环境重复生成，文件差异为 0 |
 | 生成安全 | 默认覆盖既有源码、修改运行中菜单、连接或写入数据库的行为均为 0 |
 | 数据库可信度 | 正式 PostgreSQL 集成门禁 skipped 为 0；H2/MySQL compatibility test 为 0 |
 | 可选性 | 每个声明为可选的 Starter 或模块均有 off-state 构建与启动测试 |
 | 兼容性 | 每次发布分别评估 Java API、HTTP、配置、JWT/scope、schema、事件、Starter 和生成 manifest |
 | 供应链 | 发布制品 100% 具备 checksum、SBOM、来源和许可证结果；未知许可证与未豁免 Critical/High 漏洞为 0 |
-| 升级性 | 外部消费者只通过 BOM、公开扩展点与明确 migration 升级，不复制框架补丁 |
+| 升级性 | 外部消费者只通过 BOM、公开扩展点与明确 migration 升级，不复制框架补丁；vendored 单模块须提供逐版本 diff 报告与回滚终点（ADR-0054） |
 | 公共能力晋升 | 产品能力至少由两个独立消费者证明语义稳定后，才进入 Ainer 公共契约 |
+| 扩展覆盖 | 业务被框架扩展点阻塞时，SPI 端口为第一响应；同一钩子被第二个消费者需要时按公共能力晋升规则进入公共契约（ADR-0054） |
+| 分发可达 | GitHub Packages token 解析为临时状态；目标为 Maven Central 或同级公开渠道匿名、免 token 可解析（ADR-0054） |
 
 ## 13. 首个外部消费者合同
 
@@ -530,7 +532,8 @@ port 和 local adapter；只有满足 ADR-0024 的拆分条件后再增加 remot
 
 创建 `xq-platform-next` 正式业务基线前，必须同时满足：
 
-1. 初始化器能在临时目录生成独立消费者，生成结果不包含 Ainer 源码副本；
+1. 初始化器能在临时目录生成独立消费者，生成结果不包含 Ainer 源码副本（受控 vendored
+   单模块例外须显式标记并计入例外清单，ADR-0054）；
 2. 消费者只通过 Maven 仓库解析 Ainer BOM、Starter 和可选模块；
 3. `./mvnw clean verify` 使用 PostgreSQL 18，数据库测试 `0 skipped`；
 4. 空库 migration、启动、JWT 保护接口、真实 HTTP 错误和 request ID 验证通过；
