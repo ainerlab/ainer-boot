@@ -83,6 +83,18 @@ public class ReferenceTokenProfileResolver implements TokenProfileResolver {
         if (scopeClaim == null) {
             return Set.of();
         }
+        // Spring Authorization Server 的 JwtGenerator 把 scope 写成 JSON 数组；
+        // OAuth Bearer 规范允许空格分隔字符串。两种形态都必须接受，否则所有
+        // 平台 scope 检查会静默归零（fail closed 拒绝一切业务请求）。
+        if (scopeClaim instanceof java.util.Collection<?> values) {
+            Set<String> scopes = new LinkedHashSet<>();
+            for (Object value : values) {
+                if (value instanceof String text && !text.isBlank()) {
+                    scopes.add(text.trim());
+                }
+            }
+            return scopes;
+        }
         if (!(scopeClaim instanceof String raw) || raw.isBlank()) {
             return Set.of();
         }
