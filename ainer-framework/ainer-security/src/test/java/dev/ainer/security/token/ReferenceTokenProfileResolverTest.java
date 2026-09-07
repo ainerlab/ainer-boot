@@ -45,6 +45,25 @@ class ReferenceTokenProfileResolverTest {
     }
 
     @Test
+    void resolvesCollectionScopeClaimFromJwtGenerator() {
+        // Spring Authorization Server JwtGenerator 发出的 scope claim 是 JSON 数组。
+        AuthenticatedPrincipal principal = resolver.resolve(
+                claims("SERVICE_V1", "SERVICE", "svc-1", Map.of("scope", java.util.List.of("authorization.manage"))));
+
+        assertThat(principal.isService()).isTrue();
+        assertThat(principal.hasScope("authorization.manage")).isTrue();
+    }
+
+    @Test
+    void ignoresBlankEntriesInCollectionScopeClaim() {
+        AuthenticatedPrincipal principal = resolver.resolve(
+                claims("SERVICE_V1", "SERVICE", "svc-2",
+                        Map.of("scope", java.util.List.of("account.read", "  "))));
+
+        assertThat(principal.scopes()).containsExactly("account.read");
+    }
+
+    @Test
     void resolvesUserWorkspaceToHumanPrincipal() {
         AuthenticatedPrincipal principal = resolver.resolve(
                 claims("USER_WORKSPACE_V1", "USER", "acc-2", Map.of()));
