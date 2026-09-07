@@ -41,6 +41,8 @@ class AinerAdminBrowserClientBootstrapRunnerTest {
                 "workspace.write");
         assertThat(client.getClientSettings().isRequireProofKey()).isTrue();
         assertThat(client.getClientSettings().isRequireAuthorizationConsent()).isFalse();
+        assertThat((Object) client.getClientSettings().getSetting("ainer.token-profile"))
+                .isEqualTo("USER_NEUTRAL_V1");
     }
 
     @Test
@@ -54,6 +56,32 @@ class AinerAdminBrowserClientBootstrapRunnerTest {
         runner.run(new DefaultApplicationArguments(new String[0]));
 
         assertThat(repository.clients).hasSize(1);
+    }
+
+    @Test
+    void repairsLegacyClientMissingTokenProfile() {
+        AinerAdminBrowserClientProperties properties = properties();
+        InMemoryRepository repository = new InMemoryRepository();
+        AinerAdminBrowserClientBootstrapRunner runner =
+                new AinerAdminBrowserClientBootstrapRunner(properties, repository);
+        // v1.4.1 引导缺陷产物：策略兼容但缺 ainer.token-profile。
+        runner.run(new DefaultApplicationArguments(new String[0]));
+        RegisteredClient created = repository.findByClientId("ainer-admin-dev");
+        repository.save(RegisteredClient.from(created)
+                .clientSettings(org.springframework.security.oauth2.server.authorization.settings.ClientSettings
+                        .withSettings(new HashMap<>(Map.of(
+                                "settings.client.require-proof-key", true,
+                                "settings.client.require-authorization-consent", false)))
+                        .build())
+                .build());
+
+        runner.run(new DefaultApplicationArguments(new String[0]));
+
+        RegisteredClient repaired = repository.findByClientId("ainer-admin-dev");
+        assertThat((Object) repaired.getClientSettings().getSetting("ainer.token-profile"))
+                .isEqualTo("USER_NEUTRAL_V1");
+        assertThat(repaired.getClientSettings().isRequireProofKey()).isTrue();
+        assertThat(repaired.getClientSettings().isRequireAuthorizationConsent()).isFalse();
     }
 
     @Test
