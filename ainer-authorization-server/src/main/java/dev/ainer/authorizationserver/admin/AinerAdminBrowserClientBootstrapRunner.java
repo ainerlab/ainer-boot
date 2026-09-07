@@ -1,5 +1,7 @@
 package dev.ainer.authorizationserver.admin;
 
+import dev.ainer.authorizationserver.config.AinerAuthorizationServerConfiguration;
+import dev.ainer.security.token.TokenProfile;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -56,6 +58,7 @@ final class AinerAdminBrowserClientBootstrapRunner implements ApplicationRunner 
         RegisteredClient existing = repository.findByClientId(CLIENT_ID);
         if (existing != null) {
             requireCompatible(existing, redirectUri, postLogoutRedirectUri);
+            repairMissingTokenProfile(existing);
             return;
         }
         repository.save(RegisteredClient.withId(dev.ainer.core.uuid.Uuidv7.generate().toString())
@@ -69,10 +72,34 @@ final class AinerAdminBrowserClientBootstrapRunner implements ApplicationRunner 
                 .clientSettings(ClientSettings.builder()
                         .requireProofKey(true)
                         .requireAuthorizationConsent(false)
+                        // AinerJwtTokenCustomizer fail-closed：人类浏览器客户端必须声明
+                        // Greenfield token profile，否则 access token 签发直接失败。
+                        .setting(
+                                AinerAuthorizationServerConfiguration.TOKEN_PROFILE_SETTING,
+                                TokenProfile.USER_NEUTRAL_V1.claimValue())
                         .build())
                 .tokenSettings(TokenSettings.builder()
                         .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED)
                         .accessTokenTimeToLive(ACCESS_TOKEN_TTL)
+                        .build())
+                .build());
+    }
+
+    /**
+     * 自愈历史缺陷：v1.4.1 基线引导的客户端缺少 {@code ainer.token-profile}
+     * 客户端设置，access token 签发会 fail closed。检测到缺失时补写并保存。
+     */
+    private void repairMissingTokenProfile(RegisteredClient existing) {
+        Object declared = existing.getClientSettings()
+                .getSetting(AinerAuthorizationServerConfiguration.TOKEN_PROFILE_SETTING);
+        if (TokenProfile.USER_NEUTRAL_V1.claimValue().equals(declared == null ? null : declared.toString())) {
+            return;
+        }
+        repository.save(RegisteredClient.from(existing)
+                .clientSettings(ClientSettings.withSettings(existing.getClientSettings().getSettings())
+                        .setting(
+                                AinerAuthorizationServerConfiguration.TOKEN_PROFILE_SETTING,
+                                TokenProfile.USER_NEUTRAL_V1.claimValue())
                         .build())
                 .build());
     }
