@@ -28,4 +28,23 @@
         FROM ainer_identity_human_account
         WHERE id = #{accountId}
     </select>
+
+    <!--
+      状态迁移与 epoch 递增在同一条语句内完成：不存在"状态已改但 epoch 未加"的中间态。
+      WHERE 带期望态使其成为 compare-and-set，并发迁移只有一个能影响 1 行。
+    -->
+    <update id="transitionStatusAndIncrementEpoch">
+        UPDATE ainer_identity_human_account
+        SET status = #{targetStatus},
+            security_epoch = security_epoch + 1
+        WHERE id = #{accountId}
+          AND status = #{expectedStatus}
+    </update>
+
+    <update id="incrementSecurityEpoch">
+        UPDATE ainer_identity_human_account
+        SET security_epoch = security_epoch + 1
+        WHERE id = #{accountId}
+          AND status = #{expectedStatus}
+    </update>
 </mapper>

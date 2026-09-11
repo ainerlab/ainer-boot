@@ -339,6 +339,103 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-09-11 端点授权默认拒绝落地（`@EndpointAccess` + 运行期 FAIL_CLOSED + 静态门禁）
+- **缺口**：`@AinerAuthorize` 是逐方法可选注解，没有它的 handler 在 `AinerRequestAuthorizationManager`
+  返回 `null`，落到 Resource Server 的 `anyRequest().authenticated()`——只要求登录、不要求权限。
+  默认拒绝因此只成立于决策引擎内部；新增 Controller 方法漏写注解时编译期、启动期与既有 CI 全不失败。
+- **三层机制**：决策引擎默认拒绝不变；新增 `@EndpointAccess(kind = PUBLIC | AUTHENTICATED |
+  DELEGATED, reason = "...")` 显式声明；`AinerAuthorizeInterceptor` 按
+  `ainer.security.endpoint-authorization.mode`（默认 `fail-closed`）对未声明 handler 直接 403 并记
+  ERROR 日志（`warn` 保留旧行为但记 WARN，仅作升级期灰度）；新增
+  `scripts/check-endpoint-authorization.sh` 静态门禁。`PUBLIC` 仍需与 `public-paths` 双登记才真正
+  匿名可达，规范表述见 `docs/security.md` §3.4。
+- **参考装配逐端点核对**（`ainer-server` 及其依赖模块，静态门禁实测 672 个 Java 文件 / 106 个
+  handler，违规 0 处）：68 个 handler 有 `@AinerAuthorize`；`GET /api/platform/info` 声明 `PUBLIC`
+  （默认列在 `public-paths`）；`/api/authorization/**`（14）、
+  `/internal/workspace-authorization-audits/**`（1）、`/internal/workspace-owner-recovery/**`（2）
+  与 Initializer v2 生成业务端点（5）声明类级 `DELEGATED`；v2 `/api/ping` 声明 `AUTHENTICATED`；
+  Authorization Server 独立应用的 14 个 handler 因该应用不依赖 `ainer-module-authorization` 而登记
+  在白名单里（各自的 `SecurityFilterChain` 按路径精确强制，理由写在登记行）。未声明 handler 为 0。
+- **负向实测**（完整原始输出留在本次会话，命令可重放）：临时给 `PlatformInfoController` 加一个无注解
+  的 `GET /api/platform/info-probe` → 门禁 `exit 1` 并打印
+  `ainer-server/src/main/java/dev/ainer/server/endpoint/PlatformInfoController.java:36
+  PlatformInfoController#probe 既没有 @AinerAuthorize，也没有 @EndpointAccess，且未登记在
+  scripts/endpoint-authorization-whitelist.txt`；临时登记进白名单后门禁 `exit 0`（证明白名单机制
+  可用，随后删除登记并核对 sha256 与 HEAD 一致）；临时用例打该端点得到 403，拦截器输出
+  `ERROR … 端点未声明授权口径，FAIL_CLOSED 拒绝：GET /api/platform/info-probe ->
+  dev.ainer.server.endpoint.PlatformInfoController#probe`；还原后
+  `PlatformInfoController.java` 与测试文件的 sha256 与改动前逐一相同，门禁恢复 0 违规。
+- **测试**：新增 20 项（基线 604 → 624）。`ainer-server` 真 HTTP + 真签名 JWT + PostgreSQL 18.3
+  Testcontainers：`EndpointAuthorizationFailClosedTest` 8 项（未声明端点已认证 403 / 匿名 401 且日志留
+  ERROR、`@AinerAuthorize` 无 Binding 403 建 Binding 后 200、`PUBLIC` 匿名 200、`AUTHENTICATED`
+  与类级 `DELEGATED` 匿名 401 已认证 200、`public-paths` 里的 `/api/platform/info` 不受影响、
+  第三方 handler（`/actuator/health`、`/v3/api-docs`、错误分发 404）不被误拒）；
+  `EndpointAuthorizationWarnModeTest` 3 项（放行 + WARN 日志、仍要求认证、声明仍生效）；
+  `ainer-module-authorization` 单元测试 9 项（声明口径 + 未声明处置 + 默认值 fail-closed）。
+  不使用 Mockito / H2。
+- **全量验证**：JDK 25.0.2 + Maven 4.0.0-rc-6 + Colima/PostgreSQL 18.3，
+  `DOCKER_HOST=unix://$HOME/.colima/default/docker.sock
+  TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw clean verify` →
+  28/28 模块 BUILD SUCCESS、**624 tests / 0 failure / 0 error / 0 skipped**、4m21s
+  （同环境基线 604 tests，用时 4m18s）；`scripts/check-surefire-results.sh` 通过。
+- **三道门禁**：`check-endpoint-authorization.sh`（672 Java 文件 / 106 handler / 0 违规）、
+  `check-runtime-wiring.sh`（Dockerfile COPY 27 模块、3 处 `@Scheduled` 有 `@EnableScheduling`）、
+  `check-framework-boundary.sh`（框架 main 656 Java、pom 28、migration 19 / DDL 74，0 违规）同时通过；
+  `check-release-contracts.sh` 已把端点授权门禁纳入本地执行链，CI 新增独立步骤
+  `Verify endpoint authorization declarations`（未改动任何既有 job/step 的 `name`）。
+- **全量 verify 暴露并修复的两处**：静态门禁原先只在顶层类累积成员缓冲、漏掉嵌套 `static Controller`
+  （改为类型作用域栈后真实树输出不变、负向仍拦）；默认拒绝翻转后两个测试夹具的未声明 handler 变为
+  403（`AuthorizationManagementHttpTest` 的受保护写端点、`AgentDelegationFlowTest` 的 acting-grant
+  探针），按其真实机制补 `DELEGATED` 声明，被测行为不变。
+- **升级影响**：未声明端点会从「已认证即可访问」变为 403。补声明即可，或显式配置
+  `ainer.security.endpoint-authorization.mode: warn` 灰度（放行 + WARN 日志），静态门禁不受该开关
+  影响、仍硬失败；Changelog 已按破坏性变更记录。
+- **边界**：门禁不解析继承来的映射（基类 Controller、接口默认实现）与第三方 jar 内端点；
+  `framework-handler-packages`（默认 `org.springframework.` / `org.springdoc.` / `io.swagger.`）是
+  显式豁免面，宿主引入其他第三方 MVC 库时需自行登记；白名单只豁免静态门禁，不改变运行期裁决。
+2026-09-11 全量门禁（`security_epoch` 写路径批次，工具链 JDK 25 + Spring Boot 4.1.1 + Maven 4.0.0-rc-6）
+- **命令**：`DOCKER_HOST=unix:///Users/xq/.colima/default/docker.sock TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw clean verify`
+- **结果**：28/28 reactor 模块 SUCCESS，`BUILD SUCCESS`，`Total time: 04:31 min`；
+  surefire 汇总 **632 tests / 0 failure / 0 error / 0 skipped**（25 个含测试模块的 XML 报告逐项求和）；
+  其中 `ainer-module-identity` 53 tests、`ainer-authorization-server` 57 tests。
+- **门禁**：`scripts/check-framework-boundary.sh` → 违规 0 处（框架 main Java 658 个、框架与根 pom
+  28 个、框架 migration 20 个 / DDL 75 条）；`scripts/check-runtime-wiring.sh` → Dockerfile COPY
+  覆盖 27 个 reactor 模块、3 处 `@Scheduled` 均有生效的 `@EnableScheduling`；
+  `AINER_COMMERCIAL_VERSION=1.4.1 scripts/check-release-contracts.sh` → 全部通过（两道门禁由它一并调用，
+  不在 `mvnw verify` 生命周期内，因此单独执行）。
+- **新增测试**：epoch 写路径 12、真实 PKCE 在线/离线撤销边界 4、控制面 HTTP 6、控制面配置失败关闭 5、
+  JDBC 装箱标量 claim 往返 1，合计 28 tests，全部包含在上述 632 内，0 skipped。
+
+2026-09-11 `security_epoch` 写路径缺失（文档承诺与实现相反）关闭
+- **缺陷**：`HumanAccount`/`ServicePrincipal` 的 `security_epoch` 只有 insert/select，没有任何
+  UPDATE，也从来没有禁用/锁定/关闭/密码轮换递增 epoch 的写路径，唯一构造点写死 `0L`。于是
+  `RevocationAwareOAuth2AuthorizationService` 的 `account.securityEpoch() == tokenEpoch` **恒真**：
+  `security.md`/`architecture.md`/`operations.md` 写成已解决的"账号禁用/密码轮换后旧 Token 失效"
+  在代码里并不存在。
+- **修正（写路径）**：`IdentityFoundationService` 新增 `changeAccountStatus`（`DISABLED`/`LOCKED`/
+  `CLOSED`/恢复 `ACTIVE`）、`rotatePassword`（返回前后 epoch 投影）、`revokeCredential`；
+  `ServicePrincipalFoundationService` 新增 `changePrincipalStatus`。状态与 epoch 在**同一条带期望态
+  的条件 UPDATE** 内前进（`WHERE id = ? AND status = ?`，影响 0 行即 409），`CLOSED` 是终态、
+  重复迁移失败关闭；不引入 outbox/relay。
+- **修正（HTTP 面）**：新增 Authorization Server 内部控制面 `/internal/identity/**`（默认关闭）：
+  `identity.accounts.manage` / `identity.service-principals.manage` 两个最小 scope + 精确可信
+  SERVICE `sub` + 调用方 ServicePrincipal 当前 ACTIVE 且 `sec_epoch` 等于当前 epoch；变更与
+  `ainer_identity_principal_lifecycle_audit` 审计同事务；无匿名入口。
+- **修正（连带缺陷）**：集成测试暴露 `oauth2_authorization` 的 claim 元数据反序列化拒绝
+  `java.lang.Long` 类型 id，`findByToken` 抛 `InvalidTypeIdException`，任何带 `sec_epoch` 的
+  真实 Token 都会让 introspection 退化成 503——即使补上写路径也无法判定撤销。已在
+  `AinerOAuth2AuthorizationJsonMapperFactory` 的 `PolymorphicTypeValidator` 中放行
+  `String`/`Long`/`Integer`/`Boolean`/`Double` 这些无副作用标量（不放行整个 `java.lang`）。
+- **边界固化**：新增测试明确固定"即时撤销只在 RFC 7662 在线校验路径成立"——关闭在线校验的
+  Resource Server 对同一旧 Token 仍返回 200；文档相应改为带条件表述（见 ADR-0057）。
+- **新增测试**（真实 PostgreSQL `postgres:18.3-alpine` Testcontainers，均 0 skipped、无 Mockito/H2）：
+  `IdentitySecurityEpochWritePathTest` 12 tests（状态机/并发/epoch 单调/轮换与撤销同事务）、
+  `IdentitySecurityEpochRevocationIntegrationTest` 4 tests（真实 PKCE Token + 两个真实
+  Resource Server 探针：在线 401 / 离线 200 / 轮换后新 Token 200）、`IdentityControlPlaneHttpTest`
+  6 tests、`IdentityControlConfigurationTest` 5 tests（开关开而无白名单必须启动失败）、
+  `AinerOAuth2AuthorizationJsonMapperFactoryTest` 1 test（去掉白名单即失败，已实测验证）。
+- **验证**：全量门禁数字见本节末条"2026-09-11 全量门禁"。
+
 2026-09-11 CI 暴露：通知模块时间入口未遵循微秒约定（纳秒 vs `timestamptz` 精度漂移）
 - **症状**：PR #78 的 quality gate 在
   `NotificationIntegrationTest.markFailedWithRetrySchedulesNextRetryAndIncrementsCount` 失败：
@@ -499,6 +596,34 @@ Ainer 项目签名 provenance 已通过。
 - **范围边界**：不改缓存/锁（PR-B `codex/adr-0039-cache-and-lock-reality`）与 HTTP 异常处理
   （PR-A）；`SENDING` 租约把投递明确为 **at-least-once**（租约过期后允许重新领取），
   exactly-once 语义不在本 PR 范围。
+
+2026-09-11 CI 暴露：投递引擎缺首次执行延迟，与手动驱动的测试争抢记录（本批改动引入的交互回归）
+- **症状**：PR #79 的 quality gate 在 notification 模块失败——`SmtpMailChannelSenderIntegrationTest`
+  `expected: SENT but was: SENDING`、`NotificationIntegrationTest.timestampsWithNanosecondPrecisionAreReadBackAtMicrosecondPrecision`
+  读回为空。两处本地均全绿。
+- **根因**：本批把 `@EnableScheduling` 改为默认生效（原缺陷是它挂在无关业务开关上导致通知永不投递）之后，
+  投递引擎在**每个**上下文里都会运行；而 `@Scheduled` 未声明 `initialDelay` 时 Spring 会在上下文刷新后
+  **立即执行一次**——那次"启动即投递"抢先领取了记录并写入租约，测试随后手动调用 `deliverBatch()`
+  因租约不匹配而领不到同一行，断言于是拿到 `SENDING`。仓库另一个 `@Scheduled`
+  （`WorkspaceAuthorizationAuditRetentionRunner`）**本来就有** `initialDelayString`，只有投递引擎漏了。
+- **修正**：`NotificationDeliveryEngine#deliverBatch` 补 `initialDelayString`（与轮询间隔同值：生产上首次投递
+  推迟一个周期、测试里把间隔设成极大值时不再触发）；新增契约测试
+  `NotificationDeliverySchedulingContractTest`，以反射断言"必须声明首次执行延迟"，并做过**变异验证**
+  （临时移除 `initialDelayString` → 该测试以预期消息失败，随后逐字节还原）。
+- **性质**：这是"修好一个静默失效（调度默认开启）之后暴露出的跨组件交互问题"，不是新功能缺陷；
+  也说明"本地全绿"不足以证明多消费者/多上下文的交互正确。
+
+2026-09-11 端点授权门禁在合并期抓到跨分支缺陷（门禁自身有效性的实证）
+- **现象**：安全加固第二批的两条分支各自全绿（端点默认拒绝 624 tests；identity 生命周期与 `security_epoch` 632 tests），
+  但把两支合并到同一棵树后，`scripts/check-endpoint-authorization.sh` **立即失败并打印 4 处违规**：
+  `IdentityControlController` 的 `transitionAccountStatus`/`rotatePassword`/`revokeCredential`/
+  `transitionServicePrincipalStatus` 既没有 `@AinerAuthorize` 也没有 `@EndpointAccess`、且未登记白名单——
+  该分支开发时门禁尚不存在。
+- **处置**：按既有 14 个 Authorization Server handler 的同一口径登记 `IdentityControlController#*`，
+  理由写明精确机制（`/internal/identity/**` 默认关闭；开启时要求 `SCOPE_identity.accounts.manage` 或
+  `SCOPE_identity.service-principals.manage` + 精确登记的可信 SERVICE sub + 调用方 ServicePrincipal 当前 ACTIVE
+  且 Token `sec_epoch` 等于其当前 epoch；未登记路径 `denyAll`；该应用不装配 `AinerAuthorizeInterceptor`）。
+- **意义**：这是新门禁第一次在"分支各自绿、合并才红"的场景下拦住真实缺口；也说明合并后整体验证不可省略。
 
 2026-09-11 上述各批改动合并后的整体验证（PR #78 最终树）
 - **合并方式**：四个独立验证过的分支（HTTP 状态语义、ADR-0039 缓存与分布式锁、通知投递与运行时装配门禁、

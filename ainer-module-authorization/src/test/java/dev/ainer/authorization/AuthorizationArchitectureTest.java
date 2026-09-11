@@ -57,8 +57,25 @@ class AuthorizationArchitectureTest {
     @Test
     void springAdapterIsOnlyReferencedByModuleConfiguration() {
         // 只有模块装配 Configuration 允许引用 spring/ 适配层；domain/application 等不得反向依赖。
+        // 例外：spring/ 里的注解类型（含其嵌套类型，如 @EndpointAccess.Kind）是纯声明元数据
+        // （无行为、无 Spring 依赖），任何层都可以用它标注自己的端点——把注解也纳入「适配层行为」
+        // 限制会逼出「api 层不能用注解声明访问口径」的荒谬结论。
         classes()
                 .that().resideInAPackage("..authorization.spring..")
+                .and(new com.tngtech.archunit.base.DescribedPredicate<
+                        com.tngtech.archunit.core.domain.JavaClass>("不是注解类型或其嵌套类型") {
+                    @Override
+                    public boolean test(com.tngtech.archunit.core.domain.JavaClass candidate) {
+                        com.tngtech.archunit.core.domain.JavaClass current = candidate;
+                        while (current != null) {
+                            if (current.isAnnotation()) {
+                                return false;
+                            }
+                            current = current.getEnclosingClass().orElse(null);
+                        }
+                        return true;
+                    }
+                })
                 .should().onlyHaveDependentClassesThat(new com.tngtech.archunit.base.DescribedPredicate<
                         com.tngtech.archunit.core.domain.JavaClass>(
                         "适配层本身或模块装配 Configuration") {

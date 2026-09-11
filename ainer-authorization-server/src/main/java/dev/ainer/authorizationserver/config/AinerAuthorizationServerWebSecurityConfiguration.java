@@ -117,6 +117,12 @@ public class AinerAuthorizationServerWebSecurityConfiguration {
                         .requestMatchers("/internal/oauth-browser-clients/**")
                         .hasAuthority("SCOPE_" + AinerAuthorizationServerConfiguration
                                 .BROWSER_CLIENT_CONTROL_MANAGE_SCOPE)
+                        .requestMatchers("/internal/identity/accounts/**")
+                        .hasAuthority("SCOPE_" + AinerAuthorizationServerConfiguration
+                                .IDENTITY_ACCOUNT_CONTROL_MANAGE_SCOPE)
+                        .requestMatchers("/internal/identity/service-principals/**")
+                        .hasAuthority("SCOPE_" + AinerAuthorizationServerConfiguration
+                                .IDENTITY_SERVICE_PRINCIPAL_CONTROL_MANAGE_SCOPE)
                         .anyRequest().denyAll())
                 .csrf(csrf -> csrf.disable())
                 .requestCache(cache -> cache.disable())

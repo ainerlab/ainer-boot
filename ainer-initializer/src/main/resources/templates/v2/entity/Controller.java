@@ -1,6 +1,7 @@
 package {{package.name}}.{{entity.package}}.api;
 
 import {{package.name}}.{{entity.package}}.application.{{entity.className}}ApplicationService;
+import dev.ainer.authorization.spring.EndpointAccess;
 import dev.ainer.core.web.ApiResponse;
 import dev.ainer.security.token.AuthenticatedPrincipalResolver;
 import dev.ainer.web.request.RequestIds;
@@ -25,6 +26,12 @@ import java.util.UUID;
 @Validated
 @RestController
 @RequestMapping("/api/workspaces/{workspaceId}/{{resource.path}}")
+@EndpointAccess(
+        kind = EndpointAccess.Kind.DELEGATED,
+        reason = "生成业务端点：每个用例在 {{entity.className}}ApplicationService 内显式执行"
+                + "「HUMAN 主体 + 实体 read/write scope + 目标 Workspace ACTIVE membership」三层校验，"
+                + "并写入 access audit（ADR-0052 §3）。HTTP 层不重复设 Ainer Binding 闸门，"
+                + "避免把对象级授权降级成粗粒度权限码。")
 public class {{entity.className}}Controller {
 
     private final {{entity.className}}ApplicationService service;

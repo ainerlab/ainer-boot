@@ -78,8 +78,16 @@ public class NotificationDeliveryEngine {
      * <p>调度由 {@code AinerSchedulingAutoConfiguration} 提供的全局
      * {@code @EnableScheduling} 驱动（默认生效，见 {@code ainer.scheduling.enabled}）；
      * 缺少该装配时本方法不会被调用，通知会静默停留在 PENDING。
+     *
+     * <p><strong>首次执行延迟一个轮询周期</strong>：{@code @Scheduled} 不设
+     * {@code initialDelay} 时会在上下文刷新后立即执行一次，那会在应用尚未就绪时抢先领取记录，
+     * 并让「测试里手动调用 {@link #deliverBatch()}」与调度线程争抢同一批记录（CI 上实测到的
+     * {@code expected: SENT but was: SENDING} 即由此产生）。与
+     * {@code WorkspaceAuthorizationAuditRetentionRunner} 保持同一写法。
      */
-    @Scheduled(fixedDelayString = "${ainer.notification.poll-interval-ms:5000}")
+    @Scheduled(
+            fixedDelayString = "${ainer.notification.poll-interval-ms:5000}",
+            initialDelayString = "${ainer.notification.poll-interval-ms:5000}")
     public void deliverBatch() {
         List<NotificationRecord> batch = recordRepository.claimPending(
                 BATCH_SIZE, leaseOwner, clock.instant().plus(properties.leaseDuration()));

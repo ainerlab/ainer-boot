@@ -20,6 +20,7 @@ import dev.ainer.authorization.policy.PublicAccessPolicy;
 import dev.ainer.authorization.policy.ScopePermissionCeiling;
 import dev.ainer.authorization.spring.AinerAuthorizeInterceptor;
 import dev.ainer.authorization.spring.AinerRequestAuthorizationManager;
+import dev.ainer.authorization.spring.EndpointAuthorizationProperties;
 import dev.ainer.core.error.ErrorCodeContributor;
 import dev.ainer.security.token.AuthenticatedPrincipalResolver;
 import org.apache.ibatis.annotations.Mapper;
@@ -31,6 +32,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -50,6 +52,7 @@ import java.util.Set;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "ainer.authorization", name = "enabled", havingValue = "true", matchIfMissing = true)
+@EnableConfigurationProperties(EndpointAuthorizationProperties.class)
 @ComponentScan(basePackageClasses = AuthorizationFeatureMarker.class)
 @MapperScans(@MapperScan(basePackageClasses = AuthorizationFeatureMarker.class, annotationClass = Mapper.class))
 public class AuthorizationModuleConfiguration {
@@ -262,9 +265,13 @@ public class AuthorizationModuleConfiguration {
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     @ConditionalOnMissingBean
     AinerAuthorizeInterceptor ainerAuthorizeInterceptor(
-            ObjectProvider<AinerRequestAuthorizationManager> authorizationManager) {
+            ObjectProvider<AinerRequestAuthorizationManager> authorizationManager,
+            EndpointAuthorizationProperties endpointAuthorizationProperties) {
         AinerRequestAuthorizationManager manager = authorizationManager.getIfAvailable();
-        return manager == null ? null : new AinerAuthorizeInterceptor(manager);
+        return manager == null ? null : new AinerAuthorizeInterceptor(
+                manager,
+                endpointAuthorizationProperties.getMode(),
+                endpointAuthorizationProperties.getFrameworkHandlerPackages());
     }
 
     @Bean("ainerAuthorizationWebMvcConfigurer")

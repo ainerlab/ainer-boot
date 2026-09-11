@@ -46,6 +46,18 @@ public class MybatisHumanAccountRepository implements HumanAccountRepository {
                 .map(MybatisHumanAccountRepository::toAccount);
     }
 
+    @Override
+    public int transitionStatus(
+            UUID accountId, AccountStatus expectedStatus, AccountStatus targetStatus) {
+        return mapper.transitionStatusAndIncrementEpoch(
+                accountId, expectedStatus.name(), targetStatus.name());
+    }
+
+    @Override
+    public int incrementSecurityEpoch(UUID accountId, AccountStatus expectedStatus) {
+        return mapper.incrementSecurityEpoch(accountId, expectedStatus.name());
+    }
+
     private static HumanAccount toAccount(HumanAccountRow row) {
         return new HumanAccount(
                 row.getId(),

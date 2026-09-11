@@ -4,6 +4,21 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
 
 ## [Unreleased]
 
+### Changed
+
+- **端点层默认拒绝（破坏性变更）**：`@AinerAuthorize` 是逐方法可选注解，没有它的 Controller 方法会落到
+  Resource Server 的 `anyRequest().authenticated()`——只要求登录、不要求任何权限，且编译期、启动期、
+  既有 CI 都不会失败。现在同一不变量由三层保证：新增 `@EndpointAccess(kind = PUBLIC | AUTHENTICATED |
+  DELEGATED, reason = "...")` 显式声明机制；`AinerAuthorizeInterceptor` 按
+  `ainer.security.endpoint-authorization.mode`（默认 `fail-closed`）拒绝未声明 handler（403 + ERROR
+  日志，`warn` 只作升级期灰度并记 WARN）；新增 `scripts/check-endpoint-authorization.sh` 静态门禁，
+  在 CI 与本地发布合同门禁里硬失败并打印 `文件:行`。
+  **升级影响**：未声明端点从「已认证即可访问」变为 403。处理路径：① 补 `@AinerAuthorize` 或
+  `@EndpointAccess`（匿名端点还需登记 `public-paths`）；② 升级期显式配置
+  `ainer.security.endpoint-authorization.mode: warn` 灰度，按 WARN 日志清单补齐后再切回。参考装配
+  （`ainer-server` 及其依赖模块）与 Initializer v2 模板已逐端点补齐声明，门禁在真实树零违规；
+  决策记录见 [ADR-0056](docs/decisions/0056-endpoint-authorization-default-deny.md)。
+
 ## [1.4.1] - 2026-08-28
 
 兼容性补丁版本：关闭商业文档相对稳定发行漂移的缺陷，并把目标版本一致性加入 CI/Release

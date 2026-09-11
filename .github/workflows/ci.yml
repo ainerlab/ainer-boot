@@ -66,6 +66,12 @@ jobs:
       - name: Verify framework and product boundary
         run: ./scripts/check-framework-boundary.sh
 
+      # 端点授权声明门禁：没有 @AinerAuthorize / @EndpointAccess 的 Controller 方法在运行期落到
+      # anyRequest().authenticated()（即对所有已认证主体开放）。静态门禁与运行期
+      # ainer.security.endpoint-authorization.mode=FAIL_CLOSED 是同一不变量的两层，缺一不可。
+      - name: Verify endpoint authorization declarations
+        run: ./scripts/check-endpoint-authorization.sh
+
       - name: Verify Docker runtime
         run: docker info
 

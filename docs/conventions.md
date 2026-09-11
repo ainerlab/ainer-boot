@@ -179,8 +179,24 @@ public enum WorkspaceErrorCode implements ErrorCode {
 - 审计查询必须有独立 scope、资源管理员校验以及资源绑定条件；读取审计本身也需要审计。
 - Identity 只允许返回显式安全投影，禁止复用包含 password hash、锁定状态或 OAuth 协议字段的账号对象。
 - 自包含 JWT 不得被描述为数据库状态变化后立即失效；账号撤销通过 `sec_epoch`/`security_epoch`
+  在线比对生效（`RevocationAwareOAuth2AuthorizationService`），且**只在 RFC 7662 在线校验路径上
+  即时**，离线路径仍受 Token TTL 约束。epoch 递增必须与状态/凭据变更在同一条带期望态的条件
+  UPDATE 内完成，普通 `@Async`/`@TransactionalEventListener` 不能承担可靠撤销通知。
+
   在线比对实时生效（`RevocationAwareOAuth2AuthorizationService`），普通 `@Async`/
   `@TransactionalEventListener` 不能承担可靠撤销通知。
+- **新增/修改 Controller 方法必须先归类并显式声明访问口径**（2026-09-11 立档，见
+  [`security.md` §3.4](security.md) 与 [ADR-0056](decisions/0056-endpoint-authorization-default-deny.md)）。`@AinerAuthorize` 是逐方法可选注解，未声明的 handler 会
+  落到 `anyRequest().authenticated()`（只要求登录、不要求权限），所以四类口径必须写进源码：
+  业务操作 → `@AinerAuthorize(permission=...)`；匿名 → `@EndpointAccess(kind = PUBLIC,
+  reason = "...")` **且**把路径登记进 `ainer.security.resource-server.public-paths`；只要求登录 →
+  `AUTHENTICATED`；授权在应用服务或端点专属安全构件内完成 → `DELEGATED`（reason 必须写清是哪个
+  机制在强制）。
+- **`public-paths` 只是外层可达性开关，不能替代源码声明**：只改配置让某个匿名端点生效会被静态门禁
+  拦下；只加声明不登记白名单则匿名请求仍 401（失败关闭方向）。
+- **白名单只在运行期拦截器覆盖不到时使用**：`scripts/endpoint-authorization-whitelist.txt`
+  按 `类#方法`（支持 `*` 通配）登记并写清理由，只豁免静态门禁、不改变运行期裁决；无匹配 handler 的
+  过期登记失败关闭。默认拒绝仍是 `fail-closed`，把它切成 `warn` 只能作为升级期显式灰度。
 
 ## 10. AI
 
@@ -264,6 +280,19 @@ public enum WorkspaceErrorCode implements ErrorCode {
   恒真）。
 - CI 在 `JDK 25 / Maven 4 quality gate` job 中以独立步骤执行；本地执行
   `scripts/check-release-contracts.sh` 时一并执行。
+
+端点授权声明门禁（§9 新增/修改 Controller 方法规则）的执行面：
+
+- `scripts/check-endpoint-authorization.sh`：扫描 reactor 的 `src/main/java/**` 与 Initializer v2
+  模板，逐个 `@RestController` / `@Controller` 方法检查 `@AinerAuthorize` 或 `@EndpointAccess`
+  （类级声明同样算数）；两者都没有时查白名单登记。违规打印 `文件:行` 并 exit 1，白名单缺失、
+  格式错误、缺 reason、过期登记一律失败关闭。
+- 运行期：`ainer.security.endpoint-authorization.mode`（默认 `fail-closed`）由
+  `AinerAuthorizeInterceptor` 消费，未声明 handler 直接 403 并记 ERROR 日志；`warn` 只作升级期
+  灰度，静态门禁不受该开关影响。
+- CI 在 `JDK 25 / Maven 4 quality gate` job 中以独立步骤执行；本地执行
+  `scripts/check-release-contracts.sh` 时一并执行；运行期行为由 `ainer-server` 的真 HTTP + 真签名
+  JWT + PostgreSQL 测试覆盖（`EndpointAuthorization*Test`）。
 
 本节只约束框架侧的单向边界。产品模块之间的依赖、产品包在新产品线中的命名、产品 migration 的
 版本序列等都不在此约束；遇到时按「待决策」提出，不自行发明语义。

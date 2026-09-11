@@ -2,6 +2,7 @@ package dev.ainer.module.identity.foundation;
 
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.security.principal.IdentityAuthorityRef;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -83,6 +84,47 @@ public class ServicePrincipalFoundationService {
     public Optional<ServicePrincipal> findPrincipalByClientId(String clientId) {
         requireNonBlank(clientId, "clientId");
         return principalRepository.findByActiveClientId(clientId);
+    }
+
+    /**
+     * principal 生命周期状态迁移（禁用/恢复）的唯一写路径。状态与 {@code security_epoch} 在
+     * 同一条条件 UPDATE 中前进：禁用后既不再签发 token，早于新 epoch 的 token 也不再匹配
+     * 当前 epoch；恢复同样递增 epoch，使禁用前签发的 token 不会随恢复"复活"。
+     * 未知 principal、同状态重复迁移与并发竞争都失败关闭。
+     */
+    @Transactional
+    public PrincipalStatusTransition changePrincipalStatus(
+            UUID principalId, ServicePrincipalStatus targetStatus) {
+        Objects.requireNonNull(principalId, "principalId");
+        Objects.requireNonNull(targetStatus, "targetStatus");
+
+        ServicePrincipal principal = principalRepository.findByPrincipalId(principalId)
+                .orElseThrow(() -> new BusinessException(IdentityErrorCode.SERVICE_PRINCIPAL_NOT_FOUND));
+        if (!principal.status().canTransitionTo(targetStatus)) {
+            throw new BusinessException(IdentityErrorCode.SERVICE_PRINCIPAL_STATE_CONFLICT);
+        }
+        if (principalRepository.transitionStatus(
+                principalId, principal.status(), targetStatus) != 1) {
+            throw new BusinessException(IdentityErrorCode.SERVICE_PRINCIPAL_STATE_CONFLICT);
+        }
+        ServicePrincipal current = principalRepository.findByPrincipalId(principalId)
+                .orElseThrow(() -> new BusinessException(IdentityErrorCode.SERVICE_PRINCIPAL_NOT_FOUND));
+        return new PrincipalStatusTransition(
+                principal.status(), current.securityEpoch() - 1, current);
+    }
+
+    /**
+     * 一次 principal 状态迁移的前后投影，供调用方写安全操作审计。
+     */
+    public record PrincipalStatusTransition(
+            ServicePrincipalStatus previousStatus, long previousEpoch, ServicePrincipal current) {
+        public PrincipalStatusTransition {
+            Objects.requireNonNull(previousStatus, "previousStatus");
+            Objects.requireNonNull(current, "current");
+            if (previousEpoch < 0) {
+                throw new IllegalArgumentException("previousEpoch must be non-negative");
+            }
+        }
     }
 
     private static void requireNonBlank(String value, String name) {

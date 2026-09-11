@@ -36,4 +36,13 @@
         WHERE b.client_id = #{clientId}
           AND b.status = 'ACTIVE'
     </select>
+
+    <!-- 与 HumanAccount 相同的 compare-and-set：状态与 epoch 在同一条语句内前进。 -->
+    <update id="transitionStatusAndIncrementEpoch">
+        UPDATE ainer_identity_service_principal
+        SET status = #{targetStatus},
+            security_epoch = security_epoch + 1
+        WHERE id = #{principalId}
+          AND status = #{expectedStatus}
+    </update>
 </mapper>
