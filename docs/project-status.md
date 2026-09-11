@@ -597,6 +597,18 @@ Ainer 项目签名 provenance 已通过。
   （PR-A）；`SENDING` 租约把投递明确为 **at-least-once**（租约过期后允许重新领取），
   exactly-once 语义不在本 PR 范围。
 
+2026-09-11 端点授权门禁在合并期抓到跨分支缺陷（门禁自身有效性的实证）
+- **现象**：安全加固第二批的两条分支各自全绿（端点默认拒绝 624 tests；identity 生命周期与 `security_epoch` 632 tests），
+  但把两支合并到同一棵树后，`scripts/check-endpoint-authorization.sh` **立即失败并打印 4 处违规**：
+  `IdentityControlController` 的 `transitionAccountStatus`/`rotatePassword`/`revokeCredential`/
+  `transitionServicePrincipalStatus` 既没有 `@AinerAuthorize` 也没有 `@EndpointAccess`、且未登记白名单——
+  该分支开发时门禁尚不存在。
+- **处置**：按既有 14 个 Authorization Server handler 的同一口径登记 `IdentityControlController#*`，
+  理由写明精确机制（`/internal/identity/**` 默认关闭；开启时要求 `SCOPE_identity.accounts.manage` 或
+  `SCOPE_identity.service-principals.manage` + 精确登记的可信 SERVICE sub + 调用方 ServicePrincipal 当前 ACTIVE
+  且 Token `sec_epoch` 等于其当前 epoch；未登记路径 `denyAll`；该应用不装配 `AinerAuthorizeInterceptor`）。
+- **意义**：这是新门禁第一次在"分支各自绿、合并才红"的场景下拦住真实缺口；也说明合并后整体验证不可省略。
+
 2026-09-11 上述各批改动合并后的整体验证（PR #78 最终树）
 - **合并方式**：四个独立验证过的分支（HTTP 状态语义、ADR-0039 缓存与分布式锁、通知投递与运行时装配门禁、
   框架 ↔ 产品边界门禁）合并到同一集成分支；`docs/project-status.md` 的条目冲突按「各方记录全部保留」解决。
