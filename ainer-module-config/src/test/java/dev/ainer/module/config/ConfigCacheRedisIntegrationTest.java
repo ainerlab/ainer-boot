@@ -48,6 +48,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>secret 字段在缓存里是密文实体，明文只在内存中解密。</li>
  * </ol>
  *
+ * <p>计数类断言一律按<strong>增量</strong>表达（先做只读观察固定前提，再比较前后差值），不写「全局总数 == 常数」，
+ * 因此不依赖 Redis 命令的落地时序，不会在 CI 的容器网络下假失败；完整论证见
+ * {@link #mainReadPathsDoNotHitDatabaseAgainOnCacheHit()} 的 javadoc。
+ *
  * <p><strong>测试环境策略</strong>：本类通过 {@code RedisFailFastFixture} 让 Lettuce 在断连时直接失败
  * （{@code REJECT_COMMANDS} + {@code autoReconnect(false)}）。原因是一次实测发现：本机 Colima 偶发
  * Redis 连接抖动时，Lettuce 默认会缓冲命令并在重连后重放，「写 → evict → 读」因此可能乱序落地，
@@ -158,37 +162,63 @@ class ConfigCacheRedisIntegrationTest {
         assertThat(service.getValue("app", "site.name")).contains("Ainer Boot v2");
     }
 
+    /**
+     * 证明「缓存命中 ⇒ 不再访问数据库」（即主读路径真的接通了缓存，而不是自调用绕过代理）。
+     *
+     * <p>断言全部按<strong>增量</strong>表达，不写成「全局总数 == 某个常数」，因为写 → evict → 读这条链路上
+     * evict（DEL）与回填（PUT）的落地顺序由 Redis 客户端与网络决定（Lettuce 在断连/重连窗口会缓冲并重放
+     * 命令），等待轮询期间的 miss 次数也不确定：任何全局常数断言都会在 CI 的容器网络下随机假失败。
+     *
+     * <p>为什么这版不会因时序抖动假失败——每个断言都先用<strong>只读、且不触发业务读</strong>的观察固定其前提，
+     * 再比较「观察前后的增量」，而两次观察之间不再有任何写操作，因此增量由业务语义决定：
+     * <ul>
+     *   <li><b>命中性质</b>：先预热（业务读一次完成读库+回填），再等到「缓存条目已可观察」（读缓存 API，
+     *       不触发业务读、不打库）。此后重复读的区间内没有任何写或 evict，缓存必然命中，
+     *       所以数据库调用增量<strong>必然为 0</strong>；</li>
+     *   <li><b>写路径</b>：{@code setValue} 直读数据库当前版本做乐观锁判定，增量<strong>必然为 1</strong>
+     *       （数据库计数与 Redis 时序无关）；</li>
+     *   <li><b>写后重读</b>：先等「evict 已可观察」（读缓存 API，不打库），再等「业务读返回新值」。
+     *       后者的观察一旦成立，缓存里必然已是新值（miss 时的 PUT 在方法返回前完成），
+     *       且此后本测试不再有写操作，所以紧接着的读必然命中、增量<strong>必然为 0</strong>。
+     *       等待轮询本身可能多次打库，但那些次数不进入任何断言。</li>
+     * </ul>
+     */
     @Test
     void mainReadPathsDoNotHitDatabaseAgainOnCacheHit() {
         service.setValue("app", "cache.probe", "v1", ConfigValueType.STRING, "probe", null);
         service.setSecret("app", "cache.secret", "s3cret", ConfigValueType.STRING, null, null);
-        countingRepository.resetFindCalls();
 
-        // 首次读：缓存未命中 → 两个键各打一次数据库
+        // 预热：业务读一次完成「读库 + 回填」，再用只读缓存观察等到条目真的可观察（该观察不打库）
         assertThat(service.getValue("app", "cache.probe")).contains("v1");
         assertThat(service.getSecret("app", "cache.secret")).contains("s3cret");
-        assertThat(countingRepository.findCalls()).isEqualTo(2);
+        awaitCacheEntry("app:cache.probe");
+        awaitCacheEntry("app:cache.secret");
 
-        // 之后任意多次读都命中缓存 → 数据库调用次数不再增长。
-        // 修复前 getValue/getSecret 自调用 getEntry 绕过缓存代理，这里的计数会继续增长。
+        // 1) 命中性质：预热完成后重复读，数据库调用零增长
+        long beforeHits = countingRepository.findCalls();
         assertThat(service.getValue("app", "cache.probe")).contains("v1");
         assertThat(service.getValue("app", "cache.probe")).contains("v1");
-        assertThat(service.getSecret("app", "cache.secret")).contains("s3cret");
         assertThat(service.getEntry("app", "cache.probe")).isPresent();
-        assertThat(countingRepository.findCalls()).isEqualTo(2);
+        assertThat(service.getSecret("app", "cache.secret")).contains("s3cret");
+        assertThat(countingRepository.findCalls()).isEqualTo(beforeHits);
 
-        // 写路径必须绕过缓存去读数据库当前版本（乐观锁判定）：这一次读必然打库
+        // 2) 写路径：写前直读数据库做乐观锁判定 → 增量恰好 1
+        long beforeWrite = countingRepository.findCalls();
         service.setValue("app", "cache.probe", "v2", ConfigValueType.STRING, "probe", null);
-        assertThat(countingRepository.findCalls()).isEqualTo(3);
+        assertThat(countingRepository.findCalls()).isEqualTo(beforeWrite + 1);
 
-        // 写后 evict 生效，读回到新值并重新打库。
-        // 等待的是「可观察状态」而不是断言本身：拿到 v1 这种不一致状态会继续等待，
-        // 窗口耗尽则以明确的超时错误失败；值断言在等待之后只执行一次。
+        // 3) 写后 evict：只观察「缓存里已经没有该键」（读缓存 API，不触发业务读、不打库）
+        awaitRedis("evict app:cache.probe",
+                () -> cacheManager.getCache(ConfigApplicationService.CACHE_CONFIG_ENTRY).get("app:cache.probe"),
+                Objects::isNull);
+
+        // 4) 写后重新加载：轮询期间的 miss 会打库，因此等状态成立后重新取基线，只断言最后一次读的增量
         awaitRedis("写后新值 app:cache.probe",
                 () -> service.getValue("app", "cache.probe"),
                 value -> value.filter("v2"::equals).isPresent());
+        long afterReload = countingRepository.findCalls();
         assertThat(service.getValue("app", "cache.probe")).contains("v2");
-        assertThat(countingRepository.findCalls()).isEqualTo(4);
+        assertThat(countingRepository.findCalls()).isEqualTo(afterReload);
     }
 
     @Test
@@ -214,6 +244,16 @@ class ConfigCacheRedisIntegrationTest {
     }
 
     // ---- 有界等待（只容忍瞬时故障，不吞断言失败）----
+
+    /**
+     * 等待某个缓存键在缓存后端可观察。<strong>只读缓存 API，不触发业务读、不访问数据库</strong>——
+     * 这是「按增量断言」能够成立的前提：观察本身不会改变数据库调用计数。
+     */
+    private void awaitCacheEntry(String cacheKey) {
+        awaitRedis("缓存条目 " + cacheKey,
+                () -> cacheManager.getCache(ConfigApplicationService.CACHE_CONFIG_ENTRY).get(cacheKey),
+                Objects::nonNull);
+    }
 
     /**
      * 上界 {@link #RETRY_TIMEOUT}（10 秒）、每 {@link #RETRY_INTERVAL}（100ms）探测一次的只读等待。

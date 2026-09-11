@@ -191,20 +191,36 @@ class ConfigIntegrationTest {
         assertThat(entries).filteredOn(ConfigEntry::secret).hasSize(1);
     }
 
+    /**
+     * 证明<strong>默认（Caffeine）后端</strong>下主读路径也真的接通缓存（不是自调用绕过代理）。
+     *
+     * <p>断言与 Redis 版测试同一口径：只按<strong>增量</strong>表达（先预热并做只读观察固定前提，
+     * 再比较前后差值），不写「全局总数 == 某个常数」，因此不会因环境时序抖动假失败；
+     * 完整论证见 {@code ConfigCacheRedisIntegrationTest#mainReadPathsDoNotHitDatabaseAgainOnCacheHit()}。
+     */
     @Test
     void mainReadPathServesFromCacheWithoutHittingDatabaseAgain() {
         service.setValue("app", "cached.read", "v1", ConfigValueType.STRING, null, null);
-        countingRepository.resetFindCalls();
 
-        // 首次读：缓存未命中 → 打一次数据库
+        // 预热：业务读一次完成「读库 + 回填本地缓存」
         assertThat(service.getValue("app", "cached.read")).contains("v1");
-        assertThat(countingRepository.findCalls()).isEqualTo(1);
 
-        // 命中缓存：后续读取不再打数据库（修复自调用绕过代理之前，这里会持续增长）
+        // 1) 命中性质：预热后重复读，数据库调用零增长
+        long beforeHits = countingRepository.findCalls();
         assertThat(service.getValue("app", "cached.read")).contains("v1");
         assertThat(service.getValue("app", "cached.read")).contains("v1");
         assertThat(service.getEntry("app", "cached.read")).isPresent();
-        assertThat(countingRepository.findCalls()).isEqualTo(1);
+        assertThat(countingRepository.findCalls()).isEqualTo(beforeHits);
+
+        // 2) 写路径：写前直读数据库做乐观锁判定 → 增量恰好 1
+        long beforeWrite = countingRepository.findCalls();
+        service.setValue("app", "cached.read", "v2", ConfigValueType.STRING, null, null);
+        assertThat(countingRepository.findCalls()).isEqualTo(beforeWrite + 1);
+
+        // 3) 本地缓存 evict 同步生效（无网络时序）：随后一次读重新读库并回到新值 → 增量恰好 1
+        long beforeReload = countingRepository.findCalls();
+        assertThat(service.getValue("app", "cached.read")).contains("v2");
+        assertThat(countingRepository.findCalls()).isEqualTo(beforeReload + 1);
     }
 
     @Test
