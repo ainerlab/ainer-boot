@@ -10,6 +10,8 @@ import dev.ainer.security.token.AuthenticatedPrincipalResolver;
 import dev.ainer.security.token.ReferenceTokenProfileResolver;
 import dev.ainer.security.token.TokenProfileResolver;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -55,10 +57,39 @@ import java.util.List;
 @EnableMethodSecurity
 public class AinerResourceServerAutoConfiguration {
 
+    /** Spring Boot 的资源服务器 JWKS 信任锚属性（公开属性名，不作为 ainer 自有配置的第二来源）。 */
+    public static final String JWK_SET_URI_PROPERTY = "spring.security.oauth2.resourceserver.jwt.jwk-set-uri";
+
+    /** Spring Boot 的资源服务器 issuer 属性。 */
+    public static final String ISSUER_URI_PROPERTY = "spring.security.oauth2.resourceserver.jwt.issuer-uri";
+
+    private static final Logger log = LoggerFactory.getLogger(AinerResourceServerAutoConfiguration.class);
+
     @Bean
     @ConditionalOnMissingBean(TokenProfileResolver.class)
     public TokenProfileResolver tokenProfileResolver() {
         return new ReferenceTokenProfileResolver();
+    }
+
+    /**
+     * JWKS 信任锚的启动期校验与观测。
+     *
+     * <p>显式配置 {@code jwk-set-uri} 时，Boot 用它取公钥、用 {@code issuer-uri} 校验 issuer
+     * （见 Boot 的 {@code JwkSetUriCondition} / {@code IssuerUriCondition}）。本 Bean 只做两件事：
+     * 让明文信任锚与「有 JWKS 没 issuer」这两种静默故障在启动期失败关闭
+     * （{@link AinerResourceServerProperties#resolveJwkSetTrustAnchor}），并把「公钥从哪来」打进
+     * 启动日志——生产上排查「验签为什么失败」时这是第一个要看的信号。
+     */
+    @Bean
+    AinerJwkSetTrustAnchor ainerJwkSetTrustAnchor(
+            AinerResourceServerProperties properties, Environment environment) {
+        String jwkSetUri = environment.getProperty(JWK_SET_URI_PROPERTY);
+        String issuerUri = environment.getProperty(ISSUER_URI_PROPERTY);
+        AinerJwkSetTrustAnchor trustAnchor = properties.resolveJwkSetTrustAnchor(jwkSetUri, issuerUri);
+        log.info("Ainer resource server trust anchor: jwkSetUri={}, issuerUri={}",
+                trustAnchor.jwkSetUri() == null ? "(discovery via issuer-uri)" : trustAnchor.jwkSetUri(),
+                trustAnchor.issuerUri() == null ? "(unset)" : trustAnchor.issuerUri());
+        return trustAnchor;
     }
 
     @Bean

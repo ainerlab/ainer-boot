@@ -14,6 +14,10 @@ import java.util.List;
  * <p>{@code publicPaths} 定义免认证路径（默认仅平台信息与健康检查）；在线校验
  * （OnlineValidation）配置 introspection 端点与受保护路径规则；StepUp 配置近期强认证
  * 门禁。除显式列出的 publicPaths 外，其余路径一律要求认证。
+ *
+ * <p>{@code allowInsecureJwkSetHttp} 只作用于 Spring Boot 的 JWKS 信任锚
+ * （{@code spring.security.oauth2.resourceserver.jwt.jwk-set-uri}）：该 URI 决定资源服务器
+ * 从哪里取验签公钥，明文 HTTP 且非环回时等价于把签名验证交给网络中间人，因此默认失败关闭。
  */
 @ConfigurationProperties("ainer.security.resource-server")
 public class AinerResourceServerProperties {
@@ -23,13 +27,15 @@ public class AinerResourceServerProperties {
     private final OnlineValidation onlineValidation;
     private final StepUp stepUp;
     private final List<String> publicPaths;
+    private final boolean allowInsecureJwkSetHttp;
 
     public AinerResourceServerProperties(
             boolean enabled,
             String subjectClaim,
             OnlineValidation onlineValidation,
             StepUp stepUp,
-            List<String> publicPaths) {
+            List<String> publicPaths,
+            boolean allowInsecureJwkSetHttp) {
         this.enabled = enabled;
         this.subjectClaim = subjectClaim != null ? subjectClaim : "sub";
         this.onlineValidation = onlineValidation != null
@@ -39,6 +45,7 @@ public class AinerResourceServerProperties {
         this.publicPaths = publicPaths != null
                 ? new ArrayList<>(publicPaths)
                 : new ArrayList<>(List.of("/api/platform/info", "/actuator/health/**", "/actuator/info"));
+        this.allowInsecureJwkSetHttp = allowInsecureJwkSetHttp;
     }
 
     public boolean isEnabled() {
@@ -59,6 +66,68 @@ public class AinerResourceServerProperties {
 
     public List<String> getPublicPaths() {
         return List.copyOf(publicPaths);
+    }
+
+    public boolean isAllowInsecureJwkSetHttp() {
+        return allowInsecureJwkSetHttp;
+    }
+
+    /**
+     * 校验 JWKS 信任锚 URI（来源是 Spring Boot 的
+     * {@code spring.security.oauth2.resourceserver.jwt.jwk-set-uri}；未配置时返回 {@code null}）。
+     *
+     * <p>Spring Security 的 {@code withJwkSetUri} 不做任何 scheme 检查，明文地址会被照单全收；
+     * 而 JWKS 是整条验签链的信任锚，从明文地址取公钥意味着网络中间人可以替换公钥并伪造 Token。
+     * 因此这里在启动期失败关闭：只接受 HTTPS，明文 HTTP 仅允许环回地址且必须显式放行。
+     */
+    URI validateAndGetJwkSetUri(String jwkSetUri) {
+        if (jwkSetUri == null || jwkSetUri.isBlank()) {
+            return null;
+        }
+        URI uri;
+        try {
+            uri = URI.create(jwkSetUri.trim());
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException("Ainer resource server JWK Set URI is invalid", exception);
+        }
+        if (!uri.isAbsolute() || uri.getHost() == null || uri.getUserInfo() != null || uri.getFragment() != null) {
+            throw new IllegalStateException("Ainer resource server JWK Set URI must be an absolute server URL");
+        }
+        if ("https".equalsIgnoreCase(uri.getScheme())) {
+            return uri;
+        }
+        if ("http".equalsIgnoreCase(uri.getScheme())
+                && allowInsecureJwkSetHttp
+                && isLoopbackHost(uri.getHost())) {
+            return uri;
+        }
+        throw new IllegalStateException("Ainer resource server JWK Set URI must use HTTPS; HTTP is allowed only "
+                + "for loopback tests (ainer.security.resource-server.allow-insecure-jwk-set-http=true)");
+    }
+
+    /**
+     * 解析资源服务器的 JWKS 信任锚，并在启动期拦下一个静默故障：显式配置了 {@code jwk-set-uri}
+     * 却把 {@code issuer-uri} 留空。
+     *
+     * <p>Spring Boot 把空字符串绑定成 {@code ""} 而不是 {@code null}，于是在这种组合下会构造出
+     * 「取 JWKS 走 jwk-set-uri、校验 iss 却拿空字符串比」的解码器：进程正常启动，但**所有** Token
+     * 都验不过（`iss` 永远不等于空串），表现为「配置生效了，但谁都进不来」——没有任何启动期报错。
+     * 授权服务器 issuer 与 JWKS 是同一个信任锚的两半，缺一不可，因此这里失败关闭。
+     */
+    AinerJwkSetTrustAnchor resolveJwkSetTrustAnchor(String jwkSetUri, String issuerUri) {
+        URI uri = validateAndGetJwkSetUri(jwkSetUri);
+        if (uri != null && (issuerUri == null || issuerUri.isBlank())) {
+            throw new IllegalStateException("Ainer resource server requires an issuer URI together with the JWK Set "
+                    + "URI: Spring Boot would validate the iss claim against an empty issuer and reject every "
+                    + "token (configure spring.security.oauth2.resourceserver.jwt.issuer-uri)");
+        }
+        return new AinerJwkSetTrustAnchor(uri, issuerUri == null || issuerUri.isBlank() ? null : issuerUri);
+    }
+
+    private static boolean isLoopbackHost(String host) {
+        return "localhost".equalsIgnoreCase(host)
+                || "::1".equals(host)
+                || host.startsWith("127.");
     }
 
     public static final class OnlineValidation {
@@ -178,9 +247,7 @@ public class AinerResourceServerProperties {
         }
 
         private static boolean isLoopbackHost(String host) {
-            return "localhost".equalsIgnoreCase(host)
-                    || "::1".equals(host)
-                    || host.startsWith("127.");
+            return AinerResourceServerProperties.isLoopbackHost(host);
         }
 
         private static void validatePaths(List<String> paths, String name) {
