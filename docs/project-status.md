@@ -339,6 +339,46 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-09-11 决策审计热表无限增长缺陷关闭（分支 `codex/decision-audit-retention`，基线 `2eba916`）
+- **缺陷**：`ainer_authorization_decision_audit` 只有 `insert`——写入端口
+  `AuthorizationDecisionAuditRepository` 与 mapper XML 都只有插入，全仓没有 select / delete /
+  archive / 保留策略；每个带 `@AinerAuthorize` 的请求（ALLOW/DENY/CHALLENGE）写一行，生产长期运行
+  必然失控。
+- **分层**：归档事务与 SQL 留在模块（`AuthorizationDecisionAuditLifecycleService` +
+  `AuthorizationDecisionAuditLifecycleRepository` + mapper 的单语句 CTE）；定时、批次、配置与指标
+  放装配层（`ainer-server` 的 `AuthorizationDecisionAuditRetention{Properties,Configuration,Runner}`）。
+  模块不依赖 `ainer-server`，其他宿主可用自己的调度器装配同一服务。
+- **不丢数据**：单语句原子搬迁——`FOR UPDATE SKIP LOCKED` 选候选行 → `INSERT ... ON CONFLICT
+  (decision_id) DO NOTHING` → 仅当归档行确实存在（本语句 `RETURNING`，或并发事务已提交）才 `DELETE`
+  热行。实测：触发器让归档表写入失败时热行 0 删除、整批回滚、异常计入失败计数；故障排除后同一
+  `cutoff` 仍能完整归档。
+- **多实例并发安全**：`SKIP LOCKED` 跳过其它实例持有的行锁（不阻塞、不重复、不丢行）。两个真并发
+  实例对同一区间 400 行按 batch 25 循环搬运：合计 400、归档表 `COUNT(DISTINCT decision_id)`=400、
+  热/冷交集 0、两实例各搬运 >0；另一实测用例里竞争实例持锁 50 行时，归档在锁未释放前即返回并只
+  搬走未锁的 50 行。
+- **读路径**：热+冷并集按稳定游标 `(evaluated_at, decision_id)` 倒序分页。实测归档前后返回完全一致
+  的 20 行序列；翻页扫描中途归档 24 行后仍返回 24 行且顺序与对照 workspace 一致。当前没有面向决策
+  审计历史的 HTTP 端点（`AuthorizationManagementController` 只有角色/绑定管理），历史查询方式与
+  可直接执行的并集 SQL 示例写在 `docs/operations.md` §10。
+- **Migration（追加，不改已发布文件）**：`V202609120900__authorization_decision_audit_archive.sql`
+  建同构归档表（+`archived_at`，保留原 `decision_id`）与三条索引：归档表
+  `(workspace_id, evaluated_at DESC, decision_id DESC)` 部分索引（按 workspace 读并集）、归档表
+  `(evaluated_at, decision_id)`、热表补 `(evaluated_at, decision_id)`（原热表只有 workspace 维度索引，
+  归档扫描会退化为全表扫描 + 排序）。
+- **全量门禁（唯一验收命令，原始输出）**：
+  `DOCKER_HOST=unix:///Users/xq/.colima/default/docker.sock TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw clean verify`
+  → **28/28 模块 SUCCESS、668 tests / 0 failure / 0 error / 0 skipped**、`Total time: 04:46 min`
+  （JDK 25.0.2 + Spring Boot 4.1.1 + Maven 4.0.0-rc-6；集成测试全部使用真实 PostgreSQL 18.3
+  Testcontainers，无 Mockito / H2）。本次新增 15 项：模块集成 9（不丢数据与逐列一致性、幂等、
+  失败不删热行、保留期边界、真并发不重不丢、`SKIP LOCKED` 跳过持锁行、并集读路径一致性、
+  扫描中途归档、状态快照）+ 装配层 6（批次上限与指标、最久热行 WARN、失败计数与恢复、启动校验、
+  `enabled` 条件装配、`@Scheduled` 首次延迟契约）。
+- **三道门禁（同一棵树实测原始输出）**：`scripts/check-runtime-wiring.sh` →
+  `Dockerfile COPY 覆盖 27 个 reactor 模块；4 处 @Scheduled 均有生效的 @EnableScheduling`（exit 0）；
+  `scripts/check-framework-boundary.sh` → `框架 main Java 文件 670 个、框架与根 pom 28 个、框架
+  migration 21 个（DDL 语句 76 条），违规 0 处`（exit 0）；`scripts/check-endpoint-authorization.sh`
+  → `Java 文件 686 个、handler 方法 110 个（…），违规 0 处`（exit 0）。未新增任何 HTTP 端点。
+
 2026-09-11 端点授权默认拒绝落地（`@EndpointAccess` + 运行期 FAIL_CLOSED + 静态门禁）
 - **缺口**：`@AinerAuthorize` 是逐方法可选注解，没有它的 handler 在 `AinerRequestAuthorizationManager`
   返回 `null`，落到 Resource Server 的 `anyRequest().authenticated()`——只要求登录、不要求权限。
