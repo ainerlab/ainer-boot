@@ -16,4 +16,13 @@ public enum ServicePrincipalStatus {
     public boolean canAuthenticate() {
         return this == ACTIVE;
     }
+
+    /**
+     * 状态机是否允许该迁移：只有 {@code ACTIVE <-> DISABLED} 两个方向。同状态不是变更，
+     * 拒绝以失败关闭（fail-closed），避免空操作再次递增 security_epoch。
+     */
+    public boolean canTransitionTo(ServicePrincipalStatus target) {
+        java.util.Objects.requireNonNull(target, "target");
+        return this != target;
+    }
 }

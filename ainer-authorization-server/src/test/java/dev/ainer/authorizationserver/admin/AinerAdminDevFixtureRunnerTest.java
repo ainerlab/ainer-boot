@@ -1,6 +1,7 @@
 package dev.ainer.authorizationserver.admin;
 
 import dev.ainer.authorizationserver.config.AinerAuthorizationServerProperties;
+import dev.ainer.module.identity.foundation.AccountStatus;
 import dev.ainer.module.identity.foundation.Credential;
 import dev.ainer.module.identity.foundation.CredentialRepository;
 import dev.ainer.module.identity.foundation.CredentialStatus;
@@ -135,6 +136,31 @@ class AinerAdminDevFixtureRunnerTest {
         @Override
         public UUID nextUuidV7() {
             return UUID.randomUUID();
+        }
+
+        @Override
+        public int transitionStatus(
+                UUID accountId, AccountStatus expectedStatus, AccountStatus targetStatus) {
+            HumanAccount current = values.get(accountId);
+            if (current == null || current.status() != expectedStatus) {
+                return 0;
+            }
+            values.put(accountId, new HumanAccount(
+                    current.accountId(), current.authority(), targetStatus,
+                    current.securityEpoch() + 1, current.createdAt()));
+            return 1;
+        }
+
+        @Override
+        public int incrementSecurityEpoch(UUID accountId, AccountStatus expectedStatus) {
+            HumanAccount current = values.get(accountId);
+            if (current == null || current.status() != expectedStatus) {
+                return 0;
+            }
+            values.put(accountId, new HumanAccount(
+                    current.accountId(), current.authority(), current.status(),
+                    current.securityEpoch() + 1, current.createdAt()));
+            return 1;
         }
 
         private int size() {

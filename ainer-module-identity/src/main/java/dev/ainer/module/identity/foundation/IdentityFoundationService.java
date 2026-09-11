@@ -3,6 +3,7 @@ package dev.ainer.module.identity.foundation;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.security.principal.IdentityAuthorityRef;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -23,6 +24,13 @@ import java.util.function.Supplier;
  * {@code (type, providerAuthority, normalizedIdentifier)} 是硬冲突。凭证材料在进入存储前
  * 先用项目的委托式 {@link PasswordEncoder} 编码；{@code (account, type)} 的
  * ACTIVE 唯一性由凭证存储强制。
+ *
+ * <p>生命周期写路径（ADR-0056）：{@link #changeAccountStatus} 是禁用/锁定/关闭/恢复的唯一入口，
+ * {@link #rotatePassword} 与 {@link #revokeCredential} 是凭据类安全变更入口。三者都在同一条带
+ * 期望态的条件 UPDATE 内同时写状态/凭据与递增 {@code security_epoch}（compare-and-set：并发
+ * 迁移只有一个能成功，非法迁移与竞争失败关闭），因此不存在"状态已变但 epoch 未加"的窗口，
+ * 也不依赖任何进程内异步事件或 outbox。递增只让旧 Token 在**在线校验路径**（RFC 7662）上
+ * 立即失效；本地 JWT 校验仍受 Token TTL 约束。
  *
  * <p>未标注 {@code @Service}：{@code Supplier<UUID>} ID 来源在
  * {@code IdentityModuleConfiguration} 中绑定到 foundation 仓库的 {@code nextUuidV7()}，
@@ -158,18 +166,68 @@ public class IdentityFoundationService {
     }
 
     /**
-     * 轮换既有账号的 ACTIVE 密码凭证：吊销当前材料并存入新的 ACTIVE 材料。对未知账号、
-     * 不可认证的账号、没有可轮换 ACTIVE 密码凭证的账号一律失败关闭（fail-closed）。
+     * 轮换既有账号的 ACTIVE 密码凭证：吊销当前材料并存入新的 ACTIVE 材料，并在同一事务内
+     * 递增 {@code security_epoch}（早于新 epoch 签发的 token/会话因此不再匹配当前 epoch）。
+     * 对未知账号、不可认证的账号、没有可轮换 ACTIVE 密码凭证的账号一律失败关闭（fail-closed）。
      */
-    public Credential rotatePassword(UUID accountId, String rawPassword) {
+    @Transactional
+    public PasswordRotation rotatePassword(UUID accountId, String rawPassword) {
         Objects.requireNonNull(accountId, "accountId");
         requireNonNullRawPassword(rawPassword);
 
         HumanAccount account = requireAuthenticatable(accountId);
-        if (credentialRepository.findActive(accountId, CredentialType.PASSWORD).isEmpty()) {
+        HumanAccount bumped = incrementSecurityEpoch(account);
+        Credential credential = replacePasswordCredential(account, rawPassword);
+        return new PasswordRotation(credential, bumped.status(), bumped.securityEpoch() - 1,
+                bumped.securityEpoch());
+    }
+
+    /**
+     * 撤销账号某一类型的 ACTIVE 凭据材料，并在同一事务内递增 {@code security_epoch}。
+     * 用于凭据泄漏/丢失后的吊销：材料与既有 token 一起失效，不依赖任何异步事件。
+     * 未知账号、不可认证账号、没有 ACTIVE 材料的类型一律失败关闭（fail-closed）。
+     */
+    @Transactional
+    public CredentialRevocation revokeCredential(UUID accountId, CredentialType type) {
+        Objects.requireNonNull(accountId, "accountId");
+        Objects.requireNonNull(type, "type");
+
+        HumanAccount account = requireAuthenticatable(accountId);
+        Credential active = credentialRepository.findActive(accountId, type)
+                .orElseThrow(() -> new BusinessException(IdentityErrorCode.CREDENTIAL_NOT_FOUND));
+        HumanAccount bumped = incrementSecurityEpoch(account);
+        Instant rotatedAt = clock.instant();
+        if (credentialRepository.revokeActive(accountId, type, rotatedAt) != 1) {
             throw new BusinessException(IdentityErrorCode.CREDENTIAL_NOT_FOUND);
         }
-        return storePasswordCredential(account, rawPassword);
+        Credential revoked = new Credential(
+                active.credentialId(), active.accountId(), active.type(), active.credentialData(),
+                CredentialStatus.REVOKED, active.createdAt(), rotatedAt);
+        return new CredentialRevocation(revoked, bumped.status(), bumped.securityEpoch() - 1,
+                bumped.securityEpoch());
+    }
+
+    /**
+     * 账号生命周期状态迁移（禁用/锁定/关闭/恢复）的唯一写路径。状态与
+     * {@code security_epoch} 在同一条条件 UPDATE 中前进，因此不存在"状态已变但 epoch 未加"的
+     * 窗口；非法迁移（含重复迁移与离开 CLOSED 终态）与并发竞争都失败关闭为
+     * {@link IdentityErrorCode#HUMAN_ACCOUNT_STATE_CONFLICT}。
+     */
+    @Transactional
+    public AccountStatusTransition changeAccountStatus(UUID accountId, AccountStatus targetStatus) {
+        Objects.requireNonNull(accountId, "accountId");
+        Objects.requireNonNull(targetStatus, "targetStatus");
+
+        HumanAccount account = requireAccount(accountId);
+        if (!account.status().canTransitionTo(targetStatus)) {
+            throw new BusinessException(IdentityErrorCode.HUMAN_ACCOUNT_STATE_CONFLICT);
+        }
+        if (accountRepository.transitionStatus(accountId, account.status(), targetStatus) != 1) {
+            throw new BusinessException(IdentityErrorCode.HUMAN_ACCOUNT_STATE_CONFLICT);
+        }
+        HumanAccount current = requireAccount(accountId);
+        return new AccountStatusTransition(
+                account.status(), current.securityEpoch() - 1, current);
     }
 
     /**
@@ -204,6 +262,37 @@ public class IdentityFoundationService {
             throw new BusinessException(IdentityErrorCode.HUMAN_ACCOUNT_NOT_ACTIVE);
         }
         return account;
+    }
+
+    /**
+     * 在读到的期望态上原子递增 epoch，并返回递增后的账号投影。返回的 epoch 必然是
+     * {@code 递增前 + 1}（同一条 UPDATE 内完成），因此调用方可用 {@code 新值 - 1} 得到精确的
+     * 变更前 epoch，写审计时不会与并发写入串味。期望态已被并发写入改变时失败关闭。
+     */
+    private HumanAccount incrementSecurityEpoch(HumanAccount account) {
+        if (accountRepository.incrementSecurityEpoch(account.accountId(), account.status()) != 1) {
+            throw new BusinessException(IdentityErrorCode.HUMAN_ACCOUNT_STATE_CONFLICT);
+        }
+        return requireAccount(account.accountId());
+    }
+
+    /** 轮换路径专用：必须确实吊销掉一份 ACTIVE 材料，否则整体回滚（含 epoch 递增）。 */
+    private Credential replacePasswordCredential(HumanAccount account, String rawPassword) {
+        if (credentialRepository.revokeActive(
+                account.accountId(), CredentialType.PASSWORD, clock.instant()) != 1) {
+            throw new BusinessException(IdentityErrorCode.CREDENTIAL_NOT_FOUND);
+        }
+        Instant now = clock.instant();
+        Credential credential = new Credential(
+                idSource.get(),
+                account.accountId(),
+                CredentialType.PASSWORD,
+                passwordEncoder.encode(rawPassword),
+                CredentialStatus.ACTIVE,
+                now,
+                null);
+        credentialRepository.insert(credential);
+        return credential;
     }
 
     private Credential storePasswordCredential(HumanAccount account, String rawPassword) {
@@ -256,6 +345,47 @@ public class IdentityFoundationService {
         public CredentialLookup {
             Objects.requireNonNull(account, "account");
             Objects.requireNonNull(credential, "credential");
+        }
+    }
+
+    /**
+     * 一次账号状态迁移的前后投影，供调用方写安全操作审计。
+     *
+     * <p>{@code previousEpoch} 是本次迁移前的精确 epoch（等于 {@code current.securityEpoch() - 1}，
+     * 因为状态与 epoch 在同一条 UPDATE 内前进），即使有并发写入也不会串味。
+     */
+    public record AccountStatusTransition(
+            AccountStatus previousStatus, long previousEpoch, HumanAccount current) {
+        public AccountStatusTransition {
+            Objects.requireNonNull(previousStatus, "previousStatus");
+            Objects.requireNonNull(current, "current");
+            if (previousEpoch < 0) {
+                throw new IllegalArgumentException("previousEpoch must be non-negative");
+            }
+        }
+    }
+
+    /** 一次密码轮换的前后投影：新 ACTIVE 材料 + 轮换前后的 epoch。 */
+    public record PasswordRotation(
+            Credential credential, AccountStatus accountStatus, long previousEpoch, long newEpoch) {
+        public PasswordRotation {
+            Objects.requireNonNull(credential, "credential");
+            Objects.requireNonNull(accountStatus, "accountStatus");
+            if (previousEpoch < 0 || newEpoch != previousEpoch + 1) {
+                throw new IllegalArgumentException("security epoch must advance by exactly one");
+            }
+        }
+    }
+
+    /** 一次凭据撤销的前后投影：被撤销的材料 + 撤销前后的 epoch。 */
+    public record CredentialRevocation(
+            Credential revoked, AccountStatus accountStatus, long previousEpoch, long newEpoch) {
+        public CredentialRevocation {
+            Objects.requireNonNull(revoked, "revoked");
+            Objects.requireNonNull(accountStatus, "accountStatus");
+            if (previousEpoch < 0 || newEpoch != previousEpoch + 1) {
+                throw new IllegalArgumentException("security epoch must advance by exactly one");
+            }
         }
     }
 }

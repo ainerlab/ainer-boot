@@ -165,7 +165,8 @@ class IdentityFoundationServiceTest {
                 .findPasswordCredentialForLogin(LoginIdentityType.USERNAME, AINER.issuer(), "rotate-user")
                 .orElseThrow().credential().credentialId()).orElseThrow();
 
-        Credential rotated = service.rotatePassword(registered.account().accountId(), "new-password");
+        Credential rotated = service.rotatePassword(
+                registered.account().accountId(), "new-password").credential();
 
         assertThat(rotated.isActive()).isTrue();
         assertThat(rotated.credentialId()).isNotEqualTo(before.credentialId());
@@ -237,6 +238,31 @@ class IdentityFoundationServiceTest {
         @Override
         public UUID nextUuidV7() {
             return UUID.randomUUID();
+        }
+
+        @Override
+        public int transitionStatus(
+                UUID accountId, AccountStatus expectedStatus, AccountStatus targetStatus) {
+            HumanAccount current = store.get(accountId);
+            if (current == null || current.status() != expectedStatus) {
+                return 0;
+            }
+            store.put(accountId, new HumanAccount(
+                    current.accountId(), current.authority(), targetStatus,
+                    current.securityEpoch() + 1, current.createdAt()));
+            return 1;
+        }
+
+        @Override
+        public int incrementSecurityEpoch(UUID accountId, AccountStatus expectedStatus) {
+            HumanAccount current = store.get(accountId);
+            if (current == null || current.status() != expectedStatus) {
+                return 0;
+            }
+            store.put(accountId, new HumanAccount(
+                    current.accountId(), current.authority(), current.status(),
+                    current.securityEpoch() + 1, current.createdAt()));
+            return 1;
         }
 
         int count() {
