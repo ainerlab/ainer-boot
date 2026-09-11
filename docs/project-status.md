@@ -339,6 +339,20 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-09-11 CI 暴露：通知模块时间入口未遵循微秒约定（纳秒 vs `timestamptz` 精度漂移）
+- **症状**：PR #78 的 quality gate 在
+  `NotificationIntegrationTest.markFailedWithRetrySchedulesNextRetryAndIncrementsCount` 失败：
+  `expected 2026-09-11T08:39:03.376390186Z but was 2026-09-11T08:39:03.376390Z`。本地全绿、CI 必挂——
+  本地纳秒末三位恰好为 0 时不暴露。
+- **根因**：PostgreSQL `timestamptz` 是微秒精度、`Instant` 是纳秒精度。`task`/`organization`/`knowledge`
+  三个模块都在时间入口做了 `truncatedTo(ChronoUnit.MICROS)`，**notification 模块漏了**：属「约定存在但
+  没有落到每个模块」，与本次修复的其它「声明了但不生效」缺陷同族。
+- **修正**：`MybatisNotificationRecordRepository` 在持久化边界截断全部时间参数与行字段
+  （`save`/`claimPending`/`markSent`/`markFailed` + `toRow`）；`NotificationDeliveryEngine.nextRetryAt()`
+  输出截断；新增回归用例 `timestampsWithNanosecondPrecisionAreReadBackAtMicrosecondPrecision`
+  （写入 `+789ns` 的时间戳并先断言它不等于截断值，再断言读回等于截断值）。
+- **验证**：`./mvnw clean verify` → 28/28 模块 SUCCESS、**600 tests / 0 failure / 0 error / 0 skipped**。
+
 2026-09-11 HTTP 状态语义退化缺陷关闭（405/406/415/非法请求体/429/503）
 - **缺陷**：`GlobalExceptionHandler` 原先只登记 `BusinessException`、参数校验、404、
   `ErrorResponseException` 与 `Exception` 兜底。`HttpRequestMethodNotSupportedException`（405）、
