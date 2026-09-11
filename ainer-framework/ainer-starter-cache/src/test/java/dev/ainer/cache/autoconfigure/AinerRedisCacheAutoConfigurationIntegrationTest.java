@@ -47,6 +47,8 @@ class AinerRedisCacheAutoConfigurationIntegrationTest {
 
     private static final String CACHE_KEY_PREFIX = "ainer:test:";
 
+    private static final String TTL_LOCK_KEY = "integration:ttl-lock";
+
     @Container
     static final GenericContainer<?> REDIS =
             new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
@@ -182,8 +184,11 @@ class AinerRedisCacheAutoConfigurationIntegrationTest {
             assertThat(first.tryLock("integration:ttl-lock", Duration.ofSeconds(1))).isPresent();
             assertThat(second.tryLock("integration:ttl-lock", Duration.ofSeconds(1))).isEmpty();
 
-            await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
-                    assertThat(second.tryLock("integration:ttl-lock", Duration.ofSeconds(5))).isPresent());
+            // 只等待只读状态（锁键消失 = TTL 到期），断言在等待之后一次性执行；
+            // 重试只覆盖「状态未就绪」，不覆盖断言失败。
+            await().atMost(Duration.ofSeconds(10))
+                    .until(() -> !Boolean.TRUE.equals(redis.hasKey(TTL_LOCK_KEY)));
+            assertThat(second.tryLock(TTL_LOCK_KEY, Duration.ofSeconds(5))).isPresent();
         } finally {
             ((LettuceConnectionFactory) factory).destroy();
         }

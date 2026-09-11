@@ -89,5 +89,11 @@
             <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- 「每锁一条池化连接」的代价用真实 Hikari 池实测（仅测试作用域；生产不引入连接池实现） -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

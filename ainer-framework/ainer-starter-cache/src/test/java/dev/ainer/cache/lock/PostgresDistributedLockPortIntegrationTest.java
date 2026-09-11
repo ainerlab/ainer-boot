@@ -1,5 +1,6 @@
 package dev.ainer.cache.lock;
 
+import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.testcontainers.junit.jupiter.Container;
@@ -16,6 +17,7 @@ import java.time.Duration;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 /**
@@ -127,11 +129,12 @@ class PostgresDistributedLockPortIntegrationTest {
             assertThat(other.tryLock("it:ttl", Duration.ofSeconds(5))).isEmpty();
             assertThat(advisoryLocks()).isEqualTo(1);
 
-            // PostgreSQL advisory lock 自身没有 TTL：到期由实例内收割器放锁（含归还连接）
-            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
-                assertThat(holder.activeHoldCount()).isZero();
-                assertThat(advisoryLocks()).isZero();
-            });
+            // PostgreSQL advisory lock 自身没有 TTL：到期由实例内收割器放锁（含归还连接）。
+            // 只等待只读状态（持有数/锁数归零），断言在等待之后一次性执行。
+            await().atMost(Duration.ofSeconds(10))
+                    .until(() -> holder.activeHoldCount() == 0 && advisoryLocks() == 0);
+            assertThat(holder.activeHoldCount()).isZero();
+            assertThat(advisoryLocks()).isZero();
             assertThat(other.tryLock("it:ttl", Duration.ofSeconds(5))).isPresent();
         } finally {
             holder.close();
@@ -155,6 +158,51 @@ class PostgresDistributedLockPortIntegrationTest {
             holder.close();
             other.close();
         }
+    }
+
+    @Test
+    void eachHeldLockOccupiesOnePooledConnectionAndExhaustsThePool() throws SQLException {
+        try (HikariDataSource pool = new HikariDataSource()) {
+            pool.setJdbcUrl(POSTGRES.getJdbcUrl());
+            pool.setUsername(POSTGRES.getUsername());
+            pool.setPassword(POSTGRES.getPassword());
+            pool.setPoolName("ainer-pg-lock-pool-it");
+            // 与 PGSimpleDataSource 用同一个 application_name，便于按会话核对占用
+            pool.addDataSourceProperty("ApplicationName", APPLICATION_NAME);
+            pool.setMaximumPoolSize(3);
+            // Hikari 的连接等待下限是 250ms；避免用默认 30s 拖长测试
+            pool.setConnectionTimeout(250);
+            PostgresDistributedLockPort port = new PostgresDistributedLockPort(pool);
+            try {
+                DistributedLockPort.LockHandle first = port.tryLock("pool:1", Duration.ofSeconds(30)).orElseThrow();
+                port.tryLock("pool:2", Duration.ofSeconds(30)).orElseThrow();
+                assertThat(port.activeHoldCount()).isEqualTo(2);
+                assertThat(advisoryLocks()).isEqualTo(2);
+                // 两把锁 = 池里两条连接被占住（Hikari 活跃连接数与持锁数一致）
+                assertThat(pool.getHikariPoolMXBean().getActiveConnections()).isEqualTo(2);
+                // 数据库侧同样只看到 2 条持锁会话（核对查询自己的会话被排除）
+                assertThat(advisorySessions()).isEqualTo(2);
+
+                port.tryLock("pool:3", Duration.ofSeconds(30)).orElseThrow();
+                assertThat(pool.getHikariPoolMXBean().getActiveConnections()).isEqualTo(3);
+
+                // 池被锁占满：第 4 把锁拿不到连接 → 明确失败（这就是「每锁一条连接」的代价，
+                // Hikari 默认 maximumPoolSize=10 时同理：同时持有 10 把锁即吃满默认池）
+                assertThatThrownBy(() -> port.tryLock("pool:4", Duration.ofSeconds(30)))
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("advisory lock");
+                assertThat(port.activeHoldCount()).isEqualTo(3);
+
+                // 释放一把 → 连接立即可复用，第 4 把锁可以获取
+                port.release(first);
+                assertThat(port.tryLock("pool:4", Duration.ofSeconds(30))).isPresent();
+                assertThat(pool.getHikariPoolMXBean().getActiveConnections()).isEqualTo(3);
+            } finally {
+                port.close();
+            }
+        }
+        // 全部释放后连接归还，advisory lock 归零
+        assertThat(advisoryLocks()).isZero();
     }
 
     // ---- 数据库侧核对 ----
