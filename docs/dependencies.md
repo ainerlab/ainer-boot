@@ -235,7 +235,11 @@ final class ContextSnapshotJacksonAdapter {
   `optional` 依赖：本地 Caffeine 后端不需要它，Redis 后端要求它存在。
 - PostgreSQL advisory lock 实现（`PostgresDistributedLockPort`）只依赖 JDK 的 `javax.sql.DataSource`，
   **没有**给 `ainer-starter-cache` 引入 MyBatis、JDBC starter 或连接池实现；集成测试在测试作用域引入
-  `org.postgresql:postgresql` 驱动以便打开真实会话。
+  `org.postgresql:postgresql` 驱动以便打开真实会话，并引入 BOM 管理的 `com.zaxxer:HikariCP`
+  实测「每锁一条池化连接」把有限池占满的行为（生产作用域仍不含任何连接池实现）。
+- `ainer-module-config` 的测试作用域新增 `spring-boot-starter-data-redis`（starter 的 Redis 依赖是
+  `optional`，不传递）用于真实 Redis 端到端测试；缓存命中不打库的断言使用测试专用计数仓储替身，
+  不引入 Mockito。
 - 测试镜像：沿用基线 `postgres:18.3-alpine`；新增 `redis:7-alpine`（ADR-0039 §2 明确 Redis 7.x 兼容），
   由 Testcontainers 核心的 `GenericContainer` 启动，不使用第三方 Redis 专用容器模块。
 - 未引入：Valkey 专用客户端（继续使用 Spring Boot 默认的 Lettuce）、Redis 连接池实现、缓存一致性

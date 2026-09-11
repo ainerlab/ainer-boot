@@ -356,6 +356,10 @@ at-least-once 与幂等要求见 ADR-0047 §3。
 - `lock.type=POSTGRES` 时没有 `DataSource`（或存在多个且无 `@Primary`）会**启动失败**。
 - PostgreSQL advisory lock 的代价：**每个被持有的锁独占一条池化连接**直到释放或 TTL 到期，
   因此池大小必须覆盖「并发锁数 + 常规查询并发」；TTL 由实例内收割线程强制执行。
+  实测（`PostgresDistributedLockPortIntegrationTest`，Hikari 池上限 3）：持有 2 把锁时池内活跃连接
+  就是 2；持有 3 把锁即占满整个池，第 4 把锁在 `connection-timeout` 后以明确错误失败，释放一把后
+  立即恢复。Hikari 默认 `maximum-pool-size=10`，即同时持有 10 把锁会吃满默认池并让普通查询排队——
+  需要更多并发锁时应改用 Redis 实现。
 - 启动日志会打印实际生效的缓存后端类名、TTL、锁实现类名与 `multiInstanceSafe`，
   同一信息以 `dev.ainer.cache.autoconfigure.AinerCacheCapabilities` bean 暴露，可用于测试与运维探针。
 

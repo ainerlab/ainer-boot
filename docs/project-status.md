@@ -362,18 +362,31 @@ Ainer 项目签名 provenance 已通过。
   （`List.of`）既无类型标记也无法反序列化；缓存值序列化器因此对根值做等价归一化（`Optional` → 载体
   record、不可变集合 → 可变等价实现）。Redis 中 secret 字段是密文实体，明文不落缓存；Redis 仍须视为
   受信基础设施。
+- **主读路径接通缓存（同日补齐）**：原先 `@Cacheable` 落在 `ConfigApplicationService#getEntry` 上，
+  而它只被同类的 `getValue`/`getSecret` 自调用——自调用不经过 Spring 代理，配置模块主读路径实际
+  每次都打数据库。现抽出包内组件 `ConfigEntryLookup`（缓存注解落在它身上，`getEntry`/`getValue`/
+  `getTyped`/`getSecret` 一律经它读取；写入路径仍直读数据库做乐观锁判定）；集成测试用计数仓储替身
+  （`dev.ainer.testfixture.config.CountingConfigEntryRepository`，不用 Mockito）断言同一键第二次读取
+  **数据库调用次数不增长**，把 `@Cacheable` 移回自调用路径时该断言以 `expected: 2 but was: 5` 失败，
+  证明回归测试非空转。
 - **实测**：`./mvnw clean verify`（JDK 25 / Maven 4.0.0-rc-6 / Colima，`DOCKER_HOST` +
-  `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 指向 colima socket）= 28 模块、**577 tests / 0 failure /
-  0 error / 0 skipped**，`scripts/check-surefire-results.sh` 同结果。其中缓存 starter 25 项
-  （装配 17 + PostgreSQL advisory lock 4 + Redis 缓存/锁 4，后两组真实容器：`postgres:18.3-alpine`、
-  `redis:7-alpine`），`ainer-module-config` 新增 3 项真实 `Optional<ConfigEntry>` Redis 端到端测试
-  （含「绕过 service 直接改库后仍读到缓存旧值」的命中证明）；`ainer-offstate-app` 无 DB/无 Redis
+  `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 指向 colima socket）= 28 模块、**580 tests / 0 failure /
+  0 error / 0 skipped**，`scripts/check-surefire-results.sh` 同结果。其中缓存 starter 26 项
+  （装配 17 + PostgreSQL advisory lock 5 + Redis 缓存/锁 4，后两组真实容器：`postgres:18.3-alpine`、
+  `redis:7-alpine`），`ainer-module-config` 22 项（含 4 项真实 `Optional<ConfigEntry>` Redis 端到端测试：
+  缓存命中证明、主读路径不打库的计数断言、密文不落明文、能力报告）；`ainer-offstate-app` 无 DB/无 Redis
   仍正常启动。
-- **未完成/待决策**：① `ConfigApplicationService#getValue`/`getSecret` 通过自调用访问 `getEntry`，
-  绕过缓存代理，配置模块主读路径目前实际不走缓存（本次未改结构，已由测试显式断言该边界，建议后续
-  抽出独立缓存读组件）；② PostgreSQL advisory lock 每锁占一条池化连接，池大小需按并发锁数评估
-  （javadoc 已写明）；③ ADR-0039 §1 的第三层能力「分布式限流 `RateLimitPort`」仍未实现，限流现状
-  仍是 ADR-0016 的 node-local 固定窗口。
+- **连接占用实测**：advisory lock 集成测试用真实 Hikari 池（上限 3）证明「每锁一条池化连接」：
+  2 把锁 → 池内活跃连接 2；3 把锁 → 池占满，第 4 把锁在 `connection-timeout` 后以明确错误失败，
+  释放一把后立即恢复。Hikari 默认池 10，等同「同时持有 10 把锁即吃满默认池」。
+- **测试重试口径**：Redis 集成测试的有界等待只对「状态未就绪」与连接/超时类瞬时异常
+  （`DataAccessResourceFailureException`、`QueryTimeoutException`）重试，上限 10 秒、每 100ms 探测一次；
+  **断言不在重试循环内**（拿到值后一次性断言，值不对立即失败，窗口耗尽抛出明确超时错误）。
+- **未完成/待决策**：① PostgreSQL advisory lock 每锁占一条池化连接，池大小需按并发锁数评估
+  （javadoc 与 configuration.md 已写明，并给出 3 连接池的实测行为）；② ADR-0039 §1 的第三层能力
+  「分布式限流 `RateLimitPort`」仍未实现，限流现状仍是 ADR-0016 的 node-local 固定窗口；
+  ③ 配置模块主读路径已接通缓存，但 `getByNamespace` 等按命名空间列举的读路径仍直读数据库
+  （未加缓存，属有意保留：批量列举的失效面更大）。
 
 2026-08-28 `v1.4.1` 已发布（商业事实基线与测试确定性补丁）
 - **发布身份**：发布准备 PR [#70](https://github.com/ainerlab/ainer-boot/pull/70) 合入默认分支
