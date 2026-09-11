@@ -11,6 +11,8 @@ import java.time.Duration;
  *
  * <p>背景：在补齐之前，{@code ainer.cache.type=redis} 不会产生任何 {@code CacheManager}，
  * 无 Redis 时 {@code DistributedLockPort} 会静默退化为进程内实现——两者都不会在启动日志里留下痕迹。
+ * 第三层能力（限流）落地后同样纳入本报告：{@code RateLimitPort} 一旦退化为进程内固定窗口，
+ * 集群总阈值就会放大到「配置值 × 实例数」，必须和锁一样在启动期可见。
  *
  * @param declaredCacheType        配置声明的缓存后端类型
  * @param cacheManagerClass        实际生效的 {@code CacheManager} 实现类名；缓存关闭或没有
@@ -19,6 +21,8 @@ import java.time.Duration;
  * @param declaredLockType         配置声明的锁策略
  * @param lockImplementationClass  实际生效的 {@code DistributedLockPort} 实现类名
  * @param multiInstanceSafe        锁在多实例部署下是否真实互斥（进程内锁为 {@code false}）
+ * @param rateLimitImplementationClass 实际生效的 {@code RateLimitPort} 实现类名；未装配时为 {@code null}
+ * @param rateLimitClusterAccurate 限流在多实例部署下是否给出集群精确配额（进程内实现为 {@code false}）
  */
 public record AinerCacheCapabilities(
         AinerCacheProperties.CacheType declaredCacheType,
@@ -26,7 +30,9 @@ public record AinerCacheCapabilities(
         @Nullable Duration cacheTimeToLive,
         AinerCacheProperties.LockType declaredLockType,
         @Nullable String lockImplementationClass,
-        boolean multiInstanceSafe) {
+        boolean multiInstanceSafe,
+        @Nullable String rateLimitImplementationClass,
+        boolean rateLimitClusterAccurate) {
 
     /** 供启动日志使用的一行摘要：声明值 → 生效值。 */
     public String describe() {
@@ -35,6 +41,15 @@ public record AinerCacheCapabilities(
                 : this.cacheManagerClass + " (TTL=" + this.cacheTimeToLive + ")";
         return "cache{declared=" + this.declaredCacheType + " → effective=" + cache + "}"
                 + " lock{declared=" + this.declaredLockType + " → effective=" + this.lockImplementationClass
-                + ", multiInstanceSafe=" + this.multiInstanceSafe + "}";
+                + ", multiInstanceSafe=" + this.multiInstanceSafe + "}"
+                + " rateLimit{declared=" + this.declaredCacheType
+                + "（实现跟随 ainer.cache.type） → effective=" + describeRateLimit()
+                + ", clusterAccurate=" + this.rateLimitClusterAccurate + "}";
+    }
+
+    private String describeRateLimit() {
+        return this.rateLimitImplementationClass == null
+                ? "(未装配 RateLimitPort)"
+                : this.rateLimitImplementationClass;
     }
 }

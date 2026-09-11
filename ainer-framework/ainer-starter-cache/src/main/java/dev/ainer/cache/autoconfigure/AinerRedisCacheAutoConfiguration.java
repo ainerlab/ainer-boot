@@ -2,6 +2,8 @@ package dev.ainer.cache.autoconfigure;
 
 import dev.ainer.cache.lock.DistributedLockPort;
 import dev.ainer.cache.lock.RedisDistributedLockPort;
+import dev.ainer.cache.ratelimit.RateLimitPort;
+import dev.ainer.cache.ratelimit.RedisFixedWindowRateLimitPort;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -97,6 +99,22 @@ public class AinerRedisCacheAutoConfiguration {
     @Conditional(AinerCacheConditions.OnLockTypeAuto.class)
     public DistributedLockPort redisDistributedLockPort(StringRedisTemplate ainerRedisTemplate) {
         return new RedisDistributedLockPort(ainerRedisTemplate);
+    }
+
+    /**
+     * Redis 固定窗口限流：{@code ainer.cache.type=redis} 时的 {@code RateLimitPort} 实现，
+     * 兑现 ADR-0039 §1「默认实现 Redis，无 Redis 时降级 node-local」的顺序。
+     *
+     * <p>装配在这里而不是独立自动配置类，是因为它需要本类装配的 {@link StringRedisTemplate}，
+     * 且必须与「Redis 后端可用」的判定（classpath + {@code ainer.cache.type}）保持一致；
+     * 缺省/无 Redis 时由 {@link AinerRateLimitAutoConfiguration} 提供进程内实现并 WARN。
+     */
+    @Bean
+    @ConditionalOnMissingBean(RateLimitPort.class)
+    public RateLimitPort redisRateLimitPort(
+            StringRedisTemplate ainerRedisTemplate, AinerCacheProperties properties) {
+        return new RedisFixedWindowRateLimitPort(
+                ainerRedisTemplate, properties.rateLimit().keyPrefix());
     }
 
     /**
