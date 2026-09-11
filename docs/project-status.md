@@ -497,6 +497,7 @@ Ainer 项目签名 provenance 已通过。
 - **边界**：门禁不解析继承来的映射（基类 Controller、接口默认实现）与第三方 jar 内端点；
   `framework-handler-packages`（默认 `org.springframework.` / `org.springdoc.` / `io.swagger.`）是
   显式豁免面，宿主引入其他第三方 MVC 库时需自行登记；白名单只豁免静态门禁，不改变运行期裁决。
+
 2026-09-11 全量门禁（`security_epoch` 写路径批次，工具链 JDK 25 + Spring Boot 4.1.1 + Maven 4.0.0-rc-6）
 - **命令**：`DOCKER_HOST=unix:///Users/xq/.colima/default/docker.sock TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw clean verify`
 - **结果**：28/28 reactor 模块 SUCCESS，`BUILD SUCCESS`，`Total time: 04:31 min`；
