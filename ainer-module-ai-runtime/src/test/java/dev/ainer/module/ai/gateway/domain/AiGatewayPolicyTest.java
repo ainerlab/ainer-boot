@@ -1,5 +1,8 @@
 package dev.ainer.module.ai.gateway.domain;
 
+import dev.ainer.cache.ratelimit.NodeLocalRateLimitPort;
+import dev.ainer.cache.ratelimit.RateLimitDecision;
+import dev.ainer.cache.ratelimit.RateLimitPort;
 import dev.ainer.module.ai.AiRuntimeProperties;
 import dev.ainer.module.ai.gateway.policy.CostCalculator;
 import dev.ainer.module.ai.gateway.policy.PromptFingerprint;
@@ -10,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Arrays;
@@ -59,13 +63,69 @@ class AiGatewayPolicyTest {
 
     @Test
     void limitsRequestsPerSubjectWithinTheMinuteWindow() {
-        SubjectRateLimiter limiter = new SubjectRateLimiter(
-                2, Clock.fixed(Instant.parse("2026-07-22T10:00:00Z"), ZoneOffset.UTC));
+        SubjectRateLimiter limiter = new SubjectRateLimiter(2, new NodeLocalRateLimitPort(
+                "ainer:ratelimit:", Clock.fixed(Instant.parse("2026-07-22T10:00:00Z"), ZoneOffset.UTC)));
 
         assertThat(limiter.tryAcquire("subject-a")).isTrue();
         assertThat(limiter.tryAcquire("subject-a")).isTrue();
         assertThat(limiter.tryAcquire("subject-a")).isFalse();
         assertThat(limiter.tryAcquire("subject-b")).isTrue();
+    }
+
+    @Test
+    void subjectRateLimiterDelegatesCountingToThePortWithDocumentedKeyAndWindow() {
+        RecordingRateLimitPort port = new RecordingRateLimitPort();
+        SubjectRateLimiter limiter = new SubjectRateLimiter(60, port);
+
+        assertThat(limiter.tryAcquire("subject-a")).isTrue();
+        assertThat(port.key).isEqualTo("ai:subject:subject-a");
+        assertThat(port.permits).isEqualTo(1);
+        assertThat(port.limit).isEqualTo(60);
+        assertThat(port.window).isEqualTo(Duration.ofMinutes(1));
+    }
+
+    @Test
+    void subjectRateLimiterFailsClosedWhenThePortReportsBackendUnavailable() {
+        RecordingRateLimitPort port = new RecordingRateLimitPort();
+        port.decision = RateLimitDecision.backendUnavailable();
+
+        assertThat(new SubjectRateLimiter(60, port).tryAcquire("subject-a")).isFalse();
+    }
+
+    @Test
+    void subjectRateLimiterExposesWhetherItsQuotaIsClusterAccurate() {
+        SubjectRateLimiter nodeLocal = new SubjectRateLimiter(
+                60, new NodeLocalRateLimitPort(Clock.systemUTC()));
+        assertThat(nodeLocal.clusterAccurate()).isFalse();
+
+        RecordingRateLimitPort clusterAccurate = new RecordingRateLimitPort();
+        clusterAccurate.clusterAccurate = true;
+        assertThat(new SubjectRateLimiter(60, clusterAccurate).clusterAccurate()).isTrue();
+    }
+
+    /** 手工记录调用的限流端口替身（仓库约定：不用 Mockito）。 */
+    private static final class RecordingRateLimitPort implements RateLimitPort {
+
+        private String key;
+        private int permits;
+        private int limit;
+        private Duration window;
+        private boolean clusterAccurate;
+        private RateLimitDecision decision = RateLimitDecision.allowed(59);
+
+        @Override
+        public RateLimitDecision tryAcquire(String key, int permits, int limit, Duration window) {
+            this.key = key;
+            this.permits = permits;
+            this.limit = limit;
+            this.window = window;
+            return this.decision;
+        }
+
+        @Override
+        public boolean clusterAccurate() {
+            return this.clusterAccurate;
+        }
     }
 
     @Test
