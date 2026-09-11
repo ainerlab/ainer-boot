@@ -179,8 +179,9 @@ public enum WorkspaceErrorCode implements ErrorCode {
 - 审计查询必须有独立 scope、资源管理员校验以及资源绑定条件；读取审计本身也需要审计。
 - Identity 只允许返回显式安全投影，禁止复用包含 password hash、锁定状态或 OAuth 协议字段的账号对象。
 - 自包含 JWT 不得被描述为数据库状态变化后立即失效；账号撤销通过 `sec_epoch`/`security_epoch`
-  在线比对实时生效（`RevocationAwareOAuth2AuthorizationService`），普通 `@Async`/
-  `@TransactionalEventListener` 不能承担可靠撤销通知。
+  在线比对生效（`RevocationAwareOAuth2AuthorizationService`），且**只在 RFC 7662 在线校验路径上
+  即时**，离线路径仍受 Token TTL 约束。epoch 递增必须与状态/凭据变更在同一条带期望态的条件
+  UPDATE 内完成，普通 `@Async`/`@TransactionalEventListener` 不能承担可靠撤销通知。
 
 ## 10. AI
 

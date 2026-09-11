@@ -37,17 +37,36 @@ ainer-authorization-server/target/ainer-authorization-server-0.1.0-SNAPSHOT.jar
 
 ### 2.1 人员撤销在线生效
 
-账号禁用、密码轮换和成员撤销通过递增 `securityEpoch` 使旧 Token 失效，不依赖跨运行时事件
+账号禁用、密码轮换、凭据撤销与服务主体禁用都在同一条带期望态的条件 UPDATE 内递增
+`securityEpoch`（状态与 epoch 一起前进，非法迁移与并发竞争失败关闭），不依赖跨运行时事件
 relay。Authorization Server 在查找人员 authorization 时用 JWT `sec_epoch` claim 与 Identity
-当前 epoch 比对，不等即 inactive。首次启用按以下顺序：
+当前 epoch 比对，不等即 inactive。
+
+**边界必须一起说明**：这条链路只影响走在线校验（RFC 7662 introspection，即 2.3 节开关）的请求。
+关闭在线校验的资源服务器在 Token 过期前仍会接受旧 epoch 的自包含 JWT——那是 TTL 窗口，不是
+"已全局强实时撤销"。首次启用按以下顺序：
 
 1. 先发布 Authorization Server 与应用，确认新 baseline 从空库重放成功；
 2. 用真实浏览器会话签发含 `sec_epoch` 的 `USER_NEUTRAL_V1` Token；
 3. 变更账号密码或禁用账号，验证旧 Token 在线校验返回 inactive、新签发 Token 正常；
-4. 需要更强实时性的高风险路径再按 2.3 节启用在线 introspection。
+4. 需要更强实时性的高风险路径再按 2.3 节启用在线 introspection；
+5. 需要运营界面化操作时按 2.4 节启用身份生命周期控制面，并登记唯一受信 SERVICE `sub`。
 
 回滚时保留已签发的 OAuth authorization 与 Identity 元数据不变。epoch 方案是 Greenfield 的
 原子切换结果，不保留 access-event outbox、relay 或消费端。
+
+### 2.4 身份生命周期控制面启用顺序（默认关闭）
+
+1. 用一次性 machine client 引导建立只持有 `identity.accounts.manage`（需要管理服务主体时再加
+   `identity.service-principals.manage`）的 SERVICE client，随后删除引导开关与明文 secret；
+2. 从 `ainer_identity_oauth_client_binding` 读出该 client 绑定的 ServicePrincipal UUID，
+   写入 `AINER_AUTHORIZATION_IDENTITY_CONTROL_TRUSTED_SERVICE_ID`；
+3. 打开 `AINER_AUTHORIZATION_IDENTITY_CONTROL_ENABLED=true`；白名单缺失或非法时启动失败，
+   不要用空值启动；
+4. 先用一条合法变更验证 200 + `security_epoch` 递增 + `ainer_identity_principal_lifecycle_audit`
+   出现对应记录，再做真实禁用；
+5. 禁用或轮换运营用 ServicePrincipal 后，其旧 Token 即使未过期也会被控制面 403 拒绝；
+   轮换运营凭据必须同时更新白名单。
 
 ### 2.2 M4.2 安全运维上线顺序
 

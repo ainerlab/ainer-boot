@@ -78,8 +78,10 @@ Flyway 起始版本，工具只新增切片文件、有限合并顶层 POM，并
 - Identity 只暴露 ACTIVE HumanAccount 安全投影，不允许 Workspace 共享查询 Identity 表。
   Identity 的 HTTP adapter 位于 `ainer-authorization-server`，`ainer-server` 不装配 Identity
   migration，Identity 应用/领域层不依赖 Web。
-- 人员 Token 撤销通过 `security_epoch`/`sec_epoch` claim 在线比对，不依赖进程内异步事件或
-  跨运行时 relay；网络调用不进入 Identity 数据库事务。
+- 人员 Token 撤销通过 `security_epoch`/`sec_epoch` claim 比对，不依赖进程内异步事件或跨运行时
+  relay；epoch 递增与状态/凭据变更在同一条带期望态的条件 UPDATE 内完成（非法迁移与并发竞争失败
+  关闭），网络调用不进入 Identity 数据库事务。即时失效只成立于走在线校验的请求，离线 JWT 请求
+  受 Token TTL 约束。
 - 高风险安全运维使用短时双人审批：申请者和批准者是不同服务主体、分别持有最小 scope，批准事务锁定并重新验证目标状态。
 - Workspace 授权审计以同事务热/冷搬迁控制热表增长，在线查询和 SIEM 稳定游标读取两表并集；归档数据仍属于 Workspace 数据库。
 - persistence starter 只装配共性，不拥有任何业务表或 Repository。MyBatis-Plus 只增强
@@ -288,12 +290,13 @@ M3/M4 已形成以下边界：
   OWNER/ADMIN/MEMBER 关系决定具体资源权限；owner 不能由客户端指定。
 - 新邀请是 PENDING，只有目标 JWT 主体本人接受后才激活；被邀主体必须已是 ACTIVE HumanAccount。Workspace 不跨模块读取 Identity 私有表。
 - 通用角色变更不能触碰 OWNER；所有权转移锁定 Workspace 并由 PostgreSQL 部分唯一索引保证最多一个 ACTIVE OWNER。
-- 非 ACTIVE 成员访问按 404 隐藏资源；成员角色不足返回 403。关键允许/拒绝授权决策持久化到独立事务审计。PENDING/ACTIVE membership 在账号禁用时由授权查询在线判定失效（`security_epoch` 比对），不再参与授权；OWNER 也可因全局安全禁用而失效。
+- 非 ACTIVE 成员访问按 404 隐藏资源；成员角色不足返回 403。关键允许/拒绝授权决策持久化到独立事务审计。账号禁用后 membership 的失效判定只在走在线校验（RFC 7662）的请求上即时生效；这是因为授权查询在线判定 `security_epoch`，而离线 JWT 请求在 Token 过期前不会重新读取账号状态。
 - Workspace 审计查询额外要求 `workspace.audit.read` 和 ACTIVE OWNER/ADMIN，并绑定 workspace 分页；热表保留、归档、SIEM 拉取、拒绝窗口与 OWNER 缺失指标已落地。
-- Identity 提供 ACTIVE HumanAccount 安全投影、安全禁用/撤销事务与 `security_epoch` 在线判定，不依赖 outbox、跨运行时 relay 或进程内异步事件。
+- Identity 提供 ACTIVE HumanAccount 安全投影、账号/服务主体生命周期写路径（状态迁移、密码轮换、凭据撤销）与 `security_epoch` 在线判定：状态与 epoch 在同一条条件 UPDATE 中前进，安全操作审计与变更同事务。不依赖 outbox、跨运行时 relay 或进程内异步事件；即时撤销只对走在线校验的请求成立。
 - 内部 HTTP adapter 使用短生命周期 Client Credentials JWT、issuer/audience、`token_profile=SERVICE_V1`、`claim_contract_version=1`、scope 与可信 publisher subject；生产仍需 TLS、受控网络，后续可叠加 mTLS 或服务网格身份。
 - OWNER 恢复只提升现有 ACTIVE 成员，不恢复被禁用主体。两者由不同 request/approve Client 完成并写模块所属安全操作审计。
 - M4.3 在上述本地 JWT 认证后为高风险路径追加 RFC 7662 在线校验；Authorization Server 使用 Identity 当前账号状态与 `sec_epoch` 作为人员 Token revocation epoch。普通低风险 JWT 请求仍有自然到期窗口，不能宣称所有 API 强实时撤销。
+- 账号/服务主体生命周期写路径由 Authorization Server 的内部控制面（`/internal/identity/**`，默认关闭）暴露：受信 SERVICE `sub` + 最小 scope + 调用方 ServicePrincipal 当前 ACTIVE 且 `sec_epoch` 与当前 epoch 一致，变更与审计同事务，非法状态迁移与并发竞争失败关闭。
 - 两个发行物的 Prometheus endpoint 使用同一声明 `token_profile=SERVICE_V1`、`claim_contract_version=1`
   与 `platform.metrics.read` 契约；指标 client 与业务、SIEM、introspection 和 browser client
   控制面 client 分离。共享 PostgreSQL 只是 Authorization Server 多实例前提，尚未验证的浏览器会话、容量和故障切换不能写成已完成 HA。

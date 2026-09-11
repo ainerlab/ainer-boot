@@ -141,7 +141,7 @@ Authorization Code + PKCE 当前由自动化测试专用 registered client 证�
 通过默认关闭的 browser client 控制面创建。不得把测试 client、测试 issuer 或测试 RSA key 带入
 发行环境。
 
-人员 Token 的 introspection 还检查 Identity 当前状态和最新 revocation epoch（`sec_epoch` 不符即失效）。inactive 原因不向调用方细分。Resource Server 对匹配高风险规则的 inactive 返回 Ainer 401；introspection 依赖失败返回 503 `AINER.SECURITY.ONLINE_VALIDATION_UNAVAILABLE`。保护规则和配置见 [`configuration.md`](configuration.md)。
+人员 Token 的 introspection 还检查 Identity 当前状态和最新 revocation epoch（`sec_epoch` 不符即失效）。inactive 原因不向调用方细分。Resource Server 对匹配高风险规则的 inactive 返回 Ainer 401；introspection 依赖失败返回 503 `AINER.SECURITY.ONLINE_VALIDATION_UNAVAILABLE`。保护规则和配置见 [`configuration.md`](configuration.md)。注意：本地 JWT 校验路径不受数据库状态变化影响，自包含 Token 在 TTL 内仍然可用——即时失效只成立于走 introspection 的请求。
 
 以下是默认关闭的系统间接口，不属于公网或租户客户端 API。所有系统间接口都要求类型化
 SERVICE Token：`token_profile=SERVICE_V1`、`claim_contract_version=1`、`actor_type=SERVICE`，
@@ -157,6 +157,10 @@ SERVICE Token：`token_profile=SERVICE_V1`、`claim_contract_version=1`、`actor
 | Authorization Server | GET | `/internal/oauth-browser-clients/{clientId}` | 同上 | 查询单个 client 生命周期投影 |
 | Authorization Server | POST | `/internal/oauth-browser-clients/{clientId}/rotations` | 同上 | 以新 client ID 创建并行 replacement |
 | Authorization Server | POST | `/internal/oauth-browser-clients/{clientId}/retirement` | 同上 | 显式退役，阻止新 Token 并让在线 Token 查询 inactive |
+| Authorization Server | POST | `/internal/identity/accounts/{accountId}/status-transitions` | `actor_type=SERVICE` + `identity.accounts.manage` + 可信 service `sub` | 禁用（`DISABLED`）/锁定（`LOCKED`）/关闭（`CLOSED`）/恢复（`ACTIVE`），同事务递增 `security_epoch` |
+| Authorization Server | POST | `/internal/identity/accounts/{accountId}/password-rotations` | 同上 | 轮换密码：吊销旧材料、写入新 ACTIVE 材料并递增 epoch |
+| Authorization Server | POST | `/internal/identity/accounts/{accountId}/credential-revocations` | 同上 | 按 `credentialType` 撤销 ACTIVE 凭据材料并递增 epoch |
+| Authorization Server | POST | `/internal/identity/service-principals/{principalId}/status-transitions` | `actor_type=SERVICE` + `identity.service-principals.manage` + 可信 service `sub` | 禁用/恢复服务主体，同事务递增 `security_epoch` |
 | `ainer-server` | POST | `/internal/workspace-owner-recovery/workspaces/{workspaceId}/requests` | `actor_type=SERVICE` + `workspace.owner-recovery.request.all` | 为无 ACTIVE OWNER 的 Workspace 申请恢复 |
 | `ainer-server` | POST | `/internal/workspace-owner-recovery/workspaces/{workspaceId}/requests/{requestId}/approvals` | `actor_type=SERVICE` + `workspace.owner-recovery.approve.all` | 不同服务批准并提升现有 ACTIVE 成员 |
 | `ainer-server` | GET | `/internal/workspace-authorization-audits/workspaces/{workspaceId}/exports` | `actor_type=SERVICE` + `workspace.audit.export.all` + 可信 exporter `sub` | SIEM 按 Workspace 稳定游标拉取热/冷审计并集 |

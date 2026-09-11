@@ -339,6 +339,49 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-09-11 全量门禁（`security_epoch` 写路径批次，工具链 JDK 25 + Spring Boot 4.1.1 + Maven 4.0.0-rc-6）
+- **命令**：`DOCKER_HOST=unix:///Users/xq/.colima/default/docker.sock TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw clean verify`
+- **结果**：28/28 reactor 模块 SUCCESS，`BUILD SUCCESS`，`Total time: 04:31 min`；
+  surefire 汇总 **632 tests / 0 failure / 0 error / 0 skipped**（25 个含测试模块的 XML 报告逐项求和）；
+  其中 `ainer-module-identity` 53 tests、`ainer-authorization-server` 57 tests。
+- **门禁**：`scripts/check-framework-boundary.sh` → 违规 0 处（框架 main Java 658 个、框架与根 pom
+  28 个、框架 migration 20 个 / DDL 75 条）；`scripts/check-runtime-wiring.sh` → Dockerfile COPY
+  覆盖 27 个 reactor 模块、3 处 `@Scheduled` 均有生效的 `@EnableScheduling`；
+  `AINER_COMMERCIAL_VERSION=1.4.1 scripts/check-release-contracts.sh` → 全部通过（两道门禁由它一并调用，
+  不在 `mvnw verify` 生命周期内，因此单独执行）。
+- **新增测试**：epoch 写路径 12、真实 PKCE 在线/离线撤销边界 4、控制面 HTTP 6、控制面配置失败关闭 5、
+  JDBC 装箱标量 claim 往返 1，合计 28 tests，全部包含在上述 632 内，0 skipped。
+
+2026-09-11 `security_epoch` 写路径缺失（文档承诺与实现相反）关闭
+- **缺陷**：`HumanAccount`/`ServicePrincipal` 的 `security_epoch` 只有 insert/select，没有任何
+  UPDATE，也从来没有禁用/锁定/关闭/密码轮换递增 epoch 的写路径，唯一构造点写死 `0L`。于是
+  `RevocationAwareOAuth2AuthorizationService` 的 `account.securityEpoch() == tokenEpoch` **恒真**：
+  `security.md`/`architecture.md`/`operations.md` 写成已解决的"账号禁用/密码轮换后旧 Token 失效"
+  在代码里并不存在。
+- **修正（写路径）**：`IdentityFoundationService` 新增 `changeAccountStatus`（`DISABLED`/`LOCKED`/
+  `CLOSED`/恢复 `ACTIVE`）、`rotatePassword`（返回前后 epoch 投影）、`revokeCredential`；
+  `ServicePrincipalFoundationService` 新增 `changePrincipalStatus`。状态与 epoch 在**同一条带期望态
+  的条件 UPDATE** 内前进（`WHERE id = ? AND status = ?`，影响 0 行即 409），`CLOSED` 是终态、
+  重复迁移失败关闭；不引入 outbox/relay。
+- **修正（HTTP 面）**：新增 Authorization Server 内部控制面 `/internal/identity/**`（默认关闭）：
+  `identity.accounts.manage` / `identity.service-principals.manage` 两个最小 scope + 精确可信
+  SERVICE `sub` + 调用方 ServicePrincipal 当前 ACTIVE 且 `sec_epoch` 等于当前 epoch；变更与
+  `ainer_identity_principal_lifecycle_audit` 审计同事务；无匿名入口。
+- **修正（连带缺陷）**：集成测试暴露 `oauth2_authorization` 的 claim 元数据反序列化拒绝
+  `java.lang.Long` 类型 id，`findByToken` 抛 `InvalidTypeIdException`，任何带 `sec_epoch` 的
+  真实 Token 都会让 introspection 退化成 503——即使补上写路径也无法判定撤销。已在
+  `AinerOAuth2AuthorizationJsonMapperFactory` 的 `PolymorphicTypeValidator` 中放行
+  `String`/`Long`/`Integer`/`Boolean`/`Double` 这些无副作用标量（不放行整个 `java.lang`）。
+- **边界固化**：新增测试明确固定"即时撤销只在 RFC 7662 在线校验路径成立"——关闭在线校验的
+  Resource Server 对同一旧 Token 仍返回 200；文档相应改为带条件表述（见 ADR-0056）。
+- **新增测试**（真实 PostgreSQL `postgres:18.3-alpine` Testcontainers，均 0 skipped、无 Mockito/H2）：
+  `IdentitySecurityEpochWritePathTest` 12 tests（状态机/并发/epoch 单调/轮换与撤销同事务）、
+  `IdentitySecurityEpochRevocationIntegrationTest` 4 tests（真实 PKCE Token + 两个真实
+  Resource Server 探针：在线 401 / 离线 200 / 轮换后新 Token 200）、`IdentityControlPlaneHttpTest`
+  6 tests、`IdentityControlConfigurationTest` 5 tests（开关开而无白名单必须启动失败）、
+  `AinerOAuth2AuthorizationJsonMapperFactoryTest` 1 test（去掉白名单即失败，已实测验证）。
+- **验证**：全量门禁数字见本节末条"2026-09-11 全量门禁"。
+
 2026-09-11 CI 暴露：通知模块时间入口未遵循微秒约定（纳秒 vs `timestamptz` 精度漂移）
 - **症状**：PR #78 的 quality gate 在
   `NotificationIntegrationTest.markFailedWithRetrySchedulesNextRetryAndIncrementsCount` 失败：

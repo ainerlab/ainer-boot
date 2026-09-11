@@ -270,6 +270,7 @@ Maven 4 对根工程 import 同 reactor BOM 的模型 WARNING 以 ADR-0049 为�
 | [`decisions/0051-mit-license-and-public-repository.md`](decisions/0051-mit-license-and-public-repository.md) | ADR-0051：MIT 许可与仓库公开（不授予商标权） |
 | [`decisions/0052-initializer-v2-secure-vertical-slice.md`](decisions/0052-initializer-v2-secure-vertical-slice.md) | ADR-0052：Manifest v2 `simple-service + workspace` 安全纵向切片与第四消费者门禁 |
 | [`decisions/0053-initializer-existing-project-and-authorization-composition.md`](decisions/0053-initializer-existing-project-and-authorization-composition.md) | ADR-0053：已有项目显式 migration 增量接入与 Workspace/Authorization 策略组合 |
+| [`decisions/0056-identity-lifecycle-write-path-and-security-epoch.md`](decisions/0056-identity-lifecycle-write-path-and-security-epoch.md) | ADR-0056：账号/服务主体生命周期写路径与 `security_epoch` 递增语义（撤销即时性限于在线校验路径） |
 
 ### 工程规范
 
