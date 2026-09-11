@@ -20,6 +20,8 @@ public enum AiGatewayErrorCode implements ErrorCode {
     PROVIDER_TIMEOUT("AINER.AI.PROVIDER_TIMEOUT", "模型服务调用超时", 504),
     PROVIDER_UNAVAILABLE("AINER.AI.PROVIDER_UNAVAILABLE", "模型服务当前不可用", 503),
     PROVIDER_PROTOCOL_ERROR("AINER.AI.PROVIDER_PROTOCOL_ERROR", "模型服务返回了无效响应", 502),
+    INVOCATION_SELF_HEALED("AINER.AI.INVOCATION_SELF_HEALED",
+            "调用超时或被中断后长时间停留在中间态，已由定时自愈置为失败并释放预算预占", 503),
     INVOCATION_NOT_FOUND("AINER.AI.INVOCATION_NOT_FOUND", "AI 调用记录不存在", 404);
 
     private final String code;

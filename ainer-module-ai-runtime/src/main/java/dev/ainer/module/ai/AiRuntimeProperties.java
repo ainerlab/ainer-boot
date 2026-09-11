@@ -16,13 +16,16 @@ public class AiRuntimeProperties {
     private final Provider provider;
     private final Limits limits;
     private final Pricing pricing;
+    private final SelfHeal selfHeal;
 
-    public AiRuntimeProperties(boolean enabled, Provider provider, Limits limits, Pricing pricing) {
+    public AiRuntimeProperties(
+            boolean enabled, Provider provider, Limits limits, Pricing pricing, SelfHeal selfHeal) {
         this.enabled = enabled;
         this.provider = provider != null ? provider
                 : new Provider(null, null, null, null, null, null, null, null, null, false);
         this.limits = limits != null ? limits : new Limits(null, null, null);
         this.pricing = pricing != null ? pricing : new Pricing(null, null, null);
+        this.selfHeal = selfHeal != null ? selfHeal : new SelfHeal(null, null, null, null);
     }
 
     public boolean isEnabled() {
@@ -41,13 +44,25 @@ public class AiRuntimeProperties {
         return pricing;
     }
 
+    public SelfHeal getSelfHeal() {
+        return selfHeal;
+    }
+
     public void validate() {
         require(provider != null, "ainer.ai.provider is required");
         require(limits != null, "ainer.ai.limits is required");
         require(pricing != null, "ainer.ai.pricing is required");
+        require(selfHeal != null, "ainer.ai.self-heal is required");
         provider.validate();
         limits.validate();
         pricing.validate();
+        selfHeal.validate();
+        // 自愈阈值必须显著大于「一次调用在途的最长时间」，否则清扫会把仍在进行的调用判死。
+        // 在途上限 = provider 流式总超时（含响应体读取）＋ 建连/写审计等开销，这里留 1 分钟余量。
+        require(selfHeal.getStuckThreshold()
+                        .compareTo(provider.getStreamTotalTimeout().plus(Duration.ofMinutes(1))) > 0,
+                "ainer.ai.self-heal.stuck-threshold must exceed "
+                        + "ainer.ai.provider.stream-total-timeout by at least 1m");
     }
 
     private static void require(boolean condition, String message) {
@@ -252,6 +267,56 @@ public class AiRuntimeProperties {
                     "ainer.ai.pricing.input-per-million-tokens cannot be negative");
             require(outputPerMillionTokens != null && outputPerMillionTokens.signum() >= 0,
                     "ainer.ai.pricing.output-per-million-tokens cannot be negative");
+        }
+    }
+
+    /**
+     * 中间态自愈配置：把「超过阈值仍停在 STARTED / RUNNING」的审计与任务行推进到终态。
+     *
+     * <p>只靠调用线程自己写终态不足以自愈——进程被 kill、线程卡死在上游读取、或客户端
+     * 断开导致回写丢失时，行会永久停在中间态；当日预算按 {@code STARTED} 行统计，于是
+     * 该 subject 的预算被永久占用直到 UTC 跨日。定时清扫是这类残留的唯一兜底。
+     */
+    public static final class SelfHeal {
+
+        private final boolean enabled;
+        private final Duration stuckThreshold;
+        private final Long scanIntervalMs;
+        private final Integer batchSize;
+
+        public SelfHeal(Boolean enabled, Duration stuckThreshold, Long scanIntervalMs, Integer batchSize) {
+            this.enabled = enabled == null || enabled;
+            this.stuckThreshold = stuckThreshold != null ? stuckThreshold : Duration.ofMinutes(15);
+            this.scanIntervalMs = scanIntervalMs != null ? scanIntervalMs : 60_000L;
+            this.batchSize = batchSize != null ? batchSize : 200;
+        }
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /** 中间态允许的最长停留时间；必须大于 provider 流式总超时，默认 15m。 */
+        public Duration getStuckThreshold() {
+            return stuckThreshold;
+        }
+
+        /** 清扫周期（毫秒）。{@code @Scheduled} 占位符默认值必须与这里的默认值一致。 */
+        public long getScanIntervalMs() {
+            return scanIntervalMs;
+        }
+
+        /** 单次清扫每类中间态最多处理的行数，避免一次清扫长时间持锁。 */
+        public int getBatchSize() {
+            return batchSize;
+        }
+
+        private void validate() {
+            require(stuckThreshold != null && stuckThreshold.isPositive(),
+                    "ainer.ai.self-heal.stuck-threshold must be positive");
+            require(scanIntervalMs != null && scanIntervalMs >= 1_000L && scanIntervalMs <= 3_600_000L,
+                    "ainer.ai.self-heal.scan-interval-ms must be between 1000 and 3600000");
+            require(batchSize != null && batchSize >= 1 && batchSize <= 10_000,
+                    "ainer.ai.self-heal.batch-size must be between 1 and 10000");
         }
     }
 

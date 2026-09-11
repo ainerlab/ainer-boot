@@ -23,8 +23,27 @@ public interface AiTaskMapper {
 
     int updateTaskRunStatus(
             @Param("id") UUID id,
+            @Param("expectedStatus") String expectedStatus,
             @Param("status") String status,
             @Param("completedAt") Instant completedAt);
+
+    int healStuckRunningRuns(
+            @Param("startedBefore") Instant startedBefore,
+            @Param("limit") int limit,
+            @Param("healedAt") Instant healedAt);
+
+    long countStuckRunningRuns(@Param("startedBefore") Instant startedBefore);
+
+    Instant oldestRunningRunStartedAt();
+
+    int healStuckRunningTasks(
+            @Param("updatedBefore") Instant updatedBefore,
+            @Param("limit") int limit,
+            @Param("healedAt") Instant healedAt);
+
+    long countStuckRunningTasks(@Param("updatedBefore") Instant updatedBefore);
+
+    Instant oldestRunningTaskUpdatedAt();
 
     AiTaskRunRow selectTaskRunById(@Param("id") UUID id);
 

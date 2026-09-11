@@ -67,6 +67,10 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "ainer.ai.pricing.currency=USD",
                 "ainer.ai.pricing.input-per-million-tokens=1.00",
                 "ainer.ai.pricing.output-per-million-tokens=2.00",
+                // 本模块的 @ComponentScan 会扫到 test-classes 下同包的嵌套测试配置，因此每个集成测试
+                // 必须用属性把自己的测试 bean 门控起来（同 AgentDelegationFlowTest 的既有做法），
+                // 否则另一个集成测试的 fake provider 会以 @Primary 身份泄漏进本上下文。
+                "ainer.ai.test-fake-provider=true",
                 "ainer.security.resource-server.enabled=true",
                 "mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml",
                 "spring.main.banner-mode=off"
@@ -401,7 +405,14 @@ class AiGatewayModuleIntegrationTest {
         assertThat(resultRow.get("invocation_id")).isEqualTo(invocationId);
     }
 
+    /**
+     * 只在 {@code ainer.ai.test-fake-provider=true} 时生效：模块的 {@code @ComponentScan} 会把
+     * test-classes 里同包的嵌套测试配置一起扫进来，不门控就会让本 fake 以 {@code @Primary}
+     * 身份进入其它集成测试（例如 AiRuntimeResilienceIntegrationTest 需要真实 HTTP provider）。
+     */
     @TestConfiguration(proxyBeanMethods = false)
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+            name = "ainer.ai.test-fake-provider", havingValue = "true")
     static class FakeProviderConfiguration {
 
         @Bean

@@ -42,5 +42,19 @@ public interface AiInvocationRepository {
      */
     boolean markFailedReleasingReservation(UUID id, String errorCode, long latencyMillis, Instant completedAt);
 
+    /**
+     * 把超过阈值仍停在 STARTED 的调用批量推进到 FAILED 并释放预算预占，返回实际处理行数。
+     *
+     * <p>幂等且并发安全：条件 UPDATE（{@code status = 'STARTED'}）是 CAS，候选行用
+     * {@code FOR UPDATE SKIP LOCKED} 领取，因此多个实例同时扫不会重复处理同一行。
+     */
+    int healStuckStarted(Instant startedBefore, int limit, String errorCode, Instant healedAt);
+
+    /** 仍停在 STARTED 且早于阈值的行数（自愈积压，用于告警）。 */
+    long countStuckStarted(Instant startedBefore);
+
+    /** 仍停在 STARTED 的最早 started_at；没有任何中间态时返回 {@code null}。 */
+    Instant oldestStartedAt();
+
     Optional<AiInvocation> findBySubjectAndId(String subjectId, UUID id);
 }

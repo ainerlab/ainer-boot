@@ -70,6 +70,11 @@ ainer:
       requests-per-minute: ${AINER_AI_REQUESTS_PER_MINUTE:60}
       subject-daily-budget: ${AINER_AI_SUBJECT_DAILY_BUDGET:10.00}
       max-prompt-characters: ${AINER_AI_MAX_PROMPT_CHARACTERS:100000}
+    self-heal:
+      enabled: ${AINER_AI_SELF_HEAL_ENABLED:true}
+      stuck-threshold: ${AINER_AI_SELF_HEAL_STUCK_THRESHOLD:15m}
+      scan-interval-ms: ${AINER_AI_SELF_HEAL_SCAN_INTERVAL_MS:60000}
+      batch-size: ${AINER_AI_SELF_HEAL_BATCH_SIZE:200}
     pricing:
       currency: ${AINER_AI_CURRENCY:USD}
       input-per-million-tokens: ${AINER_AI_INPUT_PER_MILLION_TOKENS:0}

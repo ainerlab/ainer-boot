@@ -65,6 +65,21 @@ public class MybatisAiInvocationRepository implements AiInvocationRepository {
     }
 
     @Override
+    public int healStuckStarted(Instant startedBefore, int limit, String errorCode, Instant healedAt) {
+        return mapper.healStuckStarted(startedBefore, limit, errorCode, healedAt);
+    }
+
+    @Override
+    public long countStuckStarted(Instant startedBefore) {
+        return mapper.countStuckStarted(startedBefore);
+    }
+
+    @Override
+    public Instant oldestStartedAt() {
+        return mapper.oldestStartedAt();
+    }
+
+    @Override
     public Optional<AiInvocation> findBySubjectAndId(String subjectId, UUID id) {
         return Optional.ofNullable(mapper.selectBySubjectAndId(subjectId, id)).map(this::toDomain);
     }
