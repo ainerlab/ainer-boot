@@ -3,6 +3,31 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.ainer.authorization.infrastructure.AuthorizationDecisionAuditMapper">
 
+    <resultMap id="decisionAuditRow"
+               type="dev.ainer.authorization.infrastructure.AuthorizationDecisionAuditRow">
+        <id property="decisionId" column="decision_id"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="requesterIssuer" column="requester_issuer"/>
+        <result property="requesterType" column="requester_type"/>
+        <result property="requesterId" column="requester_id"/>
+        <result property="permissionCode" column="permission_code"/>
+        <result property="resourceType" column="resource_type"/>
+        <result property="resourceId" column="resource_id"/>
+        <result property="outcome" column="outcome"/>
+        <result property="reasonCode" column="reason_code"/>
+        <result property="policyVersion" column="policy_version"/>
+        <result property="requestId" column="request_id"/>
+        <result property="traceId" column="trace_id"/>
+        <result property="evaluatedAt" column="evaluated_at"/>
+    </resultMap>
+
+    <resultMap id="decisionAuditOperationalStatusRow"
+               type="dev.ainer.authorization.infrastructure.AuthorizationDecisionAuditOperationalStatusRow">
+        <result property="hot" column="hot"/>
+        <result property="archived" column="archived"/>
+        <result property="oldestHotAt" column="oldest_hot_at"/>
+    </resultMap>
+
     <insert id="insert">
         INSERT INTO ainer_authorization_decision_audit (
             decision_id, workspace_id,
@@ -18,5 +43,96 @@
             #{row.requestId}, #{row.traceId}, #{row.evaluatedAt}
         )
     </insert>
+
+    <!--
+      单语句原子归档：先归档、后删除，且仅当归档行确实存在才删热行。
+      - FOR UPDATE SKIP LOCKED：被其它归档实例锁住的候选行直接跳过，既不阻塞也不重复搬运；
+      - ON CONFLICT (decision_id) DO NOTHING + RETURNING：只返回本语句真正插入的 id；
+      - 第二个 EXISTS 兜住「归档行已由并发事务提交、但本事务快照看不到」的情况：
+        此时不能靠 RETURNING 判断，只能查归档表；两处都不成立的行留在热表，下个周期重试。
+      agent_id / acting_grant_id 是 ADR-0043 A1 给热表预留的委托关联列，当前没有写入方；
+      归档按整行复制，避免将来出现写入方时丢列。
+    -->
+    <delete id="archiveBefore">
+        WITH candidates AS MATERIALIZED (
+            SELECT decision_id, workspace_id,
+                   requester_issuer, requester_type, requester_id,
+                   permission_code, resource_type, resource_id,
+                   outcome, reason_code, policy_version,
+                   request_id, trace_id, evaluated_at,
+                   agent_id, acting_grant_id
+            FROM ainer_authorization_decision_audit
+            WHERE evaluated_at &lt; #{cutoff}
+            ORDER BY evaluated_at, decision_id
+            LIMIT #{limit}
+            FOR UPDATE SKIP LOCKED
+        ), archived AS (
+            INSERT INTO ainer_authorization_decision_audit_archive (
+                decision_id, workspace_id,
+                requester_issuer, requester_type, requester_id,
+                permission_code, resource_type, resource_id,
+                outcome, reason_code, policy_version,
+                request_id, trace_id, evaluated_at,
+                agent_id, acting_grant_id, archived_at
+            )
+            SELECT decision_id, workspace_id,
+                   requester_issuer, requester_type, requester_id,
+                   permission_code, resource_type, resource_id,
+                   outcome, reason_code, policy_version,
+                   request_id, trace_id, evaluated_at,
+                   agent_id, acting_grant_id, #{archivedAt}
+            FROM candidates
+            ON CONFLICT (decision_id) DO NOTHING
+            RETURNING decision_id
+        )
+        DELETE FROM ainer_authorization_decision_audit hot
+        USING candidates
+        WHERE hot.decision_id = candidates.decision_id
+          AND (
+              EXISTS (SELECT 1 FROM archived WHERE archived.decision_id = hot.decision_id)
+              OR EXISTS (
+                  SELECT 1
+                  FROM ainer_authorization_decision_audit_archive archive
+                  WHERE archive.decision_id = hot.decision_id
+              )
+          )
+    </delete>
+
+    <!-- 热+冷并集，稳定游标 (evaluated_at, decision_id) 倒序；两分支各自命中同形索引后再归并。 -->
+    <select id="selectPage" resultMap="decisionAuditRow">
+        SELECT decision_id, workspace_id,
+               requester_issuer, requester_type, requester_id,
+               permission_code, resource_type, resource_id,
+               outcome, reason_code, policy_version,
+               request_id, trace_id, evaluated_at
+        FROM (
+            SELECT decision_id, workspace_id,
+                   requester_issuer, requester_type, requester_id,
+                   permission_code, resource_type, resource_id,
+                   outcome, reason_code, policy_version,
+                   request_id, trace_id, evaluated_at
+            FROM ainer_authorization_decision_audit
+            UNION ALL
+            SELECT decision_id, workspace_id,
+                   requester_issuer, requester_type, requester_id,
+                   permission_code, resource_type, resource_id,
+                   outcome, reason_code, policy_version,
+                   request_id, trace_id, evaluated_at
+            FROM ainer_authorization_decision_audit_archive
+        ) audit
+        WHERE workspace_id = #{workspaceId}
+        <if test="afterEvaluatedAt != null and afterDecisionId != null">
+            AND (evaluated_at, decision_id) &lt; (#{afterEvaluatedAt}, #{afterDecisionId})
+        </if>
+        ORDER BY evaluated_at DESC, decision_id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectOperationalStatus" resultMap="decisionAuditOperationalStatusRow">
+        SELECT
+            (SELECT COUNT(*) FROM ainer_authorization_decision_audit) AS hot,
+            (SELECT COUNT(*) FROM ainer_authorization_decision_audit_archive) AS archived,
+            (SELECT MIN(evaluated_at) FROM ainer_authorization_decision_audit) AS oldest_hot_at
+    </select>
 
 </mapper>
