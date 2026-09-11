@@ -1,5 +1,6 @@
 package dev.ainer.server.security;
 
+import dev.ainer.authorization.spring.EndpointAccess;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.core.web.ApiResponse;
@@ -30,6 +31,13 @@ import java.util.UUID;
 @Validated
 @RestController
 @RequestMapping("/internal/workspace-authorization-audits/workspaces/{workspaceId}/exports")
+@EndpointAccess(
+        kind = EndpointAccess.Kind.DELEGATED,
+        reason = "内部审计导出控制面（默认关闭）：handler 内 requireExporter 用 "
+                + "JwtAuthenticatedServiceFactory 要求 SERVICE 主体、匹配 "
+                + "ainer.workspace.authorization-audit-export.trusted-exporter-subject，"
+                + "并强制 SCOPE_workspace.audit.export.all。授权语义是 service scope + 受信主体，"
+                + "不是 Ainer Binding，因此 HTTP 层不加 @AinerAuthorize（docs/security.md §3.4）。")
 @ConditionalOnProperty(
         prefix = "ainer.workspace.authorization-audit-export",
         name = "enabled",
