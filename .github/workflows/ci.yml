@@ -60,6 +60,9 @@ jobs:
       - name: Verify shell, commercial docs and release workflow contracts
         run: ./scripts/check-release-contracts.sh
 
+      - name: Verify framework and product boundary
+        run: ./scripts/check-framework-boundary.sh
+
       - name: Verify Docker runtime
         run: docker info
 

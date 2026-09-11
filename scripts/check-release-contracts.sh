@@ -124,5 +124,6 @@ for marker in "${required_release_markers[@]}"; do
 done
 
 "$boot_root/scripts/check-commercial-docs.sh"
+"$boot_root/scripts/check-framework-boundary.sh"
 
-echo "[ainer-release-contracts] shell, commercial documentation and release workflow contracts passed"
+echo "[ainer-release-contracts] shell, commercial documentation, framework boundary and release workflow contracts passed"
