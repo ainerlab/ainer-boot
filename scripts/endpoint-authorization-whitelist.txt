@@ -36,3 +36,4 @@ AinerPasskeyEnrollmentController#* /internal/passkey-enrollment/** 由 internalS
 AinerPasskeyRecoveryController#*  /internal/passkey-recovery/** 由 internalSecurityFilterChain 要求 SERVICE 主体持 SCOPE_passkey.recovery.request.all 或 SCOPE_passkey.recovery.approve.all（按路径分动作）。
 AinerPasskeyRecoveryCodeController#* 自助恢复码控制面（默认关闭）：默认 SecurityFilterChain 要求已认证会话，签发侧另受 WebAuthn 条件 MFA 门禁约束；兑现侧刻意不要求 WebAuthn（用户已丢失设备），这是 ADR-0015 的既有设计而非权限码缺口。
 CurrentAccessTokenRevocationController#* /api/me/access-token-revocations 由 accessTokenRevocationSecurityFilterChain 要求已认证，并经 AinerAdminAccessTokenActiveFilter 校验该 access token 仍为 ACTIVE。
+IdentityControlController#*           /internal/identity/** 身份生命周期控制面（默认关闭；开启时要求 SCOPE_identity.accounts.manage 或 SCOPE_identity.service-principals.manage、精确登记的可信 SERVICE sub，且调用方 ServicePrincipal 当前 ACTIVE 且 Token sec_epoch 等于其当前 epoch），未登记路径 denyAll；该应用不装配 AinerAuthorizeInterceptor，端点由 internalSecurityFilterChain 精确强制。
