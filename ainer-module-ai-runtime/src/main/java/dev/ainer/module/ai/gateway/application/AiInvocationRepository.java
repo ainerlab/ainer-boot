@@ -32,5 +32,15 @@ public interface AiInvocationRepository {
 
     boolean markFailed(UUID id, String errorCode, long latencyMillis, Instant completedAt);
 
+    /**
+     * 超时/中断失败的终态回写：状态置 FAILED 并把 {@code actual_cost} 置 0，释放这次调用对当日
+     * 预算的预占（{@code estimated_cost} 保留在审计行里，只影响费用暴露口径，不丢失审计信息）。
+     *
+     * <p>与 {@link #markFailed} 的区别是刻意设计的：普通供应商失败仍按预估值占用预算（既有口径，
+     * 避免失败重试绕过上限）；而超时/自愈这类「结果未知且不会自己回到终态」的行如果继续占用，
+     * 会让该 subject 的当日预算永久被锁死到 UTC 跨日。
+     */
+    boolean markFailedReleasingReservation(UUID id, String errorCode, long latencyMillis, Instant completedAt);
+
     Optional<AiInvocation> findBySubjectAndId(String subjectId, UUID id);
 }

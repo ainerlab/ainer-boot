@@ -20,7 +20,7 @@ public class AiRuntimeProperties {
     public AiRuntimeProperties(boolean enabled, Provider provider, Limits limits, Pricing pricing) {
         this.enabled = enabled;
         this.provider = provider != null ? provider
-                : new Provider(null, null, null, null, null, null, null, false);
+                : new Provider(null, null, null, null, null, null, null, null, null, false);
         this.limits = limits != null ? limits : new Limits(null, null, null);
         this.pricing = pricing != null ? pricing : new Pricing(null, null, null);
     }
@@ -65,6 +65,8 @@ public class AiRuntimeProperties {
         private final List<String> allowedModels;
         private final Duration connectTimeout;
         private final Duration requestTimeout;
+        private final Duration totalTimeout;
+        private final Duration streamTotalTimeout;
         private final boolean allowInsecureHttp;
 
         public Provider(
@@ -75,6 +77,8 @@ public class AiRuntimeProperties {
                 List<String> allowedModels,
                 Duration connectTimeout,
                 Duration requestTimeout,
+                Duration totalTimeout,
+                Duration streamTotalTimeout,
                 boolean allowInsecureHttp) {
             this.name = name != null && !name.isBlank() ? name.trim() : "openai-compatible";
             this.baseUrl = baseUrl != null ? baseUrl.trim() : null;
@@ -85,6 +89,8 @@ public class AiRuntimeProperties {
                     : new ArrayList<>();
             this.connectTimeout = connectTimeout != null ? connectTimeout : Duration.ofSeconds(5);
             this.requestTimeout = requestTimeout != null ? requestTimeout : Duration.ofSeconds(60);
+            this.totalTimeout = totalTimeout != null ? totalTimeout : Duration.ofSeconds(120);
+            this.streamTotalTimeout = streamTotalTimeout != null ? streamTotalTimeout : Duration.ofSeconds(600);
             this.allowInsecureHttp = allowInsecureHttp;
         }
 
@@ -114,6 +120,21 @@ public class AiRuntimeProperties {
 
         public Duration getRequestTimeout() {
             return requestTimeout;
+        }
+
+        /**
+         * 单次非流式调用的总时长上限，覆盖「响应头已到、响应体仍在读取」的阶段。
+         *
+         * <p>JDK 的 {@code HttpRequest.timeout} 只覆盖到响应头（JDK-8258397），上游发完响应头
+         * 后静默时读取会无限阻塞，因此必须由本上限兜住整次调用。
+         */
+        public Duration getTotalTimeout() {
+            return totalTimeout;
+        }
+
+        /** 单次 SSE 流式调用的总时长上限，语义同 {@link #getTotalTimeout()}，默认更宽。 */
+        public Duration getStreamTotalTimeout() {
+            return streamTotalTimeout;
         }
 
         public boolean isAllowInsecureHttp() {
@@ -153,6 +174,10 @@ public class AiRuntimeProperties {
                     "ainer.ai.provider.connect-timeout must be positive");
             require(requestTimeout != null && requestTimeout.isPositive(),
                     "ainer.ai.provider.request-timeout must be positive");
+            require(totalTimeout != null && totalTimeout.isPositive(),
+                    "ainer.ai.provider.total-timeout must be positive");
+            require(streamTotalTimeout != null && streamTotalTimeout.isPositive(),
+                    "ainer.ai.provider.stream-total-timeout must be positive");
         }
     }
 

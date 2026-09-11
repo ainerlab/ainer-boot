@@ -81,6 +81,21 @@ public class AiInvocationAuditService {
         }
     }
 
+    /**
+     * 超时/中断失败的终态回写：除置 FAILED 外把 {@code actual_cost} 置 0，释放该调用对当日预算的
+     * 预占（{@code estimated_cost} 仍留在审计行里）。
+     *
+     * <p>为什么单独一条路径：超时调用没有可用的 usage，也没有任何东西会再把它推进终态；若继续按
+     * 预估值占用预算，一次上游静默就会把该 subject 的当日预算锁死到 UTC 跨日。普通供应商失败
+     * （限流/不可用/协议错误）保持既有口径不变。
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void failReleasingReservation(UUID id, String errorCode, long latencyMillis) {
+        if (!repository.markFailedReleasingReservation(id, errorCode, latencyMillis, clock.instant())) {
+            throw new IllegalStateException("AI invocation failure update affected no STARTED row");
+        }
+    }
+
     @Transactional(readOnly = true)
     public AiInvocation get(String subjectId, UUID id) {
         Optional<AiInvocation> invocation = repository.findBySubjectAndId(subjectId, id);

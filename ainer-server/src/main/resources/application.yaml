@@ -63,6 +63,8 @@ ainer:
       allowed-models: ${AINER_AI_ALLOWED_MODELS:}
       connect-timeout: ${AINER_AI_CONNECT_TIMEOUT:5s}
       request-timeout: ${AINER_AI_REQUEST_TIMEOUT:60s}
+      total-timeout: ${AINER_AI_TOTAL_TIMEOUT:120s}
+      stream-total-timeout: ${AINER_AI_STREAM_TOTAL_TIMEOUT:600s}
       allow-insecure-http: ${AINER_AI_ALLOW_INSECURE_HTTP:false}
     limits:
       requests-per-minute: ${AINER_AI_REQUESTS_PER_MINUTE:60}

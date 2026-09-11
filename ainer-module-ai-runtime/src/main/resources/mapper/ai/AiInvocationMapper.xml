@@ -82,6 +82,19 @@
           AND status = 'STARTED'
     </update>
 
+    <!-- 超时/中断失败：连同 actual_cost = 0 一起写，释放这次调用对当日预算的预占。
+         estimated_cost 保留不动，审计仍能看到当初预占了多少。 -->
+    <update id="markFailedReleasingReservation">
+        UPDATE ainer_ai_invocation
+        SET status = 'FAILED',
+            error_code = #{errorCode},
+            actual_cost = 0,
+            latency_ms = #{latencyMillis},
+            completed_at = #{completedAt}
+        WHERE id = #{id}
+          AND status = 'STARTED'
+    </update>
+
     <select id="selectBySubjectAndId" resultMap="aiInvocationRow">
         SELECT id, subject_id, request_id, provider,
                requested_model, resolved_model, streaming, status, policy_decision,

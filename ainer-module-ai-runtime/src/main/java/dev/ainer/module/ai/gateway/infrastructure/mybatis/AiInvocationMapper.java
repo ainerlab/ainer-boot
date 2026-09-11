@@ -34,5 +34,11 @@ public interface AiInvocationMapper {
             @Param("latencyMillis") long latencyMillis,
             @Param("completedAt") Instant completedAt);
 
+    int markFailedReleasingReservation(
+            @Param("id") UUID id,
+            @Param("errorCode") String errorCode,
+            @Param("latencyMillis") long latencyMillis,
+            @Param("completedAt") Instant completedAt);
+
     AiInvocationRow selectBySubjectAndId(@Param("subjectId") String subjectId, @Param("id") UUID id);
 }

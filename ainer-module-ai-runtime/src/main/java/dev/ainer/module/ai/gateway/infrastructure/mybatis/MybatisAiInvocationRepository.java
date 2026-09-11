@@ -59,6 +59,12 @@ public class MybatisAiInvocationRepository implements AiInvocationRepository {
     }
 
     @Override
+    public boolean markFailedReleasingReservation(
+            UUID id, String errorCode, long latencyMillis, Instant completedAt) {
+        return mapper.markFailedReleasingReservation(id, errorCode, latencyMillis, completedAt) == 1;
+    }
+
+    @Override
     public Optional<AiInvocation> findBySubjectAndId(String subjectId, UUID id) {
         return Optional.ofNullable(mapper.selectBySubjectAndId(subjectId, id)).map(this::toDomain);
     }
