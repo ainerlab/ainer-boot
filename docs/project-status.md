@@ -379,9 +379,17 @@ Ainer 项目签名 provenance 已通过。
 - **连接占用实测**：advisory lock 集成测试用真实 Hikari 池（上限 3）证明「每锁一条池化连接」：
   2 把锁 → 池内活跃连接 2；3 把锁 → 池占满，第 4 把锁在 `connection-timeout` 后以明确错误失败，
   释放一把后立即恢复。Hikari 默认池 10，等同「同时持有 10 把锁即吃满默认池」。
-- **测试重试口径**：Redis 集成测试的有界等待只对「状态未就绪」与连接/超时类瞬时异常
-  （`DataAccessResourceFailureException`、`QueryTimeoutException`）重试，上限 10 秒、每 100ms 探测一次；
-  **断言不在重试循环内**（拿到值后一次性断言，值不对立即失败，窗口耗尽抛出明确超时错误）。
+- **测试重试口径**：Redis 集成测试的有界等待（`awaitRedis`）上限 10 秒、每 100ms 探测一次，
+  只对「状态未就绪」与连接/超时类瞬时异常（`DataAccessResourceFailureException`（含
+  `RedisConnectionFailureException`）、`QueryTimeoutException`）重试；**等待的是可观察状态而不是断言**，
+  值/内容断言在等待之后一次性执行，值不对立即失败，状态始终不满足则以明确的超时错误失败。
+  等待覆盖的「写后一致性状态」只有两个：evict 可观察、写后新值可读。
+- **环境定位记录**：一次实测发现本机 Colima 偶发 Redis 连接抖动（日志可见 `Connection refused`/
+  `Connection reset`）时，Lettuce 默认会把命令缓冲到重连后重放，「写 → evict → 读」因此可能乱序落地、
+  缓存里静默留下过期值；加诊断探针后现象消失，且探针下数据库值、缓存内容、数据库调用次数三者始终一致，
+  判定为命令落地时序问题而非实现缺陷。测试作用域因此加 `RedisFailFastFixture`
+  （`REJECT_COMMANDS` + `autoReconnect(false)`），让连接问题以明确的连接异常暴露。
+  该结论是本机复现得到的，未在其他 CI 环境验证。
 - **未完成/待决策**：① PostgreSQL advisory lock 每锁占一条池化连接，池大小需按并发锁数评估
   （javadoc 与 configuration.md 已写明，并给出 3 连接池的实测行为）；② ADR-0039 §1 的第三层能力
   「分布式限流 `RateLimitPort`」仍未实现，限流现状仍是 ADR-0016 的 node-local 固定窗口；
