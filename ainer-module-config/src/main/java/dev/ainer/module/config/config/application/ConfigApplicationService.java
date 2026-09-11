@@ -102,7 +102,16 @@ public class ConfigApplicationService {
 
     // ---- 读取（缓存）----
 
-    @Cacheable(value = CACHE_CONFIG_ENTRY, key = "#namespace + ':' + #key", unless = "#result == null || !#result.isPresent()")
+    /**
+     * 读取配置实体并缓存（ADR-0039/0040）。
+     *
+     * <p>{@code unless} 只判断 {@code #result == null}：Spring Cache 在写入前会对
+     * {@code Optional} 返回值<strong>拆包</strong>（{@code CacheAspectSupport#unwrapReturnValue}），
+     * 因此 SpEL 里的 {@code #result} 是包内的 {@link ConfigEntry}（空 Optional 对应 {@code null}），
+     * 对它调用 {@code #result.isPresent()} 会直接抛 {@code SpelEvaluationException}。命中缓存时
+     * Spring 再按方法返回类型重新包回 {@code Optional}（{@code CacheAspectSupport#wrapCacheValue}）。
+     */
+    @Cacheable(value = CACHE_CONFIG_ENTRY, key = "#namespace + ':' + #key", unless = "#result == null")
     @Transactional(readOnly = true)
     public Optional<ConfigEntry> getEntry(String namespace, String key) {
         return entryRepository.findByNamespaceAndKey(namespace, key);

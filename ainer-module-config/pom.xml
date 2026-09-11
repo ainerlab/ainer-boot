@@ -75,6 +75,17 @@
             <artifactId>testcontainers-postgresql</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Redis 缓存端到端测试：真实 redis:7-alpine 容器 + Redis 客户端（starter 的 Redis 依赖是 optional，不传递） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>dev.ainer</groupId>
             <artifactId>ainer-test-support</artifactId>
