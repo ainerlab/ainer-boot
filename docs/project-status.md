@@ -339,6 +339,32 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-09-11 框架 ↔ 产品边界可执行门禁落地
+- **动机**：产品主线（`cn.xiaoqu.*` / `dev.xq.*` 包、`xq-*` 模块）与框架（`dev.ainer.*` 包、
+  `ainer-*` 模块）将同仓开发，再由脚本把框架子集机械导出回公开仓；边界一旦在开发期被打破，
+  抽取就会退化为重写。规范表述见 `docs/conventions.md` §13。
+- **文本级门禁**：新增 `scripts/check-framework-boundary.sh`，覆盖三类违规——框架 main 源码
+  import 产品包根、框架模块与根 pom 声明产品 groupId、框架 migration 触碰非 `ainer_*` 且非白名单
+  表。违规逐条打印 `文件:行` 并 exit 1；零违规打印一行摘要。当前真实树实测：639 个框架 main
+  Java 文件、28 个框架与根 pom、18 个框架 migration（72 条 DDL 语句），**0 违规**。产品包根、
+  产品 groupId、框架表前缀与白名单集中在 `scripts/framework-boundary-targets.txt`，扩展规则
+  不需要改脚本。
+- **字节码级断言**：`ainer-server` 新增 `AinerServerBoundaryArchitectureTest`（ArchUnit 1.4.2，
+  版本由 `ainer-dependencies` BOM 管理），断言 `dev.ainer..` 不依赖产品包，并与脚本门禁共用同一份
+  清单。公开仓当前没有产品类，主断言平凡通过；因此配 `cn.xiaoqu` 负向夹具与纯框架对照组自测，
+  证明规则真的会拦（变异验证：抽掉夹具的真实字节码依赖后，该负向用例立即失败）。
+- **负向实测**：临时在框架 main 源码 import `cn.xiaoqu.demo.ProductDemo`、临时给框架 pom 加产品
+  groupId 依赖（多行与单行两种形态）、临时在框架 migration 加 `CREATE TABLE xq_demo`，三者均被
+  拦下（`文件:行` + exit 1）并已逐字节还原；`ALTER TABLE` / `DROP TABLE IF EXISTS` / schema 限定 /
+  带引号 / 一条语句多表名同样命中，`oauth2_*`、`user_entities`、`user_credentials` 白名单与
+  注释掉的语句不误报；表名与关键字不同行时失败关闭而非静默放行。
+- **接入**：CI `JDK 25 / Maven 4 quality gate` job 新增独立步骤 `Verify framework and product
+  boundary`（未改动任何既有 job 的 `name`，分支保护检查名不变）；本地
+  `scripts/check-release-contracts.sh` 一并执行，实测通过。
+- **全量验证**：JDK 25 + Maven 4.0.0-rc-6 + Colima/PostgreSQL 18.3，`./mvnw clean verify`
+  28 模块 BUILD SUCCESS，**556 tests / 0 failure / 0 error / 0 skipped**（基线 552，新增 4 项边界
+  测试）；`scripts/check-surefire-results.sh` 通过。
+
 2026-08-28 `v1.4.1` 已发布（商业事实基线与测试确定性补丁）
 - **发布身份**：发布准备 PR [#70](https://github.com/ainerlab/ainer-boot/pull/70) 合入默认分支
   `377a0795d8890b0ca48d314e1c162a54369d7fc4`；annotated tag `v1.4.1` peel 精确等于该提交。
