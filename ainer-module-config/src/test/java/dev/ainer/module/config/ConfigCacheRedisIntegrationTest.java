@@ -6,6 +6,7 @@ import dev.ainer.module.config.config.domain.ConfigEntry;
 import dev.ainer.module.config.config.domain.ConfigValueType;
 import dev.ainer.testfixture.config.CountingConfigEntryRepository;
 import dev.ainer.testfixture.config.CountingRepositoryFixture;
+import dev.ainer.testfixture.config.RedisFailFastFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,10 +47,18 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       在缓存命中时不再访问数据库（自调用绕过代理的路径已消除）；</li>
  *   <li>secret 字段在缓存里是密文实体，明文只在内存中解密。</li>
  * </ol>
+ *
+ * <p><strong>测试环境策略</strong>：本类通过 {@code RedisFailFastFixture} 让 Lettuce 在断连时直接失败
+ * （{@code REJECT_COMMANDS} + {@code autoReconnect(false)}）。原因是一次实测发现：本机 Colima 偶发
+ * Redis 连接抖动时，Lettuce 默认会缓冲命令并在重连后重放，「写 → evict → 读」因此可能乱序落地，
+ * 缓存里静默留下过期值。禁掉重放后，连接问题以明确的连接异常暴露，而不是以顺序错乱暴露；
+ * 读写时序相关的等待统一走 {@link #awaitRedis}（有界、只容忍状态未就绪与连接/超时类瞬时异常，
+ * 断言一次性执行）。
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
-        classes = {ConfigIntegrationTest.TestApplication.class, CountingRepositoryFixture.class},
+        classes = {ConfigIntegrationTest.TestApplication.class, CountingRepositoryFixture.class,
+                RedisFailFastFixture.class},
         properties = {
                 "ainer.config.enabled=true",
                 "mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml",
@@ -136,10 +145,16 @@ class ConfigCacheRedisIntegrationTest {
                 () -> redis.getExpire(ENTRY_CACHE_KEY), ttl -> ttl != null && ttl > 0);
         assertThat(ttlSeconds).isLessThanOrEqualTo(Duration.ofMinutes(30).toSeconds());
 
-        // service 写入触发 @CacheEvict → 缓存被真实删除，数据库新值可见
+        // service 写入触发 @CacheEvict → 缓存被真实删除，数据库新值可见。
+        // 等待 evict 在缓存上可观察（同一套有界策略：只容忍连接/超时类瞬时故障与状态未就绪），
+        // 断言在等待之后一次性执行；evict 若始终不发生会以明确的超时错误失败，不被重试掩盖。
         service.setValue("app", "site.name", "Ainer Boot v2", ConfigValueType.STRING, "Site name", null);
-        assertThat(cacheManager.getCache(ConfigApplicationService.CACHE_CONFIG_ENTRY).get("app:site.name"))
-                .isNull();
+        awaitRedis("evict " + ENTRY_CACHE_KEY,
+                () -> cacheManager.getCache(ConfigApplicationService.CACHE_CONFIG_ENTRY).get("app:site.name"),
+                Objects::isNull);
+        awaitRedis("写后新值 app:site.name",
+                () -> service.getValue("app", "site.name"),
+                value -> value.filter("Ainer Boot v2"::equals).isPresent());
         assertThat(service.getValue("app", "site.name")).contains("Ainer Boot v2");
     }
 
@@ -162,9 +177,16 @@ class ConfigCacheRedisIntegrationTest {
         assertThat(service.getEntry("app", "cache.probe")).isPresent();
         assertThat(countingRepository.findCalls()).isEqualTo(2);
 
-        // 写路径必须绕过缓存去读数据库当前版本（乐观锁判定），紧接着的读才会重新打库
+        // 写路径必须绕过缓存去读数据库当前版本（乐观锁判定）：这一次读必然打库
         service.setValue("app", "cache.probe", "v2", ConfigValueType.STRING, "probe", null);
         assertThat(countingRepository.findCalls()).isEqualTo(3);
+
+        // 写后 evict 生效，读回到新值并重新打库。
+        // 等待的是「可观察状态」而不是断言本身：拿到 v1 这种不一致状态会继续等待，
+        // 窗口耗尽则以明确的超时错误失败；值断言在等待之后只执行一次。
+        awaitRedis("写后新值 app:cache.probe",
+                () -> service.getValue("app", "cache.probe"),
+                value -> value.filter("v2"::equals).isPresent());
         assertThat(service.getValue("app", "cache.probe")).contains("v2");
         assertThat(countingRepository.findCalls()).isEqualTo(4);
     }
@@ -200,8 +222,10 @@ class ConfigCacheRedisIntegrationTest {
      * （{@link DataAccessResourceFailureException}，含 {@code RedisConnectionFailureException}；
      * 以及 {@link QueryTimeoutException}）——容器启动与 Lettuce 预热属于这一类。其他异常立即冒泡。
      *
-     * <p><strong>断言不在重试循环里</strong>：本方法只负责把值取回来，内容断言由调用方在拿到值之后
-     * 一次性执行，因此「值不对」会立即失败，不会被重试掩盖；窗口耗尽则抛出明确的超时错误。
+     * <p><strong>等待的是可观察状态，不是断言</strong>：本方法只负责把状态取回来，内容断言由调用方在拿到
+     * 状态之后一次性执行（值不对立即失败）。唯一被重试的「状态未就绪」是写后缓存一致性状态
+     * （evict 尚未可观察、新值尚未可读）——它由 Redis 命令的落地时序决定，窗口耗尽会抛出明确的
+     * 超时错误而不是静默通过。
      */
     private static <T> T awaitRedis(String what, Supplier<T> read, Predicate<T> ready) {
         Instant deadline = Instant.now().plus(RETRY_TIMEOUT);
