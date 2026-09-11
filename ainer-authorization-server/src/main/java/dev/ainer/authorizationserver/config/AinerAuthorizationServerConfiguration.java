@@ -46,6 +46,11 @@ public class AinerAuthorizationServerConfiguration {
     public static final String INTROSPECTION_CLIENT_SCOPE = "token.introspect";
     public static final String CLIENT_CONTROL_MANAGE_SCOPE = "oauth.clients.manage";
     public static final String BROWSER_CLIENT_CONTROL_MANAGE_SCOPE = "oauth.browser-clients.manage";
+    /** 人员账号生命周期控制面（禁用/锁定/关闭/恢复、密码轮换、凭据撤销）的最小 scope。 */
+    public static final String IDENTITY_ACCOUNT_CONTROL_MANAGE_SCOPE = "identity.accounts.manage";
+    /** 服务主体生命周期控制面（禁用/恢复）的最小 scope，与人员账号 scope 分离。 */
+    public static final String IDENTITY_SERVICE_PRINCIPAL_CONTROL_MANAGE_SCOPE =
+            "identity.service-principals.manage";
 
     @Bean
     ManagedRegisteredClientRepository registeredClientRepository(JdbcTemplate jdbcTemplate) {
