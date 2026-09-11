@@ -131,8 +131,13 @@ done
 "$boot_root/scripts/check-commercial-docs.sh"
 "$boot_root/scripts/check-framework-boundary.sh"
 
+# 端点授权声明门禁：新增但没有 @AinerAuthorize / @EndpointAccess 的 Controller 方法在运行期对
+# 全部已认证主体开放（编译期、启动期、既有 CI 都不会失败），所以本地 check-release-contracts.sh
+# 也要拦住它；与 CI 的独立步骤同源。
+"$boot_root/scripts/check-endpoint-authorization.sh"
+
 # 运行时装配门禁：Dockerfile COPY 覆盖 reactor 模块 + @Scheduled 有生效的 @EnableScheduling。
 # 与 CI 的独立步骤同源，保证本地 `check-release-contracts.sh` 也能拦住同类回归。
 "$boot_root/scripts/check-runtime-wiring.sh"
 
-echo "[ainer-release-contracts] shell, runtime wiring, framework boundary, commercial documentation and release workflow contracts passed"
+echo "[ainer-release-contracts] shell, endpoint authorization, runtime wiring, framework boundary, commercial documentation and release workflow contracts passed"

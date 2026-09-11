@@ -18,6 +18,7 @@ import dev.ainer.authorization.domain.ResourceType;
 import dev.ainer.authorization.domain.SubjectRef;
 import dev.ainer.authorization.domain.SubjectType;
 import dev.ainer.authorization.spring.AinerAuthorize;
+import dev.ainer.authorization.spring.EndpointAccess;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.core.web.ApiResponse;
@@ -813,6 +814,11 @@ class AuthorizationManagementHttpTest {
 
     @RestController
     @RequestMapping("/test/consumer-resources")
+    @EndpointAccess(
+            kind = EndpointAccess.Kind.DELEGATED,
+            reason = "测试夹具：写端点的授权由 ProtectedBusinessWriteService 内的 AuthorizationService 检查"
+                    + "（含决策审计）强制，HTTP 层刻意不设 @AinerAuthorize，正是为了证明绕过 HTTP 注解"
+                    + "也拦得住；默认拒绝生效后必须显式声明口径（docs/security.md §3.4）。")
     @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
             name = "ainer.authorization.test-protected-write", havingValue = "true")
     static class ProtectedBusinessWriteController {

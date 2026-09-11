@@ -144,6 +144,9 @@ Bearer Token 仍由 Resource Server 在更早阶段返回 401。
 注册 `PublicAccessPolicy`，当前 public ALLOW 仍携带 projection obligation，而 0.1 adapter 尚未执行
 该 obligation，因此会失败关闭为 403；在 `DecisionObligationExecutor` 交付前不得宣称支持匿名投影。
 
+**该注解是逐方法可选的**：没有它的 handler 由端点层默认拒绝，不再静默落到「已认证即可访问」
+（见 §3.4）。新增端点必须显式声明授权或公开，静态门禁与运行期 `fail-closed` 都会拦下漏写。
+
 ### 3.3 Initializer v2 生成项目
 
 Manifest v2 的 `simple-service + workspace` 预设复用同一可信主体与 Workspace 双层授权原则，但不把
@@ -152,6 +155,122 @@ scope 与目标 Workspace 的 ACTIVE membership；随后执行带 `workspace_id`
 授权决定写入独立事务审计，审计失败阻断请求。生成项目只公开健康检查，业务 API 与 OpenAPI 都
 需要有效 Bearer JWT；真签名 JWT、跨 Workspace、缺 scope 与 DENY 审计进入独立消费者门禁。
 完整合同见 [ADR-0052](decisions/0052-initializer-v2-secure-vertical-slice.md)。
+
+### 3.4 端点访问声明与端点层默认拒绝
+
+决策记录见 [ADR-0056](decisions/0056-endpoint-authorization-default-deny.md)（默认值取舍、备选方案、
+豁免面边界与后续项都在那里）。
+
+**缺口（2026-09-11 修复前）**：`@AinerAuthorize` 是逐方法可选注解。没有它的 handler 在
+`AinerRequestAuthorizationManager` 里返回 `null`，最终落到 Resource Server 的
+`anyRequest().authenticated()`——**只要求登录，不要求任何权限**。默认拒绝因此只成立于决策引擎内部
+（未知权限 / 无策略 / 无 Binding → DENY），端点层并不成立：新增 Controller 方法若漏写注解，编译期、
+启动期、既有 CI 都不会失败，而它对全部已认证主体开放。
+
+现在同一条不变量由三层共同保证，缺一层就留下绕过路径：
+
+| 层 | 机制 | 漏写声明时的表现 |
+|---|---|---|
+| 决策引擎 | 未知权限 / 无策略 / 无 Binding / 未执行 obligation → DENY | 已声明端点上 403 |
+| 端点层（运行期） | `AinerAuthorizeInterceptor` 按 `ainer.security.endpoint-authorization.mode` 处置未声明 handler，默认 `fail-closed` | 403，并记 ERROR 日志（含 HTTP 方法与端点身份） |
+| 静态门禁 | `scripts/check-endpoint-authorization.sh` 扫描全部 `@RestController` / `@Controller` 方法 | 提交在本地 `check-release-contracts.sh` 与 CI 直接失败，打印 `文件:行` |
+
+#### 3.4.1 显式访问声明 `@EndpointAccess`
+
+有权限语义的端点仍首选 `@AinerAuthorize(permission=...)`。不需要权限码的端点必须在源码里显式声明
+口径并写清理由，不允许沉默：
+
+| 声明 | 含义 | 运行期要求 |
+|---|---|---|
+| `@EndpointAccess(kind = PUBLIC, reason = "...")` | 匿名端点 | 无需认证；真正可达还需 `public-paths` 登记（见 §3.4.2） |
+| `@EndpointAccess(kind = AUTHENTICATED, reason = "...")` | 只要求已认证主体，不要求权限 | 必须有非匿名认证，否则 401 |
+| `@EndpointAccess(kind = DELEGATED, reason = "...")` | HTTP 层不设 Ainer 权限闸门，授权由应用服务或该端点专属的安全构件强制 | 必须有非匿名认证，否则 401 |
+
+- `reason` 必填：静态门禁对缺 reason 的 `@EndpointAccess` 判违规，运行期另记 WARN。
+- 可写在方法或类上；类级声明对类内全部 handler 生效。`@AinerAuthorize` 只支持方法级
+  （`@Target(ElementType.METHOD)`），类级写法编译期即失败——权限码必须逐个方法审阅，而
+  「这个 Controller 整体只需要登录 / 授权在服务里做」这类结论天然是类级的。
+- `DELEGATED` 不是免检。参考装配的三处分别是：`/api/authorization/**`（每个 handler 先调
+  `GrantAdministrationGuard.requireManager`，应用服务事务边界再查一次）、
+  `/internal/workspace-authorization-audits/**`（service scope + 受信导出主体）、
+  `/internal/workspace-owner-recovery/**`（service scope 按动作分权）。选择 `DELEGATED` 时必须在
+  reason 里写清是哪个机制在强制，评审时按该机制复核。
+
+#### 3.4.2 与 `public-paths` 的关系（谁优先、如何审计）
+
+`ainer.security.resource-server.public-paths` 是**网络边界白名单**，由 Spring Security filter chain
+最先执行；`@EndpointAccess` 是**源码侧声明**，由 MVC 拦截器在 handler 解析之后消费。两者不能互相
+替代：真正匿名可达必须两条同时登记，只有配置没有声明不允许上线（静态门禁直接失败）。
+
+| public-paths | `@EndpointAccess(PUBLIC)` | 结果 |
+|---|---|---|
+| 有 | 有 | 匿名可达（`/api/platform/info` 就是这个形态） |
+| 有 | 无 | 运行期 403（`fail-closed`）+ 静态门禁失败——不允许「只改配置就上线匿名端点」 |
+| 无 | 有 | 匿名 401（外层链仍要求认证），失败关闭方向；审计上视为声明与事实不一致，须补齐配置 |
+| 无 | 无 | 匿名 401；已认证主体 403（缺声明） |
+
+审计链路：源码声明（含 reason）→ 每次 CI 的静态门禁 → `scripts/endpoint-authorization-whitelist.txt`
+（仅静态豁免，`类#方法` + 理由，过期登记失败关闭）→ 运行期日志（WARN / ERROR 行含方法与端点身份，
+可接告警）。白名单**不改变运行期裁决**：登记项在 `fail-closed` 下仍被拒绝，除非它由外层安全链或
+应用服务自己完成鉴权；白名单只服务「运行期拦截器覆盖不到」的场景（例如不装配
+`ainer-module-authorization` 的应用），不是让新端点免于声明的捷径。
+
+#### 3.4.3 配置与既有消费者影响
+
+| 配置 key | base | prod | dev | local | 说明 |
+|---|---|---|---|---|---|
+| `ainer.security.endpoint-authorization.mode` | `fail-closed`（代码默认值；三个 profile 都不覆盖） | 继承 base | 继承 base | 继承 base | 未声明端点的处置 |
+| `ainer.security.endpoint-authorization.framework-handler-packages` | `org.springframework.`、`org.springdoc.`、`io.swagger.` | 继承 base | 继承 base | 继承 base | 第三方 jar 提供的 MVC handler 包前缀 |
+
+默认值是 `fail-closed`：升级后**任何没有 `@AinerAuthorize` / `@EndpointAccess` 的 Controller 方法
+都会从「已认证即可访问」变为 403**。这是有意的破坏性变更——把默认值留成宽容、再由每个宿主自己
+想起来加固，等于把安全默认值交给运气。受影响的既有消费者有两条明确路径：
+
+1. **补声明（推荐）**：有权限语义用 `@AinerAuthorize(permission=...)`；匿名 / 仅登录 / 委托授权用
+   `@EndpointAccess(kind=..., reason=...)`；
+2. **升级期灰度**：显式配置 `ainer.security.endpoint-authorization.mode: warn`，未声明端点恢复旧行为
+   （只要求已认证）但每次访问记 WARN 日志，按日志清单批量补声明后再切回 `fail-closed`。
+   静态门禁不受该开关影响，仍硬失败。
+
+`framework-handler-packages` 登记第三方 handler：Spring Boot 错误分发（`/error`）、Actuator 端点、
+springdoc 的 `/v3/api-docs`。这些 handler 不是宿主 Controller、拿不到注解，其认证由外层链负责
+（ADR-0052 要求 `/v3/api-docs` 需有效 JWT，本配置不会让它匿名——带真签名 JWT 200、无 Token 401）。
+
+**该豁免面由宿主覆盖**，覆盖即**整体替换**默认清单（不做增量追加）：
+
+```yaml
+ainer:
+  security:
+    endpoint-authorization:
+      mode: fail-closed            # 未声明端点：fail-closed（默认）| warn
+      framework-handler-packages:  # 覆盖本 key 时默认前缀不再自动保留，需一并写出
+        - org.springframework.
+        - org.springdoc.
+        - io.swagger.
+        - com.acme.platform.docs.  # 宿主引入的其他第三方 MVC 库
+```
+
+只覆盖 `mode` 而不写 `framework-handler-packages` 时，默认前缀仍然生效；一旦写出后者，豁免面就完全
+由该清单决定——这是有意的，豁免必须是显式清单，不靠「默认值还在」隐式继承（决策依据见
+[ADR-0056](decisions/0056-endpoint-authorization-default-deny.md) §5）。
+
+#### 3.4.4 参考装配逐端点处置
+
+`@AinerAuthorize` 覆盖 68 个 handler（Workspace、文件、配置、通知、字典、任务、知识、组织、
+`ai.invoke`、`ai.agents.manage`）。其余逐个核对如下，未声明 handler 数为 0：
+
+| 端点 | 处置 | 理由 |
+|---|---|---|
+| `GET /api/platform/info` | `PUBLIC` | 只返回产品名 / 运行模式 / JDK feature 版本；默认列在 `public-paths` |
+| `/api/authorization/**`（14 个 handler） | 类级 `DELEGATED` | `GrantAdministrationGuard` 精确校验受信 SERVICE，服务层再查一次；加粗闸门会覆盖精确拒绝原因码 |
+| `/internal/workspace-authorization-audits/**`（1 个） | 类级 `DELEGATED` | handler 内要求 SERVICE 主体匹配受信导出者并持 `SCOPE_workspace.audit.export.all` |
+| `/internal/workspace-owner-recovery/**`（2 个） | 类级 `DELEGATED` | handler 内要求 `SCOPE_workspace.owner-recovery.request.all` / `approve.all` |
+| Initializer v2 `GET /api/ping` | `AUTHENTICATED` | 脚手架自检端点，ADR-0052 规定需有效 JWT |
+| Initializer v2 生成业务端点（5 个） | 类级 `DELEGATED` | 用例内 HUMAN 主体 + 实体 scope + Workspace ACTIVE membership + 访问审计（ADR-0052 §3） |
+| Authorization Server 独立应用（14 个 handler） | 白名单登记 | 该应用不依赖 `ainer-module-authorization`，端点由它自己的 `SecurityFilterChain` 按路径精确强制（见 §4） |
+
+已知边界（新增形态需先扩门禁）：静态门禁不解析继承来的映射（基类 Controller、接口默认实现）与
+第三方 jar 内的端点；`@EndpointAccess(PUBLIC)` 只声明「该端点匿名」，不改变 filter chain。
 
 ## 4. Authorization Server
 
@@ -387,14 +506,25 @@ OWNER 恢复只在 Workspace 无 ACTIVE OWNER、至少有一个 REVOKED OWNER，
 ## 8. 验证
 
 ```bash
+./scripts/check-endpoint-authorization.sh
 ./mvnw -pl ainer-framework/ainer-starter-security -am test
 ./mvnw -pl ainer-authorization-server -am test
 ./mvnw -pl ainer-module-identity -am test
 ./mvnw -pl ainer-module-workspace -am test
+./mvnw -pl ainer-server -am -Dtest='EndpointAuthorization*Test' test
 ./mvnw clean verify
 ```
 
 Resource Server 的 401/403、可信 claim、伪造身份头以及 Workspace 应用授权测试不依赖 Docker。Identity、JDBC 协议表、Client Credentials 签发与 Workspace 资源 SQL 测试使用 PostgreSQL Testcontainers；没有 Docker 时会明确跳过，不会改用 H2。
+
+端点授权声明（§3.4）的验证分成两层：静态门禁必须在真实树上零违规（`check-endpoint-authorization.sh`
+打印 handler 计数），运行期必须用真 HTTP + 真签名 JWT 覆盖四种口径——未声明端点对已认证主体 403、
+匿名 401；`@AinerAuthorize` 端点无 Binding 403、建 Binding 后 200；`@EndpointAccess(PUBLIC)` +
+`public-paths` 匿名 200；`AUTHENTICATED` / 类级 `DELEGATED` 匿名 401、已认证 200；同时确认
+`public-paths` 里既有的 `/api/platform/info` 与第三方 handler（`/actuator/health`、`/v3/api-docs`、
+错误分发）不受影响。`warn` 模式另有一组用例证明「放行但留 WARN 日志」。负向实测（临时新增一个
+无声明端点 → 门禁 exit 1 并打印 `文件:行` → 运行期 403 → 还原并校验 sha256）记录在
+[`project-status.md`](project-status.md)。
 
 M4.3 还要求验证在线校验、专用 client 与普通 client 隔离、RFC 7009 撤销，以及 Identity submission 时间等于/前后边界。指标与 SERVICE 控制面还需验证无 Token 401、USER/missing-scope 403、专用 SERVICE 200，以及业务 Resource Server 关闭时仍不匿名公开。browser client 控制面还需验证一次性、白名单、operator/tenant 隔离、蓝绿轮换、退役后新 Token 401、历史 Token introspection inactive 和无 secret 审计。PKCE 门禁必须使用真实 HTTP 会话和 PostgreSQL，覆盖 S256 正反路径、登录 CSRF、
 授权码重放、redirect URI、人员 claims、无 refresh token 以及协议记录不落凭证。Passkey 基线还

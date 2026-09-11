@@ -339,6 +339,61 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-09-11 端点授权默认拒绝落地（`@EndpointAccess` + 运行期 FAIL_CLOSED + 静态门禁）
+- **缺口**：`@AinerAuthorize` 是逐方法可选注解，没有它的 handler 在 `AinerRequestAuthorizationManager`
+  返回 `null`，落到 Resource Server 的 `anyRequest().authenticated()`——只要求登录、不要求权限。
+  默认拒绝因此只成立于决策引擎内部；新增 Controller 方法漏写注解时编译期、启动期与既有 CI 全不失败。
+- **三层机制**：决策引擎默认拒绝不变；新增 `@EndpointAccess(kind = PUBLIC | AUTHENTICATED |
+  DELEGATED, reason = "...")` 显式声明；`AinerAuthorizeInterceptor` 按
+  `ainer.security.endpoint-authorization.mode`（默认 `fail-closed`）对未声明 handler 直接 403 并记
+  ERROR 日志（`warn` 保留旧行为但记 WARN，仅作升级期灰度）；新增
+  `scripts/check-endpoint-authorization.sh` 静态门禁。`PUBLIC` 仍需与 `public-paths` 双登记才真正
+  匿名可达，规范表述见 `docs/security.md` §3.4。
+- **参考装配逐端点核对**（`ainer-server` 及其依赖模块，静态门禁实测 672 个 Java 文件 / 106 个
+  handler，违规 0 处）：68 个 handler 有 `@AinerAuthorize`；`GET /api/platform/info` 声明 `PUBLIC`
+  （默认列在 `public-paths`）；`/api/authorization/**`（14）、
+  `/internal/workspace-authorization-audits/**`（1）、`/internal/workspace-owner-recovery/**`（2）
+  与 Initializer v2 生成业务端点（5）声明类级 `DELEGATED`；v2 `/api/ping` 声明 `AUTHENTICATED`；
+  Authorization Server 独立应用的 14 个 handler 因该应用不依赖 `ainer-module-authorization` 而登记
+  在白名单里（各自的 `SecurityFilterChain` 按路径精确强制，理由写在登记行）。未声明 handler 为 0。
+- **负向实测**（完整原始输出留在本次会话，命令可重放）：临时给 `PlatformInfoController` 加一个无注解
+  的 `GET /api/platform/info-probe` → 门禁 `exit 1` 并打印
+  `ainer-server/src/main/java/dev/ainer/server/endpoint/PlatformInfoController.java:36
+  PlatformInfoController#probe 既没有 @AinerAuthorize，也没有 @EndpointAccess，且未登记在
+  scripts/endpoint-authorization-whitelist.txt`；临时登记进白名单后门禁 `exit 0`（证明白名单机制
+  可用，随后删除登记并核对 sha256 与 HEAD 一致）；临时用例打该端点得到 403，拦截器输出
+  `ERROR … 端点未声明授权口径，FAIL_CLOSED 拒绝：GET /api/platform/info-probe ->
+  dev.ainer.server.endpoint.PlatformInfoController#probe`；还原后
+  `PlatformInfoController.java` 与测试文件的 sha256 与改动前逐一相同，门禁恢复 0 违规。
+- **测试**：新增 20 项（基线 604 → 624）。`ainer-server` 真 HTTP + 真签名 JWT + PostgreSQL 18.3
+  Testcontainers：`EndpointAuthorizationFailClosedTest` 8 项（未声明端点已认证 403 / 匿名 401 且日志留
+  ERROR、`@AinerAuthorize` 无 Binding 403 建 Binding 后 200、`PUBLIC` 匿名 200、`AUTHENTICATED`
+  与类级 `DELEGATED` 匿名 401 已认证 200、`public-paths` 里的 `/api/platform/info` 不受影响、
+  第三方 handler（`/actuator/health`、`/v3/api-docs`、错误分发 404）不被误拒）；
+  `EndpointAuthorizationWarnModeTest` 3 项（放行 + WARN 日志、仍要求认证、声明仍生效）；
+  `ainer-module-authorization` 单元测试 9 项（声明口径 + 未声明处置 + 默认值 fail-closed）。
+  不使用 Mockito / H2。
+- **全量验证**：JDK 25.0.2 + Maven 4.0.0-rc-6 + Colima/PostgreSQL 18.3，
+  `DOCKER_HOST=unix://$HOME/.colima/default/docker.sock
+  TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw clean verify` →
+  28/28 模块 BUILD SUCCESS、**624 tests / 0 failure / 0 error / 0 skipped**、4m21s
+  （同环境基线 604 tests，用时 4m18s）；`scripts/check-surefire-results.sh` 通过。
+- **三道门禁**：`check-endpoint-authorization.sh`（672 Java 文件 / 106 handler / 0 违规）、
+  `check-runtime-wiring.sh`（Dockerfile COPY 27 模块、3 处 `@Scheduled` 有 `@EnableScheduling`）、
+  `check-framework-boundary.sh`（框架 main 656 Java、pom 28、migration 19 / DDL 74，0 违规）同时通过；
+  `check-release-contracts.sh` 已把端点授权门禁纳入本地执行链，CI 新增独立步骤
+  `Verify endpoint authorization declarations`（未改动任何既有 job/step 的 `name`）。
+- **全量 verify 暴露并修复的两处**：静态门禁原先只在顶层类累积成员缓冲、漏掉嵌套 `static Controller`
+  （改为类型作用域栈后真实树输出不变、负向仍拦）；默认拒绝翻转后两个测试夹具的未声明 handler 变为
+  403（`AuthorizationManagementHttpTest` 的受保护写端点、`AgentDelegationFlowTest` 的 acting-grant
+  探针），按其真实机制补 `DELEGATED` 声明，被测行为不变。
+- **升级影响**：未声明端点会从「已认证即可访问」变为 403。补声明即可，或显式配置
+  `ainer.security.endpoint-authorization.mode: warn` 灰度（放行 + WARN 日志），静态门禁不受该开关
+  影响、仍硬失败；Changelog 已按破坏性变更记录。
+- **边界**：门禁不解析继承来的映射（基类 Controller、接口默认实现）与第三方 jar 内端点；
+  `framework-handler-packages`（默认 `org.springframework.` / `org.springdoc.` / `io.swagger.`）是
+  显式豁免面，宿主引入其他第三方 MVC 库时需自行登记；白名单只豁免静态门禁，不改变运行期裁决。
+
 2026-09-11 CI 暴露：通知模块时间入口未遵循微秒约定（纳秒 vs `timestamptz` 精度漂移）
 - **症状**：PR #78 的 quality gate 在
   `NotificationIntegrationTest.markFailedWithRetrySchedulesNextRetryAndIncrementsCount` 失败：

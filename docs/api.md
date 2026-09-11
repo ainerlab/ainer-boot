@@ -46,6 +46,18 @@ Spring MVC 自身判定的异常同样保留真实状态码：405（带 `Allow` 
 
 不要因这些端点公开而扩大其他 Actuator exposure。
 
+**新增公共端点必须同时改两处**（缺一不可，见 [security.md §3.4](security.md)）：
+
+1. 源码声明：在 handler（或 Controller 类）上加
+   `@EndpointAccess(kind = EndpointAccess.Kind.PUBLIC, reason = "为什么它可以匿名")`。
+   `reason` 必填，写清端点的数据面与匿名理由，评审与静态门禁都会看它；
+2. 配置登记：把路径写进 `ainer.security.resource-server.public-paths`
+   （filter chain 先于 MVC 执行，只有它 permitAll，匿名请求才真正可达）。
+
+只加注解不加白名单 → 匿名请求仍是 401；只加白名单不加注解 → 运行期 `fail-closed` 403 且静态门禁
+直接失败。不需要匿名但也不需要权限的端点写 `kind = AUTHENTICATED`；授权在应用服务里做的端点写
+`kind = DELEGATED`（两者都仍要求已认证主体）。
+
 ## 4. Workspace API
 
 | Method | Path | 成功状态 | Scope | 资源角色/状态 |
@@ -190,6 +202,13 @@ SIEM 导出参数 `afterOccurredAt` 与 `afterId` 必须同时提供或同时省
 的门禁，不新增 HTTP endpoint，也不替代应用服务中的资源级授权。未认证请求返回 401；DENY 返回统一
 403；高风险权限缺少近期强认证时返回 401 并携带 RFC 9470 挑战头
 `WWW-Authenticate: Bearer error="insufficient_user_authentication"`。
+
+注解是逐方法可选的，但**漏写不会被静默放行**：既没有 `@AinerAuthorize` 也没有
+`@EndpointAccess`（`PUBLIC` / `AUTHENTICATED` / `DELEGATED`，见
+[security.md §3.4](security.md)）的 handler 在默认配置下由拦截器直接 403 并记 ERROR 日志，
+`scripts/check-endpoint-authorization.sh` 也会在 CI 与本地发布合同门禁里失败。新增端点请先归类：
+有权限语义 → `@AinerAuthorize`；匿名 → `@EndpointAccess(PUBLIC)` **且**登记 `public-paths`；
+只要求登录 → `AUTHENTICATED`；授权在应用服务内完成 → `DELEGATED`（reason 里写清强制机制）。
 
 目标解析与投影语义：
 

@@ -1,5 +1,6 @@
 package dev.ainer.server.security;
 
+import dev.ainer.authorization.spring.EndpointAccess;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.core.error.StandardErrorCode;
 import dev.ainer.core.web.ApiResponse;
@@ -24,6 +25,12 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/internal/workspace-owner-recovery/workspaces/{workspaceId}")
+@EndpointAccess(
+        kind = EndpointAccess.Kind.DELEGATED,
+        reason = "内部运维控制面（默认关闭）：两个 handler 都先调用 requireWorkspaceAccess，用 "
+                + "JwtAuthenticatedServiceFactory 要求 SERVICE 主体并校验 "
+                + "SCOPE_workspace.owner-recovery.request.all / approve.all（按动作分权）；"
+                + "权限语义来自 service scope，不是 Ainer Binding（docs/security.md §3.4）。")
 @ConditionalOnProperty(
         prefix = "ainer.workspace.owner-recovery",
         name = "enabled",

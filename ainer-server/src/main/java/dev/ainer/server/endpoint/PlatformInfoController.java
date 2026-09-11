@@ -1,6 +1,7 @@
 package dev.ainer.server.endpoint;
 
 import dev.ainer.core.web.ApiResponse;
+import dev.ainer.authorization.spring.EndpointAccess;
 import dev.ainer.spring.runtime.AinerRuntimeProperties;
 import dev.ainer.web.request.RequestIds;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,6 +20,11 @@ public class PlatformInfoController {
     }
 
     @GetMapping("/info")
+    @EndpointAccess(
+            kind = EndpointAccess.Kind.PUBLIC,
+            reason = "平台信息端点：只返回产品名、运行模式与 JDK feature 版本，不含租户或用户数据；"
+                    + "默认列在 ainer.security.resource-server.public-paths 里，容器探活与客户端首连"
+                    + "需要匿名可达（docs/security.md §3.4）。")
     public ApiResponse<PlatformInfo> info(HttpServletRequest request) {
         PlatformInfo info = new PlatformInfo(
                 "Ainer Boot",

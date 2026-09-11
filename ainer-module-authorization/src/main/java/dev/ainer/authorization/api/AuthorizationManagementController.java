@@ -14,6 +14,7 @@ import dev.ainer.authorization.domain.PermissionCode;
 import dev.ainer.authorization.domain.Scope;
 import dev.ainer.authorization.domain.SubjectRef;
 import dev.ainer.authorization.domain.SubjectType;
+import dev.ainer.authorization.spring.EndpointAccess;
 import dev.ainer.core.error.BusinessException;
 import dev.ainer.core.web.ApiResponse;
 import dev.ainer.security.token.AuthenticatedPrincipal;
@@ -49,6 +50,14 @@ import static dev.ainer.authorization.api.AuthorizationApiDtos.*;
  */
 @RestController
 @RequestMapping("/api/authorization")
+@EndpointAccess(
+        kind = EndpointAccess.Kind.DELEGATED,
+        reason = "通用授权管理面：每个 handler 先调 requireManagement() → "
+                + "GrantAdministrationGuard.requireManager，按宿主版本化 GrantAdministrationPolicy 精确"
+                + "校验受信 SERVICE issuer+sub，应用服务事务边界会再查一次；授权语义是 "
+                + "authorization.manage scope + 受信清单，不是 Ainer Binding 粗闸门，"
+                + "加 @AinerAuthorize 反而会先被粗闸门 403 覆盖掉精确的拒绝原因码"
+                + "（docs/security.md §3.1、ADR-0030 §8.3）。")
 public class AuthorizationManagementController {
 
     private final RoleApplicationService roleService;
