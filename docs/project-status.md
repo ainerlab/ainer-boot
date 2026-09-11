@@ -372,7 +372,7 @@ Ainer 项目签名 provenance 已通过。
 - **测试（真实 `redis:7-alpine` + 真实 `postgres:18.3-alpine`，无 Mockito / 无 H2）**：
   ① 核心并发证明——两个独立 `RateLimitPort` 实例（两条独立 Lettuce 连接，模拟两个 JVM）各 200 个
   virtual-thread 任务同时放闸打同一 key，阈值 100：**总放行 100、拒绝 300**，Redis 里只有一个计数键
-  且值 = 100（本机连跑实测三轮分布 `A=42/B=58`、`A=58/B=42`、`A=28/B=72`，三种分布下总放行都恒等于
+  且值 = 100（本机连跑实测四轮分布 `A=42/B=58`、`A=58/B=42`、`A=28/B=72`、`A=52/B=48`，四轮总放行都恒等于
   阈值；首轮曾出现 `A=100/B=0`——未预热的那条连接在起跑后才握手，已修夹具让竞争真正交织）；② 串行交错证明「真共享」——实例 A 取 1、实例 B 取 1
   后，实例 A 的第 3 次被拒（独立计数时该断言失败）；③ 窗口推进后配额恢复、`retryAfter` 从 60s
   单调收敛到 40s、旧窗口键 TTL 有上界并真实过期消失；④ 失败关闭——测试内真实 `stop()` 掉一个
@@ -384,10 +384,11 @@ Ainer 项目签名 provenance 已通过。
   `REJECTED:REJECTED_RATE_LIMIT:AINER.AI.RATE_LIMITED`，且 Redis 共享键
   `ainer:test:ai-ratelimit:ai:subject:<sub>:<窗口序号>=2`（进程内自算时不会有这个键）；
   默认 `local` 上下文另断言端口为 node-local 且报告 `clusterAccurate=false`。
-- **实测**：`./mvnw clean verify`（JDK 25 / Maven 4.0.0-rc-6 / Colima，`DOCKER_HOST` +
+- **实测（提交态复跑）**：本条记录的三次 `clean verify` 都在同一份代码内容上执行，最后一次在提交
+  `4ab8844`（工作树干净）上复跑。`./mvnw clean verify`（JDK 25 / Maven 4.0.0-rc-6 / Colima，`DOCKER_HOST` +
   `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 指向 colima socket）= 28 模块、**681 tests / 0 failure /
   0 error / 0 skipped**、`Total time: 04:53 min`；`scripts/check-surefire-results.sh` 同结果
-  `tests=681, failures=0, errors=0, skipped=0` 并退出 0。本次新增 30 项（cache starter 26 → 48：
+  `tests=681, failures=0, errors=0, skipped=0` 并退出 0，构建日志 `[ERROR]` 0 条。本次新增 30 项（cache starter 26 → 48：
   Redis 限流 8、node-local 5、装配 8，另在既有装配测试补 1 项默认降级断言；AI runtime 33 → 41：
   新集成类 3、策略单测 +4、既有集成类 +1），两个模块均 0 skipped（真实容器 `redis:7-alpine`、
   `postgres:18.3-alpine`；无 Mockito / 无 H2）。
