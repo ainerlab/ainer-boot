@@ -327,6 +327,22 @@ MDC 关联；不改写域 Micrometer counters，也不把 Prometheus 鉴权搬�
 失败时异常传播、请求失败关闭，不会在缺少审计的情况下继续处理。产品部署应以自己的策略 bean
 取代该参考实现。
 
+决策审计热表归档任务默认关闭（`ainer.authorization.enabled` 只控制模块装配，不控制该任务）：
+
+| 键 | 默认 | 说明 |
+|---|---|---|
+| `AINER_AUTHORIZATION_DECISION_AUDIT_RETENTION_ENABLED` | `false` | 打开决策审计热表归档任务；首次上线顺序见 [`operations.md`](operations.md) §2.7 |
+| `AINER_AUTHORIZATION_DECISION_AUDIT_HOT_RETENTION` | `90d` | 热表保留期：`evaluated_at` 早于 `now - hot-retention` 的行会被搬进归档表 |
+| `AINER_AUTHORIZATION_DECISION_AUDIT_RETENTION_FIXED_DELAY` | `5m` | 相邻两个归档周期的间隔（上一周期结束后计算），必须为正 |
+| `AINER_AUTHORIZATION_DECISION_AUDIT_RETENTION_INITIAL_DELAY` | `5m` | 首次执行延迟，必须为正；不声明会在启动瞬间抢跑并与启动期负载争抢行锁 |
+| `AINER_AUTHORIZATION_DECISION_AUDIT_ARCHIVE_BATCH_SIZE` | `500` | 单批搬运上限，1..5000；限制单事务持锁时间与 WAL 量 |
+| `AINER_AUTHORIZATION_DECISION_AUDIT_MAX_BATCHES_PER_CYCLE` | `20` | 单周期最多连续搬运批数，1..1000；限制单周期资源占用，剩余积压留给下一周期 |
+| `AINER_AUTHORIZATION_DECISION_AUDIT_OLDEST_HOT_WARN_WINDOW` | `91d` | 最久未归档告警窗口，**必须严格大于热保留期**；最旧热行年龄超过它即 WARN |
+
+非正时长、`batch-size` / `max-batches-per-cycle` 越界、告警窗口不大于热保留期都会让启动失败
+（失败关闭，不静默回退到默认值）。归档语义、指标与历史查询示例见
+[`operations.md`](operations.md) §10。
+
 RSA 签名密钥、撤销 epoch 和在线 introspection 配置属于 Authorization Server（§5），
 不在通用授权模块配置范围内。
 
