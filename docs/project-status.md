@@ -637,6 +637,24 @@ Ainer 项目签名 provenance 已通过。
   （PR-A）；`SENDING` 租约把投递明确为 **at-least-once**（租约过期后允许重新领取），
   exactly-once 语义不在本 PR 范围。
 
+2026-09-11 运行时装配门禁扩到四条检查，并在负向实测中发现并修掉两种绕过
+- **新增两条检查**（`scripts/check-runtime-wiring.sh`）：③「`@Cacheable`/`@CacheEvict`/`@CachePut`
+  存在 ⇒ 存在真正生效的 `@EnableCaching`」（此前因依赖分支未合入而留作 TODO，现已补上）；
+  ④「每个 `fixedDelay`/`fixedRate` 型 `@Scheduled` 必须声明首次执行延迟」（`cron` 型不强制——
+  触发时刻由表达式决定）。
+- **负向实测暴露了门禁自身的两种绕过**（都已修，并复测确认拦住）：
+  ① **全限定注解名绕过**：原先只匹配 `@Scheduled` / `@EnableCaching` / `@ConditionalOnProperty`
+  等简单名，把注解写成 `@org.springframework...Scheduled` 即可静默绕过。现统一改为容忍任意包前缀
+  的匹配（`anno()` 助手）。**能一键绕过的门禁比没有门禁更危险**——它提供虚假的信心。
+  ② **同文件无关条件注解掩盖**：原先判断"`@EnableScheduling`/`@EnableCaching` 是否被默认关闭的条件
+  门控"时，用的是"整个文件里出现过 `matchIfMissing = true`"，于是同文件里**另一条**无关的条件注解
+  就能让它通过。现改为**逐条注解判断**：每条 `@ConditionalOnProperty` 自己必须声明
+  `matchIfMissing = true`。
+- **检查范围**：新增的首次执行延迟检查只覆盖 `main` 源码——测试里的 `@Scheduled` 探针
+  （如 `AinerSchedulingAutoConfigurationTest`）正是要断言"调度生效即立即执行"，强制加延迟会让该断言失去意义。
+- **真实树零违规**：`Dockerfile COPY 覆盖 27 个 reactor 模块；4 处 @Scheduled 均有生效的
+  @EnableScheduling 与首次执行延迟；3 个 main 源码文件使用缓存注解且缓存切面已生效`。
+
 2026-09-11 CI 暴露：投递引擎缺首次执行延迟，与手动驱动的测试争抢记录（本批改动引入的交互回归）
 - **症状**：PR #79 的 quality gate 在 notification 模块失败——`SmtpMailChannelSenderIntegrationTest`
   `expected: SENT but was: SENDING`、`NotificationIntegrationTest.timestampsWithNanosecondPrecisionAreReadBackAtMicrosecondPrecision`
