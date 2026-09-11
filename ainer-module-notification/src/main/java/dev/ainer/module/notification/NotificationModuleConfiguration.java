@@ -1,6 +1,7 @@
 package dev.ainer.module.notification;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.ainer.module.notification.notification.application.NotificationDeliveryProperties;
 import dev.ainer.module.notification.notification.application.NotificationEmailProperties;
 import dev.ainer.module.notification.notification.application.NotificationWebhookProperties;
 import dev.ainer.module.notification.notification.infrastructure.HttpWebhookChannelSender;
@@ -27,7 +28,7 @@ import java.time.Clock;
  * <p>架构要点：
  * <ul>
  *   <li>PG {@code SKIP LOCKED} 实现无锁队列领取——无需外部 MQ；</li>
- *   <li>虚拟线程 + {@code StructuredTaskScope} 实现有界并发投递；</li>
+ *   <li>领取租约 + 虚拟线程 + 有界发送超时实现安全的有界并发投递；</li>
  *   <li>switch 模式匹配实现类型安全的渠道路由；</li>
  *   <li>可选的 HTTP webhook / SMTP 邮件投递（默认关闭，日志 sender 兜底）；</li>
  *   <li>JSONB 模板变量（PG 18）。</li>
@@ -37,7 +38,8 @@ import java.time.Clock;
 @ConditionalOnProperty(prefix = "ainer.notification", name = "enabled", havingValue = "true", matchIfMissing = true)
 @ComponentScan(basePackageClasses = NotificationFeatureMarker.class)
 @MapperScans(@MapperScan(basePackageClasses = NotificationFeatureMarker.class, annotationClass = Mapper.class))
-@EnableConfigurationProperties({NotificationWebhookProperties.class, NotificationEmailProperties.class})
+@EnableConfigurationProperties({NotificationWebhookProperties.class, NotificationEmailProperties.class,
+        NotificationDeliveryProperties.class})
 public class NotificationModuleConfiguration {
 
     @Bean

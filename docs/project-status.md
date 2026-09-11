@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-09-05 · 工程版本：`1.4.1`（当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-09-11 · 工程版本：`1.4.1`（当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -338,6 +338,208 @@ Ainer 项目签名 provenance 已通过。
   `auth_time` 在 `maxAuthAge` 内才能执行所有权转移。
 
 ## 3. 最近验证记录
+
+2026-09-11 CI 暴露：通知模块时间入口未遵循微秒约定（纳秒 vs `timestamptz` 精度漂移）
+- **症状**：PR #78 的 quality gate 在
+  `NotificationIntegrationTest.markFailedWithRetrySchedulesNextRetryAndIncrementsCount` 失败：
+  `expected 2026-09-11T08:39:03.376390186Z but was 2026-09-11T08:39:03.376390Z`。本地全绿、CI 必挂——
+  本地纳秒末三位恰好为 0 时不暴露。
+- **根因**：PostgreSQL `timestamptz` 是微秒精度、`Instant` 是纳秒精度。`task`/`organization`/`knowledge`
+  三个模块都在时间入口做了 `truncatedTo(ChronoUnit.MICROS)`，**notification 模块漏了**：属「约定存在但
+  没有落到每个模块」，与本次修复的其它「声明了但不生效」缺陷同族。
+- **修正**：`MybatisNotificationRecordRepository` 在持久化边界截断全部时间参数与行字段
+  （`save`/`claimPending`/`markSent`/`markFailed` + `toRow`）；`NotificationDeliveryEngine.nextRetryAt()`
+  输出截断；新增回归用例 `timestampsWithNanosecondPrecisionAreReadBackAtMicrosecondPrecision`
+  （写入 `+789ns` 的时间戳并先断言它不等于截断值，再断言读回等于截断值）。
+- **验证**：`./mvnw clean verify` → 28/28 模块 SUCCESS、**600 tests / 0 failure / 0 error / 0 skipped**。
+
+2026-09-11 HTTP 状态语义退化缺陷关闭（405/406/415/非法请求体/429/503）
+- **缺陷**：`GlobalExceptionHandler` 原先只登记 `BusinessException`、参数校验、404、
+  `ErrorResponseException` 与 `Exception` 兜底。`HttpRequestMethodNotSupportedException`（405）、
+  `HttpMediaTypeNotSupportedException`（415）、`HttpMediaTypeNotAcceptableException`（406）与
+  `HttpMessageNotReadableException`（非法 JSON）都不继承 `ErrorResponseException`，全部落进
+  catch-all → 500 + `AINER.COMMON.INTERNAL_ERROR` 并打 error 级日志；`standardCode` 的
+  `default` 分支还把 429/503 分别压成 400/500。与 `docs/architecture.md` §6 及 README
+  「HTTP status 始终保持真实语义」的承诺直接冲突。
+- **修正**：`GlobalExceptionHandler` 改为继承 `ResponseEntityExceptionHandler`，在
+  `handleExceptionInternal` 单一收口把 Spring 判定的状态码折算为稳定错误码并包成
+  `ApiResponse` 信封（405 的 `Allow`、415 的 `Accept` 响应头原样保留）；`standardCode` 补齐
+  405/406/415/429/503，`StandardErrorCode` 新增 `AINER.COMMON.METHOD_NOT_ALLOWED`、
+  `NOT_ACCEPTABLE`、`UNSUPPORTED_MEDIA_TYPE`、`SERVICE_UNAVAILABLE`（429 复用既有
+  `RATE_LIMITED`），`ErrorCodeRegistry` 启动期无重复码。4xx 不再打 error 级日志；5xx 仍记
+  error 且只返回稳定文案，`X-Request-Id`、`requestId` 与 `ApiResponse` 字段结构不变。
+- **本地验证**：JDK 25 + Maven 4.0.0-rc-6 + Colima/PostgreSQL 18.3 下，唯一验收命令
+  `./mvnw clean verify` 为 **28 模块全部 SUCCESS / 562 tests / 0 failure / 0 error /
+  0 skipped**（用时 3m25s，日志 0 条 `[ERROR]`）；`scripts/check-surefire-results.sh`
+  输出 `[ainer-test-results] tests=562, failures=0, errors=0, skipped=0` 并退出 0。
+  同一命令在基线 `abf5a76` 上实测 552 tests / 0 failure / 0 error / 0 skipped，
+  本次净增 10 项。
+- **新增测试**：`GlobalExceptionHandlerHttpStatusTest`（`ainer-starter-web`，真实 Tomcat +
+  `TestRestTemplate`，无 mock）10 项：405（含 `Allow` 响应头与 `X-Request-Id`）、415（含 `Accept` 头）、
+  非法 JSON→400、406、429、503，以及 400 绑定校验、404、409、422 与成功响应信封回归。
+- **回归证据**：既有 401/403（`FileStorageHttpTest`、`AinerServerMetricsSecurityTest`、
+  `AinerServerAuthorizationLivePathTest`）、409/422（`TaskHttpTest`、`DictionaryHttpTest`、
+  `NotificationHttpTest`）、404（`FileStorageHttpTest`、`WorkspaceHttpJwtTest`）与
+  `AinerWebAutoConfigurationTest` 的 422 业务码断言在同一 `clean verify` 中全绿。
+- **边界**：未改动 `ApiResponse` 字段结构；未单独列举的状态码保留真实状态码、`code` 回落到最接近的
+  通用错误码。
+
+2026-09-11 ADR-0039「缓存与分布式协调」落地补齐（分支 `codex/adr-0039-cache-and-lock-reality`）
+- **背景（欠账）**：`@Cacheable`/`@CacheEvict` 已在 `ainer-module-dictionary`（9 处）与
+  `ainer-module-config`（3 处）生产使用，但全仓没有生产 `@EnableCaching`，Spring Boot 也不会替产品打开
+  缓存（`CacheAutoConfiguration` 自身以 `@ConditionalOnBean(CacheAspectSupport.class)` 为前提）——
+  这些注解实际是死注解；`ainer.cache.type=redis` 既不产生 `RedisCacheManager`，ADR-0039 §4 承诺的
+  PG advisory lock 降级实现也不存在；本地锁每次获取都起一条休眠虚拟线程，且多实例下静默失效。
+- **本次交付**：① 新增 `AinerCacheAutoConfiguration`（`@EnableCaching`，`ainer.cache.enabled` 默认
+  `true`、`false` 时不启用）与 `AinerCacheProperties`（`enabled` / `type` / `local.time-to-live` /
+  `local.maximum-size` / `redis.time-to-live` / `redis.key-prefix` / `lock.type`），默认仍为 Caffeine
+  本地缓存，保持 ADR-0039「运维与迁移」第 2 条不改变现有默认行为；② `type=redis` 真正提供
+  `RedisCacheManager`（TTL + key 前缀 + `GenericJacksonJsonRedisSerializer`），缺少 Redis 客户端或
+  `RedisConnectionFactory` 时启动失败并给出修复建议，绝不静默退回本地缓存；③ 新增
+  `PostgresDistributedLockPort`（会话级 `pg_try_advisory_lock(hashtextextended(key, seed))`，每个持有的锁
+  独占一条连接、实例内 TTL 收割器主动放锁），锁选择统一到 `lock.type`（`AUTO`/`POSTGRES`/`LOCAL`），
+  退化为进程内锁时 WARN 明说多实例互斥不成立；④ 新增 `AinerCacheCapabilities` record + 启动日志，
+  打印「声明了什么 vs 实际生效什么」；⑤ 修正 `ConfigApplicationService#getEntry` 的 `unless`——Spring
+  Cache 写入前会拆包 `Optional`，原表达式 `!#result.isPresent()` 在方法被外部调用时会直接抛
+  `SpelEvaluationException`（本次一并修复，属启用缓存后暴露的既有缺陷）。
+- **Redis 序列化实测结论**：`GenericJacksonJsonRedisSerializer` 能往返 `List<record>`/`ArrayList`，
+  但会丢掉 `Optional` 包装（读回 `ConfigEntry` 而非 `Optional<ConfigEntry>`），且 JDK 不可变集合
+  （`List.of`）既无类型标记也无法反序列化；缓存值序列化器因此对根值做等价归一化（`Optional` → 载体
+  record、不可变集合 → 可变等价实现）。Redis 中 secret 字段是密文实体，明文不落缓存；Redis 仍须视为
+  受信基础设施。
+- **主读路径接通缓存（同日补齐）**：原先 `@Cacheable` 落在 `ConfigApplicationService#getEntry` 上，
+  而它只被同类的 `getValue`/`getSecret` 自调用——自调用不经过 Spring 代理，配置模块主读路径实际
+  每次都打数据库。现抽出包内组件 `ConfigEntryLookup`（缓存注解落在它身上，`getEntry`/`getValue`/
+  `getTyped`/`getSecret` 一律经它读取；写入路径仍直读数据库做乐观锁判定）；集成测试用计数仓储替身
+  （`dev.ainer.testfixture.config.CountingConfigEntryRepository`，不用 Mockito）断言同一键第二次读取
+  **数据库调用次数不增长**，把 `@Cacheable` 移回自调用路径时该断言以 `expected: 2 but was: 5` 失败，
+  证明回归测试非空转。
+- **实测**：`./mvnw clean verify`（JDK 25 / Maven 4.0.0-rc-6 / Colima，`DOCKER_HOST` +
+  `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 指向 colima socket）= 28 模块、**580 tests / 0 failure /
+  0 error / 0 skipped**，`scripts/check-surefire-results.sh` 同结果。其中缓存 starter 26 项
+  （装配 17 + PostgreSQL advisory lock 5 + Redis 缓存/锁 4，后两组真实容器：`postgres:18.3-alpine`、
+  `redis:7-alpine`），`ainer-module-config` 22 项（含 4 项真实 `Optional<ConfigEntry>` Redis 端到端测试：
+  缓存命中证明、主读路径不打库的计数断言、密文不落明文、能力报告）；`ainer-offstate-app` 无 DB/无 Redis
+  仍正常启动。
+- **连接占用实测**：advisory lock 集成测试用真实 Hikari 池（上限 3）证明「每锁一条池化连接」：
+  2 把锁 → 池内活跃连接 2；3 把锁 → 池占满，第 4 把锁在 `connection-timeout` 后以明确错误失败，
+  释放一把后立即恢复。Hikari 默认池 10，等同「同时持有 10 把锁即吃满默认池」。
+- **测试重试口径**：Redis 集成测试的有界等待（`awaitRedis`）上限 10 秒、每 100ms 探测一次，
+  只对「状态未就绪」与连接/超时类瞬时异常（`DataAccessResourceFailureException`（含
+  `RedisConnectionFailureException`）、`QueryTimeoutException`）重试；**等待的是可观察状态而不是断言**，
+  值/内容断言在等待之后一次性执行，值不对立即失败，状态始终不满足则以明确的超时错误失败。
+  等待覆盖的「写后一致性状态」只有两个：evict 可观察、写后新值可读。
+- **环境定位记录**：一次实测发现本机 Colima 偶发 Redis 连接抖动（日志可见 `Connection refused`/
+  `Connection reset`）时，Lettuce 默认会把命令缓冲到重连后重放，「写 → evict → 读」因此可能乱序落地、
+  缓存里静默留下过期值；加诊断探针后现象消失，且探针下数据库值、缓存内容、数据库调用次数三者始终一致，
+  判定为命令落地时序问题而非实现缺陷。测试作用域因此加 `RedisFailFastFixture`
+  （`REJECT_COMMANDS` + `autoReconnect(false)`），让连接问题以明确的连接异常暴露。
+  该结论是本机复现得到的，未在其他 CI 环境验证。
+- **未完成/待决策**：① PostgreSQL advisory lock 每锁占一条池化连接，池大小需按并发锁数评估
+  （javadoc 与 configuration.md 已写明，并给出 3 连接池的实测行为）；② ADR-0039 §1 的第三层能力
+  「分布式限流 `RateLimitPort`」仍未实现，限流现状仍是 ADR-0016 的 node-local 固定窗口；
+  ③ 配置模块主读路径已接通缓存，但 `getByNamespace` 等按命名空间列举的读路径仍直读数据库
+  （未加缓存，属有意保留：批量列举的失效面更大）。
+
+2026-09-11 通知投递「声明了但不生效」三处缺陷修复 + 运行时装配门禁（`codex/notification-delivery-and-gates`）
+- **缺陷 1（调度器默认不注册）**：全仓 `@EnableScheduling` 只挂在一个默认关闭的业务开关配置
+  （`WorkspaceAuthorizationAuditRetentionConfiguration`）上，默认配置下调度器根本不注册——
+  提交通知写库成功、API 返回 201、审计有记录，但记录永远停在 `PENDING`，无异常、无告警、
+  既有测试（全部手动直调 `deliverBatch()`）全绿。现移入 framework 层
+  `AinerSchedulingAutoConfiguration`（`ainer-spring`，`ainer.scheduling.enabled` 默认 `true`，
+  缺失即生效），业务条件保留在原配置类。
+- **缺陷 1b/1c（同一引擎的两个静默咬人问题）**：① `claimPending` 把 `SENDING` 与 `PENDING`
+  一起领取且没有租约，发送慢于 `poll-interval-ms`（默认 5s）时同一行被再次领取 → 重复投递；
+  新增 migration `V202609111500` 加 `lease_owner`/`lease_expires_at` 与
+  `ck_ainer_notification_record_sending_lease`（并把存量无租约 `SENDING` 复位为 `PENDING`），
+  领取条件改为「PENDING 到期 或 SENDING 租约过期」，回写按 `(status='SENDING', lease_owner)`
+  CAS。② 发送等待无超时（`try (executor)` + 无参 `future.get()`，`close()` 无限等待）——
+  批次改为共享 `ainer.notification.delivery.send-timeout`（默认 30s）截止时间，超时记录按失败
+  进入既有重试/终态（`error_message=Delivery timed out after <n>ms`），执行器用 `shutdownNow()`
+  收尾；新增 `ainer.notification.delivery.lease-duration`（默认 2m，必须大于 send-timeout，
+  否则启动失败关闭）。
+- **引擎级测试**：新增 `NotificationDeliveryEngineSchedulingIntegrationTest`（真实 PostgreSQL
+  `postgres:18.3-alpine` + 本地 `HttpServer` 桩，**全程不手动触发** `deliverBatch()`）：
+  调度自动投递到 `SENT` 且桩收到 1 次；慢发送（1.5s vs 250ms 轮询）只投递 1 次；
+  卡死发送在 `send-timeout` 后按失败重试并继续推进到终态。**负向实测**：注释掉自动装配登记后
+  该测试 3/3 失败，断言输出 `status=PENDING, retryCount=0, errorMessage=null`（正是生产缺陷
+  形态），且在有界超时内结束不挂构建。
+- **缺陷 2（Dockerfile 与 reactor 脱节）**：COPY 只覆盖 11 个模块（漏 `ainer-module-config`/
+  `-dictionary`/`-file`/`-knowledge`/`-notification`/`-organization`/`-task` 与 framework 的
+  `starter-cache`/`starter-observability`），任何 `docker build` 都在 Maven 项目加载阶段失败；
+  补齐后真跑又暴露两处同类缺陷：构建阶段缺 `unzip` 使 mvnw 静默换用 `.tar.gz` 分发包、与
+  `maven-wrapper.properties` 里 `.zip` 的 `distributionSha256Sum` 冲突（镜像内装 `unzip` 保留
+  校验）；`help:evaluate -DforceStdout` 在 Maven 4 输出 `[INFO] [stdout] 0.1.0-SNAPSHOT`，
+  拼出的产物路径不存在（改为按产物名定位 JAR）。新增 `.dockerignore`；保留 `AINER_MODULE`
+  build arg 与多阶段/非 root 结构。**本机 Colima 实测**：`--no-cache` 冷构建 62 步全过
+  **15m01s**（同一网络另一次冷构建 18m02s，差异来自容器内依赖下载；仅源码变更的增量重建 44s）；
+  镜像 147MB、`USER ainer`(uid 999)、`/app/app.jar` 48MB。
+  CI 新增真构建步骤（`timeout-minutes: 25`，含非 root + 产物存在断言），对 90 分钟超时的
+  quality job 影响：现状约 22 分钟 → 预计 30–40 分钟，仍在预算内。
+- **缺陷 3（门禁缺口）**：新增 `scripts/check-runtime-wiring.sh`（bash，`bash -n` 干净，
+  违规输出 `文件:行` 并 exit 1）：① Dockerfile COPY ⊇ reactor 模块集合（递归解析根 pom 与
+  framework 子模块，共 27 个模块，pom 阶段与源码阶段分别校验）；② `@Scheduled` ⇒ 存在生效的
+  `@EnableScheduling`（main 源码、未被未声明 `matchIfMissing=true` 的 `@ConditionalOnProperty`
+  门控、且已登记进 `AutoConfiguration.imports`）；③ maven-wrapper 固定 `.zip` 校验和 ⇒
+  Dockerfile 必须装 `unzip`；④ 禁止用 `help:evaluate -DforceStdout` 解析版本拼产物路径。
+  接入 CI 新步骤（未改任何既有 job `name`）并在 `check-release-contracts.sh` 中调用。
+  **负向实测**：逐个造违规均被拦住——漏 `ainer-module-task` 的 COPY（2 处违规）、
+  取消 `@EnableScheduling` 自动装配登记、给 `@EnableScheduling` 加上默认关闭的
+  `@ConditionalOnProperty`、移除 `unzip` 安装、恢复 `help:evaluate` 版本解析。
+  同 PR 修正 `check-release-contracts.sh:70` 的空守卫：原 `grep -E '/usr/sbin/ab|AINNER_VERSION'`
+  只反查双 N 拼写（脚本实际用单 N 的 `AINER_VERSION`），拼写修正后恒不成立；改为正面断言
+  `AINER_VERSION` 必须出现。实测三种临时改动都被拦住：硬编码 `/usr/sbin/ab`、把变量改名为
+  `AINER_BOOT_VERSION`、把拼写改回 `AINNER_VERSION`。
+  「`@Cacheable` ⇒ `@EnableCaching`」同类检查按要求**不在本 PR 加入**（依赖并行分支
+  `codex/adr-0039-cache-and-lock-reality`），脚本内留 TODO 注释。
+- **本地验证**：JDK 25 + Maven 4.0.0-rc-6 `./mvnw clean verify` = **28/28 modules SUCCESS，
+  561 tests / 0 failure / 0 error / 0 skipped**（04:00–04:09 min，两次实测；改动前基线 552 tests / 03:29 min）；
+  `OffStateApplicationTest`（无 DB/无 Redis 离态启动）仍通过；`check-release-contracts.sh`
+  含新门禁通过。
+- **范围边界**：不改缓存/锁（PR-B `codex/adr-0039-cache-and-lock-reality`）与 HTTP 异常处理
+  （PR-A）；`SENDING` 租约把投递明确为 **at-least-once**（租约过期后允许重新领取），
+  exactly-once 语义不在本 PR 范围。
+
+2026-09-11 上述各批改动合并后的整体验证（PR #78 最终树）
+- **合并方式**：四个独立验证过的分支（HTTP 状态语义、ADR-0039 缓存与分布式锁、通知投递与运行时装配门禁、
+  框架 ↔ 产品边界门禁）合并到同一集成分支；`docs/project-status.md` 的条目冲突按「各方记录全部保留」解决。
+- **合并后整体验证**：`./mvnw clean verify` → 28/28 模块 SUCCESS、**604 tests / 0 failure / 0 error / 0 skipped**
+  （基线 `abf5a76` 为 552）。
+- **三道门禁在合并树上同时通过**：`scripts/check-framework-boundary.sh`（框架 main 653 个 Java、pom 28 个、
+  migration 19 个 / DDL 74 条，违规 0 处）、`scripts/check-runtime-wiring.sh`（Dockerfile COPY 覆盖 27 个
+  reactor 模块；3 处 `@Scheduled` 均有生效的 `@EnableScheduling`）、`scripts/check-release-contracts.sh`
+  （含前述两者与商业文档、发布 workflow 契约）。
+- **CI**：合并前 head 的完整 GitHub Actions（含本批新增的容器真构建步骤）四项检查全部通过——
+  Commit discipline、quality gate（16m20s）、虚拟线程矩阵（1m32s）、gitleaks——证明新增门禁在 runner 上可执行。
+- **两个只有 CI 才能暴露的缺陷**（本地不可复现，均已修并各有回归证明）：通知模块时间入口未截断到微秒
+  （生产代码，见上条记录）；配置缓存测试用**全局精确计数**断言跨进程可见性（测试断言改为增量式，
+  并以两次变异验证其非空转）。
+
+2026-09-11 框架 ↔ 产品边界可执行门禁落地
+- **动机**：产品主线（`cn.xiaoqu.*` / `dev.xq.*` 包、`xq-*` 模块）与框架（`dev.ainer.*` 包、
+  `ainer-*` 模块）将同仓开发，再由脚本把框架子集机械导出回公开仓；边界一旦在开发期被打破，
+  抽取就会退化为重写。规范表述见 `docs/conventions.md` §13。
+- **文本级门禁**：新增 `scripts/check-framework-boundary.sh`，覆盖三类违规——框架 main 源码
+  import 产品包根、框架模块与根 pom 声明产品 groupId、框架 migration 触碰非 `ainer_*` 且非白名单
+  表。违规逐条打印 `文件:行` 并 exit 1；零违规打印一行摘要。当前真实树实测：639 个框架 main
+  Java 文件、28 个框架与根 pom、18 个框架 migration（72 条 DDL 语句），**0 违规**。产品包根、
+  产品 groupId、框架表前缀与白名单集中在 `scripts/framework-boundary-targets.txt`，扩展规则
+  不需要改脚本。
+- **字节码级断言**：`ainer-server` 新增 `AinerServerBoundaryArchitectureTest`（ArchUnit 1.4.2，
+  版本由 `ainer-dependencies` BOM 管理），断言 `dev.ainer..` 不依赖产品包，并与脚本门禁共用同一份
+  清单。公开仓当前没有产品类，主断言平凡通过；因此配 `cn.xiaoqu` 负向夹具与纯框架对照组自测，
+  证明规则真的会拦（变异验证：抽掉夹具的真实字节码依赖后，该负向用例立即失败）。
+- **负向实测**：临时在框架 main 源码 import `cn.xiaoqu.demo.ProductDemo`、临时给框架 pom 加产品
+  groupId 依赖（多行与单行两种形态）、临时在框架 migration 加 `CREATE TABLE xq_demo`，三者均被
+  拦下（`文件:行` + exit 1）并已逐字节还原；`ALTER TABLE` / `DROP TABLE IF EXISTS` / schema 限定 /
+  带引号 / 一条语句多表名同样命中，`oauth2_*`、`user_entities`、`user_credentials` 白名单与
+  注释掉的语句不误报；表名与关键字不同行时失败关闭而非静默放行。
+- **接入**：CI `JDK 25 / Maven 4 quality gate` job 新增独立步骤 `Verify framework and product
+  boundary`（未改动任何既有 job 的 `name`，分支保护检查名不变）；本地
+  `scripts/check-release-contracts.sh` 一并执行，实测通过。
+- **全量验证**：JDK 25 + Maven 4.0.0-rc-6 + Colima/PostgreSQL 18.3，`./mvnw clean verify`
+  28 模块 BUILD SUCCESS，**556 tests / 0 failure / 0 error / 0 skipped**（基线 552，新增 4 项边界
+  测试）；`scripts/check-surefire-results.sh` 通过。
 
 2026-08-28 `v1.4.1` 已发布（商业事实基线与测试确定性补丁）
 - **发布身份**：发布准备 PR [#70](https://github.com/ainerlab/ainer-boot/pull/70) 合入默认分支

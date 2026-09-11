@@ -68,8 +68,13 @@ if ! diff -u "$manifest_projects" "$actual_projects"; then
 fi
 
 if grep -n -E '/usr/sbin/ab|AINNER_VERSION' "$boot_root/scripts/measure-virtual-threads.sh"; then
-  fail "virtual-thread tooling must resolve ab from PATH and use AINER_VERSION"
+  fail "virtual-thread tooling must resolve ab from PATH and must not misspell AINER_VERSION"
 fi
+# 正面断言：脚本必须真的从单 N 的 AINER_VERSION 解析版本。原守卫只反查双 N 拼写
+# （AINNER_VERSION）——在拼写修正落地后该条件恒不成立，守卫沦为永不触发的空检查，
+# 变量被改坏/改名都不会被发现（docs/project-status.md 记录了拼写修正但守卫未同步）。
+grep -Fq 'AINER_VERSION' "$boot_root/scripts/measure-virtual-threads.sh" \
+  || fail "virtual-thread tooling must resolve the Ainer version from AINER_VERSION"
 
 for wrapper_asset in mvnw mvnw.cmd maven-wrapper.properties; do
   [[ -f "$initializer_templates/$wrapper_asset" ]] \
@@ -124,5 +129,10 @@ for marker in "${required_release_markers[@]}"; do
 done
 
 "$boot_root/scripts/check-commercial-docs.sh"
+"$boot_root/scripts/check-framework-boundary.sh"
 
-echo "[ainer-release-contracts] shell, commercial documentation and release workflow contracts passed"
+# 运行时装配门禁：Dockerfile COPY 覆盖 reactor 模块 + @Scheduled 有生效的 @EnableScheduling。
+# 与 CI 的独立步骤同源，保证本地 `check-release-contracts.sh` 也能拦住同类回归。
+"$boot_root/scripts/check-runtime-wiring.sh"
+
+echo "[ainer-release-contracts] shell, runtime wiring, framework boundary, commercial documentation and release workflow contracts passed"

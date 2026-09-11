@@ -126,6 +126,18 @@ SMTP 邮件真实投递默认关闭。启用后必须提供 `from`，并装配 `
 | `AINER_NOTIFICATION_EMAIL_ENABLED` | `false` | 用 SMTP 替换 EMAIL 渠道的日志兜底 |
 | `AINER_NOTIFICATION_EMAIL_FROM` | 空 | 启用时必填；合法 From 地址 |
 
+投递引擎的轮询与超时约束（2026-09-11 加固）。`poll-interval` 是调度轮询间隔；`send-timeout`
+是单个批次的投递上限（批次内发送并发执行，调度线程最多等这么久，超时按失败走既有重试/终态
+语义，不再无限等待卡死的 SMTP/HTTP）；`lease-duration` 是领取租约，**必须大于 `send-timeout`**，
+否则启动时失败关闭。租约未过期的 `SENDING` 记录不会被再次领取（防重复投递），租约过期后才允许
+重新领取（覆盖实例崩溃或发送线程卡死）。投递语义为 at-least-once，发送方需保证幂等。
+
+| 键 | 默认 | 说明 |
+|---|---|---|
+| `ainer.notification.poll-interval-ms` | `5000` | 调度轮询间隔；引擎由全局 `@EnableScheduling` 驱动 |
+| `ainer.notification.delivery.send-timeout` | `30s` | 单批次投递上限；非法值回落默认值 |
+| `ainer.notification.delivery.lease-duration` | `2m` | 领取租约时长；必须大于 `send-timeout`，否则启动失败 |
+
 ## 4. AI runtime
 
 AI 默认关闭。启用时以下设置共同构成安全门禁：
@@ -277,6 +289,14 @@ MDC 关联；不改写域 Micrometer counters，也不把 Prometheus 鉴权搬�
 | `ainer.observability.otlp.enabled` | `false` | 开启只装配导出标记；真实 OTel exporter 由产品自备 |
 | `ainer.observability.otlp.endpoint` | 空 | 预留端点字段；本 Starter 不强制发起 OTLP 导出 |
 
+全局调度由 `ainer-spring` 的 `AinerSchedulingAutoConfiguration` 装配（`@EnableScheduling`），
+**与任何业务开关无关**：通知投递引擎等 `@Scheduled` 组件因此默认生效。关闭它等于停掉进程内
+所有定时任务（含审计归档与通知投递），只应用于运维降级。
+
+| 键 | 默认 | 说明 |
+|---|---|---|
+| `ainer.scheduling.enabled` | `true` | `false` 时不注册调度器，所有 `@Scheduled` 方法都不再执行 |
+
 ## 7. 通用授权模块（ADR-0037；ADR-0030 已被取代）
 
 `ainer.authorization.enabled`（默认 `true`）控制 `ainer-module-authorization` 的模块装配。
@@ -327,7 +347,45 @@ RSA 签名密钥、撤销 epoch 和在线 introspection 配置属于 Authorizati
 非法或缺失的键自动钳制到上述默认值。引擎按 `TaskHandler` 端口的 `taskType` 派发；超时语义、
 at-least-once 与幂等要求见 ADR-0047 §3。
 
-## 9. 新增配置检查表
+## 9. 缓存与分布式协调（ADR-0039）
+
+`ainer.cache.enabled`（默认 `true`）控制是否打开 Spring Cache 注解驱动。**默认缓存后端不变**：
+`ainer.cache.type=LOCAL`（Caffeine，零外部依赖）。
+
+| 键 | 默认 | 说明 |
+|---|---|---|
+| `AINER_CACHE_ENABLED` | `true` | 是否注册 `@EnableCaching` 切面；`false` 时 `@Cacheable`/`@CacheEvict` 直接落到方法体 |
+| `AINER_CACHE_TYPE` | `LOCAL` | 缓存后端：`LOCAL`（Caffeine）或 `REDIS`（Redis/Valkey，ADR-0039 §2 推荐 Valkey 8.x，Redis 7.x 兼容）；取值大小写不敏感 |
+| `AINER_CACHE_LOCAL_TIME_TO_LIVE` | `PT30M` | Caffeine 写入后过期时间，必须为正 |
+| `AINER_CACHE_LOCAL_MAXIMUM_SIZE` | `10000` | 单个缓存最大条目数，必须为正 |
+| `AINER_CACHE_REDIS_TIME_TO_LIVE` | `PT30M` | Redis 缓存条目 TTL，必须为正 |
+| `AINER_CACHE_REDIS_KEY_PREFIX` | `ainer:cache:` | Redis 缓存键前缀（多应用共享实例时用于隔离命名空间） |
+| `AINER_CACHE_LOCK_TYPE` | `AUTO` | 分布式锁策略：`AUTO` / `POSTGRES` / `LOCAL`；取值大小写不敏感 |
+
+装配与失败语义：
+
+- `type=REDIS` 要求应用<strong>显式引入</strong> `org.springframework.boot:spring-boot-starter-data-redis`
+  （`ainer-starter-cache` 的 Redis 依赖是 `optional`，不传递给消费者）并提供 `RedisConnectionFactory`；
+  缺失时启动失败并给出修复建议，**不会**静默退回本地缓存。
+- 缓存值以 JSON（Jackson 3 `GenericJacksonJsonRedisSerializer`）写入，带受限的多态类型标记；
+  键使用字符串序列化并加配置前缀。Redis 中会保存业务配置数据（secret 字段是密文，明文不落缓存），
+  必须把 Redis 当作**受信基础设施**：启用认证、限制网络可达面、按环境隔离实例。
+  缓存是最终一致：断连/重连窗口内的 evict 乱序风险、陈旧值的 TTL 上限与可选的 fail-fast 取舍，
+  见 [operations.md](operations.md) §9「缓存与 Redis 运维」。
+- 锁选择顺序（`lock.type=AUTO`）：Redis 缓存后端可用 → Redis 锁（`SET NX EX` + Lua 校验 token 释放）；
+  否则存在唯一 `DataSource` → PostgreSQL 会话级 advisory lock（`pg_try_advisory_lock(hashtextextended(key, seed))`）；
+  否则退化为进程内锁并 **WARN**（多实例部署下互斥不成立）。
+- `lock.type=POSTGRES` 时没有 `DataSource`（或存在多个且无 `@Primary`）会**启动失败**。
+- PostgreSQL advisory lock 的代价：**每个被持有的锁独占一条池化连接**直到释放或 TTL 到期，
+  因此池大小必须覆盖「并发锁数 + 常规查询并发」；TTL 由实例内收割线程强制执行。
+  实测（`PostgresDistributedLockPortIntegrationTest`，Hikari 池上限 3）：持有 2 把锁时池内活跃连接
+  就是 2；持有 3 把锁即占满整个池，第 4 把锁在 `connection-timeout` 后以明确错误失败，释放一把后
+  立即恢复。Hikari 默认 `maximum-pool-size=10`，即同时持有 10 把锁会吃满默认池并让普通查询排队——
+  需要更多并发锁时应改用 Redis 实现。
+- 启动日志会打印实际生效的缓存后端类名、TTL、锁实现类名与 `multiInstanceSafe`，
+  同一信息以 `dev.ainer.cache.autoconfigure.AinerCacheCapabilities` bean 暴露，可用于测试与运维探针。
+
+## 10. 新增配置检查表
 
 - 属性归属明确，并使用 `@ConfigurationProperties`；
 - 有安全默认值、边界验证和错误配置测试；

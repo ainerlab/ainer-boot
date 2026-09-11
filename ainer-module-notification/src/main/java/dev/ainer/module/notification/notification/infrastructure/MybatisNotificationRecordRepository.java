@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,7 +36,7 @@ public class MybatisNotificationRecordRepository implements NotificationRecordRe
     @Override
     public UUID save(NotificationRecord record) {
         NotificationRecordRow row = toRow(record);
-        return mapper.insertReturningId(row, clock.instant());
+        return mapper.insertReturningId(row, micros(clock.instant()));
     }
 
     @Override
@@ -44,19 +45,21 @@ public class MybatisNotificationRecordRepository implements NotificationRecordRe
     }
 
     @Override
-    public List<NotificationRecord> claimPending(int batchSize) {
-        return mapper.claimPending(batchSize, clock.instant()).stream()
+    public List<NotificationRecord> claimPending(int batchSize, String leaseOwner, Instant leaseExpiresAt) {
+        return mapper.claimPending(batchSize, leaseOwner, micros(leaseExpiresAt), micros(clock.instant())).stream()
                 .map(MybatisNotificationRecordRepository::toDomain).toList();
     }
 
     @Override
-    public void markSent(UUID id, Instant sentAt) {
-        mapper.markSent(id, sentAt, clock.instant());
+    public void markSent(UUID id, String leaseOwner, Instant sentAt) {
+        mapper.markSent(id, leaseOwner, micros(sentAt), micros(clock.instant()));
     }
 
     @Override
-    public void markFailed(UUID id, String errorMessage, int retryCount, int maxRetries, Instant nextRetryAt) {
-        mapper.markFailed(id, errorMessage, retryCount, maxRetries, nextRetryAt, clock.instant());
+    public void markFailed(UUID id, String leaseOwner, String errorMessage,
+            int retryCount, int maxRetries, Instant nextRetryAt) {
+        mapper.markFailed(id, leaseOwner, errorMessage, retryCount, maxRetries,
+                micros(nextRetryAt), micros(clock.instant()));
     }
 
     @Override
@@ -80,12 +83,22 @@ public class MybatisNotificationRecordRepository implements NotificationRecordRe
         row.setStatus(record.status().name());
         row.setRetryCount(record.retryCount());
         row.setMaxRetries(record.maxRetries());
-        row.setNextRetryAt(record.nextRetryAt());
+        row.setNextRetryAt(micros(record.nextRetryAt()));
         row.setErrorMessage(record.errorMessage());
-        row.setSentAt(record.sentAt());
-        row.setCreatedAt(record.createdAt());
-        row.setUpdatedAt(record.updatedAt());
+        row.setSentAt(micros(record.sentAt()));
+        row.setCreatedAt(micros(record.createdAt()));
+        row.setUpdatedAt(micros(record.updatedAt()));
         return row;
+    }
+
+    /**
+     * PostgreSQL {@code timestamptz} 是微秒精度，而 {@link Instant} 是纳秒精度：不截断时同一时刻
+     * 「内存里的值」与「读回来的值」不相等（本地纳秒末位恰好为 0 时不会暴露，CI 上会）。按仓库既有的
+     * 时间入口约定（task、organization、knowledge 模块同款处理），在持久化边界统一截断到微秒，
+     * 保证内存值与落库值一致。
+     */
+    private static Instant micros(Instant value) {
+        return value == null ? null : value.truncatedTo(ChronoUnit.MICROS);
     }
 
     private static NotificationRecord toDomain(NotificationRecordRow row) {

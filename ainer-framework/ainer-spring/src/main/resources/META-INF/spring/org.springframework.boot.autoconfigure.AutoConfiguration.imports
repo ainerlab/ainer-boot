@@ -1,2 +1,3 @@
 dev.ainer.spring.runtime.AinerRuntimeAutoConfiguration
+dev.ainer.spring.scheduling.AinerSchedulingAutoConfiguration
 dev.ainer.spring.storage.LocalFileStorageAutoConfiguration

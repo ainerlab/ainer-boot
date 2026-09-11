@@ -245,6 +245,11 @@ ainer_identity_access_event
 - `updated_at >= created_at`、`expires_at > created_at` 等可验证关系必须使用 CHECK；
 - 持续时长优先使用带单位的 `integer`/`bigint`，如 `latency_ms`、`ttl_seconds`；仅当数据库需要进行区间运算时使用 `interval`；
 - 稳定分页必须在时间列后增加唯一 tie-breaker，例如 `(occurred_at DESC, id DESC)`。
+- **精度契约**：`timestamptz` 存储微秒，`java.time.Instant` 是纳秒精度。应用层时间入口
+  （领域对象构造、重试/过期时间计算、Repository 写入前）必须 `truncatedTo(ChronoUnit.MICROS)`，
+  否则同一时刻在内存与数据库之间往返不相等——本地纳秒末位恰为 0 时不暴露，CI 上必然失败
+  （2026-09-11 `notification` 模块 CI 失败教训）。实现层速查见
+  [`conventions.md`](conventions.md) §8。
 
 ### 5.5 状态与分类
 

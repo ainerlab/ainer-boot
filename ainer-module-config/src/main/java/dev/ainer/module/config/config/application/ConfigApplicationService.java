@@ -7,7 +7,6 @@ import dev.ainer.module.config.config.domain.ConfigValueType;
 import dev.ainer.security.token.AuthenticatedPrincipal;
 import org.jspecify.annotations.Nullable;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,7 +18,8 @@ import java.util.UUID;
 
 /**
  * 动态配置的应用服务（ADR-0038）。使用 Spring Cache 抽象（ADR-0039）——
- * 读路径 {@code @Cacheable}，写入时 {@code @CacheEvict}。缓存后端可替换：
+ * <strong>缓存读在 {@link ConfigEntryLookup}</strong>（独立组件，避免自调用绕过代理导致
+ * 「声明了缓存但每次打库」），写入时在这里用 {@code @CacheEvict} 失效键。缓存后端可替换：
  * Caffeine（本地，默认）或 Redis/Valkey（分布式）。
  *
  * <p>secret 值通过 {@link ConfigEncryptionPort} 加密（默认 AES-GCM）。调用方向
@@ -33,16 +33,19 @@ public class ConfigApplicationService {
     public static final String CACHE_CONFIG_ENTRY = "config:entry";
 
     private final ConfigEntryRepository entryRepository;
+    private final ConfigEntryLookup entryLookup;
     private final ConfigHistoryRepository historyRepository;
     private final ConfigEncryptionPort encryption;
     private final Clock clock;
 
     public ConfigApplicationService(
             ConfigEntryRepository entryRepository,
+            ConfigEntryLookup entryLookup,
             ConfigHistoryRepository historyRepository,
             ConfigEncryptionPort encryption,
             Clock clock) {
         this.entryRepository = entryRepository;
+        this.entryLookup = entryLookup;
         this.historyRepository = historyRepository;
         this.encryption = encryption;
         this.clock = clock;
@@ -100,17 +103,20 @@ public class ConfigApplicationService {
         }
     }
 
-    // ---- 读取（缓存）----
+    // ---- 读取（缓存；缓存注解在 ConfigEntryLookup，避免自调用绕过代理）----
 
-    @Cacheable(value = CACHE_CONFIG_ENTRY, key = "#namespace + ':' + #key", unless = "#result == null || !#result.isPresent()")
+    /**
+     * 读取配置实体（缓存读路径，ADR-0039/0040）。实际读取与缓存由
+     * {@link ConfigEntryLookup#find} 完成：命中缓存时不访问数据库。
+     */
     @Transactional(readOnly = true)
     public Optional<ConfigEntry> getEntry(String namespace, String key) {
-        return entryRepository.findByNamespaceAndKey(namespace, key);
+        return entryLookup.find(namespace, key);
     }
 
     @Transactional(readOnly = true)
     public Optional<String> getValue(String namespace, String key) {
-        return getEntry(namespace, key).filter(e -> !e.secret()).map(ConfigEntry::value);
+        return entryLookup.find(namespace, key).filter(e -> !e.secret()).map(ConfigEntry::value);
     }
 
     @Transactional(readOnly = true)
@@ -119,11 +125,12 @@ public class ConfigApplicationService {
     }
 
     /**
-     * 读取 secret 配置值并解密为明文。密文经 {@link ConfigEncryptionPort} 解密。
+     * 读取 secret 配置值并解密为明文。密文经 {@link ConfigEncryptionPort} 解密；
+     * 解密只发生在内存里，缓存里存的是密文实体。
      */
     @Transactional(readOnly = true)
     public Optional<String> getSecret(String namespace, String key) {
-        return getEntry(namespace, key)
+        return entryLookup.find(namespace, key)
                 .filter(ConfigEntry::secret)
                 .map(e -> encryption.decrypt(e.encryptedValue()));
     }

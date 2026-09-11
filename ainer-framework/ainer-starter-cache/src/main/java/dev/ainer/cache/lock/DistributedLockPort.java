@@ -29,6 +29,16 @@ public interface DistributedLockPort {
      */
     void release(LockHandle handle);
 
+    /**
+     * 该实现是否在多实例部署下仍真实互斥。
+     *
+     * <p>默认 {@code true}。进程内实现必须覆写为 {@code false}——装配层据此在启动期 WARN，
+     * 让「退化为单实例锁」这件事显式可见，而不是静默成立（ADR-0039 落地补齐要求）。
+     */
+    default boolean multiInstanceSafe() {
+        return true;
+    }
+
     /** 携带锁 key 与唯一 token 的不透明句柄，用于安全释放。 */
     record LockHandle(String key, String token) {}
 }

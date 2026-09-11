@@ -4,12 +4,15 @@ import dev.ainer.module.config.config.application.ConfigApplicationService;
 import dev.ainer.module.config.config.domain.ConfigEntry;
 import dev.ainer.module.config.config.domain.ConfigHistory;
 import dev.ainer.module.config.config.domain.ConfigValueType;
+import dev.ainer.testfixture.config.CountingConfigEntryRepository;
+import dev.ainer.testfixture.config.CountingRepositoryFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -32,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
-        classes = ConfigIntegrationTest.TestApplication.class,
+        classes = {ConfigIntegrationTest.TestApplication.class, CountingRepositoryFixture.class},
         properties = {
                 "ainer.config.enabled=true",
                 "mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml",
@@ -58,11 +61,19 @@ class ConfigIntegrationTest {
     ConfigApplicationService service;
     @Autowired
     JdbcTemplate jdbcTemplate;
+    @Autowired
+    CacheManager cacheManager;
+    @Autowired
+    CountingConfigEntryRepository countingRepository;
 
     @BeforeEach
     void clean() {
         jdbcTemplate.execute("DELETE FROM ainer_config_history");
         jdbcTemplate.execute("DELETE FROM ainer_config_entry");
+        // 缓存自 2026-09-11 起真实生效（ADR-0039 补齐）：清库之外必须同时清缓存，
+        // 否则用例之间会互相看到上一个用例留下的缓存值。
+        cacheManager.getCache(ConfigApplicationService.CACHE_CONFIG_ENTRY).clear();
+        countingRepository.resetFindCalls();
     }
 
     @Test
@@ -180,6 +191,38 @@ class ConfigIntegrationTest {
         assertThat(entries).filteredOn(ConfigEntry::secret).hasSize(1);
     }
 
+    /**
+     * 证明<strong>默认（Caffeine）后端</strong>下主读路径也真的接通缓存（不是自调用绕过代理）。
+     *
+     * <p>断言与 Redis 版测试同一口径：只按<strong>增量</strong>表达（先预热并做只读观察固定前提，
+     * 再比较前后差值），不写「全局总数 == 某个常数」，因此不会因环境时序抖动假失败；
+     * 完整论证见 {@code ConfigCacheRedisIntegrationTest#mainReadPathsDoNotHitDatabaseAgainOnCacheHit()}。
+     */
+    @Test
+    void mainReadPathServesFromCacheWithoutHittingDatabaseAgain() {
+        service.setValue("app", "cached.read", "v1", ConfigValueType.STRING, null, null);
+
+        // 预热：业务读一次完成「读库 + 回填本地缓存」
+        assertThat(service.getValue("app", "cached.read")).contains("v1");
+
+        // 1) 命中性质：预热后重复读，数据库调用零增长
+        long beforeHits = countingRepository.findCalls();
+        assertThat(service.getValue("app", "cached.read")).contains("v1");
+        assertThat(service.getValue("app", "cached.read")).contains("v1");
+        assertThat(service.getEntry("app", "cached.read")).isPresent();
+        assertThat(countingRepository.findCalls()).isEqualTo(beforeHits);
+
+        // 2) 写路径：写前直读数据库做乐观锁判定 → 增量恰好 1
+        long beforeWrite = countingRepository.findCalls();
+        service.setValue("app", "cached.read", "v2", ConfigValueType.STRING, null, null);
+        assertThat(countingRepository.findCalls()).isEqualTo(beforeWrite + 1);
+
+        // 3) 本地缓存 evict 同步生效（无网络时序）：随后一次读重新读库并回到新值 → 增量恰好 1
+        long beforeReload = countingRepository.findCalls();
+        assertThat(service.getValue("app", "cached.read")).contains("v2");
+        assertThat(countingRepository.findCalls()).isEqualTo(beforeReload + 1);
+    }
+
     @Test
     void cacheEvictedOnValueUpdate() {
         service.setValue("app", "cached", "v1", ConfigValueType.STRING, null, null);
@@ -201,6 +244,7 @@ class ConfigIntegrationTest {
     @Import({ConfigModuleConfiguration.class})
     static class TestApplication {
     }
+
 
     /** Satisfies the controller's resolver dependency without enabling the resource-server chain. */
     @org.springframework.boot.test.context.TestConfiguration
