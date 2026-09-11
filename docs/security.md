@@ -41,6 +41,28 @@ export AINER_SECURITY_RESOURCE_SERVER_ENABLED=false
 
 关闭 Ainer Resource Server 后，starter 会提供明确的 permit-all 链，避免 Spring Boot 因 Security 位于 classpath 而生成随机密码和 Basic Login。生产发行配置不得关闭；依赖 `AuthenticatedPrincipal` 的 Workspace/AI 能力也不得借此获得匿名回退身份。
 
+### 2.0 JWKS 信任锚
+
+验签公钥从哪里取，是整条身份链的信任锚。`AINER_SECURITY_ISSUER_URI` 在两种形态下都必须提供（它同时是 `iss` 的校验值）：
+
+| 形态 | 配置 | 公钥来源 |
+|---|---|---|
+| discovery（默认） | 只给 `AINER_SECURITY_ISSUER_URI` | `<issuer>/.well-known/openid-configuration` → `jwks_uri` |
+| 显式 JWKS | 另给 `AINER_SECURITY_JWK_SET_URI` | 直接 GET 该地址（Authorization Server 的 `/oauth2/jwks`），issuer 校验不变 |
+
+- **明文信任锚失败关闭**：`jwk-set-uri` 必须是 HTTPS；明文 HTTP 只允许环回地址且必须显式
+  `AINER_SECURITY_ALLOW_INSECURE_JWK_SET_HTTP=true`（本机/自动化专用），其余情况启动失败。
+  Spring Security 的 `withJwkSetUri` 自身不做 scheme 检查，这道闸门由框架补齐。
+- **有 JWKS 没 issuer 也失败关闭**：只配 `jwk-set-uri` 而 `issuer-uri` 为空时，Spring Boot 把空
+  issuer 绑成 `""` 并拿它比较 `iss`——进程照常启动，但所有 Token 都 401。框架在启动期拒绝这种
+  组合，并把最终信任锚写进启动日志（`Ainer resource server trust anchor: jwkSetUri=…,
+  issuerUri=…`），作为排查「验签为什么失败」的第一个信号。
+- **证据**：`JwksTrustAndSigningKeyRotationIntegrationTest` 用真实 HTTP 从真实 Authorization
+  Server 的 `/oauth2/jwks` 取公钥完成验签，资源服务器侧不声明任何 `JwtDecoder`（解码器由生产
+  装配按 `jwk-set-uri` + `issuer-uri` + `audiences` 构造）。覆盖正常验签 200、篡改签名 401、
+  未发布 `kid` 401、伪造 `iss`/`aud` 401。`AinerResourceServerTrustAnchorContractTest` 钉住
+  Boot 的解码器选择与空 issuer 绑定行为，避免上游语义变化后框架假设失效。
+
 AI 请求示例：
 
 ```bash
@@ -282,9 +304,8 @@ export SPRING_DATASOURCE_USERNAME=ainer_auth
 export SPRING_DATASOURCE_PASSWORD='use-secret-injection'
 export AINER_AUTHORIZATION_SERVER_ISSUER=https://auth.example.com
 export AINER_AUTHORIZATION_SERVER_AUDIENCE=ainer-api
-export AINER_AUTHORIZATION_SIGNING_KEY_ID=ainer-signing-2026-01
-export AINER_AUTHORIZATION_PRIVATE_KEY_LOCATION=file:/run/secrets/ainer-private.pem
-export AINER_AUTHORIZATION_PUBLIC_KEY_LOCATION=file:/run/secrets/ainer-public.pem
+export AINER_AUTHORIZATION_SIGNING_KEY_DIRECTORY=file:/run/secrets/ainer-signing-keys
+export AINER_AUTHORIZATION_SIGNING_KEY_ACTIVE_ID=ainer-signing-2026h2
 
 ./mvnw -pl ainer-authorization-server -am spring-boot:run
 ```
@@ -296,7 +317,46 @@ openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out ainer-private.
 openssl pkey -in ainer-private.pem -pubout -out ainer-public.pem
 ```
 
-密钥文件不得提交。生产环境应由 secret manager 挂载只读文件，并建立双 key 发布、旧 Token 验证窗口和定期轮换流程；当前最小装配加载一对 RSA key，不等同于完整 KMS 生命周期。
+密钥文件不得提交。生产环境应由 secret manager 挂载只读目录，轮换步骤见
+[`operations.md`](operations.md) §2.7。
+
+### 4.1 签名密钥环与轮换窗口
+
+签发与验证的密钥集合是同一份环（`SigningKeyRing`），语义只有三条，且都由启动期校验强制，不是
+文档承诺：
+
+| 语义 | 实现 |
+|---|---|
+| **发布** | 环里每把 key 的公钥都进入 `/oauth2/jwks`；Authorization Server 自身的 `JwtDecoder` 同样接受其中任意一把 |
+| **签发** | 只有 `active-key-id` 那把携带私钥材料，其余 key 在装载阶段被剥成纯公钥；`NimbusJwtEncoder` 显式选择「唯一带私钥的 JWK」，因此「误用旧 key 签发」在数据上不可达 |
+| **移除** | key 不再出现在环里就不再发布，也就立刻不再被接受（未知 `kid` 失败关闭）；没有隐藏宽限期 |
+
+配置形态（互斥，同时配置即启动失败）：
+
+- **目录形态（推荐）**：`AINER_AUTHORIZATION_SIGNING_KEY_DIRECTORY` 内 `<kid>.public.pem` 是发布
+  key，`<kid>.private.pem` 只允许属于激活 key。运维可先把新 key 的公钥放进目录观察，再切
+  `active-key-id`；过渡期里旧 key 的私钥即使还在目录中也不会被装载进签名环（回滚时可直接切回）。
+- **单文件形态（兼容）**：`AINER_AUTHORIZATION_SIGNING_KEY_ID` + 私钥/公钥位置，等价于只有一把
+  key，不具备过渡期验证旧 Token 的能力，轮换前必须迁到目录形态。
+
+启动期失败关闭的清单：两种形态同时配置或都不配置；`active-key-id` 缺失或不在目录中；激活 key
+没有私钥文件；私钥文件缺少配对公钥；目录里出现无法识别的文件（文件名拼错不会被静默忽略）；
+同一 `kid` 的公私钥不是同一对（否则签出来的 Token 永远验不过）；RSA 模数低于 2048 位；目录
+不存在。
+
+**边界（必须与能力一起读）**：
+
+- 环在**应用启动时装载一次**，不提供热加载：新增 key、切换激活 key、移除旧 key 都通过重启
+  Authorization Server 生效。这样做的取舍是让「目录半写状态被读走」不可能发生，代价是每次
+  变更需要一次重启；
+- 移除旧 key 后，**已经缓存过旧 JWKS 的资源服务器实例**在自身缓存过期前仍可能接受旧 key 签名的
+  Token。Spring Security 的 `NimbusJwtDecoder` 走 Nimbus `JWKSourceBuilder` 默认缓存：
+  `DEFAULT_CACHE_TIME_TO_LIVE = 300000 ms`（5 分钟），过期后刷新超时 15s，
+  `refreshAheadCache(false)`、`rateLimited(false)`。因此 runbook 要求先等
+  Token TTL 过去再移除，而不是靠缓存过期兜底；
+- 本能力替代的是「单 key 不可轮换」，**不等于** KMS/HSM 生命周期：私钥仍是挂载的 PEM 文件，
+  没有硬件保护、没有自动轮换、没有多实例密钥同步，也没有密钥使用审计；
+- 不校验 `x5c`/证书链，不使用非 RSA 算法；`kid` 由运营方在文件名中给定，不做指纹派生。
 
 Flyway 会创建 Identity 表和 Spring Security JDBC 协议表。应用没有默认管理员、默认用户、默认 client 或默认 secret，空库启动后不会凭空获得可用凭证。
 
@@ -551,6 +611,16 @@ OWNER 恢复只在 Workspace 无 ACTIVE OWNER、至少有一个 REVOKED OWNER，
 ```
 
 Resource Server 的 401/403、可信 claim、伪造身份头以及 Workspace 应用授权测试不依赖 Docker。Identity、JDBC 协议表、Client Credentials 签发与 Workspace 资源 SQL 测试使用 PostgreSQL Testcontainers；没有 Docker 时会明确跳过，不会改用 H2。
+
+JWKS 信任锚与签名密钥轮换的证据必须在真实 HTTP 上取得（§2.0、§4.1）：
+`JwksTrustAndSigningKeyRotationIntegrationTest` 同时启动三个真实 Authorization Server 实例
+（轮换前 / 过渡期 / 移除后，各自 PostgreSQL + 真实 PEM 密钥目录，经完整 PKCE 会话签发 Token）与
+两个资源服务器探针（不声明 `JwtDecoder`，只用生产装配），断言：新 key 签发的 Token 验签 200、
+旧 key 签发的在途 Token 在过渡期仍 200、旧 key 移除后同一 Token 401 而新 Token 仍 200、篡改签名
+401、未发布 `kid` 401、伪造 `iss`/`aud` 401、JWKS 只含公钥参数且模数与本地私钥一致。
+配置侧的失败关闭（明文信任锚、有 JWKS 无 issuer、目录形态的各种非法配置）由
+`AinerResourceServerPropertiesTest`、`AinerResourceServerTrustAnchorContractTest`、
+`SigningKeyRingTest` 与 `AinerAuthorizationServerSigningKeyBindingTest` 分别覆盖。
 
 端点授权声明（§3.4）的验证分成两层：静态门禁必须在真实树上零违规（`check-endpoint-authorization.sh`
 打印 handler 计数），运行期必须用真 HTTP + 真签名 JWT 覆盖四种口径——未声明端点对已认证主体 403、

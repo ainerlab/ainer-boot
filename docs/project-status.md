@@ -339,6 +339,53 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-09-11 JWKS 信任锚实证与签名密钥轮换窗口（分支 `codex/jwks-trust-and-rotation`，基线 2e222ac）
+- **两个缺口**：①Resource Server「信任生产 AS 的 JWKS」这一跳从未被证明——全仓没有
+  `jwk-set-uri`，所有 HTTP/JWT 集成测试都用 `@Primary JwtDecoder` 自签自验把生产解码器顶掉，
+  没有一条测试真的经 HTTP 从 JWKS 端点取公钥验签；②Authorization Server 用 `ImmutableJWKSet`
+  装载**一对** RSA key，没有多 key 发布、没有 `kid` 选择窗口、没有轮换流程，换 key 会让在途
+  Token 全部失效且没有过渡窗口。
+- **授权服务器侧**：`SigningKeyRing` 把「发布哪些 key」与「用哪把 key 签发」拆开。目录形态
+  （`AINER_AUTHORIZATION_SIGNING_KEY_DIRECTORY` + `_ACTIVE_ID`）内 `<kid>.public.pem` 全部进
+  `/oauth2/jwks`，`<kid>.private.pem` 只允许属于激活 key；非激活 key 在装载期即被剥成纯公钥，
+  并显式给 `NimbusJwtEncoder` 设 `setJwkSelector`（只选唯一带私钥的 JWK）——多把 RS256 key 同时
+  发布时默认编码器会抛 `multiple keys`，不设选择器则轮换窗口一签发就失败。单文件形态保留兼容，
+  两种形态互斥。启动期失败关闭覆盖：形态歧义/缺失、`active-key-id` 不在目录、激活 key 无私钥、
+  私钥缺配对公钥、目录含无法识别文件、公私钥不是同一对、RSA < 2048 位、目录不存在。
+- **资源服务器侧**：新增 `AINER_SECURITY_JWK_SET_URI`（同时给 `issuer-uri` 时 Boot 用前者取
+  JWKS、用后者校验 `iss`）。两类静默故障改为启动期失败关闭：明文信任锚（Spring Security
+  `withJwkSetUri` 不做 scheme 检查）、以及「有 JWKS 没 issuer」——Boot 把空 issuer 绑成 `""`
+  而非 `null`，进程能启动但所有 Token 都 401。启动日志打印最终信任锚。
+- **信任锚的真实证据**：`JwksTrustAndSigningKeyRotationIntegrationTest` 8 项。资源服务器探针
+  **不声明任何 `JwtDecoder`**，解码器与安全链由生产装配按 `jwk-set-uri` + `issuer-uri` +
+  `audiences` 构造；三个真实 Authorization Server 实例（轮换前 / 过渡期 / 移除后，各自
+  PostgreSQL 18.3 Testcontainers + 真实 PEM 密钥目录 + 完整 PKCE 会话）与两个探针一起断言：
+  新 key 签发 Token 200；JWKS 只含 `n`/`e` 且模数与本地私钥一致；过渡期旧 key 在途 Token 仍
+  200；移除旧 key 后同一旧 Token 401 而新 Token 仍 200；篡改签名 401；未发布 `kid` 401；伪造
+  `iss`/`aud` 401。原始断言为
+  `assertThat(probeStatus(windowProbe, legacyToken)).isEqualTo(200)` 与
+  `assertThat(probeStatus(removalProbe, legacyToken)).isEqualTo(401)`——同一个旧 Token 在两个只
+  有「读哪份 JWKS」不同的资源服务器上得到相反结果，构成受控对照，不是自证。
+- **配置与包装配**：`SigningKeyRingTest` 13 项、`AinerAuthorizationServerSigningKeyBindingTest`
+  3 项、`AinerResourceServerPropertiesTest` 新增 7 项、`AinerResourceServerTrustAnchorContractTest`
+  2 项（钉住 Boot 的解码器选择与空 issuer 绑定行为）、`ResourceServerTrustAnchorConfigurationTest`
+  1 项（出厂 YAML 键名与环境变量名契约）。不使用 Mockito / H2，0 skipped。
+- **全量验证**：JDK 25.0.2 + Maven 4.0.0-rc-6 + Colima/PostgreSQL 18.3，
+  `DOCKER_HOST=unix:///Users/xq/.colima/default/docker.sock
+  TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw clean verify` →
+  28/28 模块 BUILD SUCCESS、**687 tests / 0 failure / 0 error / 0 skipped**、4m48s；
+  基线 2e222ac 同命令 **653 tests / 0 / 0 / 0**、4m39s（同机复测），即本次净增 34 项。
+  `scripts/check-surefire-results.sh` 打印 `tests=687, failures=0, errors=0, skipped=0` 并通过。
+- **三道门禁**（改动后 / 基线 2e222ac）：`check-endpoint-authorization.sh` 680 Java 文件 /
+  110 handler / 0 违规（基线 677 / 110 / 0）；`check-runtime-wiring.sh` Dockerfile COPY 27 模块、
+  3 处 `@Scheduled` 均有生效 `@EnableScheduling`（与基线一致）；`check-framework-boundary.sh`
+  框架 main Java 664 / pom 28 / migration 20、DDL 75 条 / 0 违规（基线 661 / 28 / 20 / 75 / 0）。
+- **边界（与能力一起读）**：密钥环在应用启动时装载一次，不提供热加载，新增/切换/移除 key 都
+  需要重启 AS；移除旧 key 后已缓存旧 JWKS 的资源服务器实例最多还会接受旧 key 签名的 Token
+  5 分钟（Nimbus `JWKSourceBuilder.DEFAULT_CACHE_TIME_TO_LIVE = 300000 ms`），因此 runbook
+  要求先等 Token TTL 过去再移除；私钥仍是挂载 PEM，没有 HSM/KMS、自动轮换、多实例密钥同步或
+  密钥使用审计；未实现 `x5c`/证书链与非 RSA 算法。
+
 2026-09-11 端点授权默认拒绝落地（`@EndpointAccess` + 运行期 FAIL_CLOSED + 静态门禁）
 - **缺口**：`@AinerAuthorize` 是逐方法可选注解，没有它的 handler 在 `AinerRequestAuthorizationManager`
   返回 `null`，落到 Resource Server 的 `anyRequest().authenticated()`——只要求登录、不要求权限。
@@ -2099,7 +2146,10 @@ M4.3 另使用本机 PostgreSQL 18.4 从空库执行 Authorization Server 五份
   导出、双人审批或 UI；
 - Authorization Code + PKCE 与 Passkey 条件门禁、虚拟 authenticator 签名 ceremony、恢复、
   受控 enrollment 和 Resource Server step-up 已有自动化验证，但生产 browser/OIDC client 控制面、
-  恢复通知、真实设备矩阵、共享限流、多节点会话和签名密钥轮换未完成；品牌登录合同 1.0.0
+  恢复通知、真实设备矩阵、共享限流和多节点会话未完成；签名密钥轮换的**应用内**能力已完成
+  （多 key 发布 + 过渡窗口 + `kid` 选择 + 启动期失败关闭，见 §3 2026-09-11 条目），仍未完成的
+  是外部密钥生命周期：HSM/KMS、自动轮换、多实例密钥同步、密钥使用审计与 `x5c`/证书链；
+  品牌登录合同 1.0.0
   明确不提供可见 Passkey 动作，因此需要人员 Passkey 登录的部署仍需等待 Studio 新合同；
 - 平台级 tenant/user 控制面已有默认关闭的预配申请/查询、一次性激活核心、加密 notification
   outbox、OAuth2/HTTPS 通知网关 relay、已有用户本人接受、安全分页、显式取消与 provider-neutral
