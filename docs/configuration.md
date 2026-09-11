@@ -350,6 +350,8 @@ at-least-once 与幂等要求见 ADR-0047 §3。
 - 缓存值以 JSON（Jackson 3 `GenericJacksonJsonRedisSerializer`）写入，带受限的多态类型标记；
   键使用字符串序列化并加配置前缀。Redis 中会保存业务配置数据（secret 字段是密文，明文不落缓存），
   必须把 Redis 当作**受信基础设施**：启用认证、限制网络可达面、按环境隔离实例。
+  缓存是最终一致：断连/重连窗口内的 evict 乱序风险、陈旧值的 TTL 上限与可选的 fail-fast 取舍，
+  见 [operations.md](operations.md) §9「缓存与 Redis 运维」。
 - 锁选择顺序（`lock.type=AUTO`）：Redis 缓存后端可用 → Redis 锁（`SET NX EX` + Lua 校验 token 释放）；
   否则存在唯一 `DataSource` → PostgreSQL 会话级 advisory lock（`pg_try_advisory_lock(hashtextextended(key, seed))`）；
   否则退化为进程内锁并 **WARN**（多实例部署下互斥不成立）。
