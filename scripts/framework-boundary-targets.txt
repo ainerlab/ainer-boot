@@ -1,0 +1,32 @@
+# 框架 ↔ 产品边界目标清单（规范见 docs/conventions.md §13）
+#
+# 本文件是「框架 ↔ 产品边界」可执行门禁的唯一配置来源，被两处读取：
+#   1. scripts/check-framework-boundary.sh   —— 源码/pom/migration 文本级门禁；
+#   2. ainer-server 的 AinerServerBoundaryArchitectureTest —— 字节码级依赖方向断言。
+# 因此新增产品包根、产品 groupId 或白名单表时只改本文件，不需要改脚本或测试代码。
+#
+# 格式：每行 `<键> <值>`；`#` 起为注释；空行忽略。键的语义：
+#   package      产品包根。框架 main 源码 import 该包（或其子包）即违规。
+#   group        产品 groupId。框架模块/根 pom 出现该 groupId 依赖即违规。
+#   table-prefix 框架自有表前缀。框架 migration 只能触碰这些前缀的表。
+#   table-allow  例外表白名单，允许框架 migration 触碰的非框架表。支持 `*` 通配，
+#                也支持精确表名；每一项都必须写明归属方，否则不要加。
+#
+# --- 产品包根（monorepo 中新增产品包根时在此追加一行） ---
+package cn.xiaoqu
+package dev.xq
+
+# --- 产品 groupId（monorepo 中新增产品模块 groupId 时在此追加一行） ---
+group cn.xiaoqu
+group dev.xq
+
+# --- 框架自有表前缀（框架 migration 只允许创建/修改这些表） ---
+table-prefix ainer_
+
+# --- 白名单：上游框架拥有的协议表，框架 migration 允许触碰 ---
+# oauth2_*：Spring Authorization Server 官方 JDBC 协议存储（schema 由上游定义）。
+table-allow oauth2_*
+# user_entities / user_credentials：Spring Security WebAuthn 官方 JDBC 协议存储
+# （见 ainer-authorization-server/.../V202608070330__authorization_server_foundation_baseline.sql）。
+table-allow user_entities
+table-allow user_credentials

@@ -63,6 +63,9 @@ jobs:
       - name: Verify runtime wiring contracts
         run: ./scripts/check-runtime-wiring.sh
 
+      - name: Verify framework and product boundary
+        run: ./scripts/check-framework-boundary.sh
+
       - name: Verify Docker runtime
         run: docker info
 

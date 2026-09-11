@@ -129,9 +129,10 @@ for marker in "${required_release_markers[@]}"; do
 done
 
 "$boot_root/scripts/check-commercial-docs.sh"
+"$boot_root/scripts/check-framework-boundary.sh"
 
 # 运行时装配门禁：Dockerfile COPY 覆盖 reactor 模块 + @Scheduled 有生效的 @EnableScheduling。
 # 与 CI 的独立步骤同源，保证本地 `check-release-contracts.sh` 也能拦住同类回归。
 "$boot_root/scripts/check-runtime-wiring.sh"
 
-echo "[ainer-release-contracts] shell, runtime wiring, commercial documentation and release workflow contracts passed"
+echo "[ainer-release-contracts] shell, runtime wiring, framework boundary, commercial documentation and release workflow contracts passed"
