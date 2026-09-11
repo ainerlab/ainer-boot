@@ -1,8 +1,5 @@
 package dev.ainer.authorizationserver.config;
 
-import com.nimbusds.jose.jwk.JWKSet;
-import com.nimbusds.jose.jwk.RSAKey;
-import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import dev.ainer.authorizationserver.identity.AinerUserDetailsService;
@@ -10,6 +7,8 @@ import dev.ainer.module.identity.foundation.HumanAccountRepository;
 import dev.ainer.module.identity.foundation.IdentityFoundationService;
 import dev.ainer.module.identity.foundation.ServicePrincipalRepository;
 import dev.ainer.module.identity.foundation.ServicePrincipalFoundationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -23,8 +22,10 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
@@ -39,6 +40,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(AinerAuthorizationServerProperties.class)
 public class AinerAuthorizationServerConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(AinerAuthorizationServerConfiguration.class);
 
     public static final String CLIENT_INTROSPECTION_ALLOWED_SETTING = "ainer.introspection-allowed";
     public static final String TOKEN_PROFILE_SETTING = "ainer.token-profile";
@@ -106,19 +109,41 @@ public class AinerAuthorizationServerConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    JWKSource<SecurityContext> authorizationJwkSource(
+    SigningKeyRing authorizationSigningKeyRing(
             AinerAuthorizationServerProperties properties,
             ResourceLoader resourceLoader) {
-        AinerAuthorizationServerProperties.SigningKey signingKey = properties.getSigningKey();
-        if (signingKey.getKeyId() == null || signingKey.getKeyId().isBlank()) {
-            throw new IllegalStateException("Ainer authorization signing key id is required");
+        SigningKeyRing ring = SigningKeyRing.load(
+                properties.getSigningKey(),
+                properties.getSigningKeyRing(),
+                new PemRsaKeyLoader(resourceLoader));
+        // 启动期打印一次即可判定「发布集 / 签发 key」是否符合预期——轮换 runbook 的可观测信号之一。
+        log.info("Ainer authorization signing key ring: active={}, published={}",
+                ring.activeKeyId(), ring.publishedKeyIds());
+        if (ring.publishedKeyIds().size() > 1) {
+            log.info("Ainer authorization signing key ring is in a rotation window: {} keys are published "
+                            + "and tokens signed by any of them verify until the key stops being published",
+                    ring.publishedKeyIds().size());
         }
-        PemRsaKeyLoader loader = new PemRsaKeyLoader(resourceLoader);
-        RSAKey rsaKey = new RSAKey.Builder(loader.publicKey(signingKey.getPublicKeyLocation()))
-                .privateKey(loader.privateKey(signingKey.getPrivateKeyLocation()))
-                .keyID(signingKey.getKeyId())
-                .build();
-        return new ImmutableJWKSet<>(new JWKSet(rsaKey));
+        return ring;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    JWKSource<SecurityContext> authorizationJwkSource(SigningKeyRing signingKeyRing) {
+        return signingKeyRing.jwkSource();
+    }
+
+    /**
+     * 签发侧编码器：多把 RS256 key 同时发布时 {@code NimbusJwtEncoder} 默认直接抛
+     * 「multiple keys」，因此必须显式给出选择策略——只选唯一带私钥材料的 key（当前激活 key）。
+     * 不注册本 Bean 的话，SAS 会用同一 JWKSource 构造默认编码器，轮换过渡期一签发就失败。
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    JwtEncoder authorizationJwtEncoder(JWKSource<SecurityContext> jwkSource) {
+        NimbusJwtEncoder encoder = new NimbusJwtEncoder(jwkSource);
+        encoder.setJwkSelector(SigningKeyRing::selectSigningKey);
+        return encoder;
     }
 
     @Bean

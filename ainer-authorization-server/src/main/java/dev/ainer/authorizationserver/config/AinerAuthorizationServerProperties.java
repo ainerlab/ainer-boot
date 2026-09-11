@@ -12,6 +12,7 @@ public class AinerAuthorizationServerProperties {
     private final String issuer;
     private final String audience;
     private final SigningKey signingKey;
+    private final SigningKeyRing signingKeyRing;
     private final Passkey passkey;
     private final MachineClientBootstrap machineClientBootstrap;
     private final IntrospectionClientBootstrap introspectionClientBootstrap;
@@ -26,10 +27,12 @@ public class AinerAuthorizationServerProperties {
             MachineClientBootstrap machineClientBootstrap,
             IntrospectionClientBootstrap introspectionClientBootstrap,
             MetricsClientBootstrap metricsClientBootstrap,
-            BrowserClientControlOperatorBootstrap browserClientControlOperatorBootstrap) {
+            BrowserClientControlOperatorBootstrap browserClientControlOperatorBootstrap,
+            SigningKeyRing signingKeyRing) {
         this.issuer = issuer;
         this.audience = audience != null ? audience : "ainer-api";
         this.signingKey = signingKey != null ? signingKey : new SigningKey(null, null, null);
+        this.signingKeyRing = signingKeyRing != null ? signingKeyRing : new SigningKeyRing(null, null);
         this.passkey = passkey != null ? passkey : new Passkey(false, null, null, null, false, null);
         this.machineClientBootstrap = machineClientBootstrap != null
                 ? machineClientBootstrap
@@ -55,6 +58,10 @@ public class AinerAuthorizationServerProperties {
 
     public SigningKey getSigningKey() {
         return signingKey;
+    }
+
+    public SigningKeyRing getSigningKeyRing() {
+        return signingKeyRing;
     }
 
     public Passkey getPasskey() {
@@ -99,6 +106,32 @@ public class AinerAuthorizationServerProperties {
 
         public String getPublicKeyLocation() {
             return publicKeyLocation;
+        }
+    }
+
+    /**
+     * 可轮换的签名密钥环配置（目录形态，见 {@link SigningKeyRing}）。
+     *
+     * <p>与 {@link SigningKey} 互斥：两者同时配置时启动失败，避免「以为切到了新 key，实际仍在用旧的」。
+     */
+    public static final class SigningKeyRing {
+
+        private final String directory;
+        private final String activeKeyId;
+
+        public SigningKeyRing(String directory, String activeKeyId) {
+            this.directory = directory;
+            this.activeKeyId = activeKeyId;
+        }
+
+        /** 密钥目录（文件系统路径或 {@code file:} 位置），内含 {@code <kid>.public.pem} / {@code <kid>.private.pem}。 */
+        public String getDirectory() {
+            return directory;
+        }
+
+        /** 当前用于签发的 key id；必须存在于目录中且必须带私钥文件。 */
+        public String getActiveKeyId() {
+            return activeKeyId;
         }
     }
 

@@ -40,6 +40,13 @@ ainer:
         key-id: ${AINER_AUTHORIZATION_SIGNING_KEY_ID:}
         private-key-location: ${AINER_AUTHORIZATION_PRIVATE_KEY_LOCATION:}
         public-key-location: ${AINER_AUTHORIZATION_PUBLIC_KEY_LOCATION:}
+      # 可轮换密钥环（目录形态，与上面的 signing-key 互斥；两者同时配置会在启动期失败关闭）。
+      # 目录内 <kid>.public.pem 是已发布 key（全部进 /oauth2/jwks），<kid>.private.pem 只允许属于
+      # active-key-id；只有激活 key 能签发，其余已发布 key 只用于验证在途 Token。
+      # 环在启动时装载一次：新增/移除/切换 key 通过重启授权服务器生效，不提供热加载。
+      signing-key-ring:
+        directory: ${AINER_AUTHORIZATION_SIGNING_KEY_DIRECTORY:}
+        active-key-id: ${AINER_AUTHORIZATION_SIGNING_KEY_ACTIVE_ID:}
       passkey:
         enabled: ${AINER_AUTHORIZATION_PASSKEY_ENABLED:false}
         rp-id: ${AINER_AUTHORIZATION_PASSKEY_RP_ID:}
