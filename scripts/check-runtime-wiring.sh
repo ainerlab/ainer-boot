@@ -305,7 +305,7 @@ for path in java_files(r"^\s*" + anno("Scheduled")):
         continue
     lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
     for lineno, line in enumerate(lines, start=1):
-        if not re.match(r"\s*@Scheduled\b", line):
+        if not re.match(r"\s*" + anno("Scheduled"), line):
             continue
         block = annotation_block(lines, lineno)
         if "cron" in block and "fixedDelay" not in block and "fixedRate" not in block:
