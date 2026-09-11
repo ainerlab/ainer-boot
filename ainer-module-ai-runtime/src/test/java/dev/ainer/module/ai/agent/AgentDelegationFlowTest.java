@@ -455,6 +455,10 @@ class AgentDelegationFlowTest {
 
     @RestController
     @RequestMapping("/api/ai/acting-probe")
+    @dev.ainer.authorization.spring.EndpointAccess(
+            kind = dev.ainer.authorization.spring.EndpointAccess.Kind.DELEGATED,
+            reason = "测试夹具：代理授权由 handler 内的 AiGatewayActingGrantGuard.requireIfPresent 强制，"
+                    + "HTTP 层不设 @AinerAuthorize（ADR-0030 §8.4）；默认拒绝生效后必须显式声明口径。")
     @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
             name = "ainer.ai.test-agent-flow", havingValue = "true")
     static class ActingGrantProbeController {
