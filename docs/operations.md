@@ -193,6 +193,26 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 - 区分策略拒绝、连接超时、provider 失败和客户端断开；
 - 只记录稳定错误码和调用 ID，不记录 API key、prompt 或供应商原始正文。
 
+### 通知记录停在 PENDING（投递引擎不运行）
+
+提交返回 201、审计有 `TEMPLATE_*` 行，但 `ainer_notification_record.status` 长期是 `PENDING`
+且日志无任何异常——这是「调度器没注册」的典型形态（2026-09-11 修复前的默认状态）：
+
+1. 确认全局调度生效：`ainer.scheduling.enabled` 未设为 `false`，且运行时 classpath 上有
+   `ainer-spring` 的
+   `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
+   中的 `AinerSchedulingAutoConfiguration`（`@EnableScheduling` 不再依赖任何业务开关）；
+2. 确认模块装配：`ainer.notification.enabled`（默认 `true`）与 `ainer.notification.poll-interval-ms`；
+3. 静态兜底：`scripts/check-runtime-wiring.sh` 把「`@Scheduled` 存在 ⇒ 生效的 `@EnableScheduling`」
+   做成门禁，本地与 CI 都会拦；
+4. 若记录停在 `SENDING`：查看 `lease_owner` / `lease_expires_at`。租约未过期表示仍在投递；
+   租约过期后会被下一轮重新领取（实例崩溃、发送线程卡死的自愈路径）；
+5. `Send failed ...` / `Send timed out ...` 是引擎的 warn 日志：发送失败按指数退避重试，
+   达到 `max_retries` 后进入终态 `FAILED`；超过 `ainer.notification.delivery.send-timeout`
+   的发送按失败处理，`error_message` 为 `Delivery timed out after <n>ms`；
+6. 投递是 at-least-once：租约过期后的重新领取可能造成重复投递，接收方/发送方必须幂等，
+   不要把它当作 exactly-once 通道。
+
 ### REVOKED OWNER 恢复
 
 1. 先确认原 OWNER 的 Identity 状态和撤销事实，不得通过恢复流程重新激活原主体；

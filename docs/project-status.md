@@ -427,6 +427,65 @@ Ainer 项目签名 provenance 已通过。
   ③ 配置模块主读路径已接通缓存，但 `getByNamespace` 等按命名空间列举的读路径仍直读数据库
   （未加缓存，属有意保留：批量列举的失效面更大）。
 
+2026-09-11 通知投递「声明了但不生效」三处缺陷修复 + 运行时装配门禁（`codex/notification-delivery-and-gates`）
+- **缺陷 1（调度器默认不注册）**：全仓 `@EnableScheduling` 只挂在一个默认关闭的业务开关配置
+  （`WorkspaceAuthorizationAuditRetentionConfiguration`）上，默认配置下调度器根本不注册——
+  提交通知写库成功、API 返回 201、审计有记录，但记录永远停在 `PENDING`，无异常、无告警、
+  既有测试（全部手动直调 `deliverBatch()`）全绿。现移入 framework 层
+  `AinerSchedulingAutoConfiguration`（`ainer-spring`，`ainer.scheduling.enabled` 默认 `true`，
+  缺失即生效），业务条件保留在原配置类。
+- **缺陷 1b/1c（同一引擎的两个静默咬人问题）**：① `claimPending` 把 `SENDING` 与 `PENDING`
+  一起领取且没有租约，发送慢于 `poll-interval-ms`（默认 5s）时同一行被再次领取 → 重复投递；
+  新增 migration `V202609111500` 加 `lease_owner`/`lease_expires_at` 与
+  `ck_ainer_notification_record_sending_lease`（并把存量无租约 `SENDING` 复位为 `PENDING`），
+  领取条件改为「PENDING 到期 或 SENDING 租约过期」，回写按 `(status='SENDING', lease_owner)`
+  CAS。② 发送等待无超时（`try (executor)` + 无参 `future.get()`，`close()` 无限等待）——
+  批次改为共享 `ainer.notification.delivery.send-timeout`（默认 30s）截止时间，超时记录按失败
+  进入既有重试/终态（`error_message=Delivery timed out after <n>ms`），执行器用 `shutdownNow()`
+  收尾；新增 `ainer.notification.delivery.lease-duration`（默认 2m，必须大于 send-timeout，
+  否则启动失败关闭）。
+- **引擎级测试**：新增 `NotificationDeliveryEngineSchedulingIntegrationTest`（真实 PostgreSQL
+  `postgres:18.3-alpine` + 本地 `HttpServer` 桩，**全程不手动触发** `deliverBatch()`）：
+  调度自动投递到 `SENT` 且桩收到 1 次；慢发送（1.5s vs 250ms 轮询）只投递 1 次；
+  卡死发送在 `send-timeout` 后按失败重试并继续推进到终态。**负向实测**：注释掉自动装配登记后
+  该测试 3/3 失败，断言输出 `status=PENDING, retryCount=0, errorMessage=null`（正是生产缺陷
+  形态），且在有界超时内结束不挂构建。
+- **缺陷 2（Dockerfile 与 reactor 脱节）**：COPY 只覆盖 11 个模块（漏 `ainer-module-config`/
+  `-dictionary`/`-file`/`-knowledge`/`-notification`/`-organization`/`-task` 与 framework 的
+  `starter-cache`/`starter-observability`），任何 `docker build` 都在 Maven 项目加载阶段失败；
+  补齐后真跑又暴露两处同类缺陷：构建阶段缺 `unzip` 使 mvnw 静默换用 `.tar.gz` 分发包、与
+  `maven-wrapper.properties` 里 `.zip` 的 `distributionSha256Sum` 冲突（镜像内装 `unzip` 保留
+  校验）；`help:evaluate -DforceStdout` 在 Maven 4 输出 `[INFO] [stdout] 0.1.0-SNAPSHOT`，
+  拼出的产物路径不存在（改为按产物名定位 JAR）。新增 `.dockerignore`；保留 `AINER_MODULE`
+  build arg 与多阶段/非 root 结构。**本机 Colima 实测**：`--no-cache` 冷构建 62 步全过
+  **15m01s**（同一网络另一次冷构建 18m02s，差异来自容器内依赖下载；仅源码变更的增量重建 44s）；
+  镜像 147MB、`USER ainer`(uid 999)、`/app/app.jar` 48MB。
+  CI 新增真构建步骤（`timeout-minutes: 25`，含非 root + 产物存在断言），对 90 分钟超时的
+  quality job 影响：现状约 22 分钟 → 预计 30–40 分钟，仍在预算内。
+- **缺陷 3（门禁缺口）**：新增 `scripts/check-runtime-wiring.sh`（bash，`bash -n` 干净，
+  违规输出 `文件:行` 并 exit 1）：① Dockerfile COPY ⊇ reactor 模块集合（递归解析根 pom 与
+  framework 子模块，共 27 个模块，pom 阶段与源码阶段分别校验）；② `@Scheduled` ⇒ 存在生效的
+  `@EnableScheduling`（main 源码、未被未声明 `matchIfMissing=true` 的 `@ConditionalOnProperty`
+  门控、且已登记进 `AutoConfiguration.imports`）；③ maven-wrapper 固定 `.zip` 校验和 ⇒
+  Dockerfile 必须装 `unzip`；④ 禁止用 `help:evaluate -DforceStdout` 解析版本拼产物路径。
+  接入 CI 新步骤（未改任何既有 job `name`）并在 `check-release-contracts.sh` 中调用。
+  **负向实测**：逐个造违规均被拦住——漏 `ainer-module-task` 的 COPY（2 处违规）、
+  取消 `@EnableScheduling` 自动装配登记、给 `@EnableScheduling` 加上默认关闭的
+  `@ConditionalOnProperty`、移除 `unzip` 安装、恢复 `help:evaluate` 版本解析。
+  同 PR 修正 `check-release-contracts.sh:70` 的空守卫：原 `grep -E '/usr/sbin/ab|AINNER_VERSION'`
+  只反查双 N 拼写（脚本实际用单 N 的 `AINER_VERSION`），拼写修正后恒不成立；改为正面断言
+  `AINER_VERSION` 必须出现。实测三种临时改动都被拦住：硬编码 `/usr/sbin/ab`、把变量改名为
+  `AINER_BOOT_VERSION`、把拼写改回 `AINNER_VERSION`。
+  「`@Cacheable` ⇒ `@EnableCaching`」同类检查按要求**不在本 PR 加入**（依赖并行分支
+  `codex/adr-0039-cache-and-lock-reality`），脚本内留 TODO 注释。
+- **本地验证**：JDK 25 + Maven 4.0.0-rc-6 `./mvnw clean verify` = **28/28 modules SUCCESS，
+  561 tests / 0 failure / 0 error / 0 skipped**（04:00–04:09 min，两次实测；改动前基线 552 tests / 03:29 min）；
+  `OffStateApplicationTest`（无 DB/无 Redis 离态启动）仍通过；`check-release-contracts.sh`
+  含新门禁通过。
+- **范围边界**：不改缓存/锁（PR-B `codex/adr-0039-cache-and-lock-reality`）与 HTTP 异常处理
+  （PR-A）；`SENDING` 租约把投递明确为 **at-least-once**（租约过期后允许重新领取），
+  exactly-once 语义不在本 PR 范围。
+
 2026-08-28 `v1.4.1` 已发布（商业事实基线与测试确定性补丁）
 - **发布身份**：发布准备 PR [#70](https://github.com/ainerlab/ainer-boot/pull/70) 合入默认分支
   `377a0795d8890b0ca48d314e1c162a54369d7fc4`；annotated tag `v1.4.1` peel 精确等于该提交。

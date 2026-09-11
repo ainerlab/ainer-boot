@@ -1,0 +1,30 @@
+# Docker 构建上下文排除清单。
+#
+# Dockerfile 只 COPY：.mvn/、mvnw、各模块 pom.xml 与模块源码目录。其余内容（文档、CI 配置、
+# 部署脚本、Git 元数据、上一次构建产物）都不参与镜像，无需传给 docker daemon。
+# 注意：不要排除 pom.xml 或任何模块目录——`scripts/check-runtime-wiring.sh` 会校验
+# Dockerfile 的 COPY 覆盖了全部 reactor 模块。
+
+.git/
+.gitignore
+.gitattributes
+.gitleaks.toml
+.github/
+.idea/
+*.iml
+.env
+.env.*
+
+# 上一次构建产物（容器内会重新构建）
+**/target/
+
+docs/
+ops/
+scripts/
+docker/
+docker-compose.yml
+docker-compose.*.yml
+
+*.md
+LICENSE
+NOTICE

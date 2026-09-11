@@ -60,6 +60,9 @@ jobs:
       - name: Verify shell, commercial docs and release workflow contracts
         run: ./scripts/check-release-contracts.sh
 
+      - name: Verify runtime wiring contracts
+        run: ./scripts/check-runtime-wiring.sh
+
       - name: Verify Docker runtime
         run: docker info
 
@@ -68,6 +71,19 @@ jobs:
 
       - name: Require zero failed, errored, or skipped tests
         run: ./scripts/check-surefire-results.sh
+
+      # 容器路径真构建：静态门禁（check-runtime-wiring.sh）只能挡 COPY/模块漂移，基础镜像、
+      # Maven Wrapper 分发格式、产物路径这类变化只有真跑 docker build 才会暴露
+      # （2026-09-11 修复前该镜像从未构建成功过：COPY 漏 7 个模块、构建阶段缺 unzip 导致
+      # wrapper 换成 .tar.gz 与固定校验和不符、Maven 4 help:evaluate 输出带前缀）。
+      # 实测：本地 Colima 冷构建（--no-cache，62 步全过）15m01s、仅源码变更的增量重建 44s；镜像 147MB。
+      - name: Build development Docker image
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          docker build --build-arg AINER_MODULE=ainer-server -t ainer-server:ci .
+          docker run --rm --entrypoint sh ainer-server:ci -c '[ "$(id -u)" != "0" ] && [ -f /app/app.jar ]'
+          docker image rm ainer-server:ci
 
       - name: Install locked Maven 3 consumer runtime
         env:
