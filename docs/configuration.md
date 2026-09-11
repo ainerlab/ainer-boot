@@ -151,8 +151,14 @@ AI 默认关闭。启用时以下设置共同构成安全门禁：
 | `AINER_AI_DEFAULT_MODEL` | 空 | 最长 128 字符 |
 | `AINER_AI_ALLOWED_MODELS` | 空 | 白名单必须包含默认模型 |
 | `AINER_AI_CONNECT_TIMEOUT` | `5s` | 必须为正数 |
-| `AINER_AI_REQUEST_TIMEOUT` | `60s` | 必须为正数 |
+| `AINER_AI_REQUEST_TIMEOUT` | `60s` | 必须为正数；按 JDK 定性只覆盖到响应头（JDK-8258397） |
+| `AINER_AI_TOTAL_TIMEOUT` | `120s` | 必须为正数；非流式调用总时长上限，**覆盖响应体读取** |
+| `AINER_AI_STREAM_TOTAL_TIMEOUT` | `600s` | 必须为正数；流式调用总时长上限，**覆盖响应体读取** |
 | `AINER_AI_ALLOW_INSECURE_HTTP` | `false` | 仅本地合约测试可设为 `true` |
+| `AINER_AI_SELF_HEAL_ENABLED` | `true` | 中间态定时自愈总开关 |
+| `AINER_AI_SELF_HEAL_STUCK_THRESHOLD` | `15m` | 必须为正数，且比 `AINER_AI_STREAM_TOTAL_TIMEOUT` 至少大 1 分钟，否则启动失败 |
+| `AINER_AI_SELF_HEAL_SCAN_INTERVAL_MS` | `60000` | `1000..3600000`；同时作为 `@Scheduled` 的初始延迟 |
+| `AINER_AI_SELF_HEAL_BATCH_SIZE` | `200` | `1..10000`；单次清扫每类中间态的处理上限 |
 | `AINER_AI_REQUESTS_PER_MINUTE` | `60` | 当前进程内 subject 限流基线 |
 | `AINER_AI_SUBJECT_DAILY_BUDGET` | `10.00` | 必须大于 0 |
 | `AINER_AI_MAX_PROMPT_CHARACTERS` | `100000` | `1000..10000000` |
@@ -161,6 +167,12 @@ AI 默认关闭。启用时以下设置共同构成安全门禁：
 | `AINER_AI_OUTPUT_PER_MILLION_TOKENS` | `0` | 不得为负 |
 
 完整调用与审计说明见 [`ai-gateway.md`](ai-gateway.md)。
+
+**配置矩阵**：以上 `AINER_AI_*` 键只在 `ainer-server/src/main/resources/application.yaml`（base）
+定义，`prod` / `dev` / `local` 三个 profile 全部继承 base，靠环境变量覆盖；仓库内不存在
+profile 级覆盖文件，因此新键加在 base 即对所有环境生效。默认值同时由
+`AiRuntimeProperties` 兜底并在 `validate()` 里校验（例如 `self-heal.stuck-threshold` 必须大于
+`stream-total-timeout + 1m`），配置写错会在启动期失败而不是静默降级。
 
 ## 5. Authorization Server
 
