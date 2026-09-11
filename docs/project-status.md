@@ -500,6 +500,21 @@ Ainer 项目签名 provenance 已通过。
   （PR-A）；`SENDING` 租约把投递明确为 **at-least-once**（租约过期后允许重新领取），
   exactly-once 语义不在本 PR 范围。
 
+2026-09-11 上述各批改动合并后的整体验证（PR #78 最终树）
+- **合并方式**：四个独立验证过的分支（HTTP 状态语义、ADR-0039 缓存与分布式锁、通知投递与运行时装配门禁、
+  框架 ↔ 产品边界门禁）合并到同一集成分支；`docs/project-status.md` 的条目冲突按「各方记录全部保留」解决。
+- **合并后整体验证**：`./mvnw clean verify` → 28/28 模块 SUCCESS、**604 tests / 0 failure / 0 error / 0 skipped**
+  （基线 `abf5a76` 为 552）。
+- **三道门禁在合并树上同时通过**：`scripts/check-framework-boundary.sh`（框架 main 653 个 Java、pom 28 个、
+  migration 19 个 / DDL 74 条，违规 0 处）、`scripts/check-runtime-wiring.sh`（Dockerfile COPY 覆盖 27 个
+  reactor 模块；3 处 `@Scheduled` 均有生效的 `@EnableScheduling`）、`scripts/check-release-contracts.sh`
+  （含前述两者与商业文档、发布 workflow 契约）。
+- **CI**：合并前 head 的完整 GitHub Actions（含本批新增的容器真构建步骤）四项检查全部通过——
+  Commit discipline、quality gate（16m20s）、虚拟线程矩阵（1m32s）、gitleaks——证明新增门禁在 runner 上可执行。
+- **两个只有 CI 才能暴露的缺陷**（本地不可复现，均已修并各有回归证明）：通知模块时间入口未截断到微秒
+  （生产代码，见上条记录）；配置缓存测试用**全局精确计数**断言跨进程可见性（测试断言改为增量式，
+  并以两次变异验证其非空转）。
+
 2026-09-11 框架 ↔ 产品边界可执行门禁落地
 - **动机**：产品主线（`cn.xiaoqu.*` / `dev.xq.*` 包、`xq-*` 模块）与框架（`dev.ainer.*` 包、
   `ainer-*` 模块）将同仓开发，再由脚本把框架子集机械导出回公开仓；边界一旦在开发期被打破，
