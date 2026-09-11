@@ -597,6 +597,22 @@ Ainer 项目签名 provenance 已通过。
   （PR-A）；`SENDING` 租约把投递明确为 **at-least-once**（租约过期后允许重新领取），
   exactly-once 语义不在本 PR 范围。
 
+2026-09-11 CI 暴露：投递引擎缺首次执行延迟，与手动驱动的测试争抢记录（本批改动引入的交互回归）
+- **症状**：PR #79 的 quality gate 在 notification 模块失败——`SmtpMailChannelSenderIntegrationTest`
+  `expected: SENT but was: SENDING`、`NotificationIntegrationTest.timestampsWithNanosecondPrecisionAreReadBackAtMicrosecondPrecision`
+  读回为空。两处本地均全绿。
+- **根因**：本批把 `@EnableScheduling` 改为默认生效（原缺陷是它挂在无关业务开关上导致通知永不投递）之后，
+  投递引擎在**每个**上下文里都会运行；而 `@Scheduled` 未声明 `initialDelay` 时 Spring 会在上下文刷新后
+  **立即执行一次**——那次"启动即投递"抢先领取了记录并写入租约，测试随后手动调用 `deliverBatch()`
+  因租约不匹配而领不到同一行，断言于是拿到 `SENDING`。仓库另一个 `@Scheduled`
+  （`WorkspaceAuthorizationAuditRetentionRunner`）**本来就有** `initialDelayString`，只有投递引擎漏了。
+- **修正**：`NotificationDeliveryEngine#deliverBatch` 补 `initialDelayString`（与轮询间隔同值：生产上首次投递
+  推迟一个周期、测试里把间隔设成极大值时不再触发）；新增契约测试
+  `NotificationDeliverySchedulingContractTest`，以反射断言"必须声明首次执行延迟"，并做过**变异验证**
+  （临时移除 `initialDelayString` → 该测试以预期消息失败，随后逐字节还原）。
+- **性质**：这是"修好一个静默失效（调度默认开启）之后暴露出的跨组件交互问题"，不是新功能缺陷；
+  也说明"本地全绿"不足以证明多消费者/多上下文的交互正确。
+
 2026-09-11 端点授权门禁在合并期抓到跨分支缺陷（门禁自身有效性的实证）
 - **现象**：安全加固第二批的两条分支各自全绿（端点默认拒绝 624 tests；identity 生命周期与 `security_epoch` 632 tests），
   但把两支合并到同一棵树后，`scripts/check-endpoint-authorization.sh` **立即失败并打印 4 处违规**：
