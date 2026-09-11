@@ -367,8 +367,8 @@ Ainer 项目签名 provenance 已通过。
   `AinerServerAuthorizationLivePathTest`）、409/422（`TaskHttpTest`、`DictionaryHttpTest`、
   `NotificationHttpTest`）、404（`FileStorageHttpTest`、`WorkspaceHttpJwtTest`）与
   `AinerWebAutoConfigurationTest` 的 422 业务码断言在同一 `clean verify` 中全绿。
-- **边界**：未改动 `ApiResponse` 字段结构；未 push、未开 PR，提交留在
-  `codex/fix-http-status-fidelity` 分支。
+- **边界**：未改动 `ApiResponse` 字段结构；未单独列举的状态码保留真实状态码、`code` 回落到最接近的
+  通用错误码。
 
 2026-09-11 ADR-0039「缓存与分布式协调」落地补齐（分支 `codex/adr-0039-cache-and-lock-reality`）
 - **背景（欠账）**：`@Cacheable`/`@CacheEvict` 已在 `ainer-module-dictionary`（9 处）与
