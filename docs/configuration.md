@@ -126,6 +126,18 @@ SMTP 邮件真实投递默认关闭。启用后必须提供 `from`，并装配 `
 | `AINER_NOTIFICATION_EMAIL_ENABLED` | `false` | 用 SMTP 替换 EMAIL 渠道的日志兜底 |
 | `AINER_NOTIFICATION_EMAIL_FROM` | 空 | 启用时必填；合法 From 地址 |
 
+投递引擎的轮询与超时约束（2026-09-11 加固）。`poll-interval` 是调度轮询间隔；`send-timeout`
+是单个批次的投递上限（批次内发送并发执行，调度线程最多等这么久，超时按失败走既有重试/终态
+语义，不再无限等待卡死的 SMTP/HTTP）；`lease-duration` 是领取租约，**必须大于 `send-timeout`**，
+否则启动时失败关闭。租约未过期的 `SENDING` 记录不会被再次领取（防重复投递），租约过期后才允许
+重新领取（覆盖实例崩溃或发送线程卡死）。投递语义为 at-least-once，发送方需保证幂等。
+
+| 键 | 默认 | 说明 |
+|---|---|---|
+| `ainer.notification.poll-interval-ms` | `5000` | 调度轮询间隔；引擎由全局 `@EnableScheduling` 驱动 |
+| `ainer.notification.delivery.send-timeout` | `30s` | 单批次投递上限；非法值回落默认值 |
+| `ainer.notification.delivery.lease-duration` | `2m` | 领取租约时长；必须大于 `send-timeout`，否则启动失败 |
+
 ## 4. AI runtime
 
 AI 默认关闭。启用时以下设置共同构成安全门禁：
@@ -276,6 +288,14 @@ MDC 关联；不改写域 Micrometer counters，也不把 Prometheus 鉴权搬�
 | `ainer.observability.enabled` | `true` | 关闭后不装配 ObservationRegistry 桥与关联过滤器 |
 | `ainer.observability.otlp.enabled` | `false` | 开启只装配导出标记；真实 OTel exporter 由产品自备 |
 | `ainer.observability.otlp.endpoint` | 空 | 预留端点字段；本 Starter 不强制发起 OTLP 导出 |
+
+全局调度由 `ainer-spring` 的 `AinerSchedulingAutoConfiguration` 装配（`@EnableScheduling`），
+**与任何业务开关无关**：通知投递引擎等 `@Scheduled` 组件因此默认生效。关闭它等于停掉进程内
+所有定时任务（含审计归档与通知投递），只应用于运维降级。
+
+| 键 | 默认 | 说明 |
+|---|---|---|
+| `ainer.scheduling.enabled` | `true` | `false` 时不注册调度器，所有 `@Scheduled` 方法都不再执行 |
 
 ## 7. 通用授权模块（ADR-0037；ADR-0030 已被取代）
 

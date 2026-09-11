@@ -198,6 +198,10 @@ public enum WorkspaceErrorCode implements ErrorCode {
   测试不构成此类模块的验证（2026-08-22 评审教训：任务引擎四个缺陷全部位于管理面测试
   盲区）。
 - 重要 Starter、数据库适配、认证和 AI provider 需要失败路径测试。
+- 「声明 ↔ 是否生效」由 `scripts/check-runtime-wiring.sh` 静态兜底（本地与 CI 都跑）：
+  `@Scheduled` 必须对应生效的 `@EnableScheduling`，Dockerfile COPY 必须覆盖全部 reactor
+  模块（2026-09-11 教训：`@EnableScheduling` 挂在默认关闭的业务开关上、通知投递记录永远
+  停在 PENDING，Dockerfile 漏了 7 个模块导致镜像从未构建成功）。
 - AI provider 合约至少覆盖请求字段、Bearer header、非流式、SSE、最终 usage、usage fallback、超时/限流和错误脱敏。
 - AI 数据集成测试至少覆盖 migration、预算并发暴露、拒绝/失败审计和租户隔离。
 - 全量验收命令：
