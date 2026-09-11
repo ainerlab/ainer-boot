@@ -152,6 +152,12 @@ public enum WorkspaceErrorCode implements ErrorCode {
   interceptor 链尾。
 - PostgreSQL UUID 使用显式 TypeHandler 并以 `Types.OTHER` 绑定，不能假设驱动或框架自动完成转换。
 - 事务边界位于应用用例；涉及聚合与附属记录的写入必须有失败回滚测试。
+- **时间精度**：PostgreSQL `timestamptz` 是**微秒**精度，而 `java.time.Instant` 是**纳秒**精度。
+  各模块的时间入口——构造持久化对象、计算下次重试/过期时间、Repository 写入前——必须
+  `truncatedTo(ChronoUnit.MICROS)`；不截断时「内存里的时间」与「读回来的时间」不相等，本地
+  纳秒末位恰好为 0 时不暴露，CI 上必然失败。`task` / `organization` / `knowledge` 已有先例；
+  `notification` 曾漏掉并在 2026-09-11 被 CI 抓到。精确到类型的权威表述见
+  [`database-design-standard.md`](database-design-standard.md) §5.4。
 
 完整持久化增强边界见
 [ADR-0028](decisions/0028-mybatis-plus-infrastructure-baseline.md)。
