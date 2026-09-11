@@ -275,7 +275,8 @@ class NotificationIntegrationTest {
                 NotificationChannel.SMS, "recip", "T", "B", null));
         recordRepository.claimPending(10, LEASE_OWNER, leaseDeadline());
 
-        java.time.Instant nextRetry = java.time.Instant.now().plusSeconds(30);
+        java.time.Instant nextRetry = java.time.Instant.now().plusSeconds(30)
+                .truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         recordRepository.markFailed(id, LEASE_OWNER, "Connection refused", 0, 3, nextRetry);
 
         Optional<NotificationRecord> afterFirstFail = recordRepository.findById(id);
@@ -285,6 +286,25 @@ class NotificationIntegrationTest {
         assertThat(afterFirstFail.get().nextRetryAt()).isEqualTo(nextRetry);
         // 退避未到期：不可领取
         assertThat(recordRepository.claimPending(10, LEASE_OWNER, leaseDeadline())).isEmpty();
+    }
+
+    @Test
+    void timestampsWithNanosecondPrecisionAreReadBackAtMicrosecondPrecision() {
+        // 回归（CI 2026-09-11 暴露）：PostgreSQL timestamptz 是微秒精度，而 Instant 是纳秒精度。
+        // 持久化边界不截断时，「内存里的时间」与「读回来的时间」不相等；本地纳秒末位恰好为 0
+        // 时不会暴露，CI 上必然失败。本用例固定断言该精度契约。
+        UUID id = service.submit(manager, null, new NotificationIntent.DirectIntent(
+                NotificationChannel.SMS, "recip", "T", "B", null));
+        recordRepository.claimPending(10, LEASE_OWNER, leaseDeadline());
+
+        java.time.Instant withNanos = java.time.Instant.now().plusSeconds(30).plusNanos(789);
+        java.time.Instant expected = withNanos.truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        assertThat(withNanos).isNotEqualTo(expected);
+        recordRepository.markFailed(id, LEASE_OWNER, "Connection refused", 0, 3, withNanos);
+
+        assertThat(recordRepository.findById(id)).get()
+                .extracting(NotificationRecord::nextRetryAt)
+                .isEqualTo(expected);
     }
 
     @Test

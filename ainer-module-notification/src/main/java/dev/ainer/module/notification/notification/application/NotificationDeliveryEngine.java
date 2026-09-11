@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -166,9 +167,13 @@ public class NotificationDeliveryEngine {
 
     /**
      * 指数退避：2^retryCount 秒（2s、4s、8s、16s……）。
+     *
+     * <p>截断到微秒：PostgreSQL {@code timestamptz} 是微秒精度，不截断会让「引擎算出的时间」与
+     * 「落库后读回的时间」不相等（本地纳秒末位为 0 时不暴露，CI 会）。仓库其它模块
+     * （task/organization/knowledge）在时间入口有同样约定。
      */
     private Instant nextRetryAt(int retryCount) {
         long delaySeconds = (long) Math.pow(2, retryCount + 1);
-        return clock.instant().plus(Duration.ofSeconds(delaySeconds));
+        return clock.instant().plus(Duration.ofSeconds(delaySeconds)).truncatedTo(ChronoUnit.MICROS);
     }
 }
