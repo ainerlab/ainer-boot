@@ -45,6 +45,17 @@
             <optional>true</optional>
         </dependency>
 
+        <!--
+          Jackson 3（tools.jackson）是 GenericJacksonJsonRedisSerializer 的 JSON 绑定。
+          Boot 4 基线自带该库（spring-boot-starter-jackson），这里声明为 optional：
+          Redis 缓存后端要求它存在，但本地 Caffeine 后端不需要。
+        -->
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -58,6 +69,24 @@
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Testcontainers：PostgreSQL advisory lock 与 Redis 缓存/锁的真实后端验证 -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- advisory lock 集成测试需要真实 JDBC 驱动（仅测试作用域，生产不引入 JDBC starter） -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
