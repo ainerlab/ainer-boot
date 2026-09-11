@@ -158,6 +158,9 @@ scope 与目标 Workspace 的 ACTIVE membership；随后执行带 `workspace_id`
 
 ### 3.4 端点访问声明与端点层默认拒绝
 
+决策记录见 [ADR-0056](decisions/0056-endpoint-authorization-default-deny.md)（默认值取舍、备选方案、
+豁免面边界与后续项都在那里）。
+
 **缺口（2026-09-11 修复前）**：`@AinerAuthorize` 是逐方法可选注解。没有它的 handler 在
 `AinerRequestAuthorizationManager` 里返回 `null`，最终落到 Resource Server 的
 `anyRequest().authenticated()`——**只要求登录，不要求任何权限**。默认拒绝因此只成立于决策引擎内部
@@ -231,8 +234,25 @@ scope 与目标 Workspace 的 ACTIVE membership；随后执行带 `workspace_id`
 
 `framework-handler-packages` 登记第三方 handler：Spring Boot 错误分发（`/error`）、Actuator 端点、
 springdoc 的 `/v3/api-docs`。这些 handler 不是宿主 Controller、拿不到注解，其认证由外层链负责
-（ADR-0052 要求 `/v3/api-docs` 需有效 JWT，本配置不会让它匿名）。宿主引入其他第三方 MVC 库时把包
-前缀加进来（覆盖即替换，不支持增量追加）。
+（ADR-0052 要求 `/v3/api-docs` 需有效 JWT，本配置不会让它匿名——带真签名 JWT 200、无 Token 401）。
+
+**该豁免面由宿主覆盖**，覆盖即**整体替换**默认清单（不做增量追加）：
+
+```yaml
+ainer:
+  security:
+    endpoint-authorization:
+      mode: fail-closed            # 未声明端点：fail-closed（默认）| warn
+      framework-handler-packages:  # 覆盖本 key 时默认前缀不再自动保留，需一并写出
+        - org.springframework.
+        - org.springdoc.
+        - io.swagger.
+        - com.acme.platform.docs.  # 宿主引入的其他第三方 MVC 库
+```
+
+只覆盖 `mode` 而不写 `framework-handler-packages` 时，默认前缀仍然生效；一旦写出后者，豁免面就完全
+由该清单决定——这是有意的，豁免必须是显式清单，不靠「默认值还在」隐式继承（决策依据见
+[ADR-0056](decisions/0056-endpoint-authorization-default-deny.md) §5）。
 
 #### 3.4.4 参考装配逐端点处置
 

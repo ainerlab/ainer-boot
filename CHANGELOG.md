@@ -16,7 +16,8 @@ Ainer Boot 的用户可见变化记录在此文件。格式参考 Keep a Changel
   **升级影响**：未声明端点从「已认证即可访问」变为 403。处理路径：① 补 `@AinerAuthorize` 或
   `@EndpointAccess`（匿名端点还需登记 `public-paths`）；② 升级期显式配置
   `ainer.security.endpoint-authorization.mode: warn` 灰度，按 WARN 日志清单补齐后再切回。参考装配
-  （`ainer-server` 及其依赖模块）与 Initializer v2 模板已逐端点补齐声明，门禁在真实树零违规。
+  （`ainer-server` 及其依赖模块）与 Initializer v2 模板已逐端点补齐声明，门禁在真实树零违规；
+  决策记录见 [ADR-0056](docs/decisions/0056-endpoint-authorization-default-deny.md)。
 
 ## [1.4.1] - 2026-08-28
 

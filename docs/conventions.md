@@ -182,7 +182,7 @@ public enum WorkspaceErrorCode implements ErrorCode {
   在线比对实时生效（`RevocationAwareOAuth2AuthorizationService`），普通 `@Async`/
   `@TransactionalEventListener` 不能承担可靠撤销通知。
 - **新增/修改 Controller 方法必须先归类并显式声明访问口径**（2026-09-11 立档，见
-  [`security.md` §3.4](security.md)）。`@AinerAuthorize` 是逐方法可选注解，未声明的 handler 会
+  [`security.md` §3.4](security.md) 与 [ADR-0056](decisions/0056-endpoint-authorization-default-deny.md)）。`@AinerAuthorize` 是逐方法可选注解，未声明的 handler 会
   落到 `anyRequest().authenticated()`（只要求登录、不要求权限），所以四类口径必须写进源码：
   业务操作 → `@AinerAuthorize(permission=...)`；匿名 → `@EndpointAccess(kind = PUBLIC,
   reason = "...")` **且**把路径登记进 `ainer.security.resource-server.public-paths`；只要求登录 →
