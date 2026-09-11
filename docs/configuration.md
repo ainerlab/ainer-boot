@@ -327,7 +327,39 @@ RSA 签名密钥、撤销 epoch 和在线 introspection 配置属于 Authorizati
 非法或缺失的键自动钳制到上述默认值。引擎按 `TaskHandler` 端口的 `taskType` 派发；超时语义、
 at-least-once 与幂等要求见 ADR-0047 §3。
 
-## 9. 新增配置检查表
+## 9. 缓存与分布式协调（ADR-0039）
+
+`ainer.cache.enabled`（默认 `true`）控制是否打开 Spring Cache 注解驱动。**默认缓存后端不变**：
+`ainer.cache.type=LOCAL`（Caffeine，零外部依赖）。
+
+| 键 | 默认 | 说明 |
+|---|---|---|
+| `AINER_CACHE_ENABLED` | `true` | 是否注册 `@EnableCaching` 切面；`false` 时 `@Cacheable`/`@CacheEvict` 直接落到方法体 |
+| `AINER_CACHE_TYPE` | `LOCAL` | 缓存后端：`LOCAL`（Caffeine）或 `REDIS`（Redis/Valkey，ADR-0039 §2 推荐 Valkey 8.x，Redis 7.x 兼容）；取值大小写不敏感 |
+| `AINER_CACHE_LOCAL_TIME_TO_LIVE` | `PT30M` | Caffeine 写入后过期时间，必须为正 |
+| `AINER_CACHE_LOCAL_MAXIMUM_SIZE` | `10000` | 单个缓存最大条目数，必须为正 |
+| `AINER_CACHE_REDIS_TIME_TO_LIVE` | `PT30M` | Redis 缓存条目 TTL，必须为正 |
+| `AINER_CACHE_REDIS_KEY_PREFIX` | `ainer:cache:` | Redis 缓存键前缀（多应用共享实例时用于隔离命名空间） |
+| `AINER_CACHE_LOCK_TYPE` | `AUTO` | 分布式锁策略：`AUTO` / `POSTGRES` / `LOCAL`；取值大小写不敏感 |
+
+装配与失败语义：
+
+- `type=REDIS` 要求应用<strong>显式引入</strong> `org.springframework.boot:spring-boot-starter-data-redis`
+  （`ainer-starter-cache` 的 Redis 依赖是 `optional`，不传递给消费者）并提供 `RedisConnectionFactory`；
+  缺失时启动失败并给出修复建议，**不会**静默退回本地缓存。
+- 缓存值以 JSON（Jackson 3 `GenericJacksonJsonRedisSerializer`）写入，带受限的多态类型标记；
+  键使用字符串序列化并加配置前缀。Redis 中会保存业务配置数据（secret 字段是密文，明文不落缓存），
+  必须把 Redis 当作**受信基础设施**：启用认证、限制网络可达面、按环境隔离实例。
+- 锁选择顺序（`lock.type=AUTO`）：Redis 缓存后端可用 → Redis 锁（`SET NX EX` + Lua 校验 token 释放）；
+  否则存在唯一 `DataSource` → PostgreSQL 会话级 advisory lock（`pg_try_advisory_lock(hashtextextended(key, seed))`）；
+  否则退化为进程内锁并 **WARN**（多实例部署下互斥不成立）。
+- `lock.type=POSTGRES` 时没有 `DataSource`（或存在多个且无 `@Primary`）会**启动失败**。
+- PostgreSQL advisory lock 的代价：**每个被持有的锁独占一条池化连接**直到释放或 TTL 到期，
+  因此池大小必须覆盖「并发锁数 + 常规查询并发」；TTL 由实例内收割线程强制执行。
+- 启动日志会打印实际生效的缓存后端类名、TTL、锁实现类名与 `multiInstanceSafe`，
+  同一信息以 `dev.ainer.cache.autoconfigure.AinerCacheCapabilities` bean 暴露，可用于测试与运维探针。
+
+## 10. 新增配置检查表
 
 - 属性归属明确，并使用 `@ConfigurationProperties`；
 - 有安全默认值、边界验证和错误配置测试；
