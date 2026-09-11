@@ -213,3 +213,47 @@ public enum WorkspaceErrorCode implements ErrorCode {
 以上规范由 CI 的 `scripts/check-commit-discipline.sh` 强制执行（PR 与 dev push 均检查）：
 提交信息必须匹配类型前缀格式；**`docs:` 类型提交只允许修改文档路径**——混入代码的
 「文档提交」（如历史上 bdfaf83 的教训）会被直接拒绝。
+
+## 13. 框架 ↔ 产品边界
+
+> 2026-09-11 立档。适用于框架（`dev.ainer.*` 包、`ainer-*` 模块）与产品（`cn.xiaoqu.*` /
+> `dev.xq.*` 包、`xq-*` 模块）在同一个私有 monorepo 中共同开发的形态。
+
+产品代码与框架代码同仓开发，由脚本把框架子集**机械导出**回公开仓。**「先开发、后抽取」唯一
+会失败的方式是开发期不守边界**：框架一旦依赖产品，导出就不再是搬文件，而是一场重写。所以
+边界必须从今天起就是可执行门禁——这样「抽取」才是搬文件，而不是重构。规则不依赖评审记忆，
+也不靠人工核对。
+
+### 13.1 规则
+
+1. **依赖方向单向**：`dev.ainer.*` 中的类不得依赖 `cn.xiaoqu.*` / `dev.xq.*` 的类；反向允许。
+   框架需要产品参与时只能先暴露端口/SPI，由产品侧实现。
+2. **模块依赖单向**：`ainer-*` 模块与根 `pom.xml` 不得声明产品 groupId（`cn.xiaoqu` /
+   `dev.xq`）的依赖；产品模块可以依赖框架模块。
+3. **schema 归属**：框架 migration 只能创建/修改 `ainer_*` 表；上游框架拥有的协议表是显式
+   白名单例外（Spring Authorization Server `oauth2_*`、Spring Security WebAuthn
+   `user_entities` / `user_credentials`）。产品表（如 `xq_*`）只能由产品 migration 创建。
+
+### 13.2 扩展方式
+
+产品包根、产品 groupId、框架自有表前缀与白名单表统一登记在
+[`scripts/framework-boundary-targets.txt`](../scripts/framework-boundary-targets.txt)。新增产品
+包根（例如某个产品线另起 `com.foo.*`）或新增框架表前缀时，只要往清单里加一行；**规则扩展
+不需要改脚本逻辑，也不需要改测试代码**。
+
+### 13.3 执行
+
+- `scripts/check-framework-boundary.sh`：文本级门禁，覆盖 `ainer-*/src/main/java/**`、
+  `ainer-framework/**/src/main/java/**` 的 `import`、框架模块与根 pom 的 `<groupId>`、
+  `ainer-*/src/main/resources/db/migration/*.sql`（含 `ainer-framework/**` 同路径）的
+  `CREATE/ALTER/DROP TABLE` 目标表名。违规逐条打印 `文件:行` 并以 exit 1 结束；零违规打印
+  一行统计摘要。配置损坏或 DDL 无法解析时同样失败关闭，不静默放行。
+- `AinerServerBoundaryArchitectureTest`（`ainer-server`）：字节码级依赖方向断言，与脚本门禁
+  共用同一份清单，避免两处规则漂移。公开仓当前没有产品类，主断言会平凡通过；它的价值在
+  monorepo 中生效——因此该测试同时用 `cn.xiaoqu` 夹具做负向自测，证明规则真的会拦（而不是
+  恒真）。
+- CI 在 `JDK 25 / Maven 4 quality gate` job 中以独立步骤执行；本地执行
+  `scripts/check-release-contracts.sh` 时一并执行。
+
+本节只约束框架侧的单向边界。产品模块之间的依赖、产品包在新产品线中的命名、产品 migration 的
+版本序列等都不在此约束；遇到时按「待决策」提出，不自行发明语义。
