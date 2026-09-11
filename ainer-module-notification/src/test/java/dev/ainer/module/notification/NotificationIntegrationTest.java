@@ -62,6 +62,8 @@ class NotificationIntegrationTest {
     private static final IdentityAuthorityRef AUTHORITY =
             new IdentityAuthorityRef("https://auth.ainer.test");
 
+    private static final String LEASE_OWNER = "test-engine";
+
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
             new PostgreSQLContainer<>(DockerImageName.parse("postgres:18.3-alpine"))
@@ -93,6 +95,18 @@ class NotificationIntegrationTest {
         jdbcTemplate.execute("DELETE FROM ainer_notification_audit");
         jdbcTemplate.execute("DELETE FROM ainer_notification_record");
         jdbcTemplate.execute("DELETE FROM ainer_notification_template");
+    }
+
+    /** 领取租约：测试里给足额租约，只有显式 {@link #expireLease} 才让记录可被重新领取。 */
+    private static java.time.Instant leaseDeadline() {
+        return java.time.Instant.now().plusSeconds(60);
+    }
+
+    /** 把租约改成已过期，模拟「发送超过租约时长 / 实例崩溃」，用于验证重新领取路径。 */
+    private void expireLease(UUID id) {
+        jdbcTemplate.update(
+                "UPDATE ainer_notification_record SET lease_expires_at = now() - interval '1 second' "
+                        + "WHERE id = ?", id);
     }
 
     @Test
@@ -190,9 +204,9 @@ class NotificationIntegrationTest {
                 NotificationChannel.SMS, "b@x", "T", "B", null));
         service.submit(manager, null, new NotificationIntent.DirectIntent(
                 NotificationChannel.SMS, "a@x", "T", "B", null));
-        assertThat(recordRepository.claimPending(1)).first()
+        assertThat(recordRepository.claimPending(1, LEASE_OWNER, leaseDeadline())).first()
                 .satisfies(claimed -> assertThat(claimed.id()).isEqualTo(sent));
-        recordRepository.markSent(sent, java.time.Instant.now());
+        recordRepository.markSent(sent, LEASE_OWNER, java.time.Instant.now());
 
         var pending = service.pageRecords(manager, "PENDING", 1, 20);
         assertThat(pending.total()).isEqualTo(1);
@@ -211,29 +225,85 @@ class NotificationIntegrationTest {
                     NotificationChannel.SMS, "recip" + i, "T" + i, "B" + i, null));
         }
 
-        List<NotificationRecord> claimed = recordRepository.claimPending(10);
+        List<NotificationRecord> claimed = recordRepository.claimPending(10, LEASE_OWNER, leaseDeadline());
         assertThat(claimed).hasSize(3);
         assertThat(claimed).allSatisfy(r ->
                 assertThat(r.status()).isEqualTo(NotificationStatus.SENDING));
     }
 
     @Test
+    void sendingRecordWithActiveLeaseIsNotReclaimable() {
+        UUID id = service.submit(manager, null, new NotificationIntent.DirectIntent(
+                NotificationChannel.SMS, "recip", "T", "B", null));
+
+        List<NotificationRecord> firstClaim =
+                recordRepository.claimPending(10, LEASE_OWNER, leaseDeadline());
+        assertThat(firstClaim).extracting(NotificationRecord::id).containsExactly(id);
+
+        // 租约未过期：其他消费者（或下一轮轮询）不得再次领取，否则慢发送会被重复投递
+        assertThat(recordRepository.claimPending(10, "other-engine", leaseDeadline())).isEmpty();
+
+        // 租约过期：允许重新领取（实例崩溃 / 发送线程卡死的自愈路径）
+        expireLease(id);
+        List<NotificationRecord> reclaimed =
+                recordRepository.claimPending(10, "other-engine", leaseDeadline());
+        assertThat(reclaimed).extracting(NotificationRecord::id).containsExactly(id);
+    }
+
+    @Test
+    void staleLeaseOwnerCannotOverwriteResultOfNewClaimant() {
+        UUID id = service.submit(manager, null, new NotificationIntent.DirectIntent(
+                NotificationChannel.SMS, "recip", "T", "B", null));
+        recordRepository.claimPending(10, LEASE_OWNER, leaseDeadline());
+        // 租约到期后被另一个消费者接管
+        expireLease(id);
+        recordRepository.claimPending(10, "other-engine", leaseDeadline());
+
+        // 旧领取者的迟到写回必须是空操作，不得把记录改成 SENT / 覆盖新领取者的结果
+        recordRepository.markSent(id, LEASE_OWNER, java.time.Instant.now());
+        assertThat(recordRepository.findById(id)).get()
+                .extracting(NotificationRecord::status).isEqualTo(NotificationStatus.SENDING);
+
+        recordRepository.markSent(id, "other-engine", java.time.Instant.now());
+        assertThat(recordRepository.findById(id)).get()
+                .extracting(NotificationRecord::status).isEqualTo(NotificationStatus.SENT);
+    }
+
+    @Test
     void markFailedWithRetrySchedulesNextRetryAndIncrementsCount() {
         UUID id = service.submit(manager, null, new NotificationIntent.DirectIntent(
                 NotificationChannel.SMS, "recip", "T", "B", null));
-        recordRepository.claimPending(10);
+        recordRepository.claimPending(10, LEASE_OWNER, leaseDeadline());
 
-        java.time.Instant nextRetry = java.time.Instant.now().plusSeconds(2);
-        recordRepository.markFailed(id, "Connection refused", 0, 3, nextRetry);
+        java.time.Instant nextRetry = java.time.Instant.now().plusSeconds(30);
+        recordRepository.markFailed(id, LEASE_OWNER, "Connection refused", 0, 3, nextRetry);
 
         Optional<NotificationRecord> afterFirstFail = recordRepository.findById(id);
         assertThat(afterFirstFail).isPresent();
         assertThat(afterFirstFail.get().status()).isEqualTo(NotificationStatus.PENDING);
         assertThat(afterFirstFail.get().retryCount()).isEqualTo(1);
+        assertThat(afterFirstFail.get().nextRetryAt()).isEqualTo(nextRetry);
+        // 退避未到期：不可领取
+        assertThat(recordRepository.claimPending(10, LEASE_OWNER, leaseDeadline())).isEmpty();
+    }
 
-        recordRepository.markFailed(id, "Still failing", 3, 3, nextRetry);
-        Optional<NotificationRecord> afterMaxFail = recordRepository.findById(id);
-        assertThat(afterMaxFail.get().status()).isEqualTo(NotificationStatus.FAILED);
+    @Test
+    void retryFailureAtMaxRetriesReachesFailedTerminal() {
+        UUID id = service.submit(manager, null, new NotificationIntent.DirectIntent(
+                NotificationChannel.SMS, "recip", "T", "B", null));
+
+        // 复刻引擎的重试序列：每次都先领取（写租约），失败时传入当前 retryCount，达到上限即终态
+        java.time.Instant due = java.time.Instant.now().minusSeconds(1);
+        for (int attempt = 0; attempt < 3; attempt++) {
+            assertThat(recordRepository.claimPending(10, LEASE_OWNER, leaseDeadline()))
+                    .extracting(NotificationRecord::id).containsExactly(id);
+            recordRepository.markFailed(id, LEASE_OWNER, "Still failing", attempt, 3, due);
+        }
+
+        assertThat(recordRepository.findById(id)).get().satisfies(record -> {
+            assertThat(record.status()).isEqualTo(NotificationStatus.FAILED);
+            assertThat(record.retryCount()).isEqualTo(3);
+        });
     }
 
     @Test

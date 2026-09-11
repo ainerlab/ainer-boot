@@ -44,19 +44,20 @@ public class MybatisNotificationRecordRepository implements NotificationRecordRe
     }
 
     @Override
-    public List<NotificationRecord> claimPending(int batchSize) {
-        return mapper.claimPending(batchSize, clock.instant()).stream()
+    public List<NotificationRecord> claimPending(int batchSize, String leaseOwner, Instant leaseExpiresAt) {
+        return mapper.claimPending(batchSize, leaseOwner, leaseExpiresAt, clock.instant()).stream()
                 .map(MybatisNotificationRecordRepository::toDomain).toList();
     }
 
     @Override
-    public void markSent(UUID id, Instant sentAt) {
-        mapper.markSent(id, sentAt, clock.instant());
+    public void markSent(UUID id, String leaseOwner, Instant sentAt) {
+        mapper.markSent(id, leaseOwner, sentAt, clock.instant());
     }
 
     @Override
-    public void markFailed(UUID id, String errorMessage, int retryCount, int maxRetries, Instant nextRetryAt) {
-        mapper.markFailed(id, errorMessage, retryCount, maxRetries, nextRetryAt, clock.instant());
+    public void markFailed(UUID id, String leaseOwner, String errorMessage,
+            int retryCount, int maxRetries, Instant nextRetryAt) {
+        mapper.markFailed(id, leaseOwner, errorMessage, retryCount, maxRetries, nextRetryAt, clock.instant());
     }
 
     @Override
