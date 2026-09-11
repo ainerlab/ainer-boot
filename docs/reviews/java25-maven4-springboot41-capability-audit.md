@@ -726,3 +726,13 @@ Priority: P1（仅针对真正冗余项）
 ## 12. Verdict One-liner
 
 `ainer-boot` 对 **Java 25 语言/领域建模** 与 **Spring Boot 4.1 运行时 starter** 的利用已达 **GOOD**；对 **Maven 4** 主要兑现了工具链与 Consumer POM，源模型仍是有意保留的 POM 4.0，整体 **PARTIAL**；跨层最大价值不在“再写新语法”，而在消除 **reactor BOM 警告、未接线 OAuth client glue、测试/可观测性/出站 HTTP 脚手架缺口**，并在压测后审慎推进虚拟线程平台默认。
+
+---
+
+## 13. 后续关闭
+
+本快照不改写上方原文；已失效的 finding 记在这里。
+
+| # | 状态 | 关闭说明 |
+|---|---|---|
+| J-3 | 已关闭（2026-09-11） | `GlobalExceptionHandler` 因 HTTP 状态语义保真重写为继承 `ResponseEntityExceptionHandler`（405/406/415/非法请求体不再退化为 500），`handleBinding` 及其旧式 cast 一并删除，finding 失去对象。实现见 `ainer-framework/ainer-starter-web/.../GlobalExceptionHandler.java`，验证见 `GlobalExceptionHandlerHttpStatusTest`。 |
