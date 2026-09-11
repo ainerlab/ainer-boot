@@ -379,6 +379,70 @@ Ainer 项目签名 provenance 已通过。
   migration 21 个（DDL 语句 76 条），违规 0 处`（exit 0）；`scripts/check-endpoint-authorization.sh`
   → `Java 文件 686 个、handler 方法 110 个（…），违规 0 处`（exit 0）。未新增任何 HTTP 端点。
 
+2026-09-11 AI runtime 无界阻塞与零自愈修复（总超时覆盖响应体读取 + 中间态定时自愈）
+- **缺口（四条，均已在 `codex/ai-runtime-resilience` 上修复）**：
+  ① `OpenAiCompatibleModelProvider` 只设了建连超时与 `HttpRequest.timeout`，按 JDK 定性
+  （JDK-8258397）该超时在读到响应头之后失效、不覆盖响应体读取——上游「发完响应头就静默」时
+  `readLine()` / `readNBytes()` 无限阻塞，不是异常，`try/catch` 永远等不到；
+  ② `ainer-module-ai-runtime` 内 `@Scheduled` 数量为 0、模块外也没有任务扫 `ainer_ai_*`，
+  调用卡死或进程中断后 `ainer_ai_invocation` 永久停在 `STARTED`，而当日预算按
+  `status IN ('STARTED','SUCCEEDED','FAILED')` 统计 → 该 subject 的当日预算被永久占用到 UTC 跨日；
+  ③ `AiTaskRunService` 全类无事务且 `updateTaskRunStatus` 没有期望态条件，中途失败会留下
+  「RUNNING 的 task 没有对应 run」；④ `auditService.fail(...)` 在没有 STARTED 行时抛异常，
+  会替换掉调用方真正需要看到的原始失败原因。
+- **实测前提（本地 `HttpServer` 桩，可重放）**：只发响应头、零字节正文时 `HttpRequest.timeout`
+  生效（804ms 抛 `HttpTimeoutException`）；发响应头 + 一小段正文后静默时，800ms 的 request
+  timeout 下读取仍阻塞 > 3s——这就是必须由总超时兜住的窗口。官方 issue 已核对：
+  JDK-8208693（Extend the request timeout's scope to cover the response body）修复版本是 JDK 26，
+  25-pool 回移 JDK-8383521 仍 Open；JDK-8258397 是配套调查单。
+- **有界总超时**：`ainer.ai.provider.total-timeout`（默认 120s）与 `stream-total-timeout`
+  （默认 600s）覆盖整次调用（发送 + 读完响应体）。调用跑在 `aiProviderCallExecutor` 虚拟线程上，
+  调用线程用 `Future.get(totalTimeout)` 兜底，超时 `cancel(true)` + 关闭响应体唤醒读取线程；
+  响应体注册与放弃在同一把锁下完成，消除「超时恰好发生在 `send()` 返回与注册之间」的永久阻塞
+  窗口；流式读取循环另有截止时间检查兜住慢速滴流；执行器 `destroyMethod=shutdownNow`
+  （`close()` 会无限等待未结束任务）。超时失败写 `FAILED:AINER.AI.PROVIDER_TIMEOUT`。
+- **预算语义（刻意例外）**：超时/中断失败与定时自愈把 `actual_cost` 置 0 释放当日预算预占
+  （`estimated_cost` 保留在审计行），因为这类调用不会再回到终态；普通供应商失败（限流/不可用/
+  协议错误）仍按既有反绕过口径占用预算，`docs/ai-gateway.md` §4 已写明差异。
+- **中间态自愈**：新增 `AiIntermediateStateSweeper`，由全局 `AinerSchedulingAutoConfiguration`
+  驱动的 `@Scheduled` 按 `scan-interval-ms`（默认 60s）清扫 `invocation STARTED` /
+  `task_run RUNNING` / `task RUNNING`（任务表无 `started_at`，用 `updated_at` 计时）到 FAILED；
+  阈值 `stuck-threshold` 默认 15m，配置校验强制它比 `stream-total-timeout` 至少大 1 分钟。
+  幂等 + 并发安全：条件 UPDATE 作 CAS，候选行 `FOR UPDATE SKIP LOCKED`，多实例同时扫同一行只处理
+  一次。指标 `ainer.ai.intermediate_state.healed|stuck|oldest_age_seconds`（tag `state`）+
+  `sweep_failed`；无 `MeterRegistry` 时降级为只打 WARN 日志。`AiTaskRunService` 的 Phase 1 / Phase 3
+  改为显式事务，`updateTaskRunStatus` 补期望态 CAS。
+- **审计不掩盖原始失败**：审计终态回写失败挂到被抛异常的 suppressed 上并打 WARN，响应仍是原始
+  错误码（不再被 `IllegalStateException` 替换成 500），SSE 客户端照常收到 `error` 事件。
+- **测试**：`ainer-module-ai-runtime` 34 → **47 tests / 0 failure / 0 error / 0 skipped**。
+  新增 `AiRuntimeResilienceIntegrationTest` 9 项（真实 PostgreSQL 18.3 Testcontainers + 本地
+  `HttpServer` 桩 + 真实 `OpenAiCompatibleModelProvider`，不使用 Mockito/H2）：静默桩下非流式与
+  流式都在有界时间内失败、invocation 进 `FAILED:AINER.AI.PROVIDER_TIMEOUT` 且 `actual_cost = 0`、
+  该 subject 暴露回到 0 且后续调用仍 200、400/1200ms 区间断言证明兜底的是总超时而不是请求头超时、
+  超期 STARTED 自愈终态且未超期行不误伤、重复清扫零副作用、两个清扫实例并发处理 24 行自愈计数
+  恰好等于 24、不手动触发只等 `@Scheduled` 在 30s 内自动变终态、在途删除 STARTED 行后响应仍是
+  504 `AINER.AI.PROVIDER_TIMEOUT`；`OpenAiCompatibleModelProviderTest` 5 → 9 项（新增超时后有界
+  失败 ×3 与「超时后同一 HttpClient 仍可正常调用」）。既有正常调用 / SSE 正常完成 / 上游故障路径
+  断言全部保持通过（`AiGatewayModuleIntegrationTest` 9 项未改断言）。
+- **全量验证**：JDK 25.0.2 + Maven 4.0.0-rc-6 + Colima/PostgreSQL 18.3，
+  `DOCKER_HOST=unix:///Users/xq/.colima/default/docker.sock
+  TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw clean verify` →
+  28/28 reactor 模块 `SUCCESS`、`BUILD SUCCESS`、`Total time: 05:33 min`（同一代码树复跑第二次
+  `05:27 min`，逐模块结论相同）；`./scripts/check-surefire-results.sh` 两次均为
+  `tests=665, failures=0, errors=0, skipped=0`。
+- **三道门禁**：`check-runtime-wiring.sh`（Dockerfile COPY 覆盖 27 个 reactor 模块；4 处 `@Scheduled`
+  均有生效的 `@EnableScheduling`）、`check-framework-boundary.sh`（框架 main Java 662、pom 28、
+  migration 20 / DDL 75，违规 0）、`check-endpoint-authorization.sh`（Java 678、handler 110、
+  违规 0）全部 `exit 0`；`check-commit-discipline.sh 9cc6086 HEAD` 通过。
+- **测试夹具踩坑（记录以免复发）**：`HttpServer` 在 chunked 响应下要等到第一次写正文才把响应头刷到
+  socket（headers-only 时客户端 60s 都拿不到响应头），所以「发完响应头就静默」的桩必须先写一小段
+  正文；另外桩服务器必须先初始化 executor 再 `setExecutor`，否则 `setExecutor(null)` 会让 handler
+  跑在唯一 dispatcher 线程上，一个静默 handler 就把整个桩服务器永久卡死（本次曾据此误判为客户端
+  连接池被污染）。
+- **待决策**：①超时/自愈的「释放预占」口径与既有 FAILED 占用口径并存，需运维知悉（见
+  `docs/ai-gateway.md` §4）；②Phase 2（provider 调用）仍刻意不包事务，靠审计 REQUIRES_NEW；
+  ③自愈只做中间态终态化，不做 provider 重试或补偿调用。
+
 2026-09-11 端点授权默认拒绝落地（`@EndpointAccess` + 运行期 FAIL_CLOSED + 静态门禁）
 - **缺口**：`@AinerAuthorize` 是逐方法可选注解，没有它的 handler 在 `AinerRequestAuthorizationManager`
   返回 `null`，落到 Resource Server 的 `anyRequest().authenticated()`——只要求登录、不要求权限。

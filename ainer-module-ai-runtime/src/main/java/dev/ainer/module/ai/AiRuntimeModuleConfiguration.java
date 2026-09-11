@@ -12,6 +12,7 @@ import dev.ainer.module.ai.gateway.policy.SensitiveDataPolicy;
 import dev.ainer.module.ai.gateway.policy.SubjectRateLimiter;
 import dev.ainer.module.ai.gateway.policy.TokenEstimator;
 import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -91,14 +92,25 @@ public class AiRuntimeModuleConfiguration {
                 Thread.ofVirtual().name("ainer-ai-stream-", 0).factory());
     }
 
+    // provider 出站调用的「总时长上限」执行器：一次调用（含响应体读取）跑在虚拟线程上，调用线程
+    // 用 Future.get(totalTimeout) 兜底。超时/取消时由调用方关闭响应体唤醒读取线程。
+    // destroyMethod 用 shutdownNow 而不是 close()：close() 会无限等待未结束的任务，停机可能被卡住。
+    @Bean(defaultCandidate = false, destroyMethod = "shutdownNow")
+    ExecutorService aiProviderCallExecutor() {
+        return Executors.newThreadPerTaskExecutor(
+                Thread.ofVirtual().name("ainer-ai-provider-", 0).factory());
+    }
+
     @Bean
     @ConditionalOnMissingBean(ModelProvider.class)
     ModelProvider openAiCompatibleModelProvider(
             AiRuntimeProperties properties,
             HttpClient aiProviderHttpClient,
             ObjectMapper objectMapper,
-            TokenEstimator tokenEstimator) {
+            TokenEstimator tokenEstimator,
+            @Qualifier("aiProviderCallExecutor") ExecutorService aiProviderCallExecutor) {
         return new OpenAiCompatibleModelProvider(
-                properties.getProvider(), aiProviderHttpClient, objectMapper, tokenEstimator);
+                properties.getProvider(), aiProviderHttpClient, objectMapper, tokenEstimator,
+                aiProviderCallExecutor);
     }
 }

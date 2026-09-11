@@ -59,6 +59,27 @@ public class MybatisAiInvocationRepository implements AiInvocationRepository {
     }
 
     @Override
+    public boolean markFailedReleasingReservation(
+            UUID id, String errorCode, long latencyMillis, Instant completedAt) {
+        return mapper.markFailedReleasingReservation(id, errorCode, latencyMillis, completedAt) == 1;
+    }
+
+    @Override
+    public int healStuckStarted(Instant startedBefore, int limit, String errorCode, Instant healedAt) {
+        return mapper.healStuckStarted(startedBefore, limit, errorCode, healedAt);
+    }
+
+    @Override
+    public long countStuckStarted(Instant startedBefore) {
+        return mapper.countStuckStarted(startedBefore);
+    }
+
+    @Override
+    public Instant oldestStartedAt() {
+        return mapper.oldestStartedAt();
+    }
+
+    @Override
     public Optional<AiInvocation> findBySubjectAndId(String subjectId, UUID id) {
         return Optional.ofNullable(mapper.selectBySubjectAndId(subjectId, id)).map(this::toDomain);
     }

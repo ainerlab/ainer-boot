@@ -39,6 +39,12 @@
             <groupId>tools.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
+        <!-- 中间态自愈的指标出口：运行时用 ObjectProvider 探测 MeterRegistry，
+             未装配 actuator 时自动降级为只打日志。 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

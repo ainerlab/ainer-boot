@@ -82,6 +82,54 @@
           AND status = 'STARTED'
     </update>
 
+    <!-- 超时/中断失败：连同 actual_cost = 0 一起写，释放这次调用对当日预算的预占。
+         estimated_cost 保留不动，审计仍能看到当初预占了多少。 -->
+    <update id="markFailedReleasingReservation">
+        UPDATE ainer_ai_invocation
+        SET status = 'FAILED',
+            error_code = #{errorCode},
+            actual_cost = 0,
+            latency_ms = #{latencyMillis},
+            completed_at = #{completedAt}
+        WHERE id = #{id}
+          AND status = 'STARTED'
+    </update>
+
+    <!-- 中间态自愈：候选行用 FOR UPDATE SKIP LOCKED 领取，条件 status = 'STARTED' 充当 CAS，
+         因此同一行只会被一个清扫实例处理一次；latency 由 SQL 直接按 started_at 计算，
+         避免逐行回查。 -->
+    <update id="healStuckStarted">
+        UPDATE ainer_ai_invocation
+        SET status = 'FAILED',
+            error_code = #{errorCode},
+            actual_cost = 0,
+            latency_ms = GREATEST(0, (EXTRACT(EPOCH FROM (#{healedAt}::timestamptz - started_at)) * 1000)::bigint),
+            completed_at = #{healedAt}
+        WHERE id IN (
+            SELECT id
+            FROM ainer_ai_invocation
+            WHERE status = 'STARTED'
+              AND started_at &lt; #{startedBefore}
+            ORDER BY started_at
+            LIMIT #{limit}
+            FOR UPDATE SKIP LOCKED
+        )
+          AND status = 'STARTED'
+    </update>
+
+    <select id="countStuckStarted" resultType="long">
+        SELECT COUNT(*)
+        FROM ainer_ai_invocation
+        WHERE status = 'STARTED'
+          AND started_at &lt; #{startedBefore}
+    </select>
+
+    <select id="oldestStartedAt" resultType="java.time.Instant">
+        SELECT MIN(started_at)
+        FROM ainer_ai_invocation
+        WHERE status = 'STARTED'
+    </select>
+
     <select id="selectBySubjectAndId" resultMap="aiInvocationRow">
         SELECT id, subject_id, request_id, provider,
                requested_model, resolved_model, streaming, status, policy_decision,

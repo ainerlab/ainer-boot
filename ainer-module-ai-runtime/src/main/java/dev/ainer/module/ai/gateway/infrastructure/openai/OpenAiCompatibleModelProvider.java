@@ -30,6 +30,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * OpenAI 兼容 HTTP 模型提供方：以 chat/completions 协议对接任意兼容网关
@@ -38,6 +44,13 @@ import java.util.Objects;
  * <p>支持非流式与 SSE 流式两条路径；对响应体大小与流内容长度设置硬上限，
  * 供应商错误分类为 {@link ProviderFailure}（限流/超时/不可用/协议错误），
  * 错误正文不透出；usage 缺失时用 {@link TokenEstimator} 估算。
+ *
+ * <p><b>总时长上限（覆盖响应体读取）</b>：{@code HttpRequest.timeout} 按 JDK 定性
+ * （JDK-8258397）只在「响应头到达」前有效，一旦上游发完响应头就静默，后续
+ * {@code readLine()} / {@code readNBytes()} 会无限阻塞。因此整次调用（发送 + 读完响应体）
+ * 都提交到独立执行器，由调用线程用 {@code Future.get(totalTimeout)} 兜底：超时即
+ * cancel + 关闭响应体（唤醒阻塞中的读取线程），并把调用推进到
+ * {@link ProviderFailure.Kind#TIMEOUT} 终态，绝不永卡中间态。
  */
 public final class OpenAiCompatibleModelProvider implements ModelProvider {
 
@@ -49,22 +62,29 @@ public final class OpenAiCompatibleModelProvider implements ModelProvider {
     private final String apiKey;
     private final URI completionsUri;
     private final Duration requestTimeout;
+    private final Duration totalTimeout;
+    private final Duration streamTotalTimeout;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final TokenEstimator tokenEstimator;
+    private final ExecutorService callExecutor;
 
     public OpenAiCompatibleModelProvider(
             AiRuntimeProperties.Provider properties,
             HttpClient httpClient,
             ObjectMapper objectMapper,
-            TokenEstimator tokenEstimator) {
+            TokenEstimator tokenEstimator,
+            ExecutorService callExecutor) {
         this.name = properties.getName();
         this.apiKey = properties.getApiKey();
         this.completionsUri = completionsUri(properties.getBaseUrl());
         this.requestTimeout = properties.getRequestTimeout();
+        this.totalTimeout = properties.getTotalTimeout();
+        this.streamTotalTimeout = properties.getStreamTotalTimeout();
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
         this.tokenEstimator = tokenEstimator;
+        this.callExecutor = callExecutor;
     }
 
     @Override
@@ -74,36 +94,129 @@ public final class OpenAiCompatibleModelProvider implements ModelProvider {
 
     @Override
     public ModelCompletion complete(ModelInvocation invocation) {
-        HttpResponse<InputStream> response = send(invocation, false);
-        try (InputStream body = response.body()) {
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                drain(body);
-                throw statusFailure(response.statusCode());
+        return callWithinDeadline("completion", totalTimeout, (responseBody, deadlineNanos) -> {
+            HttpResponse<InputStream> response = send(invocation, false);
+            responseBody.register(response.body());
+            try (InputStream body = response.body()) {
+                if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                    drain(body);
+                    throw statusFailure(response.statusCode());
+                }
+                String json = readLimited(body);
+                return parseCompletion(json, invocation);
+            } catch (ProviderFailure failure) {
+                throw failure;
+            } catch (IOException exception) {
+                throw new ProviderFailure(ProviderFailure.Kind.UNAVAILABLE, "Failed to read provider response", exception);
             }
-            String json = readLimited(body);
-            return parseCompletion(json, invocation);
-        } catch (ProviderFailure failure) {
-            throw failure;
-        } catch (IOException exception) {
-            throw new ProviderFailure(ProviderFailure.Kind.UNAVAILABLE, "Failed to read provider response", exception);
-        }
+        });
     }
 
     @Override
     public void stream(ModelInvocation invocation, ModelStreamObserver observer) {
         Objects.requireNonNull(observer, "observer");
-        HttpResponse<InputStream> response = send(invocation, true);
-        try (InputStream body = response.body()) {
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                drain(body);
-                throw statusFailure(response.statusCode());
+        callWithinDeadline("stream", streamTotalTimeout, (responseBody, deadlineNanos) -> {
+            HttpResponse<InputStream> response = send(invocation, true);
+            responseBody.register(response.body());
+            try (InputStream body = response.body()) {
+                if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                    drain(body);
+                    throw statusFailure(response.statusCode());
+                }
+                readStream(body, invocation, observer, deadlineNanos);
+                return null;
+            } catch (ProviderFailure failure) {
+                throw failure;
+            } catch (IOException exception) {
+                throw new ProviderFailure(ProviderFailure.Kind.UNAVAILABLE, "Failed to read provider stream", exception);
             }
-            readStream(body, invocation, observer);
-        } catch (ProviderFailure failure) {
-            throw failure;
-        } catch (IOException exception) {
-            throw new ProviderFailure(ProviderFailure.Kind.UNAVAILABLE, "Failed to read provider stream", exception);
+        });
+    }
+
+    /**
+     * 在有界总时长内执行一次 provider 调用：调用线程只等待 {@code timeout}，超时后取消任务并
+     * 关闭响应体，使阻塞在 {@code read()} 的读取线程立即以 IOException 结束（不留下永久阻塞
+     * 的线程），随后抛出 {@link ProviderFailure.Kind#TIMEOUT}。
+     *
+     * <p>不使用 try-with-resources 包装执行器：{@code close()} 会无限等待未结束的任务。
+     * 执行器由装配层管理生命周期。
+     */
+    private <T> T callWithinDeadline(String operation, Duration timeout, BoundedCall<T> call) {
+        long timeoutMillis = Math.max(1L, timeout.toMillis());
+        ResponseBodyHandle responseBody = new ResponseBodyHandle();
+        Future<T> future;
+        try {
+            future = callExecutor.submit(() -> call.run(responseBody, System.nanoTime() + timeout.toNanos()));
+        } catch (RejectedExecutionException exception) {
+            throw new ProviderFailure(
+                    ProviderFailure.Kind.UNAVAILABLE, "Provider call executor rejected the request", exception);
         }
+        try {
+            return future.get(timeoutMillis, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException exception) {
+            future.cancel(true);
+            responseBody.abort();
+            throw new ProviderFailure(ProviderFailure.Kind.TIMEOUT,
+                    "Provider " + operation + " exceeded the total timeout of " + timeout.toSeconds()
+                            + "s including the response body read");
+        } catch (InterruptedException exception) {
+            // 客户端断开或停机中断：仍要把调用推进到终态（由调用方写审计），所以不把中断标记
+            // 留在当前线程上，避免随后的审计回写因中断标记失败而让记录停在中间态。
+            future.cancel(true);
+            responseBody.abort();
+            throw new ProviderFailure(
+                    ProviderFailure.Kind.UNAVAILABLE, "Provider " + operation + " was interrupted");
+        } catch (ExecutionException exception) {
+            Throwable cause = exception.getCause();
+            if (cause instanceof ProviderFailure failure) {
+                throw failure;
+            }
+            if (cause instanceof RuntimeException runtime) {
+                throw runtime;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new ProviderFailure(
+                    ProviderFailure.Kind.UNAVAILABLE, "Provider " + operation + " failed", cause);
+        }
+    }
+
+    /**
+     * 在途响应体句柄：调用线程超时/中断时置 aborted 并关闭已注册的响应体；读取线程注册响应体时，
+     * 若发现调用已被放弃就立刻关掉自己手里的流。读写都在同一把锁下，因此不存在
+     * 「超时恰好发生在 send() 返回与注册之间」导致读取线程永久阻塞在 read() 上的窗口。
+     */
+    private static final class ResponseBodyHandle {
+
+        private InputStream body;
+        private boolean aborted;
+
+        synchronized void register(InputStream responseBody) throws IOException {
+            if (aborted) {
+                responseBody.close();
+                throw new ProviderFailure(ProviderFailure.Kind.TIMEOUT,
+                        "Provider call was already aborted before the response body was registered");
+            }
+            this.body = responseBody;
+        }
+
+        synchronized void abort() {
+            aborted = true;
+            if (body == null) {
+                return;
+            }
+            try {
+                body.close();
+            } catch (IOException ignored) {
+                // 关闭失败只影响唤醒速度：调用线程已按超时返回，读取线程另有中断兜底。
+            }
+        }
+    }
+
+    @FunctionalInterface
+    private interface BoundedCall<T> {
+        T run(ResponseBodyHandle responseBody, long deadlineNanos) throws IOException;
     }
 
     private HttpResponse<InputStream> send(ModelInvocation invocation, boolean stream) {
@@ -174,14 +287,20 @@ public final class OpenAiCompatibleModelProvider implements ModelProvider {
         }
     }
 
-    private void readStream(InputStream input, ModelInvocation invocation, ModelStreamObserver observer)
-            throws IOException {
+    private void readStream(InputStream input, ModelInvocation invocation, ModelStreamObserver observer,
+                            long deadlineNanos) throws IOException {
         StreamState state = new StreamState();
         boolean done = false;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(
                 new LimitedInputStream(input, MAX_STREAM_RESPONSE_BYTES), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
+                // 流式路径的进度以「读完一行」为单位：上游持续慢速吐字节时，让读取循环自己在
+                // 截止时间点失败，而不是等到调用线程的 Future.get 超时。
+                if (System.nanoTime() - deadlineNanos > 0) {
+                    throw new ProviderFailure(ProviderFailure.Kind.TIMEOUT,
+                            "Provider stream exceeded the total timeout including the response body read");
+                }
                 if (!line.startsWith("data:")) {
                     continue;
                 }

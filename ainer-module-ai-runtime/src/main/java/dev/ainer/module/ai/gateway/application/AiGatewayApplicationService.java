@@ -13,6 +13,8 @@ import dev.ainer.module.ai.gateway.policy.PromptFingerprint;
 import dev.ainer.module.ai.gateway.policy.SensitiveDataPolicy;
 import dev.ainer.module.ai.gateway.policy.SubjectRateLimiter;
 import dev.ainer.module.ai.gateway.policy.TokenEstimator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +38,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 @Service
 public class AiGatewayApplicationService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(AiGatewayApplicationService.class);
 
     private final AiRuntimeProperties properties;
     private final ModelProvider provider;
@@ -83,10 +87,13 @@ public class AiGatewayApplicationService {
             return new CompletionResult(prepared.id(), completion, cost, latency);
         } catch (ProviderFailure failure) {
             AiGatewayErrorCode errorCode = providerError(failure);
-            auditService.fail(prepared.id(), errorCode.code(), elapsedMillis(startedNanos));
-            throw new BusinessException(errorCode);
+            BusinessException business = new BusinessException(errorCode);
+            failAuditWithoutMasking(prepared.id(), errorCode.code(), elapsedMillis(startedNanos), business,
+                    errorCode == AiGatewayErrorCode.PROVIDER_TIMEOUT);
+            throw business;
         } catch (RuntimeException failure) {
-            auditService.fail(prepared.id(), "AINER.COMMON.INTERNAL_ERROR", elapsedMillis(startedNanos));
+            failAuditWithoutMasking(
+                    prepared.id(), "AINER.COMMON.INTERNAL_ERROR", elapsedMillis(startedNanos), failure, false);
             throw failure;
         }
     }
@@ -126,14 +133,46 @@ public class AiGatewayApplicationService {
                 return;
             }
             AiGatewayErrorCode errorCode = providerError(failure);
-            auditService.fail(prepared.id(), errorCode.code(), elapsedMillis(startedNanos));
+            // 审计回写失败不得吃掉错误通知：SSE 客户端必须收到 error 事件，否则只能等 emitter 超时。
+            failAuditWithoutMasking(prepared.id(), errorCode.code(), elapsedMillis(startedNanos), failure,
+                    errorCode == AiGatewayErrorCode.PROVIDER_TIMEOUT);
             notifyError(listener, prepared.id(), errorCode);
         } catch (RuntimeException failure) {
             if (auditCompleted.get()) {
                 return;
             }
-            auditService.fail(prepared.id(), "AINER.COMMON.INTERNAL_ERROR", elapsedMillis(startedNanos));
+            failAuditWithoutMasking(
+                    prepared.id(), "AINER.COMMON.INTERNAL_ERROR", elapsedMillis(startedNanos), failure, false);
             notifyError(listener, prepared.id(), AiGatewayErrorCode.PROVIDER_UNAVAILABLE);
+        }
+    }
+
+    /**
+     * 回写失败终态，且绝不替换原始失败原因。
+     *
+     * <p>{@link AiInvocationAuditService#fail} 在没有 STARTED 行时抛 {@code IllegalStateException}
+     * （例如自愈已把该行推进到终态、或审计行被清理）。此时原始异常才是调用方需要看到的结论，
+     * 因此：审计失败挂到被抛出异常的 suppressed 上，同时打 WARN 日志让两个失败都可见。
+     *
+     * @param releaseReservation 超时/中断类失败置 true：这类调用不会自己回到终态，必须同时释放
+     *                           预算预占（{@code actual_cost = 0}），否则该 subject 的当日预算会
+     *                           被永久占用；其他失败沿用既有的保守口径。
+     */
+    private void failAuditWithoutMasking(
+            UUID id, String errorCode, long latencyMillis, RuntimeException propagated, boolean releaseReservation) {
+        try {
+            if (releaseReservation) {
+                auditService.failReleasingReservation(id, errorCode, latencyMillis);
+            } else {
+                auditService.fail(id, errorCode, latencyMillis);
+            }
+        } catch (RuntimeException auditFailure) {
+            if (propagated != auditFailure) {
+                propagated.addSuppressed(auditFailure);
+            }
+            LOG.warn("AI invocation terminal failure audit failed for {} (errorCode={}); "
+                            + "the original failure is preserved and the row stays self-healable",
+                    id, errorCode, auditFailure);
         }
     }
 

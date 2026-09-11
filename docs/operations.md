@@ -233,7 +233,16 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 
 - 检查模块是否启用、HTTPS base URL、模型白名单和预算；
 - 区分策略拒绝、连接超时、provider 失败和客户端断开；
-- 只记录稳定错误码和调用 ID，不记录 API key、prompt 或供应商原始正文。
+- 只记录稳定错误码和调用 ID，不记录 API key、prompt 或供应商原始正文；
+- `AINER.AI.PROVIDER_TIMEOUT`：整次调用（含响应体读取）超过
+  `AINER_AI_TOTAL_TIMEOUT` / `AINER_AI_STREAM_TOTAL_TIMEOUT`。JDK 的 `HttpRequest.timeout`
+  只覆盖到响应头（JDK-8258397），所以只调 `AINER_AI_REQUEST_TIMEOUT` 挡不住
+  「上游发完响应头就静默」；这类失败会把 `actual_cost` 置 0 释放预算预占；
+- 日志里出现 `AI invocation terminal failure audit failed ...`：审计终态回写失败（通常是该行已被
+  自愈推进终态），原始失败原因仍会返回给调用方，行也不会丢——由下一轮自愈兜底；
+- 审计行 `status = 'STARTED'` 长时间不动：确认 `AINER_AI_SELF_HEAL_ENABLED=true` 且
+  `ainer.ai.intermediate_state.sweep_failed` 未增长；自愈阈值与调度周期见
+  [`ai-gateway.md` §4.1](ai-gateway.md)。
 
 ### 通知记录停在 PENDING（投递引擎不运行）
 
@@ -311,6 +320,28 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 | `ainer.security.online.validation.failed` | Counter | introspection 依赖失败并返回 503 的数量 |
 | `ainer.security.online.validation.duration` | Timer | 每次高风险 introspection 调用耗时，不包含后续业务处理 |
 | `ainer.passkey.recovery.requested` / `.executed` | Counter | Passkey 管理员双人恢复申请/成功执行数 |
+| `ainer.ai.intermediate_state.healed` | Counter | 定时自愈推进到终态的中间态行数，tag `state` = `invocation` / `task_run` / `task` |
+| `ainer.ai.intermediate_state.stuck` | Gauge | 当前超过 `AINER_AI_SELF_HEAL_STUCK_THRESHOLD` 仍停在中间态的行数（自愈积压），tag `state` 同上 |
+| `ainer.ai.intermediate_state.oldest_age_seconds` | Gauge | 最老中间态记录的年龄（秒），tag `state` 同上 |
+| `ainer.ai.intermediate_state.sweep_failed` | Counter | 清扫周期自身失败的次数（数据库不可用等） |
+
+AI 中间态自愈（`AiIntermediateStateSweeper`，语义见 [`ai-gateway.md` §4.1](ai-gateway.md)）的初始告警条件：
+
+- `ainer.ai.intermediate_state.sweep_failed` 持续增长 → 自愈没在跑，中间态不会被清理：先查日志与数据库连通性；
+- `ainer.ai.intermediate_state.stuck{state="invocation"}` 连续多个清扫周期后仍 > 0 → 单轮 `batch-size` 不够（积压）或清扫失败；
+- `ainer.ai.intermediate_state.oldest_age_seconds{state="invocation"}` 超过 `AINER_AI_SELF_HEAL_STUCK_THRESHOLD` → 有行长期没被推进终态，说明自愈本身失效；
+- `ainer.ai.intermediate_state.healed{state="invocation"}` 突增 → 上游或进程被批量中断，配合错误码 `AINER.AI.PROVIDER_TIMEOUT` / `AINER.AI.INVOCATION_SELF_HEALED` 探查上游。
+- 未引入 actuator（没有 `MeterRegistry`）时自愈照常运行并打 WARN 日志，只是不暴露指标。
+
+排查单个卡死调用：
+
+```sql
+SELECT id, subject_id, status, started_at, now() - started_at AS age, error_code
+FROM ainer_ai_invocation WHERE status = 'STARTED' ORDER BY started_at LIMIT 20;
+```
+
+终态化后该行 `actual_cost = 0`（预算预占已释放），`error_code` 区分调用自己的总超时
+（`AINER.AI.PROVIDER_TIMEOUT`）与定时自愈兜底（`AINER.AI.INVOCATION_SELF_HEALED`）。
 
 初始告警条件至少包括：`ownerless > 0` 立即告警、archive failure 增长，以及 DENIED 窗口值明显超过环境基线。DENIED 阈值必须根据正常流量建基线，不能在未观测环境中伪造通用数字。
 
