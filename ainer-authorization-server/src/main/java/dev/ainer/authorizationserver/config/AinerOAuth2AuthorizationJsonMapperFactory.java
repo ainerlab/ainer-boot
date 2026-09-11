@@ -26,6 +26,16 @@ final class AinerOAuth2AuthorizationJsonMapperFactory {
         BasicPolymorphicTypeValidator.Builder validator =
                 BasicPolymorphicTypeValidator.builder()
                         .allowIfSubType(AinerUserDetails.class);
+        // Access token 的自定义 claim 以 Map<String,Object> 形式往返，装箱标量会被写成类型 id
+        // （例如 sec_epoch -> "java.lang.Long"）。若不放行这些 JDK 标量，读取 oauth2_authorization
+        // 时会抛 InvalidTypeIdException，introspection / 刷新查找全部失败（在线校验退化成 503），
+        // 也就是"文档承诺的撤销判定"永远走不到。只放行无行为副作用的标量，不放行整个 java.lang 包。
+        validator
+                .allowIfSubType(String.class)
+                .allowIfSubType(Long.class)
+                .allowIfSubType(Integer.class)
+                .allowIfSubType(Boolean.class)
+                .allowIfSubType(Double.class);
         List<JacksonModule> modules = new ArrayList<>(SecurityJacksonModules.getModules(
                 AinerOAuth2AuthorizationJsonMapperFactory.class.getClassLoader(),
                 validator));
