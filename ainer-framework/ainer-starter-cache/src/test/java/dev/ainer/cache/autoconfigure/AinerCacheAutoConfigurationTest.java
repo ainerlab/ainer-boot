@@ -5,6 +5,8 @@ import dev.ainer.cache.lock.DistributedLockPort;
 import dev.ainer.cache.lock.LocalDistributedLockPort;
 import dev.ainer.cache.lock.PostgresDistributedLockPort;
 import dev.ainer.cache.lock.RedisDistributedLockPort;
+import dev.ainer.cache.ratelimit.NodeLocalRateLimitPort;
+import dev.ainer.cache.ratelimit.RateLimitPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.postgresql.ds.PGSimpleDataSource;
@@ -45,6 +47,7 @@ class AinerCacheAutoConfigurationTest {
             AinerRedisCacheAutoConfiguration.class,
             AinerRedisCacheUnavailableAutoConfiguration.class,
             AinerCacheLockAutoConfiguration.class,
+            AinerRateLimitAutoConfiguration.class,
             AinerCacheCapabilitiesAutoConfiguration.class);
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
@@ -72,6 +75,21 @@ class AinerCacheAutoConfigurationTest {
             assertThat(capabilities.lockImplementationClass())
                     .isEqualTo(LocalDistributedLockPort.class.getName());
             assertThat(capabilities.multiInstanceSafe()).isFalse();
+        });
+    }
+
+    @Test
+    void defaultsAssembleLocalRateLimitPortWithVisibleDegradation() {
+        runner.run(context -> {
+            assertThat(context).hasNotFailed();
+            // 默认（type=LOCAL）限流为进程内固定窗口：能力报告必须如实标注非集群精确
+            assertThat(context.getBean(RateLimitPort.class))
+                    .isInstanceOf(NodeLocalRateLimitPort.class);
+            AinerCacheCapabilities capabilities = context.getBean(AinerCacheCapabilities.class);
+            assertThat(capabilities.rateLimitImplementationClass())
+                    .isEqualTo(NodeLocalRateLimitPort.class.getName());
+            assertThat(capabilities.rateLimitClusterAccurate()).isFalse();
+            assertThat(capabilities.describe()).contains("rateLimit{declared=LOCAL");
         });
     }
 
