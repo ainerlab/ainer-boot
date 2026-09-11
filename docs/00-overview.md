@@ -56,13 +56,13 @@ ainer-framework/
 ├── ainer-starter-web                 HTTP、错误与请求追踪
 ├── ainer-starter-persistence         MyBatis-Plus/MyBatis、Flyway、PostgreSQL、UUID
 ├── ainer-starter-security            JWT Resource Server 共性
-├── ainer-starter-cache               Spring Cache + Caffeine/Redis + 分布式锁（ADR-0039）
+├── ainer-starter-cache               Spring Cache + Caffeine/Redis + 分布式锁 + 分布式限流（ADR-0039）
 ├── ainer-starter-observability       Observation + requestId/trace MDC；OTLP 默认关（ADR-0029 T1#6）
 └── ainer-test-support                集成测试基座（RestTestClient、Testcontainers、PostgreSQL）
 
 ainer-server                          业务 Resource Server
 ├── ainer-module-workspace            membership 资源、成员与授权审计
-├── ainer-module-ai-runtime           模型网关、策略、用量与费用审计
+├── ainer-module-ai-runtime           模型网关、策略、用量与费用审计（主体限流经 RateLimitPort，ADR-0039）
 ├── ainer-module-authorization        混合细粒度授权 + adapter + 审计（ADR-0037）
 ├── ainer-module-dictionary           树形字典 + 多语言 + Spring Cache（ADR-0040）
 ├── ainer-module-config               动态配置 + 类型安全 + 热更新 + 版本（ADR-0040）

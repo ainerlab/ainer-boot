@@ -27,6 +27,11 @@
             <groupId>dev.ainer</groupId>
             <artifactId>ainer-starter-persistence</artifactId>
         </dependency>
+        <!-- ADR-0039 §1：主体限流经 RateLimitPort（Redis 固定窗口 / 进程内降级） -->
+        <dependency>
+            <groupId>dev.ainer</groupId>
+            <artifactId>ainer-starter-cache</artifactId>
+        </dependency>
         <dependency>
             <groupId>dev.ainer</groupId>
             <artifactId>ainer-module-authorization</artifactId>
@@ -94,6 +99,15 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Redis 限流端到端回归（ainer.cache.type=redis）：starter 的 Redis 依赖是 optional，
+          不传递给消费者，因此这里显式引入客户端用于测试。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

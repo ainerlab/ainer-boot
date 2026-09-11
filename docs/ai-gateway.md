@@ -13,7 +13,8 @@
 - 供应商超时、限流、不可用和协议错误的稳定映射；
 - 不保存 prompt 与输出正文。
 
-M3 已接入 Resource Server 和可信认证上下文；当前仍不包含完整 DLP、输出 guardrail、Agent/Tool/RAG、集群级限流或自动价格同步。
+M3 已接入 Resource Server 和可信认证上下文；主体分钟限流已接入 `RateLimitPort`（`ainer.cache.type=redis`
+时跨实例共享计数），当前仍不包含完整 DLP、输出 guardrail、Agent/Tool/RAG 或自动价格同步。
 
 Run / Artifact 与 Knowledge 的后续候选边界分别记录在
 [`design/ai-runtime-data-model.md`](design/ai-runtime-data-model.md) 和
@@ -33,6 +34,7 @@ AI runtime 默认关闭。生产环境至少提供：
 | `AINER_AI_DEFAULT_MODEL` | 请求未指定模型时使用 | 无 |
 | `AINER_AI_ALLOWED_MODELS` | 逗号分隔的允许模型；必须包含默认模型 | 默认模型 |
 | `AINER_AI_CONNECT_TIMEOUT` | 建连超时 | `5s` |
+HEAD
 | `AINER_AI_REQUEST_TIMEOUT` | 单次请求超时（**只覆盖到响应头**，见 §2.1） | `60s` |
 | `AINER_AI_TOTAL_TIMEOUT` | 单次非流式调用总时长上限（覆盖响应体读取） | `120s` |
 | `AINER_AI_STREAM_TOTAL_TIMEOUT` | 单次 SSE 流式调用总时长上限（覆盖响应体读取） | `600s` |
@@ -40,7 +42,7 @@ AI runtime 默认关闭。生产环境至少提供：
 | `AINER_AI_SELF_HEAL_STUCK_THRESHOLD` | 中间态允许停留的最长时间（必须大于流式总超时 + 1m） | `15m` |
 | `AINER_AI_SELF_HEAL_SCAN_INTERVAL_MS` | 自愈扫描周期（毫秒，1000..3600000） | `60000` |
 | `AINER_AI_SELF_HEAL_BATCH_SIZE` | 单次清扫每类中间态最多处理的行数 | `200` |
-| `AINER_AI_REQUESTS_PER_MINUTE` | 每 subject、每节点分钟限流 | `60` |
+| `AINER_AI_REQUESTS_PER_MINUTE` | 每 subject 每分钟限流（`ainer.cache.type=redis` 时跨实例共享计数；默认 `local` 时仅每实例） | `60` |
 | `AINER_AI_SUBJECT_DAILY_BUDGET` | 每 subject UTC 日预算 | `10.00` |
 | `AINER_AI_MAX_PROMPT_CHARACTERS` | 所有消息内容字符总上限 | `100000` |
 | `AINER_AI_CURRENCY` | 三位大写币种代码 | `USD` |
@@ -161,7 +163,7 @@ Authorization: Bearer <access-token-with-ai.invoke-scope>
 模型白名单
   -> 提示字符上限
   -> 敏感凭据模式
-   -> 节点级 subject 分钟限流
+   -> subject 分钟限流（RateLimitPort：Redis 固定窗口 / 进程内降级）
    -> PostgreSQL subject 日预算预占
   -> Provider
   -> 实际 Token/费用回写
@@ -210,7 +212,7 @@ Authorization: Bearer <access-token-with-ai.invoke-scope>
 | `AINER.AI.PROMPT_TOO_LARGE` | 413 | 提示字符总量超限 |
 | `AINER.AI.MODEL_NOT_ALLOWED` | 422 | 模型不在白名单 |
 | `AINER.AI.SENSITIVE_DATA_REJECTED` | 422 | 命中禁止出网的敏感模式 |
-| `AINER.AI.RATE_LIMITED` | 429 | 本节点账户分钟限流 |
+| `AINER.AI.RATE_LIMITED` | 429 | 本 subject 分钟配额超限（含限流后端不可用时的失败关闭，语义见 [operations.md](operations.md) §9.4） |
 | `AINER.AI.BUDGET_EXCEEDED` | 429 | PostgreSQL 权威日预算不足 |
 | `AINER.AI.PROVIDER_PROTOCOL_ERROR` | 502 | 供应商响应不符合协议 |
 | `AINER.AI.PROVIDER_RATE_LIMITED` / `PROVIDER_UNAVAILABLE` | 503 | 供应商限流或不可用 |
@@ -224,7 +226,8 @@ Authorization: Bearer <access-token-with-ai.invoke-scope>
 - AI 身份只允许来自 Resource Server 验证后的 `USER_NEUTRAL_V1` typed `sub` 和 `ai.invoke` scope；不要在代理层重新发明身份请求头协议。
 - API key 使用 Vault/KMS/平台 secret，不写入 Git、镜像、日志或普通配置中心明文。
 - 默认敏感模式只拦截少量高风险 key/私钥格式，不能替代数据分类、DLP、prompt injection 防护和输出审查。
-- 多实例部署不能把当前 node-local limiter 当成全局限额；预算因共享 PostgreSQL 和 subject advisory lock 是数据库范围内的权威控制。
+- 多实例部署下主体分钟限流是否集群精确取决于 `ainer.cache.type`：`redis` 时两实例共享同一计数（总阈值不放大），默认 `local` 时每实例独立、总阈值放大 N 倍（启动期 WARN + `AinerCacheCapabilities.rateLimitClusterAccurate=false`），此时不能把它当成全局限额；预算因共享 PostgreSQL 和 subject advisory lock 始终是数据库范围内的权威控制。
+- 限流后端 Redis 不可用时按失败关闭拒绝（不静默放行），入口表现为 429；取舍见 [operations.md](operations.md) §9.4。
 - 监控 provider 超时、协议错误、estimated usage 比例、预算拒绝率与长时间 `STARTED` 记录。
   自愈指标（`ainer.ai.intermediate_state.*`）已内置，dashboard 与告警条件见 [`operations.md` §8](operations.md)。
 - 不在日志中增加请求/响应 body。问题定位使用 `requestId`、`invocationId` 和 provider request ID。

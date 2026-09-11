@@ -1,5 +1,6 @@
 package dev.ainer.module.ai;
 
+import dev.ainer.cache.ratelimit.RateLimitPort;
 import dev.ainer.core.error.ErrorCodeContributor;
 import dev.ainer.module.ai.gateway.AiGatewayFeatureMarker;
 import dev.ainer.module.ai.gateway.application.AiGatewayErrorCode;
@@ -78,10 +79,16 @@ public class AiRuntimeModuleConfiguration {
         return new SensitiveDataPolicy();
     }
 
+    /**
+     * 主体限流：计数委托给 {@link RateLimitPort}（ADR-0039 §1 第三层能力）。端口由
+     * {@code ainer-starter-cache} 的自动配置提供——{@code ainer.cache.type=redis} 时是 Redis
+     * 固定窗口（集群精确），否则是进程内降级实现（启动期 WARN，多实例总阈值放大 N 倍）。
+     * 端口缺失时上下文启动失败，而不是静默退回「每实例独立计数」。
+     */
     @Bean
-    SubjectRateLimiter aiSubjectRateLimiter(AiRuntimeProperties properties, Clock clock) {
+    SubjectRateLimiter aiSubjectRateLimiter(AiRuntimeProperties properties, RateLimitPort rateLimitPort) {
         properties.validate();
-        return new SubjectRateLimiter(properties.getLimits().getRequestsPerMinute(), clock);
+        return new SubjectRateLimiter(properties.getLimits().getRequestsPerMinute(), rateLimitPort);
     }
 
     // 仅用于 AI SSE 流式任务，按名显式注入；标记 defaultCandidate=false 避免被当作 Boot 通用

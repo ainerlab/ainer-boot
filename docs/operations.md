@@ -402,11 +402,45 @@ LettuceClientConfigurationBuilderCustomizer failFastLettuce() {
 冒泡），即用可用性换取"不静默陈旧"。保持默认则接受"断连窗口内可能读到旧值"。两种选择都要显式做出，
 不要假设默认行为与 fail-fast 等价。
 
-### 9.3 运维检查清单
+### 9.4 分布式限流：Redis 抖动时**失败关闭**（ADR-0039 §1 第三层）
+
+`RateLimitPort` 的 Redis 固定窗口实现（`RedisFixedWindowRateLimitPort`）在后端不可用、命令超时或
+返回不可解析结果时，**不放行、也不抛异常**：判定结果是
+`RateLimitDecision.Outcome.BACKEND_UNAVAILABLE`（`allowed=false`），并打一条 WARN。
+
+**选择失败关闭的理由**（这里有真实的可用性代价，是显式取舍而不是默认行为）：
+
+1. 限流保护的是下游（AI 供应商配额与费用、出站调用预算）。Redis 抖动时放行 = 在最不可预测的时刻
+   取消保护，而且完全不可见；
+2. 运行期静默降级为进程内计数会制造「声明了集群精确配额、实际每实例独立」的假象——这正是
+   ADR-0039 落地补齐要消除的缺陷形态。降级只允许发生在**装配期**（`ainer.cache.type=local`），
+   并且必须伴随启动期 WARN 与 `AinerCacheCapabilities.rateLimitClusterAccurate=false`；
+3. 失败形态是可观测的：判定结果与「真的超限」区分开，WARN 里带 key 与被抑制的告警条数。
+
+**代价与运维动作**：
+
+- Redis 全程不可用时，被限流的入口（当前是 AI 网关的 `/api/ai/chat/completions*`）一律 429
+  （`AINER.AI.RATE_LIMITED`，审计 `REJECTED_RATE_LIMIT`）。这是刻意的失败关闭；需要「Redis 抖动也放行」
+  的产品应在调用方按 `outcome()` 自行决定，端口不提供静默放行开关。
+- 告警按 **30 秒**节流（`RedisFixedWindowRateLimitPort.FAILURE_LOG_INTERVAL_MILLIS`），日志形如
+  `[ainer-cache] 限流后端 Redis 不可用，按失败关闭拒绝请求（key=…，此前 30000 毫秒内 N 条同类告警被抑制）`。
+  **告警出现即代表入口在拒绝流量**，应接到告警路由，而不是当成噪音。
+- 键布局：`<ainer.cache.rate-limit.key-prefix><调用方 key>:<窗口序号>`，例如
+  `ainer:ratelimit:ai:subject:<subjectId>:<窗口序号>`。窗口序号写进键里，旧窗口的键由 TTL
+  （精确到窗口结束）自然清理，不需要清理任务；排查计数异常时按这个布局直接 `GET`。
+- 集群精确性有两个前提：① 所有实例配置相同的 `limit`（配额是调用方入参，不存后端）；
+  ② 实例间 NTP 同步（窗口序号由本地时钟计算，偏移只影响跨越边界的那个窗口）。固定窗口本身允许
+  「窗口末尾打满 + 下一窗口开头打满」的双倍瞬时速率，这是算法性质、不是缺陷——需要平滑速率应引入
+  令牌桶（ADR-0039 明确属后续能力）。
+- 「多实例总阈值放大 N 倍」只可能出现在 `ainer.cache.type=local`（默认）下：启动日志会打印
+  `rateLimit{declared=LOCAL → effective=…NodeLocalRateLimitPort, clusterAccurate=false}` 并 WARN。
+
+### 9.5 运维检查清单
 
 - 关键键使用**更短 TTL**，让陈旧窗口有明确上界；
 - 监控 Redis 重连日志（`ConnectionWatchdog`）与缓存命中率；重连频繁时按 9.2 评估是否 fail-fast；
 - 排查"缓存值与数据库不一致"时，先看 TTL 与 evict 链路（网络/重连），再怀疑数据库或事务；
+HEAD
 - 实际生效的缓存后端与锁实现以启动日志 / `AinerCacheCapabilities` bean 为准，不要只看配置声明。
 
 ## 10. 决策审计归档与历史查询
@@ -503,3 +537,7 @@ FROM ainer_authorization_decision_audit_archive;
 - `agent_id` / `acting_grant_id` 是 ADR-0043 A1 给热表预留的委托关联列，当前没有写入方；
   模块读取投影不含它们，需要时按上面的方式显式列出。
 - 需要长期取证时，从最早游标回放导出到外部不可变存储，不要依赖同库归档表充当不可变副本。
+
+- 实际生效的缓存后端、锁实现与限流实现以启动日志 / `AinerCacheCapabilities` bean 为准，
+  不要只看配置声明；
+- 限流入口的 429 突增先看 `[ainer-cache] 限流后端 Redis 不可用` 告警：那是后端故障，不是业务真的打满配额。

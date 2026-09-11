@@ -242,6 +242,9 @@ final class ContextSnapshotJacksonAdapter {
   不引入 Mockito。
 - 测试镜像：沿用基线 `postgres:18.3-alpine`；新增 `redis:7-alpine`（ADR-0039 §2 明确 Redis 7.x 兼容），
   由 Testcontainers 核心的 `GenericContainer` 启动，不使用第三方 Redis 专用容器模块。
+- 分布式限流（ADR-0039 §1 第三层）不新增任何依赖：Redis 固定窗口实现只用 `StringRedisTemplate` +
+  Lua 脚本，进程内降级实现只用 JDK 集合与 `Clock`；`ainer-module-ai-runtime` 为接入限流端口新增对
+  `ainer-starter-cache` 的依赖（starter 的 Redis 依赖仍是 `optional`，AI runtime 的测试作用域另加
+  `spring-boot-starter-data-redis` 做真实 Redis 回归）。
 - 未引入：Valkey 专用客户端（继续使用 Spring Boot 默认的 Lettuce）、Redis 连接池实现、缓存一致性
-  pub/sub 失效通道，以及 ADR-0039 §1 的第三层能力「分布式限流 `RateLimitPort`」——限流现状仍是
-  ADR-0016 的 node-local 固定窗口。
+  pub/sub 失效通道、限流令牌桶算法（ADR-0039 明确首版固定窗口）。
