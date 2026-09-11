@@ -478,18 +478,53 @@ step-up 与在线校验一样：**生产签发前必须启用**，默认保护 W
 RFC 7009 的 client 授权边界。撤销直接失效 Spring Authorization Server 官方 JDBC
 authorization 中的当前 access token；不存在、过期或已撤销统一按 401 处理。
 
-账号禁用会阻止后续人员 token 签发：`IdentityFoundationService` 的账号禁用与非 OWNER
-membership revoke 与审计同事务提交。签发 token 时 customizer 把当前 `securityEpoch` 写入
-`sec_epoch` claim；`RevocationAwareOAuth2AuthorizationService` 在查找人员 authorization 时
-用 `sec_epoch` claim 与 Identity 当前 epoch 比对，不等即视为 inactive。账号禁用/密码轮换
-递增 epoch 后，事件前签发的 Token 全部失效，无需订阅撤销事件或维持 access-event outbox。
+账号禁用会阻止后续人员 token 签发。账号生命周期有真实写路径：`IdentityFoundationService`
+提供状态迁移（`DISABLED` / `LOCKED` / `CLOSED` / 恢复 `ACTIVE`）、密码轮换与凭据撤销，
+`ServicePrincipalFoundationService` 提供服务主体禁用/恢复；每次安全相关变更都在**同一条带期望态
+的条件 UPDATE** 内同时写状态与递增 `security_epoch`，非法迁移（含重复迁移、离开 `CLOSED` 终态）
+与并发竞争都失败关闭为 409。签发 token 时 customizer 把当前 `securityEpoch` 写入 `sec_epoch`
+claim；`RevocationAwareOAuth2AuthorizationService` 在按 token 查找 authorization 时用 `sec_epoch`
+与 Identity 当前 epoch 比对，不等即视为 inactive，与审计同事务提交（`ainer_identity_principal_lifecycle_audit`）。
+
+失效范围必须带条件表述：
+
+- **在线校验路径**（RFC 7662 introspection，见 §2.1，默认关闭）：epoch 递增后，旧 `sec_epoch`
+  的 Token 在下一次请求即判定 inactive → 401；刷新与撤销查找同样失败；
+- **只做本地 JWT 校验的路径**：自包含 JWT 在自身过期前仍然可用，撤销受 access token TTL 约束。
+
+因此不能把"账号禁用/密码轮换后事件前签发的 Token 全部失效"写成无条件事实：即时性只来自在线
+校验。该方案确实不需要 access-event outbox 或跨运行时 relay，但前提是高风险路径已启用在线校验。
+
+### 6.1 账号生命周期控制面（默认关闭）
+
+运营入口位于 Authorization Server 发行物（Identity 模块本身没有 Web 依赖），路径前缀
+`/internal/identity/**`，属于既有的 `/internal/**` 过滤链：必须先通过 JWT 认证，再按路径要求
+最小 scope，未登记的路径仍然 `denyAll()`，没有匿名可达端点。
+
+| Method | Path | 必需权限 | 说明 |
+|---|---|---|---|
+| POST | `/internal/identity/accounts/{accountId}/status-transitions` | `actor_type=SERVICE` + `identity.accounts.manage` | 禁用/锁定/关闭/恢复人员账号 |
+| POST | `/internal/identity/accounts/{accountId}/password-rotations` | 同上 | 轮换密码：吊销旧材料、写入新 ACTIVE 材料并递增 epoch |
+| POST | `/internal/identity/accounts/{accountId}/credential-revocations` | 同上 | 按凭据类型撤销 ACTIVE 材料并递增 epoch |
+| POST | `/internal/identity/service-principals/{principalId}/status-transitions` | `actor_type=SERVICE` + `identity.service-principals.manage` | 禁用/恢复服务主体 |
+
+除 scope 外，`ainer.security.authorization-server.identity-control.trusted-service-id` 必须显式
+登记唯一受信 SERVICE 主体（Token `sub`，即 ServicePrincipal UUID）；开关打开但白名单缺失或非法
+时启动失败。应用服务在事务边界内再次校验同一 guard，并额外要求该 ServicePrincipal **当前仍为
+ACTIVE 且 Token 的 `sec_epoch` 等于其当前 epoch**——服务主体被禁用或轮换后，未过期的旧 Token
+也不能再操作控制面。每次成功变更都与状态/凭据写入同事务写入安全操作审计（操作、前后状态、前后
+epoch、凭据类型、调用方 `sub`、requestId、changeReference）；重复迁移返回 409，非法请求 400，
+未知主体 404，`CLOSED` 之后无法复活。密码材料永远不出现在响应与审计中。生产启用前必须先用
+一次性 machine client 引导建立只持有上述 scope 的 SERVICE client，并把其 ServicePrincipal UUID
+填入白名单；运营凭据不得兼任业务或 metrics client。
 
 当前仍未提供公网注册、找回密码、恢复通知、预配激活、租户切换和图形化 client 控制台；Passkey
 协议/条件门禁、恢复、受控 enrollment、step-up 与 browser client 控制面已落地。除通用测试 client 外，`dev` profile 已提供固定的
 `ainer-admin-dev` public client；它不是生产 browser client 控制面。
 
 选择性在线校验只覆盖配置的高风险请求，普通低风险 JWT API 仍存在自然到期窗口，因此
-不能宣称所有 API 都已强实时全局撤销。
+不能宣称所有 API 都已强实时全局撤销。**资源关系的即时失效（如账号禁用后 membership 不再参与
+授权）同样只对走在线校验的请求成立**；离线 JWT 请求在该 Token 过期前仍会带着旧状态被放行。
 
 ## 7. 安全运维控制面
 
@@ -531,7 +566,10 @@ M4.3 还要求验证在线校验、专用 client 与普通 client 隔离、RFC 7
 必须覆盖配置失败关闭、UV-required options、无凭证 bootstrap、已登记账号条件拦截、生命周期/
 审计同事务、软撤销、replacement、最后凭证保护、恢复/enrollment subject 绑定、登录
 429 和 step-up 的 200/401/403。账号禁用的同事务事件、在线 epoch、与 Workspace 事件终点都要以真实 PostgreSQL
-覆盖。真实 PostgreSQL 和协议 smoke 结果维护在
+覆盖。epoch 写路径的验收必须包含**真实 PKCE Token**：禁用与密码轮换后 epoch 递增、旧 Token 在
+在线校验路径 401，并同时固定"未开启在线校验时同一旧 Token 仍通过资源服务器"这条边界，
+以及控制面的 SERVICE/USER/scope/可信 `sub`/调用方 epoch 拒绝路径与同事务审计。
+真实 PostgreSQL 和协议 smoke 结果维护在
 [`project-status.md`](project-status.md)。
 
 Ainer Admin 还必须以同一个 browser cookie session 覆盖 PKCE、Workspace 操作、当前 access token

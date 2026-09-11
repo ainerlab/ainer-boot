@@ -123,7 +123,9 @@ SLA 验收。
 - 低风险请求不得调用 introspection；每次高风险请求都必须在线校验且不缓存 active；
 - inactive 返回 401，在线依赖失败返回 503，二者都不能泄漏 Token 或原始响应；
 - introspection client 必须显式受信、只有 `token.introspect`，携带业务 scope 或普通 client 身份时拒绝；
-- RFC 7009 撤销后 inactive；账号/主体禁用或 `sec_epoch` 不匹配均 inactive；
+- RFC 7009 撤销后 inactive；账号/主体禁用或 `sec_epoch` 不匹配均 inactive（在线校验路径）；
+- 未开启在线校验时，同一旧 Token 仍必须通过资源服务器（自包含 JWT 的 TTL 窗口是已知边界，
+  不得被写成"已全局强实时撤销"）；
 - `/actuator/prometheus` 无 Token 401，USER、缺 `platform.metrics.read` 403，只有最小 scope 的
   SERVICE 成功；业务 Resource Server 显式关闭时也不得公开指标。
 - metrics bootstrap 只能创建无业务 scope、单一 `platform.metrics.read`、一分钟 Token 的 Client
@@ -152,9 +154,13 @@ SLA 验收。
   clock skew 的未来时间返回稳定 403；边界时间使用可注入 `Clock`。
 - Workspace HTTP/应用/真实 PostgreSQL 测试必须覆盖 scope + ACTIVE OWNER/ADMIN、USER/MEMBER/
   跨 Workspace 拒绝、OWNER 不可由通用接口修改、邀请接受只认 `sub` 和同事务审计。
-- Identity foundation 测试必须覆盖 HumanAccount/ServicePrincipal 的状态与 `security_epoch`
-  单调约束、`sec_epoch` claim 与账号状态联合判定（禁用即时 401），以及 SERVICE 门禁对
-  `actor_type`/`token_profile`/`claim_contract_version` 的失败关闭。
+- Identity foundation 测试必须覆盖 HumanAccount/ServicePrincipal 的状态机（禁用/锁定/关闭/恢复，
+  `CLOSED` 终态、重复迁移 409）、`security_epoch` 单调约束与并发迁移只有一个成功、
+  `sec_epoch` claim 与账号状态联合判定（在线校验路径禁用即时 401、离线路径仍放行），以及
+  SERVICE 门禁对 `actor_type`/`token_profile`/`claim_contract_version` 的失败关闭。
+- 身份生命周期控制面测试必须覆盖 SERVICE/USER 隔离、两条路径各自的最小 scope、可信 `sub`
+  白名单、调用方 ServicePrincipal 当前 ACTIVE + epoch 一致、非法迁移 409、未知主体 404、
+  非法请求 400、密码不回显，以及变更与审计同事务。
 - browser client 控制面测试必须覆盖 SERVICE operator 白名单、`oauth.browser-clients.manage`
   最小 scope、PKCE 强制、无 secret 投影、蓝绿轮换、退役后新 Token 401 与
   `CREATED/ROTATED/RETIRED` 同事务审计。
@@ -169,7 +175,11 @@ SLA 验收。
 - OWNER 恢复申请保留原 REVOKED OWNER、原申请 ID/发生时间，重复审批不重复提升；
 - 归档的插入与热表删除在一事务中，反复执行不丢数、统一查询不重数；
 - SIEM 以 `(occurredAt, id)` 稳定升序续传，跨热/归档边界不漏读，消费者可按 audit ID 去重；
-- `findByToken` 在线检查在账号禁用或 `sec_epoch` 不匹配时立即 inactive，撤销不依赖进程内事件。
+- `findByToken` 在线检查在账号禁用或 `sec_epoch` 不匹配时立即 inactive，撤销不依赖进程内事件；
+- 状态迁移与 epoch 递增在同一条带期望态的条件 UPDATE 内完成（影响 0 行即失败关闭），
+  审计行满足 `new_security_epoch = previous_security_epoch + 1`；
+- JDBC authorization 往返必须能读回含装箱标量 claim（如 `sec_epoch`）的 access token 元数据，
+  否则 introspection 会退化成 503。
 
 ### AI provider
 

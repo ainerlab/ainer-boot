@@ -145,6 +145,21 @@ class ServicePrincipalFoundationServiceTest {
         public UUID nextUuidV7() {
             return UUID.randomUUID();
         }
+
+        @Override
+        public int transitionStatus(
+                UUID principalId,
+                ServicePrincipalStatus expectedStatus,
+                ServicePrincipalStatus targetStatus) {
+            ServicePrincipal current = store.get(principalId);
+            if (current == null || current.status() != expectedStatus) {
+                return 0;
+            }
+            store.put(principalId, new ServicePrincipal(
+                    current.principalId(), current.authority(), targetStatus,
+                    current.securityEpoch() + 1, current.createdAt()));
+            return 1;
+        }
     }
 
     private static final class InMemoryOAuthClientBindingRepository implements OAuthClientBindingRepository {

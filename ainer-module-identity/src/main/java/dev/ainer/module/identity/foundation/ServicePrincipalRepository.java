@@ -24,4 +24,12 @@ public interface ServicePrincipalRepository {
 
     /** principal 聚合的下一个 PostgreSQL UUIDv7 主键。 */
     UUID nextUuidV7();
+
+    /**
+     * 带期望态的条件状态迁移：只有当前状态等于 {@code expectedStatus} 时才写入
+     * {@code targetStatus}，并在同一条 UPDATE 中递增 {@code security_epoch}。
+     * 返回受影响行数（0 或 1）；0 表示期望态不成立，调用方失败关闭。
+     */
+    int transitionStatus(
+            UUID principalId, ServicePrincipalStatus expectedStatus, ServicePrincipalStatus targetStatus);
 }

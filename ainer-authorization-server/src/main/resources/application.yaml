@@ -80,6 +80,9 @@ ainer:
         operator-client-ids: ${AINER_AUTHORIZATION_BROWSER_CLIENT_CONTROL_OPERATOR_CLIENT_IDS:}
         allowed-scopes: ${AINER_AUTHORIZATION_BROWSER_CLIENT_CONTROL_ALLOWED_SCOPES:openid,profile}
         default-access-token-minutes: ${AINER_AUTHORIZATION_BROWSER_CLIENT_CONTROL_ACCESS_TOKEN_TTL:5}
+      identity-control:
+        enabled: ${AINER_AUTHORIZATION_IDENTITY_CONTROL_ENABLED:false}
+        trusted-service-id: ${AINER_AUTHORIZATION_IDENTITY_CONTROL_TRUSTED_SERVICE_ID:}
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml

@@ -140,10 +140,18 @@ Identity foundation baseline（`V202608070300`）：
 | `ainer_identity_credential` | 凭据密码状态投影 |
 | `ainer_identity_oauth_client_binding` | 账号与 OAuth client 绑定关系 |
 | `ainer_identity_service_principal` | SERVICE 主体，同样携带 `security_epoch`；服务 `sub` 是 ServicePrincipal UUID |
+| `ainer_identity_principal_lifecycle_audit` | 账号/服务主体生命周期写路径的同事务安全操作审计（操作、前后状态、前后 epoch、凭据类型、调用方 `sub`、requestId、changeReference；`V202609111800`） |
+
+`security_epoch` 的递增走 `UPDATE ... SET status = ?, security_epoch = security_epoch + 1
+WHERE id = ? AND status = ?` 的条件更新（状态迁移）或 `SET security_epoch = security_epoch + 1
+WHERE id = ? AND status = ?`（密码轮换/凭据撤销），因此状态与 epoch 只能一起前进；期望态不匹配
+时影响 0 行，服务层失败关闭为 409。审计表用 CHECK 约束固定"新 epoch = 旧 epoch + 1"，写入不了
+"状态变了但 epoch 没动"的记录。
 
 人员 Token 在线状态通过 `sec_epoch` claim 与账号/主体的 `security_epoch` 比较实现
 （`RevocationAwareOAuth2AuthorizationService`）：`findByToken` 时账号已禁用或 epoch 不匹配即视为
-inactive，不需要 access-event outbox，也不创建自研 Token 表。RFC 7009 仍修改 Spring Security
+inactive，不需要 access-event outbox，也不创建自研 Token 表。该即时失效只成立于走 RFC 7662
+在线校验的请求；离线 JWT 请求仍受 TTL 约束。RFC 7009 仍修改 Spring Security
 官方 `oauth2_authorization` 元数据。Identity 不再保存 tenant/membership；`sub` 与 `sec_epoch`
 之外的 claim 不参与授权。
 

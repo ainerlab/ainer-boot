@@ -53,6 +53,15 @@ public class MybatisServicePrincipalRepository implements ServicePrincipalReposi
                 .map(MybatisServicePrincipalRepository::toPrincipal);
     }
 
+    @Override
+    public int transitionStatus(
+            UUID principalId,
+            ServicePrincipalStatus expectedStatus,
+            ServicePrincipalStatus targetStatus) {
+        return mapper.transitionStatusAndIncrementEpoch(
+                principalId, expectedStatus.name(), targetStatus.name());
+    }
+
     private static ServicePrincipal toPrincipal(ServicePrincipalRow row) {
         return new ServicePrincipal(
                 row.getId(),

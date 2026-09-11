@@ -24,4 +24,13 @@ public interface ServicePrincipalMapper {
      * 把可轮换凭证投影为稳定的 {@code ServiceSubjectRef}。
      */
     ServicePrincipalRow selectByActiveClientId(@Param("clientId") String clientId);
+
+    /**
+     * 带期望态的条件状态迁移，并在同一条 UPDATE 中递增 {@code security_epoch}。
+     * 当前状态不等于 {@code expectedStatus} 时不写任何行并返回 0（调用方失败关闭）。
+     */
+    int transitionStatusAndIncrementEpoch(
+            @Param("principalId") UUID principalId,
+            @Param("expectedStatus") String expectedStatus,
+            @Param("targetStatus") String targetStatus);
 }

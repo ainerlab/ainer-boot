@@ -64,6 +64,7 @@ ADR 记录难以逆转、跨模块或影响长期兼容性的决定。它不是�
 | [0054](0054-controlled-escape-hatch-and-open-distribution.md) | Accepted | 受控逃逸舱与公开分发基线：SPI 端口优先、vendored 单模块例外、匿名可解析分发与管理面退出门禁（修订 ADR-0025） |
 | [0055](0055-ainer-studio-retirement-and-admin-surface-repath.md) | Accepted | Ainer Studio 产品线退役与管理面交付路线改道（修订 ADR-0022/0054；契约留在 ainer-admin-integration.md） |
 | [0056](0056-endpoint-authorization-default-deny.md) | Accepted | 端点层默认拒绝与端点访问声明（`FAIL_CLOSED` 代码默认值 + `@EndpointAccess` + 静态门禁；修订 ADR-0037 §4 与 ADR-0052 §4 的执行细节） |
+| [0057](0057-identity-lifecycle-write-path-and-security-epoch.md) | Accepted | 账号/服务主体生命周期写路径、`security_epoch` 条件 UPDATE 递增语义与"即时撤销只成立于在线校验"边界（细化 ADR-0033，保持 ADR-0011） |
 
 ## 历史草案与审查记录
 
