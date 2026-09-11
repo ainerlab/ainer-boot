@@ -16,7 +16,7 @@ Ainer 自己撰写的源码与制品按 **MIT** 许可（见根目录 `LICENSE` 
 | JSqlParser | 5.2 | MyBatis-Plus 分页所需 SQL 解析器（传递依赖） | LGPL-2.1 与 Apache-2.0 双许可证 | `com.github.jsqlparser:jsqlparser` |
 | Flyway Core / PostgreSQL | 12.4.0 | 数据库 migration | Apache-2.0 | `org.flywaydb:flyway-core`、`flyway-database-postgresql` |
 | PostgreSQL JDBC | 42.7.13 | PostgreSQL 驱动 | BSD-2-Clause | `org.postgresql:postgresql` |
-| Testcontainers | 2.0.5 | PostgreSQL 集成测试 | MIT | `org.testcontainers:*` |
+| Testcontainers | 2.0.5 | PostgreSQL / Redis 集成测试（PostgreSQL、advisory lock、Redis 缓存与锁） | MIT | `org.testcontainers:*` |
 | springdoc-openapi | 3.1.0 | OpenAPI 运行时文档（`/v3/api-docs` + Swagger UI；官方支持 Boot 4.x；仅装配于 ainer-server，端点受资源服务器安全链保护，业务模块不强制依赖） | Apache-2.0 | `org.springdoc:springdoc-openapi-starter-webmvc-ui` |
 | ArchUnit | 1.4.2 | 包和分层边界测试 | Apache-2.0；其发布 POM 同时声明传递 ASM 的 BSD 许可证 | `com.tngtech.archunit:archunit` |
 | Micrometer Core | 1.17.1 | 在线校验、撤销传播与安全运营指标 API | Apache-2.0 | `io.micrometer:micrometer-core` |
@@ -224,3 +224,24 @@ final class ContextSnapshotJacksonAdapter {
   （原 Ainer Studio `templates/ainer-admin` 已随 ADR-0055 退役）。
 - SDK 只生成 Ainer JSON API。Authorization Code + PKCE、OIDC discovery 和 RP-Initiated
   Logout 继续交给标准前端协议库，避免生成并维护自制 OAuth 实现。
+
+## P3 缓存与分布式协调取舍（ADR-0039；2026-09-11 落地补齐）
+
+- `ainer-starter-cache` 的 Redis 客户端依赖 `org.springframework.boot:spring-boot-starter-data-redis`
+  保持 `optional`，不强迫消费者引入 Redis；`ainer.cache.type=redis` 的应用必须自己显式引入
+  （消费方契约见 [configuration.md](configuration.md) §9）。
+- 缓存值序列化复用 Spring Data Redis 自带的 `GenericJacksonJsonRedisSerializer`（Jackson 3 /
+  `tools.jackson`，Boot 4 BOM 管理），为此把 `tools.jackson.core:jackson-databind` 声明为 starter 的
+  `optional` 依赖：本地 Caffeine 后端不需要它，Redis 后端要求它存在。
+- PostgreSQL advisory lock 实现（`PostgresDistributedLockPort`）只依赖 JDK 的 `javax.sql.DataSource`，
+  **没有**给 `ainer-starter-cache` 引入 MyBatis、JDBC starter 或连接池实现；集成测试在测试作用域引入
+  `org.postgresql:postgresql` 驱动以便打开真实会话，并引入 BOM 管理的 `com.zaxxer:HikariCP`
+  实测「每锁一条池化连接」把有限池占满的行为（生产作用域仍不含任何连接池实现）。
+- `ainer-module-config` 的测试作用域新增 `spring-boot-starter-data-redis`（starter 的 Redis 依赖是
+  `optional`，不传递）用于真实 Redis 端到端测试；缓存命中不打库的断言使用测试专用计数仓储替身，
+  不引入 Mockito。
+- 测试镜像：沿用基线 `postgres:18.3-alpine`；新增 `redis:7-alpine`（ADR-0039 §2 明确 Redis 7.x 兼容），
+  由 Testcontainers 核心的 `GenericContainer` 启动，不使用第三方 Redis 专用容器模块。
+- 未引入：Valkey 专用客户端（继续使用 Spring Boot 默认的 Lettuce）、Redis 连接池实现、缓存一致性
+  pub/sub 失效通道，以及 ADR-0039 §1 的第三层能力「分布式限流 `RateLimitPort`」——限流现状仍是
+  ADR-0016 的 node-local 固定窗口。

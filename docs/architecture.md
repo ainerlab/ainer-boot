@@ -48,7 +48,8 @@ ainer-authorization-server           独立 OAuth 2.1/OIDC 发行物、Identity 
 ainer-starter-web -> ainer-spring -> ainer-core
 ainer-starter-persistence -> ainer-core
 ainer-starter-security -> ainer-security -> ainer-core
-ainer-starter-cache -> Spring Cache + Caffeine/Redis + 分布式锁
+ainer-starter-cache -> Spring Cache（Caffeine 默认 / Redis 带 TTL + key 前缀）+ 分布式锁（Redis / PG advisory / 进程内）
+                        └ ADR-0039 §1 的分布式限流 RateLimitPort 仍未实现，限流现状仍是 node-local（ADR-0016）
 ainer-starter-observability -> ObservationRegistry + requestId/trace MDC（OTLP 默认关）
 
 ainer-dependencies                   独立 BOM，统一依赖版本

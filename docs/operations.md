@@ -246,3 +246,59 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 初始告警条件至少包括：`ownerless > 0` 立即告警、archive failure 增长，以及 DENIED 窗口值明显超过环境基线。DENIED 阈值必须根据正常流量建基线，不能在未观测环境中伪造通用数字。
 
 在线校验初始告警至少包括 `.failed` 持续增长、`.inactive` 异常突增和 `.duration` 接近读取超时；阈值必须由压测和真实流量建立。当前代码已经安全暴露 Prometheus 文本 exporter，但尚未部署生产 Prometheus、统一 dashboard、告警路由、trace 和结构化日志 schema。exporter、指标、归档代码和 SIEM 拉取 API 存在，不等于生产监控或外部不可变审计链路已经完成。
+
+## 9. 缓存与 Redis 运维（ADR-0039）
+
+### 9.1 缓存是最终一致，TTL 是陈旧值的最终上限
+
+`ainer.cache.type=redis` 时缓存位于 Redis，本质是**最终一致**：写入只失效 `@CacheEvict`
+覆盖的键，多实例一致性依赖所有实例使用同一套缓存键与同一个 Redis，而不是广播失效。
+Redis 客户端在断连/重连窗口内的行为会进一步拉长陈旧窗口（见 9.2）。
+
+**陈旧值的最终上限就是缓存 TTL**：
+
+| 键 | 默认 | 含义 |
+|---|---|---|
+| `AINER_CACHE_REDIS_TIME_TO_LIVE` | `PT30M` | Redis 缓存条目 TTL，陈旧值的最终上限 |
+| `AINER_CACHE_LOCAL_TIME_TO_LIVE` | `PT30M` | Caffeine 本地缓存写入后过期时间，同上 |
+
+因此**强一致读路径不得依赖缓存**：需要读到最新值的路径必须直读数据库（或在写入后直读校验），
+不能经由 `@Cacheable` 方法；ADR-0030 的授权决策本就不缓存，这条约束与之一致。
+
+### 9.2 断连窗口内 evict 与读可能乱序（外部客户端行为，不是本模块缺陷）
+
+**现象与触发条件**：Lettuce 默认 `autoReconnect=true` 且断连行为为
+`DisconnectedBehavior.DEFAULT`（自动重连开启时"接受并缓冲命令"）。在 Redis 断连/重连窗口内发出的
+命令会被缓冲、重连后重放，于是「写入 → `@CacheEvict`（DEL）→ 随后的读」这一串可能**乱序落地**
+（较早的 PUT 落在 DEL 之后），缓存里会**静默保留旧值**，直到 TTL 到期或被下一次 evict 覆盖。
+日志侧通常伴随 `io.lettuce.core.protocol.ConnectionWatchdog: Cannot reconnect ...`、
+`Connection reset` 等重连痕迹。
+
+**这是 Redis 客户端的默认行为，不是 `ainer-starter-cache` 的实现缺陷**：本模块只使用 Spring Cache 与
+`StringRedisTemplate` 的同步 API，命令的落地顺序由客户端与网络决定，不由本模块控制。
+本机（macOS Colima）实测复现过该乱序；把测试客户端改成 fail-fast（`REJECT_COMMANDS` +
+`autoReconnect(false)`）后现象消失，同一批断言连续多轮全绿。生产默认仍是带缓冲重放的 Lettuce。
+
+**可选的 fail-fast 手段（产品的可用性取舍，不是本模块默认值）**：需要"宁可报错也不缓冲"的产品，
+可在应用侧注册一个 `LettuceClientConfigurationBuilderCustomizer`：
+
+```java
+@Bean
+LettuceClientConfigurationBuilderCustomizer failFastLettuce() {
+    return builder -> builder.clientOptions(ClientOptions.builder()
+            .autoReconnect(false)
+            .disconnectedBehavior(ClientOptions.DisconnectedBehavior.REJECT_COMMANDS)
+            .build());
+}
+```
+
+代价必须一并接受：Redis 不可用时缓存读写会**直接抛异常**（`@CacheEvict` 失败不再静默，而是向调用方
+冒泡），即用可用性换取"不静默陈旧"。保持默认则接受"断连窗口内可能读到旧值"。两种选择都要显式做出，
+不要假设默认行为与 fail-fast 等价。
+
+### 9.3 运维检查清单
+
+- 关键键使用**更短 TTL**，让陈旧窗口有明确上界；
+- 监控 Redis 重连日志（`ConnectionWatchdog`）与缓存命中率；重连频繁时按 9.2 评估是否 fail-fast；
+- 排查"缓存值与数据库不一致"时，先看 TTL 与 evict 链路（网络/重连），再怀疑数据库或事务；
+- 实际生效的缓存后端与锁实现以启动日志 / `AinerCacheCapabilities` bean 为准，不要只看配置声明。

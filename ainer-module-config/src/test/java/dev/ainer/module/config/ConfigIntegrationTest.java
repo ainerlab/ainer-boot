@@ -4,12 +4,15 @@ import dev.ainer.module.config.config.application.ConfigApplicationService;
 import dev.ainer.module.config.config.domain.ConfigEntry;
 import dev.ainer.module.config.config.domain.ConfigHistory;
 import dev.ainer.module.config.config.domain.ConfigValueType;
+import dev.ainer.testfixture.config.CountingConfigEntryRepository;
+import dev.ainer.testfixture.config.CountingRepositoryFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -32,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
-        classes = ConfigIntegrationTest.TestApplication.class,
+        classes = {ConfigIntegrationTest.TestApplication.class, CountingRepositoryFixture.class},
         properties = {
                 "ainer.config.enabled=true",
                 "mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml",
@@ -58,11 +61,19 @@ class ConfigIntegrationTest {
     ConfigApplicationService service;
     @Autowired
     JdbcTemplate jdbcTemplate;
+    @Autowired
+    CacheManager cacheManager;
+    @Autowired
+    CountingConfigEntryRepository countingRepository;
 
     @BeforeEach
     void clean() {
         jdbcTemplate.execute("DELETE FROM ainer_config_history");
         jdbcTemplate.execute("DELETE FROM ainer_config_entry");
+        // 缓存自 2026-09-11 起真实生效（ADR-0039 补齐）：清库之外必须同时清缓存，
+        // 否则用例之间会互相看到上一个用例留下的缓存值。
+        cacheManager.getCache(ConfigApplicationService.CACHE_CONFIG_ENTRY).clear();
+        countingRepository.resetFindCalls();
     }
 
     @Test
@@ -181,6 +192,22 @@ class ConfigIntegrationTest {
     }
 
     @Test
+    void mainReadPathServesFromCacheWithoutHittingDatabaseAgain() {
+        service.setValue("app", "cached.read", "v1", ConfigValueType.STRING, null, null);
+        countingRepository.resetFindCalls();
+
+        // 首次读：缓存未命中 → 打一次数据库
+        assertThat(service.getValue("app", "cached.read")).contains("v1");
+        assertThat(countingRepository.findCalls()).isEqualTo(1);
+
+        // 命中缓存：后续读取不再打数据库（修复自调用绕过代理之前，这里会持续增长）
+        assertThat(service.getValue("app", "cached.read")).contains("v1");
+        assertThat(service.getValue("app", "cached.read")).contains("v1");
+        assertThat(service.getEntry("app", "cached.read")).isPresent();
+        assertThat(countingRepository.findCalls()).isEqualTo(1);
+    }
+
+    @Test
     void cacheEvictedOnValueUpdate() {
         service.setValue("app", "cached", "v1", ConfigValueType.STRING, null, null);
         assertThat(service.getValue("app", "cached")).contains("v1");
@@ -201,6 +228,7 @@ class ConfigIntegrationTest {
     @Import({ConfigModuleConfiguration.class})
     static class TestApplication {
     }
+
 
     /** Satisfies the controller's resolver dependency without enabling the resource-server chain. */
     @org.springframework.boot.test.context.TestConfiguration

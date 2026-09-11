@@ -1,6 +1,6 @@
 # Ainer 项目状态
 
-> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-09-05 · 工程版本：`1.4.1`（当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
+> 文档类型：时间敏感快照 · 状态：持续更新 · 核对时间：2026-09-11 · 工程版本：`1.4.1`（当前稳定）；`1.1.0` withdrawn；`1.0.x` LTS；运行基线 Spring Boot 4.1.1
 
 本文只记录当前事实和验证记录，不替代架构规范与 ADR。每个里程碑结束、发布候选形成或主要风险变化时更新核对时间。
 
@@ -369,6 +369,63 @@ Ainer 项目签名 provenance 已通过。
   `AinerWebAutoConfigurationTest` 的 422 业务码断言在同一 `clean verify` 中全绿。
 - **边界**：未改动 `ApiResponse` 字段结构；未 push、未开 PR，提交留在
   `codex/fix-http-status-fidelity` 分支。
+
+2026-09-11 ADR-0039「缓存与分布式协调」落地补齐（分支 `codex/adr-0039-cache-and-lock-reality`）
+- **背景（欠账）**：`@Cacheable`/`@CacheEvict` 已在 `ainer-module-dictionary`（9 处）与
+  `ainer-module-config`（3 处）生产使用，但全仓没有生产 `@EnableCaching`，Spring Boot 也不会替产品打开
+  缓存（`CacheAutoConfiguration` 自身以 `@ConditionalOnBean(CacheAspectSupport.class)` 为前提）——
+  这些注解实际是死注解；`ainer.cache.type=redis` 既不产生 `RedisCacheManager`，ADR-0039 §4 承诺的
+  PG advisory lock 降级实现也不存在；本地锁每次获取都起一条休眠虚拟线程，且多实例下静默失效。
+- **本次交付**：① 新增 `AinerCacheAutoConfiguration`（`@EnableCaching`，`ainer.cache.enabled` 默认
+  `true`、`false` 时不启用）与 `AinerCacheProperties`（`enabled` / `type` / `local.time-to-live` /
+  `local.maximum-size` / `redis.time-to-live` / `redis.key-prefix` / `lock.type`），默认仍为 Caffeine
+  本地缓存，保持 ADR-0039「运维与迁移」第 2 条不改变现有默认行为；② `type=redis` 真正提供
+  `RedisCacheManager`（TTL + key 前缀 + `GenericJacksonJsonRedisSerializer`），缺少 Redis 客户端或
+  `RedisConnectionFactory` 时启动失败并给出修复建议，绝不静默退回本地缓存；③ 新增
+  `PostgresDistributedLockPort`（会话级 `pg_try_advisory_lock(hashtextextended(key, seed))`，每个持有的锁
+  独占一条连接、实例内 TTL 收割器主动放锁），锁选择统一到 `lock.type`（`AUTO`/`POSTGRES`/`LOCAL`），
+  退化为进程内锁时 WARN 明说多实例互斥不成立；④ 新增 `AinerCacheCapabilities` record + 启动日志，
+  打印「声明了什么 vs 实际生效什么」；⑤ 修正 `ConfigApplicationService#getEntry` 的 `unless`——Spring
+  Cache 写入前会拆包 `Optional`，原表达式 `!#result.isPresent()` 在方法被外部调用时会直接抛
+  `SpelEvaluationException`（本次一并修复，属启用缓存后暴露的既有缺陷）。
+- **Redis 序列化实测结论**：`GenericJacksonJsonRedisSerializer` 能往返 `List<record>`/`ArrayList`，
+  但会丢掉 `Optional` 包装（读回 `ConfigEntry` 而非 `Optional<ConfigEntry>`），且 JDK 不可变集合
+  （`List.of`）既无类型标记也无法反序列化；缓存值序列化器因此对根值做等价归一化（`Optional` → 载体
+  record、不可变集合 → 可变等价实现）。Redis 中 secret 字段是密文实体，明文不落缓存；Redis 仍须视为
+  受信基础设施。
+- **主读路径接通缓存（同日补齐）**：原先 `@Cacheable` 落在 `ConfigApplicationService#getEntry` 上，
+  而它只被同类的 `getValue`/`getSecret` 自调用——自调用不经过 Spring 代理，配置模块主读路径实际
+  每次都打数据库。现抽出包内组件 `ConfigEntryLookup`（缓存注解落在它身上，`getEntry`/`getValue`/
+  `getTyped`/`getSecret` 一律经它读取；写入路径仍直读数据库做乐观锁判定）；集成测试用计数仓储替身
+  （`dev.ainer.testfixture.config.CountingConfigEntryRepository`，不用 Mockito）断言同一键第二次读取
+  **数据库调用次数不增长**，把 `@Cacheable` 移回自调用路径时该断言以 `expected: 2 but was: 5` 失败，
+  证明回归测试非空转。
+- **实测**：`./mvnw clean verify`（JDK 25 / Maven 4.0.0-rc-6 / Colima，`DOCKER_HOST` +
+  `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 指向 colima socket）= 28 模块、**580 tests / 0 failure /
+  0 error / 0 skipped**，`scripts/check-surefire-results.sh` 同结果。其中缓存 starter 26 项
+  （装配 17 + PostgreSQL advisory lock 5 + Redis 缓存/锁 4，后两组真实容器：`postgres:18.3-alpine`、
+  `redis:7-alpine`），`ainer-module-config` 22 项（含 4 项真实 `Optional<ConfigEntry>` Redis 端到端测试：
+  缓存命中证明、主读路径不打库的计数断言、密文不落明文、能力报告）；`ainer-offstate-app` 无 DB/无 Redis
+  仍正常启动。
+- **连接占用实测**：advisory lock 集成测试用真实 Hikari 池（上限 3）证明「每锁一条池化连接」：
+  2 把锁 → 池内活跃连接 2；3 把锁 → 池占满，第 4 把锁在 `connection-timeout` 后以明确错误失败，
+  释放一把后立即恢复。Hikari 默认池 10，等同「同时持有 10 把锁即吃满默认池」。
+- **测试重试口径**：Redis 集成测试的有界等待（`awaitRedis`）上限 10 秒、每 100ms 探测一次，
+  只对「状态未就绪」与连接/超时类瞬时异常（`DataAccessResourceFailureException`（含
+  `RedisConnectionFailureException`）、`QueryTimeoutException`）重试；**等待的是可观察状态而不是断言**，
+  值/内容断言在等待之后一次性执行，值不对立即失败，状态始终不满足则以明确的超时错误失败。
+  等待覆盖的「写后一致性状态」只有两个：evict 可观察、写后新值可读。
+- **环境定位记录**：一次实测发现本机 Colima 偶发 Redis 连接抖动（日志可见 `Connection refused`/
+  `Connection reset`）时，Lettuce 默认会把命令缓冲到重连后重放，「写 → evict → 读」因此可能乱序落地、
+  缓存里静默留下过期值；加诊断探针后现象消失，且探针下数据库值、缓存内容、数据库调用次数三者始终一致，
+  判定为命令落地时序问题而非实现缺陷。测试作用域因此加 `RedisFailFastFixture`
+  （`REJECT_COMMANDS` + `autoReconnect(false)`），让连接问题以明确的连接异常暴露。
+  该结论是本机复现得到的，未在其他 CI 环境验证。
+- **未完成/待决策**：① PostgreSQL advisory lock 每锁占一条池化连接，池大小需按并发锁数评估
+  （javadoc 与 configuration.md 已写明，并给出 3 连接池的实测行为）；② ADR-0039 §1 的第三层能力
+  「分布式限流 `RateLimitPort`」仍未实现，限流现状仍是 ADR-0016 的 node-local 固定窗口；
+  ③ 配置模块主读路径已接通缓存，但 `getByNamespace` 等按命名空间列举的读路径仍直读数据库
+  （未加缓存，属有意保留：批量列举的失效面更大）。
 
 2026-08-28 `v1.4.1` 已发布（商业事实基线与测试确定性补丁）
 - **发布身份**：发布准备 PR [#70](https://github.com/ainerlab/ainer-boot/pull/70) 合入默认分支
