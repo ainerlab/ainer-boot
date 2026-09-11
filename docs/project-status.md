@@ -339,6 +339,37 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+2026-09-11 HTTP 状态语义退化缺陷关闭（405/406/415/非法请求体/429/503）
+- **缺陷**：`GlobalExceptionHandler` 原先只登记 `BusinessException`、参数校验、404、
+  `ErrorResponseException` 与 `Exception` 兜底。`HttpRequestMethodNotSupportedException`（405）、
+  `HttpMediaTypeNotSupportedException`（415）、`HttpMediaTypeNotAcceptableException`（406）与
+  `HttpMessageNotReadableException`（非法 JSON）都不继承 `ErrorResponseException`，全部落进
+  catch-all → 500 + `AINER.COMMON.INTERNAL_ERROR` 并打 error 级日志；`standardCode` 的
+  `default` 分支还把 429/503 分别压成 400/500。与 `docs/architecture.md` §6 及 README
+  「HTTP status 始终保持真实语义」的承诺直接冲突。
+- **修正**：`GlobalExceptionHandler` 改为继承 `ResponseEntityExceptionHandler`，在
+  `handleExceptionInternal` 单一收口把 Spring 判定的状态码折算为稳定错误码并包成
+  `ApiResponse` 信封（405 的 `Allow`、415 的 `Accept` 响应头原样保留）；`standardCode` 补齐
+  405/406/415/429/503，`StandardErrorCode` 新增 `AINER.COMMON.METHOD_NOT_ALLOWED`、
+  `NOT_ACCEPTABLE`、`UNSUPPORTED_MEDIA_TYPE`、`SERVICE_UNAVAILABLE`（429 复用既有
+  `RATE_LIMITED`），`ErrorCodeRegistry` 启动期无重复码。4xx 不再打 error 级日志；5xx 仍记
+  error 且只返回稳定文案，`X-Request-Id`、`requestId` 与 `ApiResponse` 字段结构不变。
+- **本地验证**：JDK 25 + Maven 4.0.0-rc-6 + Colima/PostgreSQL 18.3 下，唯一验收命令
+  `./mvnw clean verify` 为 **28 模块全部 SUCCESS / 562 tests / 0 failure / 0 error /
+  0 skipped**（用时 3m25s，日志 0 条 `[ERROR]`）；`scripts/check-surefire-results.sh`
+  输出 `[ainer-test-results] tests=562, failures=0, errors=0, skipped=0` 并退出 0。
+  同一命令在基线 `abf5a76` 上实测 552 tests / 0 failure / 0 error / 0 skipped，
+  本次净增 10 项。
+- **新增测试**：`GlobalExceptionHandlerHttpStatusTest`（`ainer-starter-web`，真实 Tomcat +
+  `TestRestTemplate`，无 mock）10 项：405（含 `Allow` 响应头与 `X-Request-Id`）、415（含 `Accept` 头）、
+  非法 JSON→400、406、429、503，以及 400 绑定校验、404、409、422 与成功响应信封回归。
+- **回归证据**：既有 401/403（`FileStorageHttpTest`、`AinerServerMetricsSecurityTest`、
+  `AinerServerAuthorizationLivePathTest`）、409/422（`TaskHttpTest`、`DictionaryHttpTest`、
+  `NotificationHttpTest`）、404（`FileStorageHttpTest`、`WorkspaceHttpJwtTest`）与
+  `AinerWebAutoConfigurationTest` 的 422 业务码断言在同一 `clean verify` 中全绿。
+- **边界**：未改动 `ApiResponse` 字段结构；未 push、未开 PR，提交留在
+  `codex/fix-http-status-fidelity` 分支。
+
 2026-08-28 `v1.4.1` 已发布（商业事实基线与测试确定性补丁）
 - **发布身份**：发布准备 PR [#70](https://github.com/ainerlab/ainer-boot/pull/70) 合入默认分支
   `377a0795d8890b0ca48d314e1c162a54369d7fc4`；annotated tag `v1.4.1` peel 精确等于该提交。
