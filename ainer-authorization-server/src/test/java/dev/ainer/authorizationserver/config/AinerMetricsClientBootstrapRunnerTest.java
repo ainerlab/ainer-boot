@@ -62,7 +62,7 @@ class AinerMetricsClientBootstrapRunnerTest {
     private static AinerAuthorizationServerProperties withMetricsClientBootstrap(
             AinerAuthorizationServerProperties.MetricsClientBootstrap bootstrap) {
         return new AinerAuthorizationServerProperties(
-                null, null, null, null, null, null, bootstrap, null);
+                null, null, null, null, null, null, bootstrap, null, null);
     }
 
     private static final class InMemoryRepository implements RegisteredClientRepository {

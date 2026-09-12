@@ -10,6 +10,11 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${AINER_SECURITY_ISSUER_URI:}
+          # 验签公钥来源（信任锚）。不配置时走 issuer-uri 的 OIDC discovery；配置后 Spring Boot
+          # 用本地址取 JWKS、仍用 issuer-uri 校验 iss、用 audiences 校验 aud（两者同时生效）。
+          # 明文 HTTP 只允许环回地址，且需显式 AINER_SECURITY_ALLOW_INSECURE_JWK_SET_HTTP=true，
+          # 否则启动期失败关闭——详见 docs/security.md「JWKS 信任锚」。
+          jwk-set-uri: ${AINER_SECURITY_JWK_SET_URI:}
           audiences: ${AINER_SECURITY_AUDIENCES:ainer-api}
 
 server:
@@ -44,6 +49,8 @@ ainer:
   security:
     resource-server:
       enabled: ${AINER_SECURITY_RESOURCE_SERVER_ENABLED:true}
+      # 仅用于本地/测试：允许验签公钥走明文环回地址取（见 spring.security.oauth2.resourceserver.jwt.jwk-set-uri）
+      allow-insecure-jwk-set-http: ${AINER_SECURITY_ALLOW_INSECURE_JWK_SET_HTTP:false}
       online-validation:
         enabled: ${AINER_SECURITY_ONLINE_VALIDATION_ENABLED:false}
         introspection-uri: ${AINER_SECURITY_ONLINE_VALIDATION_INTROSPECTION_URI:}

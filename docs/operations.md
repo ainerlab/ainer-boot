@@ -164,6 +164,45 @@ PostgreSQL、systemd、TLS、Nginx、回滚和公网联合验收以
 [`development-environment-deployment.md`](development-environment-deployment.md) 为准。它不
 替代尚未完成的 production ingress、browser client 控制面和高可用验收。
 
+HEAD
+### 2.7 签名密钥轮换（JWKS 信任锚）
+
+轮换把「发布哪把 key」和「用哪把 key 签发」分开：`/oauth2/jwks` 发布密钥目录里的**全部**公钥，
+Token 只用 `AINER_AUTHORIZATION_SIGNING_KEY_ACTIVE_ID` 指定的那一把签发。旧 key 只要还在目录里
+就继续能验签，一旦移出目录就立刻失败关闭（未知 `kid`）。语义与边界见
+[`security.md`](security.md) §4.1。
+
+前置条件：密钥目录形态已启用（`AINER_AUTHORIZATION_SIGNING_KEY_DIRECTORY` +
+`AINER_AUTHORIZATION_SIGNING_KEY_ACTIVE_ID`，见 [`configuration.md`](configuration.md) §5）；
+目录是只读挂载且未提交进仓库；已知当前 access token TTL（默认 5 分钟，见 client 的 token
+settings）。
+
+| 步骤 | 命令 / 动作 | 可观测信号 | 回滚点 |
+|---|---|---|---|
+| 0. 基线 | `curl -fsS $ISSUER/oauth2/jwks \| jq -r '.keys[].kid'` | 目录里现有 `kid` 列表；启动日志 `signing key ring: active=…, published=[…]` | — |
+| 1. 生成新 key | `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out <new-kid>.private.pem && openssl pkey -in <new-kid>.private.pem -pubout -out <new-kid>.public.pem` | 私钥 `0600`、公钥 `0644`，文件名 `<kid>.private.pem` / `<kid>.public.pem` | 删除新文件 |
+| 2. 同时发布新旧 | 只把 `<new-kid>.public.pem` 放进目录，`active-key-id` **不变**，重启 AS | 启动日志 `published=[old, new]` 且进入 `rotation window`；`/oauth2/jwks` 出现新 `kid`；新 Token 的 `kid` 仍是旧 key | 移除新公钥文件并重启 |
+| 3. 切换签发 | 把 `<new-kid>.private.pem` 放进目录，`active-key-id=<new-kid>`，重启 AS | 启动日志 `active=<new-kid>`；用 `jwt decode`/`kid` 观察新签发 Token 的 header 已是新 key；旧 Token 继续 200 | 把 `active-key-id` 改回旧 key 重启（旧私钥仍在目录时无需重新生成） |
+| 4. 等一个 Token TTL | 等待 ≥ access token TTL（默认 5 分钟，含时钟偏差留裕量） | 旧 key 签发的 Token 自然过期；`kid=old` 的请求量降到 0（按 `kid` 统计 401/200 或网关访问日志） | 同步骤 3 |
+| 5. 移除旧 key | 从目录删除 `<old-kid>.public.pem`（私钥另存到离线归档），重启 AS | 启动日志 `published=[<new-kid>]`；`/oauth2/jwks` 不再含旧 `kid`；旧 Token 请求 401 | 把旧公钥文件放回目录并重启（在 Token 过期前才有效） |
+
+轮换前后的检查清单：
+
+- 任何一步都不要同时改目录内容与 `active-key-id` 之外的配置；每次只重启一次 AS；
+- 步骤 2/3 之后必须确认 `ainer-server` 侧仍能验签：用真实请求打一个受保护端点，401/403 都不等于
+  「验签失败」，要看 `kid` 与错误码；
+- 资源服务器按 Nimbus `JWKSourceBuilder` 默认缓存 JWKS（`DEFAULT_CACHE_TIME_TO_LIVE` 300s = 5 分钟），
+  因此步骤 5 之后已经缓存旧 JWKS 的实例最多还会接受旧 key 签名的 Token 5 分钟。**不要靠缓存过期
+  兜底**：步骤 4 已经让旧 Token 自然过期，这才是真正的失效点；
+- 若怀疑私钥泄露，跳过步骤 4：直接执行步骤 5 并接受在途 Token 立即失效（所有 `kid=old` 的 Token
+  立刻 401），同时按事件流程撤销相关账号凭据；
+- 单文件形态（`AINER_AUTHORIZATION_SIGNING_KEY_ID`）没有过渡期，换 key 会让在途 Token 全部失效，
+  轮换前必须先迁到目录形态。
+
+告警建议：`kid=old` 的请求在步骤 4 结束后仍持续出现（说明有客户端缓存/自签 Token）、
+JWKS 端点返回的 `kid` 集合与预期不符、启动日志中的 `active=` 与预期不符、AS 因密钥环校验失败
+而重启（启动期 `IllegalStateException`，见 §4「Authorization Server 失败」）。
+
 ### 2.7 决策审计热表归档上线顺序（默认关闭）
 
 通用授权模块的决策审计 `ainer_authorization_decision_audit` 是 append-only 热表：每个带
@@ -186,7 +225,6 @@ PostgreSQL、systemd、TLS、Nginx、回滚和公网联合验收以
 
 回滚只关闭归档开关（或把 `hot-retention` 调大），**不要删除归档表**：归档表不会被自动删除，
 历史查询读热+冷并集（见 §10）。归档语义、指标与历史查询示例见 §10。
-
 ## 3. 健康检查
 
 ```bash
@@ -211,6 +249,11 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 
 - 检查 issuer 是否为 HTTPS；
 - 检查服务端签发密钥 key ID、PEM 路径、文件权限和公私钥是否匹配；
+- 密钥环形态的启动失败都会带明确原因，按消息处理：`ambiguous`（同时配了单文件与目录形态）、
+  `active key … has no published public key`（`active-key-id` 拼错或该 key 未发布）、
+  `has no private key`（激活 key 缺 `<kid>.private.pem`）、`without matching`（有私钥无公钥）、
+  `Unrecognized file`（目录里文件名不符合 `<kid>.public.pem` / `<kid>.private.pem`）、
+  `same RSA key pair`（公私钥不是同一对）、`bits`（模数低于 2048）、`does not exist`（目录不存在）；
 - 检查身份库与 OAuth 表 migration；
 - Passkey 开启时检查 RP ID、Origin、HTTPS、timeout 与代理外部域名；不要临时扩大 Origin；
 - 不把私钥内容粘贴到日志或工单。
@@ -218,6 +261,10 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 ### Resource Server 返回 401/403
 
 - 401：检查 Token 签名、issuer、audience、有效期、`sub`；匹配高风险规则时还要检查 introspection client 与 Identity 当前 epoch/状态；
+- 401 且**全部**请求都失败时，先看启动日志的 `Ainer resource server trust anchor: jwkSetUri=…`：
+  配置了 `jwk-set-uri` 却没有 `issuer-uri` 属于被框架拒绝的错误配置（见 §4 下方说明），
+  而 `jwk-set-uri` 指向的 AS 换过 key 时，检查 `/oauth2/jwks` 的 `kid` 集合与 Token header 的
+  `kid` 是否一致（轮换 runbook 见 §2.7）；
 - 403：检查 scope，再检查 Workspace ACTIVE membership 与角色；
 - 用 `X-Request-Id` 关联请求，不记录完整 Bearer Token。
 

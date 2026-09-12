@@ -33,8 +33,16 @@ PostgreSQL 分页 `maxLimit=100`、全局 `IdType.AUTO` 和显式 UUID TypeHandl
 |---|---|---|
 | `AINER_WORKSPACE_ENABLED` | `true` | 控制 Workspace 模块装配 |
 | `AINER_SECURITY_RESOURCE_SERVER_ENABLED` | `true` | 生产不得关闭 |
-| `AINER_SECURITY_ISSUER_URI` | 空 | Resource Server 启用时必须指向可信 issuer |
+| `AINER_SECURITY_ISSUER_URI` | 空 | Resource Server 启用时必须指向可信 issuer（同时是 `iss` 校验值） |
+| `AINER_SECURITY_JWK_SET_URI` | 空 | 验签公钥来源（信任锚）：留空走 issuer 的 OIDC discovery；填写则直接取该 JWKS 地址，此时 `AINER_SECURITY_ISSUER_URI` 仍必填。必须 HTTPS |
+| `AINER_SECURITY_ALLOW_INSECURE_JWK_SET_HTTP` | `false` | 只对环回地址 + 本机/自动化测试放行明文 JWKS；非环回明文一律启动失败 |
 | `AINER_SECURITY_AUDIENCES` | `ainer-api` | access token 必须包含的 audience，可配置列表 |
+
+`AINER_SECURITY_JWK_SET_URI` 与 `AINER_SECURITY_ISSUER_URI` 同时给出时，Spring Boot 用前者取
+JWKS、用后者校验 `iss`（Boot 的 `JwkSetUriCondition` 优先于 `IssuerUriCondition`，见
+`AinerResourceServerTrustAnchorContractTest`）。只给 `jwk-set-uri` 而不给 `issuer-uri` 属于
+错误配置：Boot 会把空 issuer 绑成 `""` 并拿它比较 `iss`，进程能启动但所有 Token 都 401，因此
+框架在启动期直接失败关闭。语义与轮换边界见 [`security.md`](security.md) §2、§4.1。
 
 M4.3 高风险请求在线 Token 校验默认关闭：
 
@@ -181,9 +189,11 @@ profile 级覆盖文件，因此新键加在 base 即对所有环境生效。默
 | `AINER_AUTHORIZATION_SERVER_PORT` | `9000` | 服务端口 |
 | `AINER_AUTHORIZATION_SERVER_ISSUER` | 空 | 必填，必须是显式 HTTPS URL |
 | `AINER_AUTHORIZATION_SERVER_AUDIENCE` | `ainer-api` | 签发 access token 的 audience |
-| `AINER_AUTHORIZATION_SIGNING_KEY_ID` | 空 | 必填，轮换时使用新 ID |
-| `AINER_AUTHORIZATION_PRIVATE_KEY_LOCATION` | 空 | 必填，只读 PEM 资源位置 |
-| `AINER_AUTHORIZATION_PUBLIC_KEY_LOCATION` | 空 | 必填，PEM 资源位置 |
+| `AINER_AUTHORIZATION_SIGNING_KEY_DIRECTORY` | 空 | 可轮换密钥环目录（推荐形态）：`<kid>.public.pem` 全部发布，`<kid>.private.pem` 只允许属于激活 key |
+| `AINER_AUTHORIZATION_SIGNING_KEY_ACTIVE_ID` | 空 | 当前用于签发的 `kid`；必须在目录中存在且带私钥文件 |
+| `AINER_AUTHORIZATION_SIGNING_KEY_ID` | 空 | 单文件形态（兼容保留）：唯一 key 的 `kid`，不可与上面的目录形态同时配置 |
+| `AINER_AUTHORIZATION_PRIVATE_KEY_LOCATION` | 空 | 单文件形态必填，只读 PEM 资源位置 |
+| `AINER_AUTHORIZATION_PUBLIC_KEY_LOCATION` | 空 | 单文件形态必填，PEM 资源位置 |
 | `AINER_IDENTITY_ENABLED` | `true` | 控制 Identity module 与 Identity migration 装配 |
 | `AINER_AUTHORIZATION_PASSKEY_ENABLED` | `false` | 启用 Spring Security WebAuthn/Passkey 与条件人员门禁 |
 | `AINER_AUTHORIZATION_PASSKEY_RP_ID` | 空 | 启用时必填，小写 DNS 名；测试可用 `localhost` |
@@ -214,6 +224,19 @@ profile 级覆盖文件，因此新键加在 base 即对所有环境生效。默
 | `AINER_AUTHORIZATION_BOOTSTRAP_BROWSER_CLIENT_CONTROL_OPERATOR_CLIENT_SECRET` | 空 | 24..128 字符，secret 注入 |
 | `AINER_AUTHORIZATION_BROWSER_CLIENT_CONTROL_ENABLED` | `false` | 启用受审计 browser client 控制面 |
 | `AINER_AUTHORIZATION_BROWSER_CLIENT_CONTROL_OPERATOR_CLIENT_IDS` | 空 | 启用时必填；operator client ID 精确白名单，可逗号分隔 |
+
+签名密钥有两种形态，**互斥**（同时配置会在启动期失败关闭）：
+
+- 目录形态（推荐，可轮换）：`AINER_AUTHORIZATION_SIGNING_KEY_DIRECTORY` 指向密钥目录，
+  目录内 `<kid>.public.pem` 全部进入 `/oauth2/jwks`，`<kid>.private.pem` 只允许属于
+  `AINER_AUTHORIZATION_SIGNING_KEY_ACTIVE_ID` 指定的激活 key。目录里出现无法识别的文件
+  （拼错的文件名）视为配置错误并启动失败，不会被静默忽略；
+- 单文件形态（兼容保留）：`AINER_AUTHORIZATION_SIGNING_KEY_ID` + 私钥/公钥位置，等价于
+  「只剩一把 key、它就是激活 key」，不具备过渡期验证旧 Token 的能力。
+
+装载还会拒绝：active key 无私钥文件、私钥缺配对公钥、公私钥不是同一对、RSA 模数低于 2048 位、
+目录不存在。轮换步骤与回滚点见 [`operations.md`](operations.md) §2.7，语义边界见
+[`security.md`](security.md) §4.1。
 
 Ainer Admin 开发 browser client 只在 `dev` profile 中装配，并且默认关闭：
 
