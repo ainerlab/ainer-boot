@@ -32,6 +32,15 @@ ainer:
     authorization-audit-export:
       enabled: ${AINER_WORKSPACE_AUDIT_EXPORT_ENABLED:false}
       trusted-exporter-subject: ${AINER_WORKSPACE_AUDIT_TRUSTED_EXPORTER:}
+  authorization:
+    decision-audit-retention:
+      enabled: ${AINER_AUTHORIZATION_DECISION_AUDIT_RETENTION_ENABLED:false}
+      hot-retention: ${AINER_AUTHORIZATION_DECISION_AUDIT_HOT_RETENTION:90d}
+      fixed-delay: ${AINER_AUTHORIZATION_DECISION_AUDIT_RETENTION_FIXED_DELAY:5m}
+      initial-delay: ${AINER_AUTHORIZATION_DECISION_AUDIT_RETENTION_INITIAL_DELAY:5m}
+      batch-size: ${AINER_AUTHORIZATION_DECISION_AUDIT_ARCHIVE_BATCH_SIZE:500}
+      max-batches-per-cycle: ${AINER_AUTHORIZATION_DECISION_AUDIT_MAX_BATCHES_PER_CYCLE:20}
+      oldest-hot-warn-window: ${AINER_AUTHORIZATION_DECISION_AUDIT_OLDEST_HOT_WARN_WINDOW:91d}
   security:
     resource-server:
       enabled: ${AINER_SECURITY_RESOURCE_SERVER_ENABLED:true}
@@ -63,11 +72,18 @@ ainer:
       allowed-models: ${AINER_AI_ALLOWED_MODELS:}
       connect-timeout: ${AINER_AI_CONNECT_TIMEOUT:5s}
       request-timeout: ${AINER_AI_REQUEST_TIMEOUT:60s}
+      total-timeout: ${AINER_AI_TOTAL_TIMEOUT:120s}
+      stream-total-timeout: ${AINER_AI_STREAM_TOTAL_TIMEOUT:600s}
       allow-insecure-http: ${AINER_AI_ALLOW_INSECURE_HTTP:false}
     limits:
       requests-per-minute: ${AINER_AI_REQUESTS_PER_MINUTE:60}
       subject-daily-budget: ${AINER_AI_SUBJECT_DAILY_BUDGET:10.00}
       max-prompt-characters: ${AINER_AI_MAX_PROMPT_CHARACTERS:100000}
+    self-heal:
+      enabled: ${AINER_AI_SELF_HEAL_ENABLED:true}
+      stuck-threshold: ${AINER_AI_SELF_HEAL_STUCK_THRESHOLD:15m}
+      scan-interval-ms: ${AINER_AI_SELF_HEAL_SCAN_INTERVAL_MS:60000}
+      batch-size: ${AINER_AI_SELF_HEAL_BATCH_SIZE:200}
     pricing:
       currency: ${AINER_AI_CURRENCY:USD}
       input-per-million-tokens: ${AINER_AI_INPUT_PER_MILLION_TOKENS:0}

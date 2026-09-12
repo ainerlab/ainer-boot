@@ -164,6 +164,29 @@ PostgreSQL、systemd、TLS、Nginx、回滚和公网联合验收以
 [`development-environment-deployment.md`](development-environment-deployment.md) 为准。它不
 替代尚未完成的 production ingress、browser client 控制面和高可用验收。
 
+### 2.7 决策审计热表归档上线顺序（默认关闭）
+
+通用授权模块的决策审计 `ainer_authorization_decision_audit` 是 append-only 热表：每个带
+`@AinerAuthorize` 的请求都会写一行（ALLOW/DENY/CHALLENGE），没有保留策略就会无限增长。
+归档任务由 `AINER_AUTHORIZATION_DECISION_AUDIT_RETENTION_ENABLED` 控制，默认关闭；首次上线按以下顺序：
+
+1. 先发布应用并保持归档开关关闭，记录决策审计写入速率（行/秒）与表增长曲线，估算
+   `hot-retention` 到期时单周期需要搬运的行数；
+2. 在备份恢复的接近真实规模的库上按目标批次试跑（临时把
+   `AINER_AUTHORIZATION_DECISION_AUDIT_RETENTION_FIXED_DELAY` 调小，或由运维直接调用
+   `AuthorizationDecisionAuditLifecycleService#archiveBefore`），观察锁等待、WAL 生成量与
+   归档语句的执行计划；出现长事务或复制延迟时先减小 `batch-size`；
+3. 打开 `AINER_AUTHORIZATION_DECISION_AUDIT_RETENTION_ENABLED=true`，把 `hot-retention`
+   设为与合规保留期一致的时长（默认 90d），`batch-size`（默认 500）与
+   `max-batches-per-cycle`（默认 20）按第 2 步实测值定；
+4. 至少观察一个完整周期窗口：`archived` 持续增长、`.hot` 稳定在「写入速率 × 热保留期」
+   量级、`.archive.failed` 不增长、最旧热行年龄不超过 `oldest-hot-warn-window`；
+5. 多实例部署不需要分布式锁或主从选举：每个实例独立跑归档，`FOR UPDATE SKIP LOCKED` 保证
+   同一区间不会被重复搬运，也不会因为争抢而阻塞在线写入。
+
+回滚只关闭归档开关（或把 `hot-retention` 调大），**不要删除归档表**：归档表不会被自动删除，
+历史查询读热+冷并集（见 §10）。归档语义、指标与历史查询示例见 §10。
+
 ## 3. 健康检查
 
 ```bash
@@ -210,7 +233,16 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 
 - 检查模块是否启用、HTTPS base URL、模型白名单和预算；
 - 区分策略拒绝、连接超时、provider 失败和客户端断开；
-- 只记录稳定错误码和调用 ID，不记录 API key、prompt 或供应商原始正文。
+- 只记录稳定错误码和调用 ID，不记录 API key、prompt 或供应商原始正文；
+- `AINER.AI.PROVIDER_TIMEOUT`：整次调用（含响应体读取）超过
+  `AINER_AI_TOTAL_TIMEOUT` / `AINER_AI_STREAM_TOTAL_TIMEOUT`。JDK 的 `HttpRequest.timeout`
+  只覆盖到响应头（JDK-8258397），所以只调 `AINER_AI_REQUEST_TIMEOUT` 挡不住
+  「上游发完响应头就静默」；这类失败会把 `actual_cost` 置 0 释放预算预占；
+- 日志里出现 `AI invocation terminal failure audit failed ...`：审计终态回写失败（通常是该行已被
+  自愈推进终态），原始失败原因仍会返回给调用方，行也不会丢——由下一轮自愈兜底；
+- 审计行 `status = 'STARTED'` 长时间不动：确认 `AINER_AI_SELF_HEAL_ENABLED=true` 且
+  `ainer.ai.intermediate_state.sweep_failed` 未增长；自愈阈值与调度周期见
+  [`ai-gateway.md` §4.1](ai-gateway.md)。
 
 ### 通知记录停在 PENDING（投递引擎不运行）
 
@@ -253,7 +285,9 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 - point-in-time recovery 或等价恢复策略；
 - 身份库与业务库一致的恢复点选择；
 - RSA 私钥备份、访问审计和轮换；
-- Workspace 授权审计的最终保留/删除策略、法律保留和外部不可变副本。
+- Workspace 授权审计的最终保留/删除策略、法律保留和外部不可变副本；
+- 决策审计（`ainer_authorization_decision_audit` 与归档表）的最终保留/删除策略、法律保留和
+  外部不可变副本。
 
 这些能力当前属于缺口，不能仅凭应用测试宣称已具备灾难恢复能力。
 
@@ -276,13 +310,46 @@ curl -fsS http://127.0.0.1:9000/actuator/health
 | `ainer.workspace.authorization.audit.oldest.hot.age.seconds` | Gauge | 最旧热审计的年龄 |
 | `ainer.workspace.ownerless` | Gauge | 无 ACTIVE OWNER 的 Workspace 数 |
 | `ainer.workspace.authorization.audit.exported` | Counter | SIEM 导出批次成功返回的记录数 |
+| `ainer.authorization.decision.audit.archived` | Counter | 决策审计从热表搬到归档表的累计行数 |
+| `ainer.authorization.decision.audit.archive.failed` | Counter | 决策审计归档周期失败数 |
+| `ainer.authorization.decision.audit.hot` | Gauge | 决策审计热表当前行数 |
+| `ainer.authorization.decision.audit.archive.current` | Gauge | 决策审计归档表当前行数 |
+| `ainer.authorization.decision.audit.oldest.hot.age.seconds` | Gauge | 决策审计最旧热行年龄（秒） |
 | `ainer.security.online.validation.allowed` | Counter | 高风险请求在线判定 active 并继续的数量 |
 | `ainer.security.online.validation.inactive` | Counter | 在线判定 inactive 并返回 401 的数量 |
 | `ainer.security.online.validation.failed` | Counter | introspection 依赖失败并返回 503 的数量 |
 | `ainer.security.online.validation.duration` | Timer | 每次高风险 introspection 调用耗时，不包含后续业务处理 |
 | `ainer.passkey.recovery.requested` / `.executed` | Counter | Passkey 管理员双人恢复申请/成功执行数 |
+| `ainer.ai.intermediate_state.healed` | Counter | 定时自愈推进到终态的中间态行数，tag `state` = `invocation` / `task_run` / `task` |
+| `ainer.ai.intermediate_state.stuck` | Gauge | 当前超过 `AINER_AI_SELF_HEAL_STUCK_THRESHOLD` 仍停在中间态的行数（自愈积压），tag `state` 同上 |
+| `ainer.ai.intermediate_state.oldest_age_seconds` | Gauge | 最老中间态记录的年龄（秒），tag `state` 同上 |
+| `ainer.ai.intermediate_state.sweep_failed` | Counter | 清扫周期自身失败的次数（数据库不可用等） |
+
+AI 中间态自愈（`AiIntermediateStateSweeper`，语义见 [`ai-gateway.md` §4.1](ai-gateway.md)）的初始告警条件：
+
+- `ainer.ai.intermediate_state.sweep_failed` 持续增长 → 自愈没在跑，中间态不会被清理：先查日志与数据库连通性；
+- `ainer.ai.intermediate_state.stuck{state="invocation"}` 连续多个清扫周期后仍 > 0 → 单轮 `batch-size` 不够（积压）或清扫失败；
+- `ainer.ai.intermediate_state.oldest_age_seconds{state="invocation"}` 超过 `AINER_AI_SELF_HEAL_STUCK_THRESHOLD` → 有行长期没被推进终态，说明自愈本身失效；
+- `ainer.ai.intermediate_state.healed{state="invocation"}` 突增 → 上游或进程被批量中断，配合错误码 `AINER.AI.PROVIDER_TIMEOUT` / `AINER.AI.INVOCATION_SELF_HEALED` 探查上游。
+- 未引入 actuator（没有 `MeterRegistry`）时自愈照常运行并打 WARN 日志，只是不暴露指标。
+
+排查单个卡死调用：
+
+```sql
+SELECT id, subject_id, status, started_at, now() - started_at AS age, error_code
+FROM ainer_ai_invocation WHERE status = 'STARTED' ORDER BY started_at LIMIT 20;
+```
+
+终态化后该行 `actual_cost = 0`（预算预占已释放），`error_code` 区分调用自己的总超时
+（`AINER.AI.PROVIDER_TIMEOUT`）与定时自愈兜底（`AINER.AI.INVOCATION_SELF_HEALED`）。
 
 初始告警条件至少包括：`ownerless > 0` 立即告警、archive failure 增长，以及 DENIED 窗口值明显超过环境基线。DENIED 阈值必须根据正常流量建基线，不能在未观测环境中伪造通用数字。
+
+决策审计归档的初始告警条件：`ainer.authorization.decision.audit.archive.failed` 出现非零增长立即告警；
+`ainer.authorization.decision.audit.oldest.hot.age.seconds` 超过 `oldest-hot-warn-window`（默认 91d，
+必须严格大于 `hot-retention`）告警——该状态同时会打印一条 `retention is not keeping up` 的 WARN 日志，
+含义是归档速度持续落后于写入速度，或归档任务根本没在运行。`.hot` 与 `.archive.current` 用于容量规划，
+不设固定阈值，按环境基线判断。
 
 在线校验初始告警至少包括 `.failed` 持续增长、`.inactive` 异常突增和 `.duration` 接近读取超时；阈值必须由压测和真实流量建立。当前代码已经安全暴露 Prometheus 文本 exporter，但尚未部署生产 Prometheus、统一 dashboard、告警路由、trace 和结构化日志 schema。exporter、指标、归档代码和 SIEM 拉取 API 存在，不等于生产监控或外部不可变审计链路已经完成。
 
@@ -373,6 +440,104 @@ LettuceClientConfigurationBuilderCustomizer failFastLettuce() {
 - 关键键使用**更短 TTL**，让陈旧窗口有明确上界；
 - 监控 Redis 重连日志（`ConnectionWatchdog`）与缓存命中率；重连频繁时按 9.2 评估是否 fail-fast；
 - 排查"缓存值与数据库不一致"时，先看 TTL 与 evict 链路（网络/重连），再怀疑数据库或事务；
+HEAD
+- 实际生效的缓存后端与锁实现以启动日志 / `AinerCacheCapabilities` bean 为准，不要只看配置声明。
+
+## 10. 决策审计归档与历史查询
+
+### 10.1 归档语义
+
+`ainer_authorization_decision_audit` 是 append-only 热表：写入端口
+（`AuthorizationDecisionAuditRepository`）只有 `insert`，请求决策链路在物理上无法删除审计。
+归档由独立的生命周期端口（`AuthorizationDecisionAuditLifecycleRepository`）与保留任务完成，
+归档表 `ainer_authorization_decision_audit_archive` 与热表同构，多一列 `archived_at`，
+**保留原 `decision_id`**。
+
+- **先归档后删除，且归档缺失不删热行**：单个归档是"一条语句、一个事务"——
+  `FOR UPDATE SKIP LOCKED` 选择 `evaluated_at < now - hot-retention` 的候选行 →
+  `INSERT ... ON CONFLICT (decision_id) DO NOTHING` 写归档表 → **仅当归档行确实存在**时才删除
+  热行。归档表写入失败时整批回滚，热行一条不删，异常计入 `.archive.failed` 并写 ERROR 日志。
+- **多实例并发安全**：被其它实例锁住的候选行由 `SKIP LOCKED` 跳过（不阻塞在线写入、不等待、
+  不重复搬运），留到下一个批次或周期再处理，因此不需要分布式锁或主从选举。
+- **幂等**：同一 `cutoff` 重复执行不会重复搬运，也不会因为 `ON CONFLICT` 而回头删除仍有归档
+  缺失的行。
+- **按决策时间全局执行**：候选集是"所有 workspace 中 `evaluated_at` 过期的行"，不按
+  `workspace_id` 分片；只有读路径按 workspace 过滤。
+- **归档表不会被自动删除**：最终删除、法律保留与外部不可变副本需要另立策略（见 §6）。
+  同库归档不得被宣称为 WORM 或法律不可抵赖存储。
+- **指标成本**：`.archived` / `.archive.failed` 由归档语句自身返回，`.oldest.hot.age.seconds`
+  走 `(evaluated_at, decision_id)` 索引取最小值，都是 O(1)。`.hot` 与 `.archive.current` 是
+  **精确行数**（`COUNT(*)`），在超大热表上是一次全表扫描：当热表达到数亿行时，把
+  `AINER_AUTHORIZATION_DECISION_AUDIT_RETENTION_FIXED_DELAY` 调大，或按需改为
+  `pg_class.reltuples` 估算 / `pg_total_relation_size()` 字节数（O(1)，但精度或语义不同）。
+  归档语句本身按索引取候选行，不受该成本影响。
+
+### 10.2 历史查询（热+冷并集）
+
+当前版本没有面向决策审计历史的 HTTP 端点（`AuthorizationManagementController` 只提供角色、
+绑定与集合绑定的管理面）。历史读取走模块内的稳定游标读路径：
+`AuthorizationDecisionAuditLifecycleService#history(workspaceId, cursor, limit)`，它读热表与归档表
+的并集，游标是 `(evaluated_at, decision_id)`。归档只搬运行、不改变键，因此翻页过程中即使发生
+归档也不会出现空洞或重复；这也是 SIEM 导出应采用的语义（导出方仍需按 `decision_id` 去重并
+持久化 checkpoint）。
+
+运维/审计查询示例（psql 或报表，账号应限于运维与审计角色；不要把它开放给业务端点）：
+
+```sql
+-- 某 workspace 的历史（热+冷并集），按决策时间倒序的第一页
+SELECT decision_id, evaluated_at, outcome, permission_code,
+       requester_type, requester_id, resource_type, resource_id,
+       reason_code, policy_version, request_id, trace_id
+FROM (
+    SELECT decision_id, workspace_id, evaluated_at, outcome, permission_code,
+           requester_type, requester_id, resource_type, resource_id,
+           reason_code, policy_version, request_id, trace_id
+    FROM ainer_authorization_decision_audit
+    UNION ALL
+    SELECT decision_id, workspace_id, evaluated_at, outcome, permission_code,
+           requester_type, requester_id, resource_type, resource_id,
+           reason_code, policy_version, request_id, trace_id
+    FROM ainer_authorization_decision_audit_archive
+) audit
+WHERE workspace_id = :workspace_id
+ORDER BY evaluated_at DESC, decision_id DESC
+LIMIT 50;
+
+-- 下一页：把上一页最后一行的键作为稳定游标（不要用 OFFSET，归档期间会漏行或重复）
+-- 在上一段 WHERE 后追加：
+--   AND (evaluated_at, decision_id) < (:last_evaluated_at, :last_decision_id)
+
+-- 某个 trace / request 的全量决策（跨热与冷）
+SELECT decision_id, evaluated_at, workspace_id, outcome, permission_code, reason_code
+FROM (
+    SELECT decision_id, evaluated_at, workspace_id, outcome, permission_code, reason_code, trace_id
+    FROM ainer_authorization_decision_audit
+    UNION ALL
+    SELECT decision_id, evaluated_at, workspace_id, outcome, permission_code, reason_code, trace_id
+    FROM ainer_authorization_decision_audit_archive
+) audit
+WHERE trace_id = :trace_id
+ORDER BY evaluated_at, decision_id;
+
+-- 归档进度自检：最旧热行年龄应小于 oldest-hot-warn-window
+SELECT COUNT(*) AS hot_rows, MIN(evaluated_at) AS oldest_hot_at,
+       now() - MIN(evaluated_at) AS oldest_hot_age
+FROM ainer_authorization_decision_audit;
+
+SELECT COUNT(*) AS archived_rows, MIN(archived_at) AS first_archived_at,
+       MAX(archived_at) AS last_archived_at
+FROM ainer_authorization_decision_audit_archive;
+```
+
+查询注意：
+
+- 并集两侧各自命中 `(workspace_id, evaluated_at DESC, decision_id DESC)` 部分索引；归档扫描
+  命中 `(evaluated_at, decision_id)`。两侧都写全列名，不要用 `SELECT *`（归档表多一列
+  `archived_at`，会让并集列不齐）。
+- `agent_id` / `acting_grant_id` 是 ADR-0043 A1 给热表预留的委托关联列，当前没有写入方；
+  模块读取投影不含它们，需要时按上面的方式显式列出。
+- 需要长期取证时，从最早游标回放导出到外部不可变存储，不要依赖同库归档表充当不可变副本。
+
 - 实际生效的缓存后端、锁实现与限流实现以启动日志 / `AinerCacheCapabilities` bean 为准，
   不要只看配置声明；
 - 限流入口的 429 突增先看 `[ainer-cache] 限流后端 Redis 不可用` 告警：那是后端故障，不是业务真的打满配额。

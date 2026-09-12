@@ -372,6 +372,11 @@ CREATE TABLE ainer_example_resource_member (
 - 不记录 secret、Token、完整请求/响应或模型敏感正文；
 - 更正通过新的补偿事实表达，不覆盖历史；
 - 保留、归档和外部不可变副本是独立策略。
+- 需要在线保留窗口的高写入审计表必须同时设计**同构归档表**：保留原 ID、增加 `archived_at`、
+  按实际访问路径建索引（按资源分页读并集、按事件时间扫描归档候选）；搬运语义必须是
+  「先归档后删除，归档行不存在就不删热行」，并且归档表默认不自动删除。参考实现：
+  `ainer_authorization_decision_audit` / `ainer_authorization_decision_audit_archive`
+  （`V202609120900`）与 Workspace 授权审计。
 
 ### 6.4 Outbox
 

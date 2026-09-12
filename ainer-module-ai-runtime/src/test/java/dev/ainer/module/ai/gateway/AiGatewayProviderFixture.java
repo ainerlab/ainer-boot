@@ -9,6 +9,7 @@ import dev.ainer.module.ai.gateway.domain.ModelCompletion;
 import dev.ainer.module.ai.gateway.domain.ModelInvocation;
 import dev.ainer.module.ai.gateway.domain.TokenUsage;
 import dev.ainer.testsupport.jwt.JwtTestSupport;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -28,8 +29,15 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 同包内的 {@code @TestConfiguration} 会被组件扫描真实注册。两个测试类各自定义同名 {@code @Bean}
  * 会直接 {@code BeanDefinitionOverrideException}（Boot 默认禁止覆盖），
  * 所以替身集中在本类，由各集成测试 {@code @Import} 进来，恰好只有一份定义。
+ *
+ * <p><strong>为什么还要 {@code @ConditionalOnProperty} 门控</strong>：本类位于被组件扫描的包内，
+ * 不加门控就会以 {@code @Primary} 身份进入<strong>每一个</strong>该包的测试上下文——需要真实 provider
+ * 的测试（例如 {@code AiRuntimeResilienceIntegrationTest} 断言 provider 是
+ * {@code OpenAiCompatibleModelProvider} 并打本地 HTTP 桩）会因此拿到替身而失败。
+ * 需要替身的测试显式设置 {@code ainer.ai.test-fake-provider=true}。
  */
 @TestConfiguration(proxyBeanMethods = false)
+@ConditionalOnProperty(name = "ainer.ai.test-fake-provider", havingValue = "true")
 public class AiGatewayProviderFixture {
 
     /** 测试 RSA key：签名与验签同源（{@link JwtTestSupport}）。 */
