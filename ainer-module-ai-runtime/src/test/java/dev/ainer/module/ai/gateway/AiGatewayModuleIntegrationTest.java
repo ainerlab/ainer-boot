@@ -1,15 +1,10 @@
 package dev.ainer.module.ai.gateway;
 
+import dev.ainer.cache.ratelimit.NodeLocalRateLimitPort;
 import dev.ainer.module.ai.AiRuntimeModuleConfiguration;
 import dev.ainer.module.ai.gateway.application.AiInvocationAuditService;
-import dev.ainer.module.ai.gateway.application.ModelProvider;
-import dev.ainer.module.ai.gateway.application.ModelStreamObserver;
-import dev.ainer.module.ai.gateway.application.ProviderFailure;
 import dev.ainer.module.ai.gateway.domain.AiInvocation;
 import dev.ainer.module.ai.gateway.domain.CostBreakdown;
-import dev.ainer.module.ai.gateway.domain.ModelCompletion;
-import dev.ainer.module.ai.gateway.domain.ModelInvocation;
-import dev.ainer.module.ai.gateway.domain.TokenUsage;
 import dev.ainer.web.request.RequestIds;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,14 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
@@ -41,11 +31,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -100,7 +87,7 @@ class AiGatewayModuleIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private TestModelProvider provider;
+    private AiGatewayProviderFixture.TestModelProvider provider;
 
     @Autowired
     private AiInvocationAuditService auditService;
@@ -113,6 +100,12 @@ class AiGatewayModuleIntegrationTest {
 
     @Autowired
     private Clock clock;
+
+    @Autowired
+    private dev.ainer.cache.ratelimit.RateLimitPort rateLimitPort;
+
+    @Autowired
+    private dev.ainer.cache.autoconfigure.AinerCacheCapabilities cacheCapabilities;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -242,8 +235,21 @@ class AiGatewayModuleIntegrationTest {
     }
 
     @Test
-    void budgetReservationCountsConcurrentStartedInvocations() {
-        CostBreakdown reservation = new CostBreakdown(new BigDecimal("0.00600000"), "USD");
+    void subjectRateLimitFallsBackToNodeLocalPortWithVisibleNonClusterAccuracy() {
+        // ADR-0039 §1 第三层能力：本用例的上下文是默认 ainer.cache.type=local，
+        // 限流必须显式退化为进程内固定窗口，并在能力报告里标注「非集群精确」
+        assertThat(rateLimitPort).isInstanceOf(NodeLocalRateLimitPort.class);
+        assertThat(rateLimitPort.clusterAccurate()).isFalse();
+        assertThat(cacheCapabilities.rateLimitImplementationClass())
+                .isEqualTo(NodeLocalRateLimitPort.class.getName());
+        assertThat(cacheCapabilities.rateLimitClusterAccurate()).isFalse();
+        assertThat(cacheCapabilities.describe())
+                .contains("rateLimit{declared=LOCAL")
+                .contains("clusterAccurate=false");
+    }
+
+    @Test
+    void budgetReservationCountsConcurrentStartedInvocations() {        CostBreakdown reservation = new CostBreakdown(new BigDecimal("0.00600000"), "USD");
         AiInvocation first = invocation("tenant-reservation", reservation);
         AiInvocation second = invocation("tenant-reservation", reservation);
 
@@ -263,13 +269,10 @@ class AiGatewayModuleIntegrationTest {
                 "test/model", "test/model", false, "a".repeat(64), reservation, clock.instant());
     }
 
-    /** 测试 RSA key：与 FakeProviderConfiguration.testJwtDecoder 同源。 */
-    static final com.nimbusds.jose.jwk.RSAKey HTTP_RSA_JWK =
-            dev.ainer.testsupport.jwt.JwtTestSupport.generateRsaKey();
-
     private static String userJwt(String subjectId) {
         return dev.ainer.testsupport.jwt.JwtTestSupport.signUserJwt(
-                HTTP_RSA_JWK, "https://auth.ainer.test", "ainer-api", subjectId, "ai.invoke");
+                AiGatewayProviderFixture.HTTP_RSA_JWK,
+                "https://auth.ainer.test", "ainer-api", subjectId, "ai.invoke");
     }
 
     private HttpResponse<String> post(String path, String tenantId, String body) throws Exception {
@@ -294,7 +297,7 @@ class AiGatewayModuleIntegrationTest {
 
     @SpringBootConfiguration
     @EnableAutoConfiguration
-    @Import({AiRuntimeModuleConfiguration.class, FakeProviderConfiguration.class})
+    @Import({AiRuntimeModuleConfiguration.class, AiGatewayProviderFixture.class})
     static class TestApplication {
     }
 
@@ -401,82 +404,4 @@ class AiGatewayModuleIntegrationTest {
         assertThat(resultRow.get("invocation_id")).isEqualTo(invocationId);
     }
 
-    @TestConfiguration(proxyBeanMethods = false)
-    static class FakeProviderConfiguration {
-
-        @Bean
-        @Primary
-        TestModelProvider testModelProvider() {
-            return new TestModelProvider();
-        }
-
-        @Bean
-        @Primary
-        dev.ainer.module.ai.gateway.application.ContextSnapshotBuilder testSnapshotBuilder() {
-            return (task, ctx) -> new dev.ainer.module.ai.gateway.application.ContextSnapshotBuilder.ContextSnapshotData(
-                    task.targetIdentityId(),
-                    UUID.randomUUID(),
-                    "[{\"type\":\"publication\",\"id\":\"pub-001\",\"summary\":\"上周发布3篇笔记\"},"
-                            + "{\"type\":\"metric\",\"id\":\"m-001\",\"summary\":\"总曝光12.3k,互动率4.2%\"},"
-                            + "{\"type\":\"feedback\",\"id\":\"f-001\",\"summary\":\"用户咨询增加15%\"}]",
-                    "[{\"memory_id\":\"mem-001\",\"scope\":\"brand\",\"confidence\":0.85,"
-                            + "\"summary\":\"优先发布教程类内容\"}]");
-        }
-
-        /** 真链：RSA 验签 + issuer 校验（JwtTestSupport），替代按 token 字符串直接构造的 stub。 */
-        @Bean
-        JwtDecoder testJwtDecoder() {
-            return dev.ainer.testsupport.jwt.JwtTestSupport.jwtDecoder(
-                    HTTP_RSA_JWK, "https://auth.ainer.test", "ainer-api");
-        }
-    }
-
-    static final class TestModelProvider implements ModelProvider {
-
-        private final AtomicBoolean failNext = new AtomicBoolean();
-        private final AtomicInteger calls = new AtomicInteger();
-
-        @Override
-        public String name() {
-            return "test-provider";
-        }
-
-        @Override
-        public ModelCompletion complete(ModelInvocation invocation) {
-            calls.incrementAndGet();
-            if (failNext.compareAndSet(true, false)) {
-                throw new ProviderFailure(ProviderFailure.Kind.UNAVAILABLE, "simulated provider outage");
-            }
-            return completion();
-        }
-
-        @Override
-        public void stream(ModelInvocation invocation, ModelStreamObserver observer) {
-            calls.incrementAndGet();
-            observer.onDelta("Ainer ");
-            observer.onDelta("stream");
-            observer.onComplete(new ModelCompletion(
-                    "provider-stream-1", "test/model", "Ainer stream", "stop",
-                    new TokenUsage(8, 2, false)));
-        }
-
-        void failNext() {
-            failNext.set(true);
-        }
-
-        int calls() {
-            return calls.get();
-        }
-
-        void reset() {
-            failNext.set(false);
-            calls.set(0);
-        }
-
-        private ModelCompletion completion() {
-            return new ModelCompletion(
-                    "provider-request-1", "test/model", "Ainer answer", "stop",
-                    new TokenUsage(10, 8, false));
-        }
-    }
 }

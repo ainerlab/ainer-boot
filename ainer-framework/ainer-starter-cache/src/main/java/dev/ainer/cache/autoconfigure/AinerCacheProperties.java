@@ -18,6 +18,8 @@ import java.time.Duration;
  * @param local   本地 Caffeine 后端参数
  * @param redis   Redis/Valkey 后端参数
  * @param lock    分布式锁选择策略
+ * @param rateLimit 分布式限流参数（实现选择跟随 {@link #type()}：{@code REDIS} → Redis 固定窗口，
+ *                  {@code LOCAL} → 进程内固定窗口）
  */
 @ConfigurationProperties(prefix = "ainer.cache")
 public record AinerCacheProperties(
@@ -25,7 +27,8 @@ public record AinerCacheProperties(
         CacheType type,
         Local local,
         Redis redis,
-        Lock lock) {
+        Lock lock,
+        RateLimit rateLimit) {
 
     public AinerCacheProperties {
         enabled = enabled == null || enabled;
@@ -33,6 +36,7 @@ public record AinerCacheProperties(
         local = local == null ? new Local(null, null) : local;
         redis = redis == null ? new Redis(null, null) : redis;
         lock = lock == null ? new Lock(null) : lock;
+        rateLimit = rateLimit == null ? new RateLimit(null) : rateLimit;
     }
 
     /** 缓存后端类型。{@code LOCAL} 是 ADR-0039 约定的默认值。 */
@@ -108,6 +112,27 @@ public record AinerCacheProperties(
 
         public Lock {
             type = type == null ? LockType.AUTO : type;
+        }
+    }
+
+    /**
+     * 分布式限流参数（ADR-0039 §1 第三层能力）。
+     *
+     * <p>刻意<strong>没有</strong> {@code type} 开关：限流实现跟随 {@code ainer.cache.type}
+     * ——{@code REDIS} 用 Redis 固定窗口（集群精确），{@code LOCAL} 用进程内固定窗口（降级档，
+     * 多实例总阈值放大 N 倍，启动期 WARN）。额外加一个开关只会制造「缓存用 Redis、限流偷偷用
+     * 进程内」的组合，与 ADR-0039 §1 的表格不符。
+     *
+     * <p>配额本身（{@code limit} 与窗口）不属于基础设施配置：它由每个调用方的业务语义决定，
+     * 作为 {@code tryAcquire} 的入参传入。
+     *
+     * @param keyPrefix Redis/进程内 key 前缀，默认 {@code ainer:ratelimit:}；多应用共享同一
+     *                  Redis 实例时用它隔离命名空间
+     */
+    public record RateLimit(String keyPrefix) {
+
+        public RateLimit {
+            keyPrefix = keyPrefix == null || keyPrefix.isBlank() ? "ainer:ratelimit:" : keyPrefix;
         }
     }
 }

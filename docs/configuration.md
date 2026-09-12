@@ -384,6 +384,7 @@ at-least-once 与幂等要求见 ADR-0047 §3。
 | `AINER_CACHE_REDIS_TIME_TO_LIVE` | `PT30M` | Redis 缓存条目 TTL，必须为正 |
 | `AINER_CACHE_REDIS_KEY_PREFIX` | `ainer:cache:` | Redis 缓存键前缀（多应用共享实例时用于隔离命名空间） |
 | `AINER_CACHE_LOCK_TYPE` | `AUTO` | 分布式锁策略：`AUTO` / `POSTGRES` / `LOCAL`；取值大小写不敏感 |
+| `AINER_CACHE_RATE_LIMIT_KEY_PREFIX` | `ainer:ratelimit:` | 分布式限流 key 前缀（多应用共享同一 Redis 实例时用于隔离命名空间） |
 
 装配与失败语义：
 
@@ -399,6 +400,19 @@ at-least-once 与幂等要求见 ADR-0047 §3。
   否则存在唯一 `DataSource` → PostgreSQL 会话级 advisory lock（`pg_try_advisory_lock(hashtextextended(key, seed))`）；
   否则退化为进程内锁并 **WARN**（多实例部署下互斥不成立）。
 - `lock.type=POSTGRES` 时没有 `DataSource`（或存在多个且无 `@Primary`）会**启动失败**。
+- 分布式限流（ADR-0039 §1 第三层，`RateLimitPort`）的实现**跟随 `AINER_CACHE_TYPE`**，没有独立开关：
+  `REDIS` → Redis 固定窗口（`RedisFixedWindowRateLimitPort`，多实例共享同一份计数，集群总阈值不放大）；
+  `LOCAL`（默认）→ 进程内固定窗口（`NodeLocalRateLimitPort`，**每实例各持一份完整配额**，
+  多实例总阈值放大到 N 倍，启动期 WARN 且能力报告给出 `clusterAccurate=false`）。
+  刻意不提供「缓存用 LOCAL、限流用 REDIS」的组合，也不在运行期把 Redis 失败降级为进程内计数——
+  那会把「声明了集群精确配额、实际每实例独立」的静默缺陷重新引入。
+- 限流**配额不在配置里**：`limit` 与窗口属于调用方的业务语义，作为
+  `RateLimitPort.tryAcquire(key, permits, limit, window)` 的入参传入。窗口是 epoch 对齐的固定窗口
+  （首版不做令牌桶，见 ADR-0039「非目标」）。
+- 限流 key 布局：`<AINER_CACHE_RATE_LIMIT_KEY_PREFIX><调用方 key>:<窗口序号>`；调用方 key 由业务给出
+  （AI 主体限流是 `ai:subject:<subjectId>`）。key 会以明文落在 Redis，**不要**把秘密或 PII 写进 key。
+- Redis 不可用时限流入口**失败关闭**（判定 `BACKEND_UNAVAILABLE`，不抛异常也不放行），告警按 30 秒节流：
+  取舍与运维动作见 [operations.md](operations.md) §9.4。
 - PostgreSQL advisory lock 的代价：**每个被持有的锁独占一条池化连接**直到释放或 TTL 到期，
   因此池大小必须覆盖「并发锁数 + 常规查询并发」；TTL 由实例内收割线程强制执行。
   实测（`PostgresDistributedLockPortIntegrationTest`，Hikari 池上限 3）：持有 2 把锁时池内活跃连接

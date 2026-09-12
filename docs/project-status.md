@@ -339,6 +339,8 @@ Ainer 项目签名 provenance 已通过。
 
 ## 3. 最近验证记录
 
+HEAD
+
 2026-09-11 JWKS 信任锚实证与签名密钥轮换窗口（分支 `codex/jwks-trust-and-rotation`，基线 2e222ac）
 - **两个缺口**：①Resource Server「信任生产 AS 的 JWKS」这一跳从未被证明——全仓没有
   `jwk-set-uri`，所有 HTTP/JWT 集成测试都用 `@Primary JwtDecoder` 自签自验把生产解码器顶掉，
@@ -385,6 +387,71 @@ Ainer 项目签名 provenance 已通过。
   5 分钟（Nimbus `JWKSourceBuilder.DEFAULT_CACHE_TIME_TO_LIVE = 300000 ms`），因此 runbook
   要求先等 Token TTL 过去再移除；私钥仍是挂载 PEM，没有 HSM/KMS、自动轮换、多实例密钥同步或
   密钥使用审计；未实现 `x5c`/证书链与非 RSA 算法。
+
+2026-09-11 ADR-0039 §1 第三层「分布式限流」补齐（分支 `codex/distributed-rate-limit`）
+- **销账**：上一条 2026-09-11 记录中「② ADR-0039 §1 的第三层能力『分布式限流 `RateLimitPort`』仍未实现，
+  限流现状仍是 ADR-0016 的 node-local 固定窗口」本次关闭。**ADR-0039 的结论未改写**，只补齐实现；
+  ADR-0016 的登录链路限流按边界留给独立切片（本分支未改 Authorization Server）。
+- **SPI**：新增 `dev.ainer.cache.ratelimit.RateLimitPort`
+  （`tryAcquire(key, permits, limit, window)` → `RateLimitDecision{outcome, remaining, retryAfter}`，
+  `outcome ∈ {ALLOWED, LIMIT_EXCEEDED, BACKEND_UNAVAILABLE}`）。窗口是 **epoch 对齐的固定窗口**
+  （首版不做令牌桶，符合 ADR-0039「非目标」）；key 布局
+  `<ainer.cache.rate-limit.key-prefix><调用方 key>:<窗口序号>`；配额由调用方作为入参传入、不存后端
+  （因此多实例必须配置一致）。被拒绝的请求**不消耗**配额（拒绝不惩罚）。
+- **两个实现**：① `RedisFixedWindowRateLimitPort`——单个 Lua 脚本内完成「读计数 → 判断 → `INCRBY`
+  → 维护 TTL」，key 的 TTL 精确到窗口结束（旧窗口键自然消失，无需清理任务），窗口序号写进 key
+  避免「读旧值再重置」的读改写竞态；② `NodeLocalRateLimitPort`——进程内固定窗口降级档，
+  `clusterAccurate()` 恒 `false`。
+- **失败语义（显式取舍，写清理由）**：Redis 不可用 / 命令超时 / 返回不可解析结果时**失败关闭**——
+  不抛异常、不放行，返回 `BACKEND_UNAVAILABLE`，WARN 按 30 秒节流并统计被抑制条数。理由：
+  ① 限流保护的是下游配额与费用，抖动期放行等于在最不可预测的时刻静默取消保护；
+  ② 运行期静默降级为进程内计数会重新制造「声明了集群精确、实际每实例独立」的缺陷形态，
+  这正是 ADR-0039 落地补齐要消除的形态。降级只允许发生在**装配期**（`ainer.cache.type=local`），
+  代价、告警语义与运维动作写入 [operations.md](operations.md) §9.4。
+- **装配与可见性**：实现跟随 `ainer.cache.type`（`redis` → Redis 固定窗口；缺省 `local` → 进程内），
+  **刻意不加独立开关**，避免出现「缓存用 Redis、限流偷偷用进程内」的组合；新增
+  `ainer.cache.rate-limit.key-prefix`（默认 `ainer:ratelimit:`）；`AinerCacheCapabilities` 增加
+  `rateLimit{declared=… → effective=…, clusterAccurate=…}`，退化为进程内实现时启动期 WARN。
+- **真实消费者（本轮硬要求：不允许"声明了但不生效"）**：AI runtime 的 `SubjectRateLimiter` 改为经
+  `RateLimitPort` 计数（key `ai:subject:<subjectId>`、1 分钟窗口、配额取
+  `ainer.ai.limits.requests-per-minute`），对外语义不变——HTTP 429 + `AINER.AI.RATE_LIMITED` +
+  审计 `REJECTED_RATE_LIMIT`；
+  改动面：`ainer-module-ai-runtime` 新增对 `ainer-starter-cache` 的依赖 + `SubjectRateLimiter` 由
+  「自带 `ConcurrentHashMap` 计数」重写为端口适配器 + 装配处注入端口，业务规则与错误码零改动。
+- **测试（真实 `redis:7-alpine` + 真实 `postgres:18.3-alpine`，无 Mockito / 无 H2）**：
+  ① 核心并发证明——两个独立 `RateLimitPort` 实例（两条独立 Lettuce 连接，模拟两个 JVM）各 200 个
+  virtual-thread 任务同时放闸打同一 key，阈值 100：**总放行 100、拒绝 300**，Redis 里只有一个计数键
+  且值 = 100（本机连跑实测四轮分布 `A=42/B=58`、`A=58/B=42`、`A=28/B=72`、`A=52/B=48`，四轮总放行都恒等于
+  阈值；首轮曾出现 `A=100/B=0`——未预热的那条连接在起跑后才握手，已修夹具让竞争真正交织）；② 串行交错证明「真共享」——实例 A 取 1、实例 B 取 1
+  后，实例 A 的第 3 次被拒（独立计数时该断言失败）；③ 窗口推进后配额恢复、`retryAfter` 从 60s
+  单调收敛到 40s、旧窗口键 TTL 有上界并真实过期消失；④ 失败关闭——测试内真实 `stop()` 掉一个
+  Redis 容器，连续 5 次调用全部 `BACKEND_UNAVAILABLE` 且 5 次只留 1 条 WARN（节流实测）；
+  ⑤ node-local 降级——`clusterAccurate=false`、启动期 WARN 文本与
+  `rateLimit{declared=LOCAL …, clusterAccurate=false}` 报告断言；⑥ AI runtime 消费者回归——
+  `ainer.cache.type=redis` 下限流 2/min：前两请求 200、第三请求 429 +
+  `AINER.AI.RATE_LIMITED`、provider 只被调用 2 次、审计
+  `REJECTED:REJECTED_RATE_LIMIT:AINER.AI.RATE_LIMITED`，且 Redis 共享键
+  `ainer:test:ai-ratelimit:ai:subject:<sub>:<窗口序号>=2`（进程内自算时不会有这个键）；
+  默认 `local` 上下文另断言端口为 node-local 且报告 `clusterAccurate=false`。
+- **实测（提交态复跑）**：本条记录的三次 `clean verify` 都在同一份代码内容上执行，最后一次在提交
+  `4ab8844`（工作树干净）上复跑。`./mvnw clean verify`（JDK 25 / Maven 4.0.0-rc-6 / Colima，`DOCKER_HOST` +
+  `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 指向 colima socket）= 28 模块、**681 tests / 0 failure /
+  0 error / 0 skipped**、`Total time: 04:53 min`；`scripts/check-surefire-results.sh` 同结果
+  `tests=681, failures=0, errors=0, skipped=0` 并退出 0，构建日志 `[ERROR]` 0 条。本次新增 30 项（cache starter 26 → 48：
+  Redis 限流 8、node-local 5、装配 8，另在既有装配测试补 1 项默认降级断言；AI runtime 33 → 41：
+  新集成类 3、策略单测 +4、既有集成类 +1），两个模块均 0 skipped（真实容器 `redis:7-alpine`、
+  `postgres:18.3-alpine`；无 Mockito / 无 H2）。
+- **三道门禁**：`scripts/check-runtime-wiring.sh` → `Dockerfile COPY 覆盖 27 个 reactor 模块；3 处
+  @Scheduled 均有生效的 @EnableScheduling`；`scripts/check-framework-boundary.sh` → `框架 main Java
+  文件 667 个、框架与根 pom 28 个、框架 migration 20 个（DDL 75 条），违规 0 处`；
+  `scripts/check-endpoint-authorization.sh` → `Java 文件 683 个、handler 110 个…违规 0 处`。
+- **未完成/待决策**：① 令牌桶/滑动窗口等更平滑算法仍属后续（ADR-0039 非目标）；
+  ② 登录链路（ADR-0016）与 Authorization Server 的共享限流接入留给独立切片（本任务边界明确排除）；
+  ③ `scripts/check-runtime-wiring.sh` 头部 TODO 的第三条检查「`@Cacheable` 存在 ⇒ `@EnableCaching`
+  存在」在其依赖分支已合入后仍未补（本次不扩大范围，见交接项）；④ 集群精确性依赖实例间 NTP 同步与
+  一致配额，属部署前提（已写入 operations.md §9.4，未做跨实例时钟偏移的自动化验证）；
+  ⑤ 本机 Colima 观察到一次 `@Testcontainers(disabledWithoutDocker = true)` 瞬时判定 Docker 不可用
+  导致整类跳过（重跑即恢复），该跳过语义是基线既有模式，未在本次改动中收紧。
 
 2026-09-11 端点授权默认拒绝落地（`@EndpointAccess` + 运行期 FAIL_CLOSED + 静态门禁）
 - **缺口**：`@AinerAuthorize` 是逐方法可选注解，没有它的 handler 在 `AinerRequestAuthorizationManager`
@@ -440,6 +507,7 @@ Ainer 项目签名 provenance 已通过。
 - **边界**：门禁不解析继承来的映射（基类 Controller、接口默认实现）与第三方 jar 内端点；
   `framework-handler-packages`（默认 `org.springframework.` / `org.springdoc.` / `io.swagger.`）是
   显式豁免面，宿主引入其他第三方 MVC 库时需自行登记；白名单只豁免静态门禁，不改变运行期裁决。
+
 2026-09-11 全量门禁（`security_epoch` 写路径批次，工具链 JDK 25 + Spring Boot 4.1.1 + Maven 4.0.0-rc-6）
 - **命令**：`DOCKER_HOST=unix:///Users/xq/.colima/default/docker.sock TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw clean verify`
 - **结果**：28/28 reactor 模块 SUCCESS，`BUILD SUCCESS`，`Total time: 04:31 min`；

@@ -49,7 +49,8 @@ ainer-starter-web -> ainer-spring -> ainer-core
 ainer-starter-persistence -> ainer-core
 ainer-starter-security -> ainer-security -> ainer-core
 ainer-starter-cache -> Spring Cache（Caffeine 默认 / Redis 带 TTL + key 前缀）+ 分布式锁（Redis / PG advisory / 进程内）
-                        └ ADR-0039 §1 的分布式限流 RateLimitPort 仍未实现，限流现状仍是 node-local（ADR-0016）
+                        └ 分布式限流 RateLimitPort（Redis 固定窗口默认 / 无 Redis 降级 node-local）
+                          ADR-0039 §1 三层能力均已交付；登录链路限流接入仍属 ADR-0016 后续切片
 ainer-starter-observability -> ObservationRegistry + requestId/trace MDC（OTLP 默认关）
 
 ainer-dependencies                   独立 BOM，统一依赖版本
@@ -99,7 +100,7 @@ ainer-boot/
 │   ├── ainer-starter-web/
 │   ├── ainer-starter-persistence/       # 已落地的 MyBatis-Plus/MyBatis/Flyway/PostgreSQL 共性
 │   ├── ainer-starter-security/          # Resource Server 通用能力
-│   ├── ainer-starter-cache/             # Spring Cache + Caffeine/Redis + 分布式锁（ADR-0039）
+│   ├── ainer-starter-cache/             # Spring Cache + Caffeine/Redis + 分布式锁 + 分布式限流（ADR-0039）
 │   ├── ainer-starter-observability/
 │   └── ainer-starter-test/
 ├── ainer-module-identity/                # HumanAccount/ServicePrincipal/Credential foundation（去租户化）
@@ -281,7 +282,7 @@ M3/M4 已形成以下边界：
 - M4.6 使用 Spring Security 7.1 WebAuthn 建立默认关闭的 Passkey 主线：UV-required、真实签名
   ceremony、条件 MFA、ACTIVE/REVOKED 生命周期、恢复码/管理员双人恢复、受控首次 enrollment、
   登录限速和 Resource Server step-up。最后一个 ACTIVE Passkey 不允许普通自助删除；真实设备
-  矩阵、恢复通知、共享限流和多节点 session 尚未完成。
+  矩阵、恢复通知、共享限流（`RateLimitPort` 已交付，登录链路接入属 ADR-0016 后续切片）和多节点 session 尚未完成。
 - 短信、微信和企业身份源通过认证编排或标准扩展授权接入，不复活 password grant。
 - 业务模块从 typed `AuthenticatedPrincipal` 获取 `sub`、`token_profile`、`claim_contract_version`
   和 authorities，不读取 JWT，也不接受客户端身份请求头；缺失/未知 profile/actor 组合失败关闭。
@@ -308,7 +309,7 @@ M2 已按以下调用边界落地：
 ```text
 AI HTTP / application port
   -> Model allow-list / prompt size / sensitive pattern
-  -> Subject node-local rate limit
+  -> Subject rate limit（RateLimitPort：Redis 固定窗口 / 进程内降级）
   -> PostgreSQL daily-budget reservation
   -> ModelProvider port
   -> OpenAI-compatible JDK HttpClient adapter
@@ -330,7 +331,11 @@ AI HTTP / application port
 当前边界说明：
 
 - 非流式和 SSE 都产生同一 `AiInvocation` 审计；SSE 最终 usage 事件是正常完成的结算点。
-- 数据库日预算依赖 subject advisory lock，能在共享 PostgreSQL 范围内防止并发穿透；每分钟限流当前是 node-local，不是集群精确配额。
+- 数据库日预算依赖 subject advisory lock，能在共享 PostgreSQL 范围内防止并发穿透；每分钟限流经
+  `RateLimitPort`——`ainer.cache.type=redis` 时是 Redis 固定窗口，两实例并发消耗同一 key 的总放行量
+  等于阈值（集群精确）；缺省 `local` 时退化为进程内固定窗口，启动期 WARN 且能力报告标注
+  `clusterAccurate=false`（多实例总阈值放大 N 倍）。决策与取舍见 ADR-0039 §1/§5 与
+  [operations.md](operations.md) §9.4。
 - prompt 与模型正文不落库，只持久化不可逆 fingerprint 和治理元数据。
 - AI 主体只从验证后的 typed principal（`USER_NEUTRAL_V1` `sub`）构造；旧的 AI 身份请求头已经移除。
 - OpenAI-compatible DTO 只存在于 infrastructure；Ainer 端口不暴露供应商协议。

@@ -3,4 +3,5 @@ dev.ainer.cache.autoconfigure.AinerLocalCacheAutoConfiguration
 dev.ainer.cache.autoconfigure.AinerRedisCacheAutoConfiguration
 dev.ainer.cache.autoconfigure.AinerRedisCacheUnavailableAutoConfiguration
 dev.ainer.cache.autoconfigure.AinerCacheLockAutoConfiguration
+dev.ainer.cache.autoconfigure.AinerRateLimitAutoConfiguration
 dev.ainer.cache.autoconfigure.AinerCacheCapabilitiesAutoConfiguration

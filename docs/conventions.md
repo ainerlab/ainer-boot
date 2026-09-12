@@ -205,7 +205,7 @@ public enum WorkspaceErrorCode implements ErrorCode {
 - Prompt 和模型输出正文默认不落库、不写日志；只允许记录不可逆 fingerprint 与治理元数据。
 - Provider API key 只通过 secret 注入，默认 URL 必须为 HTTPS；原始供应商错误正文不得向外传播。
 - 流式调用必须有明确的最终 usage/完成语义；没有供应商 usage 时必须标记估算，不能伪装成实际计量。
-- 预算预占必须在调用 provider 前完成。集群级预算使用共享存储作为权威账本；进程内限流必须明确标注 node-local。
+- 预算预占必须在调用 provider 前完成。集群级预算使用共享存储作为权威账本；限流经 `RateLimitPort`（ADR-0039 §1），进程内降级实现必须自报 `clusterAccurate=false` 并在启动期 WARN 明说多实例下总阈值放大。
 - 价格是受控运维配置，必须记录币种与每百万输入/输出 Token 单价；不能把某个供应商的临时价格硬编码到领域层。
 - 外部 subject header 不能充当身份凭证；应用上下文最终来自 Resource Server 验证后的 typed principal。
 - 工具必须声明权限、输入 schema、超时和幂等策略。
