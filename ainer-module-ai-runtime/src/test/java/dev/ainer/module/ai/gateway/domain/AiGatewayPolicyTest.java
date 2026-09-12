@@ -139,8 +139,8 @@ class AiGatewayPolicyTest {
     void reportsNullAllowedModelAsConfigurationErrorInsteadOfBindingFailure() {
         AiRuntimeProperties.Provider provider = new AiRuntimeProperties.Provider(
                 null, "https://provider.example", "test-secret", "test/model",
-                Arrays.asList("test/model", null), null, null, false);
-        AiRuntimeProperties properties = new AiRuntimeProperties(false, provider, null, null);
+                Arrays.asList("test/model", null), null, null, null, null, false);
+        AiRuntimeProperties properties = new AiRuntimeProperties(false, provider, null, null, null);
 
         assertThatThrownBy(properties::validate)
                 .isInstanceOf(IllegalStateException.class)

@@ -341,6 +341,8 @@ Ainer 项目签名 provenance 已通过。
 
 HEAD
 
+HEAD
+
 2026-09-11 JWKS 信任锚实证与签名密钥轮换窗口（分支 `codex/jwks-trust-and-rotation`，基线 2e222ac）
 - **两个缺口**：①Resource Server「信任生产 AS 的 JWKS」这一跳从未被证明——全仓没有
   `jwk-set-uri`，所有 HTTP/JWT 集成测试都用 `@Primary JwtDecoder` 自签自验把生产解码器顶掉，
@@ -387,6 +389,110 @@ HEAD
   5 分钟（Nimbus `JWKSourceBuilder.DEFAULT_CACHE_TIME_TO_LIVE = 300000 ms`），因此 runbook
   要求先等 Token TTL 过去再移除；私钥仍是挂载 PEM，没有 HSM/KMS、自动轮换、多实例密钥同步或
   密钥使用审计；未实现 `x5c`/证书链与非 RSA 算法。
+
+2026-09-11 决策审计热表无限增长缺陷关闭（分支 `codex/decision-audit-retention`，基线 `2eba916`）
+- **缺陷**：`ainer_authorization_decision_audit` 只有 `insert`——写入端口
+  `AuthorizationDecisionAuditRepository` 与 mapper XML 都只有插入，全仓没有 select / delete /
+  archive / 保留策略；每个带 `@AinerAuthorize` 的请求（ALLOW/DENY/CHALLENGE）写一行，生产长期运行
+  必然失控。
+- **分层**：归档事务与 SQL 留在模块（`AuthorizationDecisionAuditLifecycleService` +
+  `AuthorizationDecisionAuditLifecycleRepository` + mapper 的单语句 CTE）；定时、批次、配置与指标
+  放装配层（`ainer-server` 的 `AuthorizationDecisionAuditRetention{Properties,Configuration,Runner}`）。
+  模块不依赖 `ainer-server`，其他宿主可用自己的调度器装配同一服务。
+- **不丢数据**：单语句原子搬迁——`FOR UPDATE SKIP LOCKED` 选候选行 → `INSERT ... ON CONFLICT
+  (decision_id) DO NOTHING` → 仅当归档行确实存在（本语句 `RETURNING`，或并发事务已提交）才 `DELETE`
+  热行。实测：触发器让归档表写入失败时热行 0 删除、整批回滚、异常计入失败计数；故障排除后同一
+  `cutoff` 仍能完整归档。
+- **多实例并发安全**：`SKIP LOCKED` 跳过其它实例持有的行锁（不阻塞、不重复、不丢行）。两个真并发
+  实例对同一区间 400 行按 batch 25 循环搬运：合计 400、归档表 `COUNT(DISTINCT decision_id)`=400、
+  热/冷交集 0、两实例各搬运 >0；另一实测用例里竞争实例持锁 50 行时，归档在锁未释放前即返回并只
+  搬走未锁的 50 行。
+- **读路径**：热+冷并集按稳定游标 `(evaluated_at, decision_id)` 倒序分页。实测归档前后返回完全一致
+  的 20 行序列；翻页扫描中途归档 24 行后仍返回 24 行且顺序与对照 workspace 一致。当前没有面向决策
+  审计历史的 HTTP 端点（`AuthorizationManagementController` 只有角色/绑定管理），历史查询方式与
+  可直接执行的并集 SQL 示例写在 `docs/operations.md` §10。
+- **Migration（追加，不改已发布文件）**：`V202609120900__authorization_decision_audit_archive.sql`
+  建同构归档表（+`archived_at`，保留原 `decision_id`）与三条索引：归档表
+  `(workspace_id, evaluated_at DESC, decision_id DESC)` 部分索引（按 workspace 读并集）、归档表
+  `(evaluated_at, decision_id)`、热表补 `(evaluated_at, decision_id)`（原热表只有 workspace 维度索引，
+  归档扫描会退化为全表扫描 + 排序）。
+- **全量门禁（唯一验收命令，原始输出）**：
+  `DOCKER_HOST=unix:///Users/xq/.colima/default/docker.sock TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw clean verify`
+  → **28/28 模块 SUCCESS、668 tests / 0 failure / 0 error / 0 skipped**、`Total time: 04:46 min`
+  （JDK 25.0.2 + Spring Boot 4.1.1 + Maven 4.0.0-rc-6；集成测试全部使用真实 PostgreSQL 18.3
+  Testcontainers，无 Mockito / H2）。本次新增 15 项：模块集成 9（不丢数据与逐列一致性、幂等、
+  失败不删热行、保留期边界、真并发不重不丢、`SKIP LOCKED` 跳过持锁行、并集读路径一致性、
+  扫描中途归档、状态快照）+ 装配层 6（批次上限与指标、最久热行 WARN、失败计数与恢复、启动校验、
+  `enabled` 条件装配、`@Scheduled` 首次延迟契约）。
+- **三道门禁（同一棵树实测原始输出）**：`scripts/check-runtime-wiring.sh` →
+  `Dockerfile COPY 覆盖 27 个 reactor 模块；4 处 @Scheduled 均有生效的 @EnableScheduling`（exit 0）；
+  `scripts/check-framework-boundary.sh` → `框架 main Java 文件 670 个、框架与根 pom 28 个、框架
+  migration 21 个（DDL 语句 76 条），违规 0 处`（exit 0）；`scripts/check-endpoint-authorization.sh`
+  → `Java 文件 686 个、handler 方法 110 个（…），违规 0 处`（exit 0）。未新增任何 HTTP 端点。
+
+2026-09-11 AI runtime 无界阻塞与零自愈修复（总超时覆盖响应体读取 + 中间态定时自愈）
+- **缺口（四条，均已在 `codex/ai-runtime-resilience` 上修复）**：
+  ① `OpenAiCompatibleModelProvider` 只设了建连超时与 `HttpRequest.timeout`，按 JDK 定性
+  （JDK-8258397）该超时在读到响应头之后失效、不覆盖响应体读取——上游「发完响应头就静默」时
+  `readLine()` / `readNBytes()` 无限阻塞，不是异常，`try/catch` 永远等不到；
+  ② `ainer-module-ai-runtime` 内 `@Scheduled` 数量为 0、模块外也没有任务扫 `ainer_ai_*`，
+  调用卡死或进程中断后 `ainer_ai_invocation` 永久停在 `STARTED`，而当日预算按
+  `status IN ('STARTED','SUCCEEDED','FAILED')` 统计 → 该 subject 的当日预算被永久占用到 UTC 跨日；
+  ③ `AiTaskRunService` 全类无事务且 `updateTaskRunStatus` 没有期望态条件，中途失败会留下
+  「RUNNING 的 task 没有对应 run」；④ `auditService.fail(...)` 在没有 STARTED 行时抛异常，
+  会替换掉调用方真正需要看到的原始失败原因。
+- **实测前提（本地 `HttpServer` 桩，可重放）**：只发响应头、零字节正文时 `HttpRequest.timeout`
+  生效（804ms 抛 `HttpTimeoutException`）；发响应头 + 一小段正文后静默时，800ms 的 request
+  timeout 下读取仍阻塞 > 3s——这就是必须由总超时兜住的窗口。官方 issue 已核对：
+  JDK-8208693（Extend the request timeout's scope to cover the response body）修复版本是 JDK 26，
+  25-pool 回移 JDK-8383521 仍 Open；JDK-8258397 是配套调查单。
+- **有界总超时**：`ainer.ai.provider.total-timeout`（默认 120s）与 `stream-total-timeout`
+  （默认 600s）覆盖整次调用（发送 + 读完响应体）。调用跑在 `aiProviderCallExecutor` 虚拟线程上，
+  调用线程用 `Future.get(totalTimeout)` 兜底，超时 `cancel(true)` + 关闭响应体唤醒读取线程；
+  响应体注册与放弃在同一把锁下完成，消除「超时恰好发生在 `send()` 返回与注册之间」的永久阻塞
+  窗口；流式读取循环另有截止时间检查兜住慢速滴流；执行器 `destroyMethod=shutdownNow`
+  （`close()` 会无限等待未结束任务）。超时失败写 `FAILED:AINER.AI.PROVIDER_TIMEOUT`。
+- **预算语义（刻意例外）**：超时/中断失败与定时自愈把 `actual_cost` 置 0 释放当日预算预占
+  （`estimated_cost` 保留在审计行），因为这类调用不会再回到终态；普通供应商失败（限流/不可用/
+  协议错误）仍按既有反绕过口径占用预算，`docs/ai-gateway.md` §4 已写明差异。
+- **中间态自愈**：新增 `AiIntermediateStateSweeper`，由全局 `AinerSchedulingAutoConfiguration`
+  驱动的 `@Scheduled` 按 `scan-interval-ms`（默认 60s）清扫 `invocation STARTED` /
+  `task_run RUNNING` / `task RUNNING`（任务表无 `started_at`，用 `updated_at` 计时）到 FAILED；
+  阈值 `stuck-threshold` 默认 15m，配置校验强制它比 `stream-total-timeout` 至少大 1 分钟。
+  幂等 + 并发安全：条件 UPDATE 作 CAS，候选行 `FOR UPDATE SKIP LOCKED`，多实例同时扫同一行只处理
+  一次。指标 `ainer.ai.intermediate_state.healed|stuck|oldest_age_seconds`（tag `state`）+
+  `sweep_failed`；无 `MeterRegistry` 时降级为只打 WARN 日志。`AiTaskRunService` 的 Phase 1 / Phase 3
+  改为显式事务，`updateTaskRunStatus` 补期望态 CAS。
+- **审计不掩盖原始失败**：审计终态回写失败挂到被抛异常的 suppressed 上并打 WARN，响应仍是原始
+  错误码（不再被 `IllegalStateException` 替换成 500），SSE 客户端照常收到 `error` 事件。
+- **测试**：`ainer-module-ai-runtime` 34 → **47 tests / 0 failure / 0 error / 0 skipped**。
+  新增 `AiRuntimeResilienceIntegrationTest` 9 项（真实 PostgreSQL 18.3 Testcontainers + 本地
+  `HttpServer` 桩 + 真实 `OpenAiCompatibleModelProvider`，不使用 Mockito/H2）：静默桩下非流式与
+  流式都在有界时间内失败、invocation 进 `FAILED:AINER.AI.PROVIDER_TIMEOUT` 且 `actual_cost = 0`、
+  该 subject 暴露回到 0 且后续调用仍 200、400/1200ms 区间断言证明兜底的是总超时而不是请求头超时、
+  超期 STARTED 自愈终态且未超期行不误伤、重复清扫零副作用、两个清扫实例并发处理 24 行自愈计数
+  恰好等于 24、不手动触发只等 `@Scheduled` 在 30s 内自动变终态、在途删除 STARTED 行后响应仍是
+  504 `AINER.AI.PROVIDER_TIMEOUT`；`OpenAiCompatibleModelProviderTest` 5 → 9 项（新增超时后有界
+  失败 ×3 与「超时后同一 HttpClient 仍可正常调用」）。既有正常调用 / SSE 正常完成 / 上游故障路径
+  断言全部保持通过（`AiGatewayModuleIntegrationTest` 9 项未改断言）。
+- **全量验证**：JDK 25.0.2 + Maven 4.0.0-rc-6 + Colima/PostgreSQL 18.3，
+  `DOCKER_HOST=unix:///Users/xq/.colima/default/docker.sock
+  TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw clean verify` →
+  28/28 reactor 模块 `SUCCESS`、`BUILD SUCCESS`、`Total time: 05:33 min`（同一代码树复跑第二次
+  `05:27 min`，逐模块结论相同）；`./scripts/check-surefire-results.sh` 两次均为
+  `tests=665, failures=0, errors=0, skipped=0`。
+- **三道门禁**：`check-runtime-wiring.sh`（Dockerfile COPY 覆盖 27 个 reactor 模块；4 处 `@Scheduled`
+  均有生效的 `@EnableScheduling`）、`check-framework-boundary.sh`（框架 main Java 662、pom 28、
+  migration 20 / DDL 75，违规 0）、`check-endpoint-authorization.sh`（Java 678、handler 110、
+  违规 0）全部 `exit 0`；`check-commit-discipline.sh 9cc6086 HEAD` 通过。
+- **测试夹具踩坑（记录以免复发）**：`HttpServer` 在 chunked 响应下要等到第一次写正文才把响应头刷到
+  socket（headers-only 时客户端 60s 都拿不到响应头），所以「发完响应头就静默」的桩必须先写一小段
+  正文；另外桩服务器必须先初始化 executor 再 `setExecutor`，否则 `setExecutor(null)` 会让 handler
+  跑在唯一 dispatcher 线程上，一个静默 handler 就把整个桩服务器永久卡死（本次曾据此误判为客户端
+  连接池被污染）。
+- **待决策**：①超时/自愈的「释放预占」口径与既有 FAILED 占用口径并存，需运维知悉（见
+  `docs/ai-gateway.md` §4）；②Phase 2（provider 调用）仍刻意不包事务，靠审计 REQUIRES_NEW；
+  ③自愈只做中间态终态化，不做 provider 重试或补偿调用。
 
 2026-09-11 ADR-0039 §1 第三层「分布式限流」补齐（分支 `codex/distributed-rate-limit`）
 - **销账**：上一条 2026-09-11 记录中「② ADR-0039 §1 的第三层能力『分布式限流 `RateLimitPort`』仍未实现，
@@ -711,6 +817,24 @@ HEAD
 - **范围边界**：不改缓存/锁（PR-B `codex/adr-0039-cache-and-lock-reality`）与 HTTP 异常处理
   （PR-A）；`SENDING` 租约把投递明确为 **at-least-once**（租约过期后允许重新领取），
   exactly-once 语义不在本 PR 范围。
+
+2026-09-11 运行时装配门禁扩到四条检查，并在负向实测中发现并修掉两种绕过
+- **新增两条检查**（`scripts/check-runtime-wiring.sh`）：③「`@Cacheable`/`@CacheEvict`/`@CachePut`
+  存在 ⇒ 存在真正生效的 `@EnableCaching`」（此前因依赖分支未合入而留作 TODO，现已补上）；
+  ④「每个 `fixedDelay`/`fixedRate` 型 `@Scheduled` 必须声明首次执行延迟」（`cron` 型不强制——
+  触发时刻由表达式决定）。
+- **负向实测暴露了门禁自身的两种绕过**（都已修，并复测确认拦住）：
+  ① **全限定注解名绕过**：原先只匹配 `@Scheduled` / `@EnableCaching` / `@ConditionalOnProperty`
+  等简单名，把注解写成 `@org.springframework...Scheduled` 即可静默绕过。现统一改为容忍任意包前缀
+  的匹配（`anno()` 助手）。**能一键绕过的门禁比没有门禁更危险**——它提供虚假的信心。
+  ② **同文件无关条件注解掩盖**：原先判断"`@EnableScheduling`/`@EnableCaching` 是否被默认关闭的条件
+  门控"时，用的是"整个文件里出现过 `matchIfMissing = true`"，于是同文件里**另一条**无关的条件注解
+  就能让它通过。现改为**逐条注解判断**：每条 `@ConditionalOnProperty` 自己必须声明
+  `matchIfMissing = true`。
+- **检查范围**：新增的首次执行延迟检查只覆盖 `main` 源码——测试里的 `@Scheduled` 探针
+  （如 `AinerSchedulingAutoConfigurationTest`）正是要断言"调度生效即立即执行"，强制加延迟会让该断言失去意义。
+- **真实树零违规**：`Dockerfile COPY 覆盖 27 个 reactor 模块；4 处 @Scheduled 均有生效的
+  @EnableScheduling 与首次执行延迟；3 个 main 源码文件使用缓存注解且缓存切面已生效`。
 
 2026-09-11 CI 暴露：投递引擎缺首次执行延迟，与手动驱动的测试争抢记录（本批改动引入的交互回归）
 - **症状**：PR #79 的 quality gate 在 notification 模块失败——`SmtpMailChannelSenderIntegrationTest`

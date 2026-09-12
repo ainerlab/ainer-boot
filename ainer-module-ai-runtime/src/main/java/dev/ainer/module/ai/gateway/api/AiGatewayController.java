@@ -86,7 +86,9 @@ public class AiGatewayController {
         requireScope(principal);
         actingGrantGuard.requireIfPresent(
                 principal, request.actingAgentId(), request.workspaceId(), servletRequest.getRequestURI());
-        SseEmitter emitter = new SseEmitter(properties.getProvider().getRequestTimeout().plusSeconds(5).toMillis());
+        // SSE 通道的存活时间必须比 provider 的流式总超时（覆盖响应体读取）更长：否则 emitter 会
+        // 先于 provider 命中超时，把「provider 超时 → 写 FAILED 审计」的终态路径换成静默断开。
+        SseEmitter emitter = new SseEmitter(properties.getProvider().getStreamTotalTimeout().plusSeconds(5).toMillis());
         AtomicReference<Future<?>> task = new AtomicReference<>();
         AtomicBoolean completed = new AtomicBoolean();
         task.set(service.stream(command(principal, requestId, request), new AiStreamListener() {

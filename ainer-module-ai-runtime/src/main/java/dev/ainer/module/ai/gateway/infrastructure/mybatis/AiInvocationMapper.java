@@ -34,5 +34,21 @@ public interface AiInvocationMapper {
             @Param("latencyMillis") long latencyMillis,
             @Param("completedAt") Instant completedAt);
 
+    int markFailedReleasingReservation(
+            @Param("id") UUID id,
+            @Param("errorCode") String errorCode,
+            @Param("latencyMillis") long latencyMillis,
+            @Param("completedAt") Instant completedAt);
+
+    int healStuckStarted(
+            @Param("startedBefore") Instant startedBefore,
+            @Param("limit") int limit,
+            @Param("errorCode") String errorCode,
+            @Param("healedAt") Instant healedAt);
+
+    long countStuckStarted(@Param("startedBefore") Instant startedBefore);
+
+    Instant oldestStartedAt();
+
     AiInvocationRow selectBySubjectAndId(@Param("subjectId") String subjectId, @Param("id") UUID id);
 }

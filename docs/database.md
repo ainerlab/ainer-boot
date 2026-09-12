@@ -92,6 +92,11 @@ AI runtime foundation baseline（`V202608070320`）：
 | `ainer_authorization_subject_binding` | 绑定生命周期（UUIDv7 PK，subject_ref/role_id/scope_kind+scope 列/valid_from/until/status/version/revoked_*） |
 | `ainer_authorization_change_audit` | 变更审计 append-only（actor/target/action/before-after version，no Token/body） |
 | `ainer_authorization_decision_audit` | 决策审计 append-only（decision_id/requester/permission/resource/outcome/reason/evaluated_at） |
+| `ainer_authorization_decision_audit_archive` | 决策审计同库冷归档（同构 + `archived_at`，保留原 `decision_id`；只由保留任务写入，默认不删除） |
+
+决策审计归档表与按决策时间的扫描索引由后续 migration `V202609120900` 追加（`ainer_` 前缀、
+不改已发布文件）：归档表与热表同构并多一列 `archived_at`，索引覆盖「按 workspace 分页读热+冷
+并集」与「按决策时间归档扫描」两条访问路径，热表同时补一条 `(evaluated_at, decision_id)` 索引。
 
 `scope_kind` CHECK 适配 Greenfield Workspace 语义：`GLOBAL`（workspace/resource 全 NULL）、
 `WORKSPACE`（workspace_id 非空）、`RESOURCE`（workspace_id+resource_type+resource_id 全非空）。
@@ -230,6 +235,11 @@ Workspace OWNER 恢复审批事务按 workspace 锁定并重新验证无 ACTIVE 
 和目标 ACTIVE 成员，然后仅提升目标成员；部分唯一索引阻止同一 Workspace 存在多个开放申请。
 
 Workspace 授权审计归档使用小批量 CTE：以 `FOR UPDATE SKIP LOCKED` 选择过期热记录，`INSERT ... ON CONFLICT` 写入归档，仅在同 ID 归档已存在时删除热记录。统一查询和 SIEM 导出读取热/归档并集。归档表本身不自动删除；最终删除、法律保留和外部不可变存储需要另立策略。
+
+通用授权的决策审计归档（`V202609120900`）沿用同一模式，差异是候选集按**决策时间**全局选择
+（不按 workspace 分片），而读取路径按 `workspace_id` 读热/归档并集并使用
+`(evaluated_at, decision_id)` 稳定游标。归档任务的执行属于宿主装配层（`ainer-server`），
+模块本身只提供事务内的归档语句与读路径，不引入定时调度依赖。
 
 禁止：事务提交后才临时补写 outbox、用进程内异步事件代替可靠事实、在一个本地事务中假装覆盖另一个服务数据库。
 

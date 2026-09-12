@@ -42,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
                 "ainer.ai.enabled=true",
+                "ainer.ai.test-fake-provider=true",
                 "ainer.ai.provider.name=test-provider",
                 "ainer.ai.provider.base-url=http://localhost:9",
                 "ainer.ai.provider.api-key=test-secret",

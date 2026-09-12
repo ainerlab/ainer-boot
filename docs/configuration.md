@@ -159,8 +159,14 @@ AI 默认关闭。启用时以下设置共同构成安全门禁：
 | `AINER_AI_DEFAULT_MODEL` | 空 | 最长 128 字符 |
 | `AINER_AI_ALLOWED_MODELS` | 空 | 白名单必须包含默认模型 |
 | `AINER_AI_CONNECT_TIMEOUT` | `5s` | 必须为正数 |
-| `AINER_AI_REQUEST_TIMEOUT` | `60s` | 必须为正数 |
+| `AINER_AI_REQUEST_TIMEOUT` | `60s` | 必须为正数；按 JDK 定性只覆盖到响应头（JDK-8258397） |
+| `AINER_AI_TOTAL_TIMEOUT` | `120s` | 必须为正数；非流式调用总时长上限，**覆盖响应体读取** |
+| `AINER_AI_STREAM_TOTAL_TIMEOUT` | `600s` | 必须为正数；流式调用总时长上限，**覆盖响应体读取** |
 | `AINER_AI_ALLOW_INSECURE_HTTP` | `false` | 仅本地合约测试可设为 `true` |
+| `AINER_AI_SELF_HEAL_ENABLED` | `true` | 中间态定时自愈总开关 |
+| `AINER_AI_SELF_HEAL_STUCK_THRESHOLD` | `15m` | 必须为正数，且比 `AINER_AI_STREAM_TOTAL_TIMEOUT` 至少大 1 分钟，否则启动失败 |
+| `AINER_AI_SELF_HEAL_SCAN_INTERVAL_MS` | `60000` | `1000..3600000`；同时作为 `@Scheduled` 的初始延迟 |
+| `AINER_AI_SELF_HEAL_BATCH_SIZE` | `200` | `1..10000`；单次清扫每类中间态的处理上限 |
 | `AINER_AI_REQUESTS_PER_MINUTE` | `60` | 当前进程内 subject 限流基线 |
 | `AINER_AI_SUBJECT_DAILY_BUDGET` | `10.00` | 必须大于 0 |
 | `AINER_AI_MAX_PROMPT_CHARACTERS` | `100000` | `1000..10000000` |
@@ -169,6 +175,12 @@ AI 默认关闭。启用时以下设置共同构成安全门禁：
 | `AINER_AI_OUTPUT_PER_MILLION_TOKENS` | `0` | 不得为负 |
 
 完整调用与审计说明见 [`ai-gateway.md`](ai-gateway.md)。
+
+**配置矩阵**：以上 `AINER_AI_*` 键只在 `ainer-server/src/main/resources/application.yaml`（base）
+定义，`prod` / `dev` / `local` 三个 profile 全部继承 base，靠环境变量覆盖；仓库内不存在
+profile 级覆盖文件，因此新键加在 base 即对所有环境生效。默认值同时由
+`AiRuntimeProperties` 兜底并在 `validate()` 里校验（例如 `self-heal.stuck-threshold` 必须大于
+`stream-total-timeout + 1m`），配置写错会在启动期失败而不是静默降级。
 
 ## 5. Authorization Server
 
@@ -349,6 +361,22 @@ MDC 关联；不改写域 Micrometer counters，也不把 Prometheus 鉴权搬�
 策略决定；被拒绝的管理尝试会持久化为对 `authorization.manage` 的 DENY 决策审计，审计写入
 失败时异常传播、请求失败关闭，不会在缺少审计的情况下继续处理。产品部署应以自己的策略 bean
 取代该参考实现。
+
+决策审计热表归档任务默认关闭（`ainer.authorization.enabled` 只控制模块装配，不控制该任务）：
+
+| 键 | 默认 | 说明 |
+|---|---|---|
+| `AINER_AUTHORIZATION_DECISION_AUDIT_RETENTION_ENABLED` | `false` | 打开决策审计热表归档任务；首次上线顺序见 [`operations.md`](operations.md) §2.7 |
+| `AINER_AUTHORIZATION_DECISION_AUDIT_HOT_RETENTION` | `90d` | 热表保留期：`evaluated_at` 早于 `now - hot-retention` 的行会被搬进归档表 |
+| `AINER_AUTHORIZATION_DECISION_AUDIT_RETENTION_FIXED_DELAY` | `5m` | 相邻两个归档周期的间隔（上一周期结束后计算），必须为正 |
+| `AINER_AUTHORIZATION_DECISION_AUDIT_RETENTION_INITIAL_DELAY` | `5m` | 首次执行延迟，必须为正；不声明会在启动瞬间抢跑并与启动期负载争抢行锁 |
+| `AINER_AUTHORIZATION_DECISION_AUDIT_ARCHIVE_BATCH_SIZE` | `500` | 单批搬运上限，1..5000；限制单事务持锁时间与 WAL 量 |
+| `AINER_AUTHORIZATION_DECISION_AUDIT_MAX_BATCHES_PER_CYCLE` | `20` | 单周期最多连续搬运批数，1..1000；限制单周期资源占用，剩余积压留给下一周期 |
+| `AINER_AUTHORIZATION_DECISION_AUDIT_OLDEST_HOT_WARN_WINDOW` | `91d` | 最久未归档告警窗口，**必须严格大于热保留期**；最旧热行年龄超过它即 WARN |
+
+非正时长、`batch-size` / `max-batches-per-cycle` 越界、告警窗口不大于热保留期都会让启动失败
+（失败关闭，不静默回退到默认值）。归档语义、指标与历史查询示例见
+[`operations.md`](operations.md) §10。
 
 RSA 签名密钥、撤销 epoch 和在线 introspection 配置属于 Authorization Server（§5），
 不在通用授权模块配置范围内。

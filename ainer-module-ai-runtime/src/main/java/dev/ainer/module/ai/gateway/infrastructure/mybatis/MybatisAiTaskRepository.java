@@ -78,8 +78,39 @@ public class MybatisAiTaskRepository implements AiTaskRepository {
     }
 
     @Override
-    public boolean updateTaskRunStatus(UUID id, String status, Instant completedAt) {
-        return mapper.updateTaskRunStatus(id, status, completedAt) == 1;
+    public boolean updateTaskRunStatus(
+            UUID id, AiTaskRunStatus expected, AiTaskRunStatus next, Instant completedAt) {
+        return mapper.updateTaskRunStatus(id, expected.name(), next.name(), completedAt) == 1;
+    }
+
+    @Override
+    public int healStuckRunningRuns(Instant startedBefore, int limit, Instant healedAt) {
+        return mapper.healStuckRunningRuns(startedBefore, limit, healedAt);
+    }
+
+    @Override
+    public long countStuckRunningRuns(Instant startedBefore) {
+        return mapper.countStuckRunningRuns(startedBefore);
+    }
+
+    @Override
+    public Instant oldestRunningRunStartedAt() {
+        return mapper.oldestRunningRunStartedAt();
+    }
+
+    @Override
+    public int healStuckRunningTasks(Instant updatedBefore, int limit, Instant healedAt) {
+        return mapper.healStuckRunningTasks(updatedBefore, limit, healedAt);
+    }
+
+    @Override
+    public long countStuckRunningTasks(Instant updatedBefore) {
+        return mapper.countStuckRunningTasks(updatedBefore);
+    }
+
+    @Override
+    public Instant oldestRunningTaskUpdatedAt() {
+        return mapper.oldestRunningTaskUpdatedAt();
     }
 
     @Override

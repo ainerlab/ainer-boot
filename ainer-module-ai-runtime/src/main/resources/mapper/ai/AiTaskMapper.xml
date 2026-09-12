@@ -46,11 +46,71 @@
              #{status}, #{startedAt}, #{completedAt})
     </insert>
 
+    <!-- 期望态条件（CAS）：任务运行一旦被自愈或正常路径推进到终态，迟到的写回不再覆盖它。 -->
     <update id="updateTaskRunStatus">
         UPDATE ainer_ai_task_run
         SET status = #{status}, completed_at = #{completedAt}
-        WHERE id = #{id}
+        WHERE id = #{id} AND status = #{expectedStatus}
     </update>
+
+    <!-- 中间态自愈：RUNNING 且 started_at 早于阈值的任务运行置 FAILED；
+         条件 status = 'RUNNING' 是 CAS，FOR UPDATE SKIP LOCKED 让多实例并发扫不重复处理。 -->
+    <update id="healStuckRunningRuns">
+        UPDATE ainer_ai_task_run
+        SET status = 'FAILED', completed_at = #{healedAt}
+        WHERE id IN (
+            SELECT id
+            FROM ainer_ai_task_run
+            WHERE status = 'RUNNING'
+              AND started_at &lt; #{startedBefore}
+            ORDER BY started_at
+            LIMIT #{limit}
+            FOR UPDATE SKIP LOCKED
+        )
+          AND status = 'RUNNING'
+    </update>
+
+    <select id="countStuckRunningRuns" resultType="long">
+        SELECT COUNT(*)
+        FROM ainer_ai_task_run
+        WHERE status = 'RUNNING'
+          AND started_at &lt; #{startedBefore}
+    </select>
+
+    <select id="oldestRunningRunStartedAt" resultType="java.time.Instant">
+        SELECT MIN(started_at)
+        FROM ainer_ai_task_run
+        WHERE status = 'RUNNING'
+    </select>
+
+    <!-- 任务表没有 started_at，用 updated_at 作为中间态年龄基准（任务只在状态变化时才被写入）。 -->
+    <update id="healStuckRunningTasks">
+        UPDATE ainer_ai_task
+        SET status = 'FAILED', updated_at = #{healedAt}
+        WHERE id IN (
+            SELECT id
+            FROM ainer_ai_task
+            WHERE status = 'RUNNING'
+              AND updated_at &lt; #{updatedBefore}
+            ORDER BY updated_at
+            LIMIT #{limit}
+            FOR UPDATE SKIP LOCKED
+        )
+          AND status = 'RUNNING'
+    </update>
+
+    <select id="countStuckRunningTasks" resultType="long">
+        SELECT COUNT(*)
+        FROM ainer_ai_task
+        WHERE status = 'RUNNING'
+          AND updated_at &lt; #{updatedBefore}
+    </select>
+
+    <select id="oldestRunningTaskUpdatedAt" resultType="java.time.Instant">
+        SELECT MIN(updated_at)
+        FROM ainer_ai_task
+        WHERE status = 'RUNNING'
+    </select>
 
     <select id="selectTaskRunById" resultType="dev.ainer.module.ai.gateway.infrastructure.mybatis.AiTaskRunRow">
         SELECT id, task_id AS taskId, context_snapshot_id AS contextSnapshotId,
